@@ -1,0 +1,14 @@
+# macOS
+.DS_Store
+# Word/Office lock files
+~$*
+# Node
+node_modules/
+# Secrets / local env
+.env
+.env.local
+*.local
+# Claude local settings
+.claude/settings.local.json
+# temp
+*.tmp

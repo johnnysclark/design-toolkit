@@ -1,0 +1,16 @@
+{
+  "name": "precedent-researcher",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Architecture precedent dossier builder that makes the grain of the machine visible — every claim tagged, every precedent attacked, every fact left for the student to verify.",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.70.0"
+  }
+}

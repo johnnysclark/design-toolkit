@@ -1,0 +1,17 @@
+{
+  "name": "site-analyzer",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Deep Superfund site analyzer for design studios — pulls the physical realities of a contaminated site (climate, terrain, flood, contamination) into one map + dossier, and exports Rhino-ready geometry so students can model real designs against the real place. Every model claim is tagged and cited; the hard data is sourced and downloadable.",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.70.0",
+    "rhino3dm": "^8.17.0"
+  }
+}

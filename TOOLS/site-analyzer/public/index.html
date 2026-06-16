@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Site Analyzer · Summer AI Studio</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <header>
+      <h1>Site Analyzer <span class="sub">/ Superfund</span></h1>
+      <p class="tagline">
+        Read a contaminated site through its physical realities — climate, terrain, water,
+        contamination — then export the ground itself for Rhino. Hard data is sourced and
+        downloadable; every model claim is tagged for you to verify.
+      </p>
+    </header>
+
+    <main>
+      <form id="search-form">
+        <label class="field">
+          <span>Find a Superfund site (EPA National Priorities List)</span>
+          <input id="q" type="text" placeholder="e.g. Gowanus Canal, Love Canal, Tar Creek…" autocomplete="off" />
+        </label>
+        <button id="search-btn" type="submit">Search</button>
+      </form>
+
+      <div id="candidates" class="candidates" hidden></div>
+      <div id="status" class="status" hidden></div>
+      <div id="error" class="error" hidden></div>
+
+      <section id="results" hidden>
+        <div class="site-head">
+          <h2 id="site-name"></h2>
+          <div id="site-meta" class="site-meta"></div>
+          <div id="coverage" class="coverage"></div>
+        </div>
+
+        <div id="map"></div>
+
+        <div class="export-bar">
+          <strong>Export for Rhino:</strong>
+          <button data-fmt="analysis.3dm" class="primary" type="button">★ Full site analysis (.3dm)</button>
+          <button data-fmt="terrain.obj" type="button">Terrain mesh (.obj)</button>
+          <button data-fmt="contours.dxf" type="button">Contours (.dxf)</button>
+          <button data-fmt="boundary.dxf" type="button">Boundary (.dxf)</button>
+          <button data-fmt="boundary.geojson" type="button">Boundary (.geojson)</button>
+          <button data-fmt="epw" type="button">Weather (.epw)</button>
+          <small id="export-note"></small>
+        </div>
+
+        <section id="climate" class="layer">
+          <h3>Climate <span class="layer-sub">— sun · wind · humidity</span></h3>
+          <div id="climate-body"></div>
+        </section>
+
+        <section id="topo" class="layer">
+          <h3>Topography <span class="layer-sub">— USGS 3DEP elevation</span></h3>
+          <div id="topo-body"></div>
+        </section>
+
+        <section id="flood" class="layer">
+          <h3>Water &amp; Flood <span class="layer-sub">— FEMA NFHL</span></h3>
+          <div id="flood-body"></div>
+        </section>
+
+        <section id="contamination" class="layer">
+          <h3>Contamination <span class="layer-sub">— EPA + web-grounded, each claim cited</span></h3>
+          <div id="contamination-body"></div>
+        </section>
+
+        <section id="synthesis" class="layer">
+          <h3>Design Read <span class="layer-sub">— the model reasoning over the data above</span></h3>
+          <div id="synthesis-body"></div>
+        </section>
+
+        <section class="layer">
+          <h3>Provenance</h3>
+          <pre id="provenance" class="provenance"></pre>
+        </section>
+      </section>
+    </main>
+
+    <footer>
+      Summer AI Studio · AI is a material to be interrogated, never a second brain.
+      Hard data: EPA · USGS · FEMA · Open-Meteo. Verify before you design.
+    </footer>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="app.js"></script>
+  </body>
+</html>

@@ -1,0 +1,584 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Site Analyzer (standalone) · Summer AI Studio</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <!--
+      Standalone test site. Just open this file in a browser — no server, no key, no install.
+      All four public data sources support cross-origin requests, so the browser calls them
+      directly: EPA Superfund (search + boundary), USGS 3DEP (terrain), FEMA NFHL (flood),
+      Open-Meteo (climate). The contamination + design-read model passes are server-only and
+      omitted here. Logic mirrors ../site-analyzer; kept inline so this file stands alone.
+    -->
+    <style>
+      :root {
+        --bg:#f7f6f2; --ink:#1c1b18; --muted:#6b6862; --line:#d9d6cd; --card:#fffffe;
+        --accent:#2f5d62; --accent2:#8a4b2f; --verified:#2e7d4f; --unverified:#b88300; --halluc:#c0392b;
+      }
+      *{box-sizing:border-box}
+      body{margin:0;font:16px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--ink)}
+      header{padding:2rem 1.5rem 1rem;max-width:980px;margin:0 auto}
+      h1{margin:0;font-size:1.7rem;font-weight:650}
+      h1 .sub{color:var(--muted);font-weight:400}
+      .tagline{color:var(--muted);margin:.4rem 0 0;max-width:72ch}
+      .note-standalone{background:#fff6e9;border:1px solid #ecdcc2;border-radius:8px;padding:.6rem .9rem;margin:.8rem 0 0;font-size:.9rem;color:#7a5a25;max-width:72ch}
+      main{max-width:980px;margin:0 auto;padding:0 1.5rem 3rem}
+      form{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:1.2rem;display:flex;gap:1rem;align-items:flex-end;flex-wrap:wrap}
+      .field{flex:1;min-width:260px}
+      .field>span{display:block;font-weight:600;margin-bottom:.3rem;font-size:.9rem}
+      input[type=text],input[type=number]{width:100%;font:inherit;padding:.6rem;border:1px solid var(--line);border-radius:8px;background:#fff}
+      .gridn{width:120px;flex:none}
+      button{font:inherit;font-weight:600;padding:.6rem 1.1rem;border:1px solid var(--accent);background:var(--accent);color:#fff;border-radius:8px;cursor:pointer}
+      button:disabled{opacity:.5;cursor:wait}
+      .candidates{margin-top:1rem;display:grid;gap:.5rem}
+      .candidate{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:.7rem .9rem;cursor:pointer;display:flex;justify-content:space-between;gap:1rem;align-items:center}
+      .candidate:hover{border-color:var(--accent)}
+      .candidate .nm{font-weight:600}.candidate .loc{color:var(--muted);font-size:.85rem}
+      .candidate .badge{font-size:.72rem;font-weight:700;padding:.15rem .5rem;border-radius:999px;background:#efece4;color:var(--muted);white-space:nowrap}
+      .status,.error{margin-top:1rem;padding:.8rem 1rem;border-radius:8px}
+      .status{background:#e9eeed;color:var(--accent)}
+      .error{background:#fbe9e7;color:var(--halluc);border:1px solid #f3c4bd}
+      #results{margin-top:1.5rem}
+      .site-head h2{margin:0 0 .3rem;font-size:1.5rem}
+      .site-meta{color:var(--muted);margin-bottom:.6rem}.site-meta a{color:var(--accent)}
+      .coverage{display:flex;flex-wrap:wrap;gap:.4rem;margin-bottom:1rem}
+      .cov{font-size:.74rem;font-weight:700;padding:.18rem .55rem;border-radius:999px}
+      .cov.on{background:#e3f0e8;color:var(--verified)}.cov.off{background:#f1efe9;color:var(--muted);text-decoration:line-through}
+      #map{height:380px;border-radius:12px;border:1px solid var(--line);margin-bottom:1rem}
+      .export-bar{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:.9rem 1.1rem;margin-bottom:1.5rem;display:flex;flex-wrap:wrap;gap:.5rem;align-items:center}
+      .export-bar strong{margin-right:.3rem}
+      .export-bar button{background:#fff;color:var(--accent2);border-color:var(--accent2)}
+      .export-bar button.primary{background:var(--accent2);color:#fff}
+      .export-bar small{color:var(--muted);width:100%;margin-top:.2rem}
+      .layer{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:1.1rem 1.3rem;margin-bottom:1.2rem}
+      .layer h3{margin:0 0 .8rem;font-size:1.2rem}.layer-sub{color:var(--muted);font-weight:400;font-size:.9rem}
+      .charts{display:flex;flex-wrap:wrap;gap:1.5rem}
+      .chart{flex:1;min-width:280px}.chart h4{margin:0 0 .4rem;font-size:.95rem}.chart .cap{color:var(--muted);font-size:.8rem;margin-top:.3rem}
+      .stat-row{display:flex;flex-wrap:wrap;gap:1.2rem;margin-bottom:1rem}
+      .stat .v{font-size:1.3rem;font-weight:650}.stat .k{color:var(--muted);font-size:.78rem;text-transform:uppercase;letter-spacing:.03em}
+      svg.viz{width:100%;height:auto;display:block}svg.viz text{font:10px -apple-system,sans-serif;fill:var(--muted)}
+      .cap{color:var(--muted);font-size:.85rem}
+      pre.provenance{background:#1c1b18;color:#f4f1ea;padding:1rem 1.2rem;border-radius:12px;overflow-x:auto;font-size:.82rem;line-height:1.5;margin:0}
+      footer{text-align:center;color:var(--muted);font-size:.85rem;padding:2rem 1.5rem;border-top:1px solid var(--line);max-width:980px;margin:0 auto}
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>Site Analyzer <span class="sub">/ standalone</span></h1>
+      <p class="tagline">
+        Read a Superfund site's physical realities — climate, terrain, water — and export the
+        ground for Rhino. Runs entirely in your browser from public data.
+      </p>
+      <p class="note-standalone">
+        Standalone test build: no server, no API key. The <strong>contamination</strong> and
+        <strong>design-read</strong> model passes are server-only — run <code>../site-analyzer</code>
+        for those. Needs an internet connection (live data + map tiles).
+      </p>
+    </header>
+
+    <main>
+      <form id="search-form">
+        <label class="field">
+          <span>Find a Superfund site (EPA National Priorities List)</span>
+          <input id="q" type="text" placeholder="e.g. Gowanus Canal, Love Canal, Tar Creek…" autocomplete="off" />
+        </label>
+        <label class="field gridn">
+          <span>Terrain grid</span>
+          <input id="gridn" type="number" min="6" max="40" value="12" />
+        </label>
+        <button id="search-btn" type="submit">Search</button>
+      </form>
+
+      <div id="candidates" class="candidates" hidden></div>
+      <div id="status" class="status" hidden></div>
+      <div id="error" class="error" hidden></div>
+
+      <section id="results" hidden>
+        <div class="site-head">
+          <h2 id="site-name"></h2>
+          <div id="site-meta" class="site-meta"></div>
+          <div id="coverage" class="coverage"></div>
+        </div>
+        <div id="map"></div>
+        <div class="export-bar">
+          <strong>Export for Rhino:</strong>
+          <button data-fmt="analysis.3dm" class="primary" type="button">★ Full site analysis (.3dm)</button>
+          <button data-fmt="terrain.obj" type="button">Terrain mesh (.obj)</button>
+          <button data-fmt="contours.dxf" type="button">Contours (.dxf)</button>
+          <button data-fmt="boundary.dxf" type="button">Boundary (.dxf)</button>
+          <button data-fmt="boundary.geojson" type="button">Boundary (.geojson)</button>
+          <button data-fmt="epw" type="button">Weather (.epw)</button>
+          <small id="export-note"></small>
+        </div>
+        <section class="layer"><h3>Climate <span class="layer-sub">— sun · wind · humidity</span></h3><div id="climate-body"></div></section>
+        <section class="layer"><h3>Topography <span class="layer-sub">— USGS 3DEP</span></h3><div id="topo-body"></div></section>
+        <section class="layer"><h3>Water &amp; Flood <span class="layer-sub">— FEMA NFHL</span></h3><div id="flood-body"></div></section>
+        <section class="layer"><h3>Provenance</h3><pre id="provenance" class="provenance"></pre></section>
+      </section>
+    </main>
+
+    <footer>
+      Summer AI Studio · Hard data: EPA · USGS · FEMA · Open-Meteo. Reanalysis climate ≈ 25 km. Verify before you design.
+    </footer>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/rhino3dm@8.17.0/rhino3dm.min.js"></script>
+    <script>
+    "use strict";
+    // ======================================================================
+    // geo math (ported from ../site-analyzer/geo.js)
+    // ======================================================================
+    const RAD = Math.PI / 180, DEG = 180 / Math.PI;
+    const mod = (a, n) => ((a % n) + n) % n;
+
+    function solarPosition(lat, lon, date) {
+      const jd = date.getTime() / 86400000 + 2440587.5, t = (jd - 2451545) / 36525;
+      const L0 = mod(280.46646 + t * (36000.76983 + t * 0.0003032), 360);
+      const M = 357.52911 + t * (35999.05029 - 0.0001537 * t);
+      const e = 0.016708634 - t * (0.000042037 + 0.0000001267 * t), Mr = M * RAD;
+      const Cc = Math.sin(Mr) * (1.914602 - t * (0.004817 + 0.000014 * t)) + Math.sin(2 * Mr) * (0.019993 - 0.000101 * t) + Math.sin(3 * Mr) * 0.000289;
+      const trueLong = L0 + Cc, omega = 125.04 - 1934.136 * t, lambda = trueLong - 0.00569 - 0.00478 * Math.sin(omega * RAD);
+      const eps0 = 23 + (26 + (21.448 - t * (46.815 + t * (0.00059 - t * 0.001813))) / 60) / 60;
+      const eps = eps0 + 0.00256 * Math.cos(omega * RAD);
+      const decl = Math.asin(Math.sin(eps * RAD) * Math.sin(lambda * RAD)) * DEG;
+      const y = Math.tan(eps * RAD / 2) ** 2;
+      const eot = 4 * DEG * (y * Math.sin(2 * L0 * RAD) - 2 * e * Math.sin(Mr) + 4 * e * y * Math.sin(Mr) * Math.cos(2 * L0 * RAD) - 0.5 * y * y * Math.sin(4 * L0 * RAD) - 1.25 * e * e * Math.sin(2 * Mr));
+      const minutes = date.getUTCHours() * 60 + date.getUTCMinutes() + date.getUTCSeconds() / 60;
+      const tst = mod(minutes + eot + 4 * lon, 1440);
+      let ha = tst / 4 - 180; if (ha < -180) ha += 360;
+      const latR = lat * RAD, declR = decl * RAD, haR = ha * RAD;
+      const altitude = Math.asin(Math.sin(latR) * Math.sin(declR) + Math.cos(latR) * Math.cos(declR) * Math.cos(haR)) * DEG;
+      const azimuth = mod(Math.atan2(Math.sin(haR), Math.cos(haR) * Math.sin(latR) - Math.tan(declR) * Math.cos(latR)) * DEG + 180, 360);
+      return { altitude, azimuth };
+    }
+    function sunPaths(lat, lon, tz) {
+      const days = [{ key: "summer", month: 5, day: 21 }, { key: "equinox", month: 2, day: 21 }, { key: "winter", month: 11, day: 21 }];
+      return days.map((d) => {
+        const points = [];
+        for (let h = 0; h <= 24; h += 0.5) {
+          const utc = new Date(Date.UTC(2023, d.month, d.day, 0, 0, 0));
+          utc.setUTCMinutes(utc.getUTCMinutes() + Math.round((h - tz) * 60));
+          const { altitude, azimuth } = solarPosition(lat, lon, utc);
+          if (altitude > 0) points.push({ hour: h, altitude, azimuth });
+        }
+        return { ...d, points, peakAltitude: points.reduce((m, p) => Math.max(m, p.altitude), 0) };
+      });
+    }
+    const COMPASS = ["N","NNE","NE","ENE","E","ESE","SE","SSE","S","SSW","SW","WSW","W","WNW","NW","NNW"];
+    function windRose(speeds, dirs, dirBins = 16, speedBands = [2, 4, 6, 8]) {
+      const bands = [...speedBands, Infinity], matrix = Array.from({ length: dirBins }, () => new Array(bands.length).fill(0));
+      let calm = 0, n = 0; const sector = 360 / dirBins;
+      for (let i = 0; i < speeds.length; i++) {
+        const s = speeds[i], dir = dirs[i];
+        if (s == null || dir == null || isNaN(s) || isNaN(dir)) continue;
+        n++; if (s < 0.5) { calm++; continue; }
+        const d = Math.floor(mod(dir + sector / 2, 360) / sector) % dirBins;
+        let b = bands.findIndex((hi) => s < hi); if (b < 0) b = bands.length - 1;
+        matrix[d][b]++;
+      }
+      if (n > 0) for (let d = 0; d < dirBins; d++) for (let b = 0; b < bands.length; b++) matrix[d][b] /= n;
+      return { dirs: Array.from({ length: dirBins }, (_, d) => COMPASS[Math.round(mod(d * sector, 360) / 22.5) % 16]), bands: speedBands, matrix, calmFraction: n ? calm / n : 0 };
+    }
+    function monthlyStats(times, values) {
+      const months = Array.from({ length: 12 }, () => ({ sum: 0, n: 0, min: Infinity, max: -Infinity }));
+      for (let i = 0; i < times.length; i++) {
+        const v = values[i]; if (v == null || isNaN(v)) continue;
+        const b = months[Number(times[i].slice(5, 7)) - 1];
+        b.sum += v; b.n++; if (v < b.min) b.min = v; if (v > b.max) b.max = v;
+      }
+      return months.map((b) => ({ mean: b.n ? b.sum / b.n : null, min: b.n ? b.min : null, max: b.n ? b.max : null }));
+    }
+    function makeProjector(refLat, refLon) {
+      const mLat = 111132.92 - 559.82 * Math.cos(2 * refLat * RAD) + 1.175 * Math.cos(4 * refLat * RAD);
+      const mLon = 111412.84 * Math.cos(refLat * RAD) - 93.5 * Math.cos(3 * refLat * RAD);
+      return { toLocal: (lon, lat) => [(lon - refLon) * mLon, (lat - refLat) * mLat] };
+    }
+
+    // ======================================================================
+    // data sources (ported from ../site-analyzer/datasources.js)
+    // ======================================================================
+    const EPA_ORG = "https://services.arcgis.com/cJ9YHowT8TU7DUyn/ArcGIS/rest/services";
+    const NPL_LAYER = EPA_ORG + "/Superfund_National_Priorities_List_(NPL)_Sites_with_Status_Information/FeatureServer/0";
+    const BOUNDARY_LAYER = EPA_ORG + "/FAC_Superfund_Site_Boundaries_EPA_Public/FeatureServer/0";
+    const EPQS = "https://epqs.nationalmap.gov/v1/json";
+    const FEMA = "https://hazards.fema.gov/arcgis/rest/services/public/NFHL/MapServer/28/query";
+    const OPEN_METEO = "https://archive-api.open-meteo.com/v1/archive";
+
+    async function fetchJson(url) { const r = await fetch(url, { headers: { Accept: "application/json" } }); if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); }
+    const arcgis = (layer, params) => fetchJson(layer + "/query?" + new URLSearchParams({ f: "json", ...params }));
+    function unlink(html) { if (!html || typeof html !== "string") return null; const m = html.match(/href="([^"]+)"[^>]*>([^<]*)</i); return m ? { text: m[2].trim(), url: m[1] } : { text: html.replace(/<[^>]+>/g, "").trim(), url: null }; }
+
+    const normNpl = (a) => ({ name: a.Site_Name, epaId: a.Site_EPA_ID, semsId: a.SEMS_ID, status: a.Status, state: a.State, city: a.City, county: a.County, region: a.Region_ID, score: a.Site_Score, centroid: a.Longitude != null && a.Latitude != null ? { lat: a.Latitude, lon: a.Longitude } : null });
+
+    async function searchSites(q, limit = 12) {
+      const safe = q.replace(/'/g, "''");
+      const d = await arcgis(NPL_LAYER, { where: `UPPER(Site_Name) LIKE UPPER('%${safe}%')`, outFields: "Site_Name,Site_EPA_ID,SEMS_ID,Status,State,City,County,Region_ID,Longitude,Latitude,Site_Score", returnGeometry: "false", orderByFields: "Site_Name", resultRecordCount: String(limit) });
+      return (d.features || []).map((f) => normNpl(f.attributes));
+    }
+    async function getBoundary(epaId, name) {
+      const safeId = (epaId || "").replace(/'/g, "''");
+      let d = await arcgis(BOUNDARY_LAYER, { where: `EPA_ID LIKE '%${safeId}%'`, outFields: "EPA_ID,SITE_NAME,GIS_AREA,GIS_AREA_UNITS", returnGeometry: "true", outSR: "4326" });
+      if ((!d.features || !d.features.length) && name) d = await arcgis(BOUNDARY_LAYER, { where: `UPPER(SITE_NAME) LIKE UPPER('%${name.replace(/'/g, "''")}%')`, outFields: "EPA_ID,SITE_NAME,GIS_AREA,GIS_AREA_UNITS", returnGeometry: "true", outSR: "4326" });
+      const feats = d.features || []; if (!feats.length) return null;
+      const polys = []; let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity, area = 0;
+      for (const f of feats) { area += f.attributes.GIS_AREA || 0; for (const ring of f.geometry?.rings || []) { polys.push([ring]); for (const [x, y] of ring) { if (x < minX) minX = x; if (y < minY) minY = y; if (x > maxX) maxX = x; if (y > maxY) maxY = y; } } }
+      if (!polys.length) return null;
+      return { areaAcres: area || null, bbox: [minX, minY, maxX, maxY], geojson: { type: "MultiPolygon", coordinates: polys } };
+    }
+    async function getSite(epaId) {
+      const d = await arcgis(NPL_LAYER, { where: `Site_EPA_ID='${epaId.replace(/'/g, "''")}'`, outFields: "*", returnGeometry: "true", outSR: "4326" });
+      const f = (d.features || [])[0]; if (!f) return null;
+      const a = f.attributes, base = normNpl(a);
+      const boundary = await getBoundary(epaId, a.Site_Name).catch(() => null);
+      const centroid = base.centroid || (f.geometry ? { lat: f.geometry.y, lon: f.geometry.x } : null);
+      let bbox; if (boundary?.bbox) bbox = boundary.bbox; else if (centroid) { const dd = 0.008; bbox = [centroid.lon - dd, centroid.lat - dd, centroid.lon + dd, centroid.lat + dd]; }
+      return { ...base, centroid, bbox, areaAcres: boundary?.areaAcres ?? null, boundary: boundary?.geojson ?? null,
+        documents: { listingNarrative: unlink(a.Site_Listing_Narrative), progressProfile: unlink(a.Site_Progress_Profile) },
+        dates: { listed: a.Listing_Date } };
+    }
+    async function elevationAt(lon, lat) { try { const d = await fetchJson(`${EPQS}?x=${lon}&y=${lat}&units=Meters&wkid=4326`); const v = Number(d?.value); return isFinite(v) ? v : null; } catch { return null; } }
+    async function mapLimit(items, limit, fn) { const q = items.slice(); const workers = Array.from({ length: Math.min(limit, q.length) }, async () => { while (q.length) await fn(q.shift()); }); await Promise.all(workers); }
+    async function elevationGrid(bbox, n = 12) {
+      const [w, s, e, nth] = bbox, pts = [];
+      for (let r = 0; r < n; r++) for (let c = 0; c < n; c++) pts.push({ r, c, lon: w + (e - w) * c / (n - 1), lat: s + (nth - s) * r / (n - 1) });
+      const grid = Array.from({ length: n }, () => new Array(n).fill(null));
+      await mapLimit(pts, 8, async (p) => { grid[p.r][p.c] = await elevationAt(p.lon, p.lat); });
+      const flat = grid.flat().filter((v) => v != null), mean = flat.length ? flat.reduce((a, b) => a + b, 0) / flat.length : 0;
+      let missing = 0; for (let r = 0; r < n; r++) for (let c = 0; c < n; c++) if (grid[r][c] == null) { grid[r][c] = mean; missing++; }
+      return { n, bbox, grid, stats: flat.length ? { min: Math.min(...flat), max: Math.max(...flat), mean, missing, total: n * n } : { min: null, max: null, mean: null, missing: n * n, total: n * n } };
+    }
+    async function floodAt(lon, lat) {
+      try {
+        const d = await fetchJson(`${FEMA}?` + new URLSearchParams({ geometry: `${lon},${lat}`, geometryType: "esriGeometryPoint", inSR: "4326", spatialRel: "esriSpatialRelIntersects", outFields: "FLD_ZONE,ZONE_SUBTY,SFHA_TF,STATIC_BFE", returnGeometry: "false", f: "json" }));
+        const a = (d.features || [])[0]?.attributes;
+        if (!a) return { mapped: true, inFloodZone: false, zone: "X (or unmapped here)" };
+        return { mapped: true, inFloodZone: a.SFHA_TF === "T", zone: a.FLD_ZONE, subtype: a.ZONE_SUBTY || null, baseFloodElevation: a.STATIC_BFE && a.STATIC_BFE > -9999 ? a.STATIC_BFE : null };
+      } catch { return { mapped: false }; }
+    }
+    async function climateYear(lat, lon, year = 2023) {
+      const d = await fetchJson(`${OPEN_METEO}?` + new URLSearchParams({ latitude: lat, longitude: lon, start_date: `${year}-01-01`, end_date: `${year}-12-31`, hourly: "temperature_2m,relative_humidity_2m,dew_point_2m,wind_speed_10m,wind_direction_10m,surface_pressure,shortwave_radiation,direct_normal_irradiance,diffuse_radiation,cloud_cover", wind_speed_unit: "ms", timezone: "auto" }));
+      const h = d.hourly || {};
+      return { year, lat: d.latitude, lon: d.longitude, elevation: d.elevation, tzOffsetHours: (d.utc_offset_seconds || 0) / 3600, timezone: d.timezone, units: d.hourly_units || {}, time: h.time || [], tempC: h.temperature_2m || [], rh: h.relative_humidity_2m || [], dewC: h.dew_point_2m || [], windSpeed: h.wind_speed_10m || [], windDir: h.wind_direction_10m || [], pressure: h.surface_pressure || [], ghi: h.shortwave_radiation || [], dni: h.direct_normal_irradiance || [], dhi: h.diffuse_radiation || [], cloud: h.cloud_cover || [] };
+    }
+
+    // ======================================================================
+    // exporters (ported from ../site-analyzer/exporters.js)
+    // ======================================================================
+    const num = (v) => (v == null || isNaN(v) ? null : Number(v));
+    const fix = (v, dp, missing) => { const x = num(v); return x == null ? missing : x.toFixed(dp); };
+    function niceInterval(range) { if (!range || range <= 0) return 1; const raw = range / 10, mag = 10 ** Math.floor(Math.log10(raw)), norm = raw / mag; return (norm < 1.5 ? 1 : norm < 3 ? 2 : norm < 7 ? 5 : 10) * mag; }
+    const dxfWrap = (e) => "0\nSECTION\n2\nHEADER\n0\nENDSEC\n0\nSECTION\n2\nENTITIES\n" + (e ? e + "\n" : "") + "0\nENDSEC\n0\nEOF\n";
+
+    function terrainOBJ(topo) {
+      const { grid, n, bbox } = topo, [w, s, e, nth] = bbox, proj = makeProjector(s, w);
+      const lines = ["# Site terrain mesh — Site Analyzer (standalone)", "# Units: metres. Origin: SW corner of bbox. +X east, +Y north, +Z up.", "o site_terrain"];
+      for (let r = 0; r < n; r++) for (let c = 0; c < n; c++) { const lon = w + (e - w) * c / (n - 1), lat = s + (nth - s) * r / (n - 1), [x, y] = proj.toLocal(lon, lat); lines.push(`v ${x.toFixed(3)} ${y.toFixed(3)} ${grid[r][c].toFixed(3)}`); }
+      const idx = (r, c) => r * n + c + 1;
+      for (let r = 0; r < n - 1; r++) for (let c = 0; c < n - 1; c++) { const a = idx(r, c), b = idx(r, c + 1), d = idx(r + 1, c), e2 = idx(r + 1, c + 1); lines.push(`f ${a} ${b} ${e2}`); lines.push(`f ${a} ${e2} ${d}`); }
+      return lines.join("\n") + "\n";
+    }
+    function contoursDXF(topo, interval) {
+      const { grid, n, bbox } = topo, [w, s, e, nth] = bbox, proj = makeProjector(s, w);
+      let min = Infinity, max = -Infinity; for (const row of grid) for (const v of row) { if (v < min) min = v; if (v > max) max = v; }
+      if (!interval) interval = niceInterval(max - min);
+      const xy = (c, r) => proj.toLocal(w + (e - w) * c / (n - 1), s + (nth - s) * r / (n - 1));
+      const segs = [];
+      for (let level = Math.ceil(min / interval) * interval; level < max; level += interval) {
+        for (let r = 0; r < n - 1; r++) for (let c = 0; c < n - 1; c++) {
+          const corners = [grid[r][c], grid[r][c + 1], grid[r + 1][c + 1], grid[r + 1][c]];
+          const edges = [[corners[0], corners[1], [c, r], [c + 1, r]], [corners[1], corners[2], [c + 1, r], [c + 1, r + 1]], [corners[2], corners[3], [c + 1, r + 1], [c, r + 1]], [corners[3], corners[0], [c, r + 1], [c, r]]];
+          const cr = [];
+          for (const [va, vb, pa, pb] of edges) if ((va - level) * (vb - level) < 0) { const t = (level - va) / (vb - va); cr.push([pa[0] + (pb[0] - pa[0]) * t, pa[1] + (pb[1] - pa[1]) * t]); }
+          if (cr.length === 2) { const [x1, y1] = xy(cr[0][0], cr[0][1]), [x2, y2] = xy(cr[1][0], cr[1][1]); segs.push({ level, x1, y1, x2, y2 }); }
+        }
+      }
+      return dxfWrap(segs.map((g) => `0\nLINE\n8\nCONTOUR_${Math.round(g.level)}\n10\n${g.x1.toFixed(3)}\n20\n${g.y1.toFixed(3)}\n30\n${g.level.toFixed(3)}\n11\n${g.x2.toFixed(3)}\n21\n${g.y2.toFixed(3)}\n31\n${g.level.toFixed(3)}`).join("\n"));
+    }
+    function boundaryDXF(gj, bbox) {
+      if (!gj) return dxfWrap(""); const [w, s] = bbox, proj = makeProjector(s, w);
+      const polys = gj.type === "MultiPolygon" ? gj.coordinates : [gj.coordinates], ents = [];
+      for (const poly of polys) for (const ring of poly) { const verts = ring.map(([lon, lat]) => proj.toLocal(lon, lat)); let e = `0\nLWPOLYLINE\n8\nSITE_BOUNDARY\n90\n${verts.length}\n70\n1`; for (const [x, y] of verts) e += `\n10\n${x.toFixed(3)}\n20\n${y.toFixed(3)}`; ents.push(e); }
+      return dxfWrap(ents.join("\n"));
+    }
+    const boundaryGeoJSON = (site) => JSON.stringify({ type: "FeatureCollection", features: [{ type: "Feature", properties: { name: site.name, epaId: site.epaId, status: site.status, areaAcres: site.areaAcres }, geometry: site.boundary }] }, null, 2);
+    function climateEPW(cl, site) {
+      const n = cl.time.length;
+      const loc = ["LOCATION", (site?.name || "Site").replace(/,/g, " "), site?.state || "-", "USA", "Open-Meteo ERA5 (generated)", "000000", cl.lat.toFixed(4), cl.lon.toFixed(4), cl.tzOffsetHours.toFixed(1), (cl.elevation ?? 0).toFixed(1)].join(",");
+      const header = [loc, "DESIGN CONDITIONS,0", "TYPICAL/EXTREME PERIODS,0", "GROUND TEMPERATURES,0", "HOLIDAYS/DAYLIGHT SAVINGS,No,0,0,0",
+        "COMMENTS 1,Generated by Site Analyzer (standalone) from Open-Meteo ERA5 reanalysis. NOT a measured TMY (~25km). Use for early-stage/relative analysis; verify against a measured station file.",
+        `COMMENTS 2,Source year ${cl.year}. Measured: temp, RH, dew point, wind, pressure, GHI, DNI, DHI, sky cover. Others are EPW missing codes.`,
+        "DATA PERIODS,1,1,Data,Sunday,1/1,12/31"];
+      const rows = new Array(n);
+      for (let i = 0; i < n; i++) {
+        const t = cl.time[i], year = t.slice(0, 4), month = String(Number(t.slice(5, 7))), day = String(Number(t.slice(8, 10))), hour = Number(t.slice(11, 13)) + 1;
+        rows[i] = [year, month, day, hour, "0", "Generated from Open-Meteo ERA5; ?9?9?9?9E0?9?9?9?9?9?9?9?9?9?9?9?9?9?9?9?9*9*9*9?9?9",
+          fix(cl.tempC[i], 1, "99.9"), fix(cl.dewC[i], 1, "99.9"), fix(cl.rh[i], 0, "999"),
+          fix(num(cl.pressure[i]) == null ? null : cl.pressure[i] * 100, 0, "999999"),
+          "9999", "9999", "9999", fix(cl.ghi[i], 0, "9999"), fix(cl.dni[i], 0, "9999"), fix(cl.dhi[i], 0, "9999"),
+          "999999", "999999", "999999", "9999", fix(cl.windDir[i], 0, "999"), fix(cl.windSpeed[i], 1, "999"),
+          fix(num(cl.cloud[i]) == null ? null : cl.cloud[i] / 10, 0, "99"), fix(num(cl.cloud[i]) == null ? null : cl.cloud[i] / 10, 0, "99"),
+          "9999", "99999", "9", "999999999", "999", ".999", "999", "99", "999", "999", "99"].join(",");
+      }
+      return header.join("\n") + "\n" + rows.join("\n") + "\n";
+    }
+
+    // ======================================================================
+    // UI (ported from ../site-analyzer/public/app.js)
+    // ======================================================================
+    const $ = (id) => document.getElementById(id);
+    const el = (tag, attrs = {}, ...kids) => { const n = document.createElement(tag); for (const [k, v] of Object.entries(attrs)) { if (k === "class") n.className = v; else if (k === "html") n.innerHTML = v; else n.setAttribute(k, v); } for (const kid of kids) n.append(kid?.nodeType ? kid : document.createTextNode(kid ?? "")); return n; };
+    const show = (id) => $(id).removeAttribute("hidden"), hide = (id) => $(id).setAttribute("hidden", "");
+    const setStatus = (m) => { if (m) { $("status").textContent = m; show("status"); } else hide("status"); };
+    const setError = (m) => { if (m) { $("error").textContent = m; show("error"); } else hide("error"); };
+    const linkEl = (t, href) => el("a", { href, target: "_blank", rel: "noopener" }, t);
+    let map, layerGroup, current = null, currentTopo = null, currentClimate = null, currentFlood = null;
+
+    $("search-form").addEventListener("submit", async (e) => {
+      e.preventDefault(); const q = $("q").value.trim(); if (q.length < 2) return;
+      setError(null); hide("candidates"); setStatus(`Searching EPA Superfund sites for “${q}”…`);
+      try { const results = await searchSites(q); setStatus(null); renderCandidates(results); }
+      catch (err) { setStatus(null); setError(err.message); }
+    });
+    function renderCandidates(results) {
+      const box = $("candidates"); box.replaceChildren();
+      if (!results.length) { box.append(el("div", { class: "candidate" }, "No NPL sites matched. Try a shorter or different name.")); show("candidates"); return; }
+      for (const s of results) { const card = el("div", { class: "candidate" }, el("div", {}, el("div", { class: "nm" }, s.name), el("div", { class: "loc" }, [s.city, s.county, s.state].filter(Boolean).join(", ") + ` · EPA ${s.epaId}`)), el("span", { class: "badge" }, s.status || "—")); card.addEventListener("click", () => analyze(s.epaId)); box.append(card); }
+      show("candidates");
+    }
+
+    async function analyze(epaId) {
+      setError(null); hide("candidates"); hide("results");
+      const gridN = Math.min(Math.max(parseInt($("gridn").value, 10) || 12, 6), 40);
+      setStatus("Pulling boundary, climate, terrain, and flood directly from EPA, USGS, FEMA, and Open-Meteo. The terrain grid is many small requests, so give it a moment…");
+      try {
+        const site = await getSite(epaId);
+        if (!site) throw new Error("No NPL site found for " + epaId);
+        if (!site.centroid) throw new Error("Site has no coordinates.");
+        const [climateRaw, flood, topo] = await Promise.all([
+          climateYear(site.centroid.lat, site.centroid.lon, 2023).catch(() => null),
+          floodAt(site.centroid.lon, site.centroid.lat).catch(() => null),
+          site.bbox ? elevationGrid(site.bbox, gridN).catch(() => null) : Promise.resolve(null)
+        ]);
+        current = site; currentTopo = topo; currentClimate = climateRaw; currentFlood = flood;
+        setStatus(null);
+        render(site, climateRaw, flood, topo);
+      } catch (err) { setStatus(null); setError(err.message); }
+    }
+
+    function summarizeClimate(cl) {
+      const wr = windRose(cl.windSpeed, cl.windDir);
+      const totals = wr.matrix.map((row) => row.reduce((a, b) => a + b, 0));
+      const mean = (arr) => { const v = arr.filter((x) => x != null && !isNaN(x)); return v.length ? v.reduce((a, b) => a + b, 0) / v.length : null; };
+      const temps = cl.tempC.filter((x) => x != null);
+      return { source: "Open-Meteo ERA5 reanalysis (~25 km)", year: cl.year, tzOffsetHours: cl.tzOffsetHours, windRose: wr,
+        prevailingWind: { dir: wr.dirs[totals.indexOf(Math.max(...totals))] }, temp: monthlyStats(cl.time, cl.tempC), rh: monthlyStats(cl.time, cl.rh),
+        annual: { tempMean: mean(cl.tempC), tempMin: temps.length ? Math.min(...temps) : null, tempMax: temps.length ? Math.max(...temps) : null, rhMean: mean(cl.rh), windMean: mean(cl.windSpeed) }, sunPaths: sunPaths(cl.lat, cl.lon, cl.tzOffsetHours) };
+    }
+
+    function render(site, climateRaw, flood, topo) {
+      show("results"); $("site-name").textContent = site.name;
+      const meta = $("site-meta"); meta.replaceChildren();
+      meta.append(`${[site.city, site.county, site.state].filter(Boolean).join(", ")} · EPA Region ${site.region ?? "?"} · ${site.status}${site.areaAcres ? ` · ${site.areaAcres.toFixed(1)} acres` : ""} · EPA ID ${site.epaId}`);
+      if (site.documents?.progressProfile?.url) { meta.append(" · "); meta.append(linkEl("EPA profile", site.documents.progressProfile.url)); }
+      if (site.documents?.listingNarrative?.url) { meta.append(" · "); meta.append(linkEl("Narrative (PDF)", site.documents.listingNarrative.url)); }
+
+      const coverage = { boundary: !!site.boundary, climate: !!climateRaw, terrain: !!topo, flood: !!flood && flood.mapped !== false };
+      const cb = $("coverage"); cb.replaceChildren();
+      for (const [k, label] of Object.entries({ boundary: "Boundary", climate: "Climate", terrain: "Terrain", flood: "Flood" })) cb.append(el("span", { class: `cov ${coverage[k] ? "on" : "off"}` }, (coverage[k] ? "✓ " : "✕ ") + label));
+
+      renderMap(site, flood);
+      renderExportBar(coverage);
+      renderClimate(climateRaw ? summarizeClimate(climateRaw) : null);
+      renderTopo(topo);
+      renderFlood(flood);
+      $("provenance").textContent = JSON.stringify({ epaId: site.epaId, generatedAt: new Date().toISOString(), coverage, climate: climateRaw ? "Open-Meteo ERA5 2023" : null, terrain: "USGS 3DEP/EPQS", flood: "FEMA NFHL", note: "Standalone browser build; contamination & design read are server-only." }, null, 2);
+      $("results").scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+
+    function renderMap(site, flood) {
+      const c = site.centroid;
+      if (!map) { map = L.map("map"); L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19, attribution: "© OpenStreetMap" }).addTo(map); layerGroup = L.layerGroup().addTo(map); }
+      layerGroup.clearLayers(); if (c) map.setView([c.lat, c.lon], 15);
+      if (site.boundary) { const gj = L.geoJSON({ type: "Feature", geometry: site.boundary }, { style: { color: "#8a4b2f", weight: 2, fillColor: "#8a4b2f", fillOpacity: 0.12 } }).addTo(layerGroup); try { map.fitBounds(gj.getBounds().pad(0.4)); } catch {} }
+      if (c) { const fz = flood?.inFloodZone ? ` · FEMA ${flood.zone} (SFHA)` : flood?.zone ? ` · FEMA ${flood.zone}` : ""; L.marker([c.lat, c.lon]).addTo(layerGroup).bindPopup(`<strong>${site.name}</strong><br>${c.lat.toFixed(5)}, ${c.lon.toFixed(5)}${fz}`); }
+      setTimeout(() => map.invalidateSize(), 100);
+    }
+
+    function download(name, body, type) { const blob = new Blob([body], { type: type || "text/plain" }); const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = name; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1000); }
+    function renderExportBar(coverage) {
+      const parts = [];
+      if (!coverage.terrain) parts.push("Terrain/contours unavailable (outside USGS 3DEP).");
+      if (!coverage.boundary) parts.push("No EPA boundary polygon — boundary exports off.");
+      parts.push("★ The .3dm bakes terrain, sun-path, wind rose, flood plane & labels onto layers you toggle in Rhino — built in your browser, no plugin. All exports share one metric origin so they align.");
+      $("export-note").textContent = parts.join(" ");
+      document.querySelectorAll(".export-bar button").forEach((b) => { const fmt = b.dataset.fmt; const nt = fmt === "terrain.obj" || fmt === "contours.dxf", nb = fmt.startsWith("boundary"); b.disabled = (nt && !coverage.terrain) || (nb && !coverage.boundary) || (fmt === "epw" && !coverage.climate); });
+    }
+    document.querySelectorAll(".export-bar button").forEach((b) => b.addEventListener("click", async () => {
+      if (!current) return;
+      const slug = (current.name || "site").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+      const fmt = b.dataset.fmt;
+      if (fmt === "terrain.obj") download(`${slug}-terrain.obj`, terrainOBJ(currentTopo));
+      else if (fmt === "contours.dxf") download(`${slug}-contours.dxf`, contoursDXF(currentTopo, 0), "application/dxf");
+      else if (fmt === "boundary.dxf") download(`${slug}-boundary.dxf`, boundaryDXF(current.boundary, current.bbox), "application/dxf");
+      else if (fmt === "boundary.geojson") download(`${slug}-boundary.geojson`, boundaryGeoJSON(current), "application/geo+json");
+      else if (fmt === "epw") download(`${slug}-${currentClimate.year}.epw`, climateEPW(currentClimate, current));
+      else if (fmt === "analysis.3dm") {
+        const old = b.textContent; b.disabled = true; b.textContent = "Baking .3dm…";
+        try {
+          const bytes = await buildAnalysisModel({ site: current, topo: currentTopo, climate: currentClimate, flood: currentFlood });
+          download(`${slug}-site-analysis.3dm`, bytes, "application/octet-stream");
+        } catch (e) { setError("Could not build .3dm: " + e.message); }
+        finally { b.disabled = false; b.textContent = old; }
+      }
+    }));
+
+    // ======================================================================
+    // Ladybug-analog .3dm builder (ported from ../site-analyzer/rhino3dm-export.js)
+    // Uses the rhino3dm WASM loaded from CDN; reuses the geo functions above.
+    // ======================================================================
+    let _rhino = null;
+    const getRhino = async () => (_rhino ||= await rhino3dm());
+    function elevColor(t) {
+      const stops = [[0,[40,90,140]],[0.25,[60,155,150]],[0.5,[110,175,95]],[0.7,[205,195,95]],[0.85,[150,110,70]],[1,[240,240,240]]];
+      t = Math.max(0, Math.min(1, t));
+      for (let i = 1; i < stops.length; i++) if (t <= stops[i][0]) { const [t0,c0]=stops[i-1],[t1,c1]=stops[i],f=(t-t0)/(t1-t0||1); return c0.map((v,k)=>Math.round(v+(c1[k]-v)*f)); }
+      return stops[stops.length-1][1];
+    }
+    const WIND_BANDS = [[207,224,224],[143,188,191],[79,142,146],[47,93,98],[29,58,61]];
+    function mkLayer(doc, R, name, [r,g,b]) { const l=new R.Layer(); l.name=name; l.color={r,g,b,a:255}; const i=doc.layers().add(l); const a=new R.ObjectAttributes(); a.layerIndex=i; return a; }
+    const sunVec=(alt,az,Rr,c)=>[c[0]+Rr*Math.cos(alt*RAD)*Math.sin(az*RAD),c[1]+Rr*Math.cos(alt*RAD)*Math.cos(az*RAD),c[2]+Rr*Math.sin(alt*RAD)];
+    function localUTC(y,m,d,h,tz){const dt=new Date(Date.UTC(y,m,d,0,0,0));dt.setUTCMinutes(dt.getUTCMinutes()+Math.round((h-tz)*60));return dt;}
+
+    async function buildAnalysisModel(bundle) {
+      const R = await getRhino();
+      const doc = new R.File3dm();
+      const { site, topo, climate, flood } = bundle;
+      const bbox = (topo && topo.bbox) || site.bbox;
+      if (!bbox) throw new Error("No bounding box.");
+      const [w,s,e,nth] = bbox, proj = makeProjector(s, w);
+      const [spanX, spanY] = proj.toLocal(e, nth);
+      const maxSpan = Math.max(spanX, spanY) || 200;
+      const groundZ = topo?.stats?.mean ?? 0;
+      const center = [...proj.toLocal(site.centroid.lon, site.centroid.lat), groundZ];
+
+      // Terrain (vertex-coloured)
+      if (topo) {
+        const attr = mkLayer(doc, R, "Terrain", [150,130,100]);
+        const { grid, n } = topo; let min=Infinity, max=-Infinity;
+        for (const row of grid) for (const v of row){ if(v<min)min=v; if(v>max)max=v; }
+        const span = max-min||1, mesh=new R.Mesh(), V=mesh.vertices(), VC=mesh.vertexColors();
+        for (let r=0;r<n;r++) for (let c=0;c<n;c++){ const lon=w+(e-w)*c/(n-1),lat=s+(nth-s)*r/(n-1),[x,y]=proj.toLocal(lon,lat),z=grid[r][c]; V.add(x,y,z); const[cr,cg,cb]=elevColor((z-min)/span); VC.add(cr,cg,cb); }
+        const idx=(r,c)=>r*n+c;
+        for(let r=0;r<n-1;r++)for(let c=0;c<n-1;c++)mesh.faces().addQuadFace(idx(r,c),idx(r,c+1),idx(r+1,c+1),idx(r+1,c));
+        doc.objects().addMesh(mesh, attr);
+      }
+      // Boundary
+      if (site.boundary) {
+        const attr = mkLayer(doc, R, "Site Boundary", [138,75,47]);
+        const polys = site.boundary.type==="MultiPolygon"?site.boundary.coordinates:[site.boundary.coordinates];
+        for (const poly of polys) for (const ring of poly){ const pts=ring.map(([lon,lat])=>{const[x,y]=proj.toLocal(lon,lat);return[x,y,groundZ];}); if(pts.length>1)doc.objects().addPolyline(pts,attr); }
+      }
+      // Sun path
+      const sunR = Math.max(maxSpan*0.55, 40);
+      if (site.centroid) {
+        const tz = climate?.tzOffsetHours ?? 0, base=mkLayer(doc,R,"Sun Path",[120,120,130]), hot=mkLayer(doc,R,"Sun Path · Solstices",[192,57,43]);
+        for (const alt of [0,30,60]){ const ring=[]; for(let a=0;a<=360;a+=5)ring.push(sunVec(alt,a,sunR,center)); doc.objects().addPolyline(ring,base); }
+        for (let m=0;m<12;m++){ const pts=[]; for(let h=0;h<=24;h+=0.25){const{altitude,azimuth}=solarPosition(site.centroid.lat,site.centroid.lon,localUTC(2023,m,21,h,tz)); if(altitude>0)pts.push(sunVec(altitude,azimuth,sunR,center));} if(pts.length>1)doc.objects().addPolyline(pts,(m===5||m===11)?hot:base); }
+        for (let h=4;h<=20;h++){ const pts=[]; for(let m=0;m<12;m++){const{altitude,azimuth}=solarPosition(site.centroid.lat,site.centroid.lon,localUTC(2023,m,21,h,tz)); if(altitude>0)pts.push(sunVec(altitude,azimuth,sunR,center));} if(pts.length>2){pts.push(pts[0]);doc.objects().addPolyline(pts,base);} }
+      }
+      // Wind rose
+      if (climate && climate.windSpeed?.length) {
+        const windR=sunR*0.6, wc=[center[0]+maxSpan*0.9+windR,center[1],groundZ], attr=mkLayer(doc,R,"Wind Rose",[47,93,98]);
+        const wr=windRose(climate.windSpeed,climate.windDir), dn=wr.dirs.length, sector=2*Math.PI/dn, maxFrac=Math.max(0.0001,...wr.matrix.map(row=>row.reduce((a,b)=>a+b,0)));
+        for (const f of [0.5,1]){ const ring=[]; for(let a=0;a<=360;a+=5)ring.push([wc[0]+windR*f*Math.sin(a*RAD),wc[1]+windR*f*Math.cos(a*RAD),wc[2]]); doc.objects().addPolyline(ring,attr); }
+        wr.matrix.forEach((row,d)=>{ const a0=d*sector-sector/2,a1=d*sector+sector/2; let r0=0; row.forEach((frac,b)=>{ if(frac<=0)return; const r1=r0+(frac/maxFrac)*windR,mesh=new R.Mesh(),V=mesh.vertices(),polar=(r,a)=>[wc[0]+r*Math.sin(a),wc[1]+r*Math.cos(a),wc[2]]; [polar(r0,a0),polar(r1,a0),polar(r1,a1),polar(r0,a1)].forEach(([x,y,z])=>V.add(x,y,z)); mesh.faces().addQuadFace(0,1,2,3); const VC=mesh.vertexColors(),[cr,cg,cb]=WIND_BANDS[b%WIND_BANDS.length]; for(let k=0;k<4;k++)VC.add(cr,cg,cb); doc.objects().addMesh(mesh,attr); r0=r1; }); });
+      }
+      // Flood plane
+      if (flood && flood.inFloodZone && flood.baseFloodElevation != null) {
+        const attr=mkLayer(doc,R,"Flood Plane",[70,130,200]), z=flood.baseFloodElevation*0.3048, mesh=new R.Mesh(), V=mesh.vertices();
+        V.add(0,0,z);V.add(spanX,0,z);V.add(spanX,spanY,z);V.add(0,spanY,z); mesh.faces().addQuadFace(0,1,2,3); doc.objects().addMesh(mesh,attr);
+      }
+      // North + labels
+      const north=mkLayer(doc,R,"North",[40,40,40]);
+      doc.objects().addPolyline([[center[0],center[1],center[2]],[center[0],center[1]+sunR*1.15,center[2]]],north);
+      doc.objects().addTextDot("N",[center[0],center[1]+sunR*1.15,center[2]],north);
+      const lab=mkLayer(doc,R,"Labels",[30,30,30]);
+      doc.objects().addTextDot(`${site.name} · ${site.status}`,[center[0],center[1],center[2]+sunR+8],lab);
+      if (climate){ const wr=windRose(climate.windSpeed,climate.windDir),tot=wr.matrix.map(row=>row.reduce((a,b)=>a+b,0)),prev=wr.dirs[tot.indexOf(Math.max(...tot))];
+        const sum=solarPosition(site.centroid.lat,site.centroid.lon,localUTC(2023,5,21,12,climate.tzOffsetHours)).altitude, win=solarPosition(site.centroid.lat,site.centroid.lon,localUTC(2023,11,21,12,climate.tzOffsetHours)).altitude;
+        doc.objects().addTextDot(`Sun noon ${sum.toFixed(0)}° (Jun) / ${win.toFixed(0)}° (Dec)`,[center[0],center[1],center[2]+sunR*0.6],lab);
+        doc.objects().addTextDot(`Prevailing wind: ${prev}`,[center[0]+sunR,center[1],center[2]+sunR*0.6],lab); }
+      if (flood && flood.inFloodZone) doc.objects().addTextDot(`FEMA zone ${flood.zone}${flood.baseFloodElevation!=null?` · BFE ${flood.baseFloodElevation} ft`:""}`,[center[0],center[1]+sunR*0.3,center[2]+2],lab);
+
+      return doc.toByteArray();
+    }
+
+    // --- charts (SVG) ---
+    const SVGNS = "http://www.w3.org/2000/svg";
+    const svgEl = (tag, attrs = {}, ...kids) => { const n = document.createElementNS(SVGNS, tag); for (const [k, v] of Object.entries(attrs)) n.setAttribute(k, v); kids.forEach((k) => n.append(k)); return n; };
+    const chartBlock = (title, svg, cap) => el("div", { class: "chart" }, el("h4", {}, title), svg, el("div", { class: "cap" }, cap));
+    const fmtAlt = (paths, key) => (paths.find((p) => p.key === key)?.peakAltitude ?? 0).toFixed(0);
+
+    function renderClimate(cl) {
+      const body = $("climate-body"); body.replaceChildren();
+      if (!cl) { body.append(el("p", { class: "cap" }, "Climate data unavailable for this location.")); return; }
+      const a = cl.annual, stats = el("div", { class: "stat-row" });
+      const stat = (v, k) => el("div", { class: "stat" }, el("div", { class: "v" }, v), el("div", { class: "k" }, k));
+      stats.append(stat(a.tempMean != null ? `${a.tempMean.toFixed(1)}°C` : "—", "Mean temp"), stat(a.tempMin != null ? `${a.tempMin.toFixed(0)}–${a.tempMax.toFixed(0)}°C` : "—", "Range"), stat(a.rhMean != null ? `${a.rhMean.toFixed(0)}%` : "—", "Mean RH"), stat(a.windMean != null ? `${a.windMean.toFixed(1)} m/s` : "—", "Mean wind"), stat(cl.prevailingWind ? cl.prevailingWind.dir : "—", "Prevailing"));
+      body.append(stats);
+      const charts = el("div", { class: "charts" });
+      charts.append(chartBlock("Sun path", sunPathSVG(cl.sunPaths), `Peak altitude ${fmtAlt(cl.sunPaths, "summer")}° (summer) → ${fmtAlt(cl.sunPaths, "winter")}° (winter). Azimuth clockwise from north.`),
+        chartBlock("Wind rose", windRoseSVG(cl.windRose), `Frequency by direction & speed (m/s). Calm ${(cl.windRose.calmFraction * 100).toFixed(0)}% of hours.`),
+        chartBlock("Temperature by month", monthlyBarsSVG(cl.temp, "#8a4b2f", "°C"), `Monthly mean dry-bulb, ${cl.year}.`),
+        chartBlock("Humidity by month", monthlyBarsSVG(cl.rh, "#2f5d62", "%", 100), `Monthly mean RH, ${cl.year}.`));
+      body.append(charts);
+      body.append(el("p", { class: "cap" }, `Source: ${cl.source}, year ${cl.year}. Reanalysis ≈ 25 km — the downloadable .epw drives Ladybug/Rhino.`));
+    }
+    function sunPathSVG(paths) {
+      const S = 220, c = S / 2, R = c - 18, svg = svgEl("svg", { class: "viz", viewBox: `0 0 ${S} ${S}` });
+      [30, 60].forEach((alt) => svg.append(svgEl("circle", { cx: c, cy: c, r: R * (1 - alt / 90), fill: "none", stroke: "#e3e0d8" })));
+      svg.append(svgEl("circle", { cx: c, cy: c, r: R, fill: "none", stroke: "#d9d6cd" }));
+      for (const [d, ang] of Object.entries({ N: -90, E: 0, S: 90, W: 180 })) { const rad = ang * Math.PI / 180, t = svgEl("text", { x: c + (R + 10) * Math.cos(rad), y: c + (R + 10) * Math.sin(rad) + 3, "text-anchor": "middle" }); t.textContent = d; svg.append(t); }
+      const colors = { summer: "#c0392b", equinox: "#b88300", winter: "#2f5d62" };
+      for (const path of paths) { if (!path.points.length) continue; const pts = path.points.map((p) => { const r = R * (1 - p.altitude / 90), ang = (p.azimuth - 90) * Math.PI / 180; return `${c + r * Math.cos(ang)},${c + r * Math.sin(ang)}`; }); svg.append(svgEl("polyline", { points: pts.join(" "), fill: "none", stroke: colors[path.key], "stroke-width": 2 })); }
+      return svg;
+    }
+    function wedge(cx, cy, r0, r1, a0, a1) { const p = (r, a) => [cx + r * Math.cos(a), cy + r * Math.sin(a)], [x0, y0] = p(r0, a0), [x1, y1] = p(r1, a0), [x2, y2] = p(r1, a1), [x3, y3] = p(r0, a1); return `M${x0},${y0} L${x1},${y1} A${r1},${r1} 0 0 1 ${x2},${y2} L${x3},${y3} A${r0},${r0} 0 0 0 ${x0},${y0} Z`; }
+    function windRoseSVG(wr) {
+      const S = 220, c = S / 2, R = c - 18, svg = svgEl("svg", { class: "viz", viewBox: `0 0 ${S} ${S}` });
+      const bandColors = ["#cfe0e0", "#8fbcbf", "#4f8e92", "#2f5d62", "#1d3a3d"], maxFrac = Math.max(0.0001, ...wr.matrix.map((row) => row.reduce((a, b) => a + b, 0))), sector = 2 * Math.PI / wr.dirs.length;
+      wr.matrix.forEach((row, d) => { const ang0 = d * sector - Math.PI / 2 - sector / 2; let r0 = 0; row.forEach((frac, b) => { if (frac <= 0) return; const r1 = r0 + (frac / maxFrac) * R; svg.append(svgEl("path", { d: wedge(c, c, r0, r1, ang0, ang0 + sector), fill: bandColors[b % bandColors.length], stroke: "#fff", "stroke-width": 0.5 })); r0 = r1; }); });
+      ["N", "E", "S", "W"].forEach((d, i) => { const ang = (i * 90 - 90) * Math.PI / 180, t = svgEl("text", { x: c + (R + 9) * Math.cos(ang), y: c + (R + 9) * Math.sin(ang) + 3, "text-anchor": "middle" }); t.textContent = d; svg.append(t); });
+      return svg;
+    }
+    function monthlyBarsSVG(months, color, unit, fixedMax) {
+      const W = 280, H = 150, pad = 22, svg = svgEl("svg", { class: "viz", viewBox: `0 0 ${W} ${H}` });
+      const vals = months.map((m) => m.mean), present = vals.filter((v) => v != null), max = fixedMax || (present.length ? Math.max(...present) : 1), min = fixedMax ? 0 : Math.min(0, ...present), bw = (W - pad * 2) / 12, labels = ["J", "F", "M", "A", "M", "J", "J", "A", "S", "O", "N", "D"];
+      vals.forEach((v, i) => { if (v == null) return; const h = (v - min) / (max - min) * (H - pad * 2), x = pad + i * bw; svg.append(svgEl("rect", { x: x + 1, y: H - pad - h, width: bw - 2, height: Math.max(0, h), fill: color, opacity: 0.85 })); const t = svgEl("text", { x: x + bw / 2, y: H - pad + 11, "text-anchor": "middle" }); t.textContent = labels[i]; svg.append(t); });
+      const tMax = svgEl("text", { x: 2, y: pad - 6 }); tMax.textContent = `${max.toFixed(0)}${unit}`; svg.append(tMax);
+      return svg;
+    }
+
+    function renderTopo(t) {
+      const body = $("topo-body"); body.replaceChildren();
+      if (!t) { body.append(el("p", { class: "cap" }, "Terrain not sampled — outside USGS 3DEP coverage, no boundary box, or the request was blocked.")); return; }
+      const s = t.stats, stats = el("div", { class: "stat-row" });
+      const stat = (v, k) => el("div", { class: "stat" }, el("div", { class: "v" }, v), el("div", { class: "k" }, k));
+      stats.append(stat(s.min != null ? `${s.min.toFixed(1)} m` : "—", "Min elevation"), stat(s.max != null ? `${s.max.toFixed(1)} m` : "—", "Max elevation"), stat(s.max != null ? `${(s.max - s.min).toFixed(1)} m` : "—", "Relief"), stat(`${t.n}×${t.n}`, "Sample grid"));
+      body.append(stats);
+      body.append(el("p", { class: "cap" }, `USGS 3DEP via EPQS.${s.missing ? ` ${s.missing}/${s.total} samples out of coverage, filled with mean.` : ""} Use the terrain/contour exports above for Rhino.`));
+    }
+    function renderFlood(f) {
+      const body = $("flood-body"); body.replaceChildren();
+      if (!f || f.mapped === false) { body.append(el("p", { class: "cap" }, "FEMA NFHL returned no data at the site centroid (may be unmapped).")); return; }
+      const stats = el("div", { class: "stat-row" });
+      const stat = (v, k) => el("div", { class: "stat" }, el("div", { class: "v" }, v), el("div", { class: "k" }, k));
+      stats.append(stat(f.zone || "—", "Flood zone"), stat(f.inFloodZone ? "Yes" : "No", "In SFHA"), stat(f.baseFloodElevation != null ? `${f.baseFloodElevation} ft` : "—", "Base flood elev."));
+      body.append(stats);
+      body.append(el("p", { class: "cap" }, (f.subtype ? `Subtype: ${f.subtype}. ` : "") + "Single-point query at the site centroid. SFHA = Special Flood Hazard Area (1% annual chance)."));
+    }
+    </script>
+  </body>
+</html>

@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Precedent Researcher (Lite / preview) · Summer AI Studio</title>
+    <style>
+      :root {
+        --bg: #f7f6f2; --ink: #1c1b18; --muted: #6b6862; --line: #d9d6cd;
+        --card: #fffffe; --accent: #8a4b2f;
+        --verified: #2e7d4f; --unverified: #b88300; --halluc: #c0392b;
+        --drop: #c0392b; --keep: #2e7d4f;
+      }
+      * { box-sizing: border-box; }
+      body { margin: 0; font: 16px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: var(--bg); color: var(--ink); }
+      header { padding: 2rem 1.5rem 1rem; max-width: 920px; margin: 0 auto; }
+      h1 { margin: 0; font-size: 1.7rem; font-weight: 650; }
+      h1 .sub { color: var(--muted); font-weight: 400; }
+      .tagline { color: var(--muted); margin: 0.4rem 0 0; max-width: 60ch; }
+      .demo-banner { background: #efece4; border: 1px dashed var(--line); border-radius: 10px; padding: 0.7rem 1rem; margin: 0.9rem auto 0; max-width: 920px; color: var(--muted); font-size: 0.9rem; }
+      .demo-banner strong { color: var(--ink); }
+      main { max-width: 920px; margin: 0 auto; padding: 0 1.5rem 3rem; }
+      form { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 1.2rem; margin-top: 1rem; }
+      .field { display: block; margin-bottom: 0.8rem; }
+      .field > span { display: block; font-weight: 600; margin-bottom: 0.3rem; font-size: 0.9rem; }
+      textarea, select, input[type="number"] { width: 100%; font: inherit; padding: 0.6rem; border: 1px solid var(--line); border-radius: 8px; background: #fff; }
+      .row { display: flex; gap: 1rem; align-items: flex-end; flex-wrap: wrap; }
+      .field.small { width: 200px; margin-bottom: 0; }
+      .toggle { flex: 1; min-width: 220px; display: grid; grid-template-columns: auto 1fr; gap: 0 0.5rem; align-items: center; }
+      .toggle span { font-weight: 600; }
+      .toggle small { grid-column: 2; color: var(--muted); }
+      button { font: inherit; font-weight: 600; padding: 0.6rem 1.1rem; border: 1px solid var(--accent); background: var(--accent); color: #fff; border-radius: 8px; cursor: pointer; }
+      button:disabled { opacity: 0.5; cursor: wait; }
+      .toolbar button { background: #fff; color: var(--accent); }
+      .status { margin-top: 1rem; padding: 0.8rem 1rem; border-radius: 8px; background: #efece4; color: var(--muted); }
+      section#results { margin-top: 1.5rem; }
+      .toolbar { display: flex; gap: 0.6rem; margin-bottom: 1rem; }
+      .restatement { font-style: italic; color: var(--muted); border-left: 3px solid var(--line); padding-left: 0.8rem; margin-bottom: 1.5rem; }
+      h2 { font-size: 1.2rem; margin: 1.8rem 0 0.7rem; }
+      table { border-collapse: collapse; width: 100%; font-size: 0.9rem; background: var(--card); }
+      th, td { border: 1px solid var(--line); padding: 0.45rem 0.6rem; text-align: left; vertical-align: top; }
+      th { background: #efece4; }
+      .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 1rem 1.2rem; margin-bottom: 1rem; }
+      .card h3 { margin: 0; font-size: 1.1rem; }
+      .card .byline { color: var(--muted); font-size: 0.9rem; margin: 0.1rem 0 0.6rem; }
+      .card .why { margin: 0 0 0.8rem; }
+      .exist { font-size: 0.8rem; font-weight: 600; padding: 0.1rem 0.5rem; border-radius: 999px; }
+      .exist.certain { background: #e3f0e8; color: var(--verified); }
+      .exist.likely { background: #f6eccf; color: var(--unverified); }
+      .exist.uncertain { background: #fbe2de; color: var(--halluc); }
+      .claim { display: flex; gap: 0.5rem; padding: 0.35rem 0; border-top: 1px dashed var(--line); }
+      .claim .tag { flex: none; font-size: 0.75rem; font-weight: 700; width: 1.4rem; text-align: center; }
+      .claim.verified .tag { color: var(--verified); }
+      .claim.unverified .tag { color: var(--unverified); }
+      .claim.halluc .tag { color: var(--halluc); }
+      .claim .body { flex: 1; }
+      .claim .reason { color: var(--muted); font-size: 0.85rem; }
+      .claim .src a { color: var(--accent); }
+      .crit { border-left: 3px solid var(--halluc); padding-left: 0.8rem; margin: 0.8rem 0; }
+      .crit .verdict { font-size: 0.78rem; font-weight: 700; text-transform: uppercase; }
+      .crit .verdict.drop { color: var(--drop); }
+      .crit .verdict.keep { color: var(--keep); }
+      .crit .verdict.keep-with-caveats { color: var(--unverified); }
+      .note { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 1rem 1.2rem; }
+      .worksheet td.check { width: 4rem; text-align: center; color: var(--muted); }
+      pre.provenance { background: #1c1b18; color: #f4f1ea; padding: 1rem 1.2rem; border-radius: 12px; overflow-x: auto; font-size: 0.85rem; line-height: 1.6; }
+      footer { text-align: center; color: var(--muted); font-size: 0.85rem; padding: 2rem 1.5rem; border-top: 1px solid var(--line); }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>Precedent Researcher <span class="sub">/ lite preview</span></h1>
+      <p class="tagline">
+        Polish is not evidence. Every claim is tagged; every precedent is attacked;
+        the facts are yours to verify.
+      </p>
+    </header>
+    <div class="demo-banner">
+      <strong>Preview mode — no API key, no server.</strong> This page renders
+      <em>canned sample dossiers</em> so you can see the interface and the teaching
+      output. Nothing is generated live. The full version (<code>TOOLS/precedent-researcher</code>)
+      runs the real model.
+    </div>
+
+    <main>
+      <form id="form">
+        <label class="field">
+          <span>Research prompt</span>
+          <textarea id="topic" rows="2"></textarea>
+        </label>
+        <div class="row">
+          <label class="field small">
+            <span>Sample</span>
+            <select id="sample">
+              <option value="libraries">Naturally ventilated libraries (hot-humid)</option>
+              <option value="obscure">Deliberately thin topic (watch it flag ⚠)</option>
+            </select>
+          </label>
+          <label class="toggle">
+            <input id="grounded" type="checkbox" />
+            <span>Ground with web search</span>
+            <small>Off = model-only (you verify). On = real citations.</small>
+          </label>
+          <button id="run" type="submit">Build dossier</button>
+        </div>
+      </form>
+
+      <div id="status" class="status" hidden></div>
+
+      <section id="results" hidden>
+        <div class="toolbar">
+          <button id="dl-md" type="button">Download Markdown</button>
+          <button id="dl-json" type="button">Download JSON</button>
+        </div>
+        <div id="restatement" class="restatement"></div>
+        <div id="matrix-wrap"></div>
+        <div id="cards"></div>
+        <div id="adversarial"></div>
+        <div id="gaps"></div>
+        <div id="worksheet"></div>
+        <div id="provenance"></div>
+      </section>
+    </main>
+
+    <footer>Summer AI Studio · AI is a material to be interrogated, never a second brain.</footer>
+
+    <script>
+      // ---------------------------------------------------------------------
+      // Canned sample data — stands in for what the live pipeline returns.
+      // Keyed by [sample][grounded]. Ungrounded sets have NO verified claims
+      // (the model has no source); grounded sets flip some to verified + URL.
+      // ---------------------------------------------------------------------
+      const C = (claim, status, reason, source = "") => ({ claim, status, reason, source });
+
+      const SAMPLES = {
+        libraries: {
+          topic: "naturally ventilated libraries in hot-humid climates",
+          ungrounded: {
+            topic_restatement:
+              "Library buildings that rely on passive/natural ventilation in tropical or subtropical hot-humid climates.",
+            precedents: [
+              {
+                name: "National Library of Singapore",
+                architect: "Ken Yeang (T. R. Hamzah & Yeang)",
+                year: "2005",
+                location: "Singapore",
+                program: "National library",
+                why_relevant:
+                  "A bioclimatic high-rise with sky-courts, light shelves, and naturally ventilated transitional spaces in an equatorial hot-humid climate.",
+                existence_confidence: "certain",
+                claims: [
+                  C("Designed by Ken Yeang's practice T. R. Hamzah & Yeang.", "plausible-unverified", "Consistent with Yeang's known work; no source to hand."),
+                  C("Completed in 2005.", "plausible-unverified", "Plausible date but unconfirmed here."),
+                  C("Uses naturally ventilated sky-gardens as thermal buffers.", "plausible-unverified", "A signature Yeang strategy; verify it's used here specifically."),
+                  C("Reduced building energy use by exactly 33% versus a sealed baseline.", "likely-hallucination", "Suspiciously precise figure with no cited study — classic fabricated statistic.")
+                ]
+              },
+              {
+                name: "Mediathèque (Sendai) — comparison foil",
+                architect: "Toyo Ito",
+                year: "2001",
+                location: "Sendai, Japan",
+                program: "Media library",
+                why_relevant:
+                  "Included as a foil: famous library but Sendai is temperate, NOT hot-humid — useful to test whether the set is on-topic.",
+                existence_confidence: "certain",
+                claims: [
+                  C("Designed by Toyo Ito, completed 2001.", "plausible-unverified", "Well known but unconfirmed here."),
+                  C("Located in a hot-humid climate.", "likely-hallucination", "False — Sendai is temperate. Flagged to show on-topic filtering matters.")
+                ]
+              },
+              {
+                name: "Gandhi Smarak Sangrahalaya (library wing)",
+                architect: "Charles Correa",
+                year: "1963",
+                location: "Ahmedabad, India",
+                program: "Memorial museum with reading rooms",
+                why_relevant:
+                  "Correa's open, tile-roofed pavilions and water courts are a canonical passive-cooling response to a hot Indian climate.",
+                existence_confidence: "likely",
+                claims: [
+                  C("Designed by Charles Correa, 1963.", "plausible-unverified", "Attribution is well established; confirm the date."),
+                  C("Organized as open pavilions around water courts for evaporative cooling.", "plausible-unverified", "Matches Correa's documented approach; verify against drawings."),
+                  C("Functions primarily as a library.", "likely-hallucination", "Over-claim — it is chiefly a memorial/museum; the 'library' framing may be stretched to fit the prompt.")
+                ]
+              }
+            ],
+            gaps:
+              "No vernacular precedents (e.g. Southeast-Asian or West-African library/reading typologies), nothing post-2010, and no contemporary mass-timber or mixed-mode examples. Heavily weighted to celebrity architects."
+          },
+          grounded: {
+            topic_restatement:
+              "Library buildings that rely on passive/natural ventilation in tropical or subtropical hot-humid climates.",
+            precedents: [
+              {
+                name: "National Library Building, Singapore",
+                architect: "T. R. Hamzah & Yeang (Ken Yeang)",
+                year: "2005",
+                location: "Singapore",
+                program: "National library",
+                why_relevant:
+                  "Bioclimatic tower with naturally ventilated sky-courts and shading devices tuned to the equatorial climate.",
+                existence_confidence: "certain",
+                claims: [
+                  C("Designed by T. R. Hamzah & Yeang and opened in 2005.", "verified", "Confirmed via the National Library Board's building page.", "https://www.nlb.gov.sg/"),
+                  C("Incorporates landscaped sky-gardens and light shelves as climate devices.", "verified", "Documented in published case studies of the building.", "https://www.archdaily.com/"),
+                  C("Reduced building energy use by exactly 33% versus a sealed baseline.", "likely-hallucination", "Search found no source for this exact figure — still treat as fabricated.")
+                ]
+              },
+              {
+                name: "Gandhi Smarak Sangrahalaya",
+                architect: "Charles Correa",
+                year: "1963",
+                location: "Ahmedabad, India",
+                program: "Memorial museum with reading rooms",
+                why_relevant:
+                  "Modular tiled pavilions and water courts — a canonical passive response to a hot, dry-to-humid Indian climate.",
+                existence_confidence: "certain",
+                claims: [
+                  C("Designed by Charles Correa, completed 1963.", "verified", "Confirmed on the Correa Foundation project list.", "https://www.charlescorrea.net/"),
+                  C("Uses open pavilions around a central water court.", "verified", "Confirmed in archival documentation of the scheme.", "https://www.architectural-review.com/"),
+                  C("Functions primarily as a library.", "likely-hallucination", "Sources describe it as a memorial/museum; the library framing remains an over-claim even after grounding.")
+                ]
+              }
+            ],
+            gaps:
+              "Grounding confirmed two strong precedents but the set is still thin on vernacular and contemporary mixed-mode libraries. The fabricated energy statistic survived as a flag — a citation for the building is not a citation for every claim about it."
+          }
+        },
+
+        obscure: {
+          topic: "earth-sheltered floating libraries of medieval Patagonia",
+          ungrounded: {
+            topic_restatement:
+              "Buildings combining earth-sheltering and floating construction, used as libraries, in medieval Patagonia.",
+            precedents: [
+              {
+                name: "(no confident precedent)",
+                architect: "—",
+                year: "—",
+                location: "Patagonia (claimed)",
+                program: "Library (claimed)",
+                why_relevant:
+                  "The prompt combines features (medieval, Patagonian, floating, earth-sheltered, library) with no known historical basis. Rather than invent a plausible-sounding building, the tool declines.",
+                existence_confidence: "uncertain",
+                claims: [
+                  C("There exists a documented medieval Patagonian floating library.", "likely-hallucination", "No such building type or region/period combination is known — inventing one would be a fabricated precedent."),
+                  C("Medieval Patagonia had a literate institutional building culture of this kind.", "likely-hallucination", "Anachronistic — flagged rather than asserted.")
+                ]
+              }
+            ],
+            gaps:
+              "The honest answer is that this prompt has no real precedents. A useful next step is to relax constraints (drop 'medieval', 'Patagonia', or 'floating') and re-run — the point of this sample is to show the tool refusing to fill the count with confident fiction."
+          }
+        }
+      };
+      SAMPLES.obscure.grounded = SAMPLES.obscure.ungrounded; // grounding can't rescue a non-existent topic
+
+      // ---------------------------------------------------------------------
+      // Rendering (mirrors the full app's public/app.js)
+      // ---------------------------------------------------------------------
+      const $ = (id) => document.getElementById(id);
+      const TAG = {
+        verified: { glyph: "✓", cls: "verified", label: "verified" },
+        "plausible-unverified": { glyph: "?", cls: "unverified", label: "unverified" },
+        "likely-hallucination": { glyph: "⚠", cls: "halluc", label: "likely hallucination" }
+      };
+      const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+      let lastResult = null;
+
+      function buildResult() {
+        const key = $("sample").value;
+        const grounded = $("grounded").checked;
+        const s = SAMPLES[key];
+        const dossier = grounded ? s.grounded : s.ungrounded;
+        return {
+          meta: { topic: s.topic, count: dossier.precedents.length, grounded, model: "claude-opus-4-8 (sample)", generated_at: new Date().toISOString() },
+          dossier,
+          adversarial: ADVERSARIAL[key]
+        };
+      }
+
+      const ADVERSARIAL = {
+        libraries: {
+          critiques: [
+            { name: "National Library Building, Singapore", relevance_verdict: "keep-with-caveats", strongest_case_against: "It is a sealed, heavily air-conditioned tower; the 'natural ventilation' is confined to transitional sky-courts, not the reading floors. Citing it as a naturally ventilated library overstates the case." },
+            { name: "Mediathèque (Sendai)", relevance_verdict: "drop", strongest_case_against: "Sendai is temperate, not hot-humid. Its inclusion is off-prompt and likely driven by fame, not relevance — exactly the Pinterest-mean failure mode." },
+            { name: "Gandhi Smarak Sangrahalaya", relevance_verdict: "keep-with-caveats", strongest_case_against: "It is a memorial/museum, not a library, and Ahmedabad is hot-DRY for much of the year. The passive strategies are real but the typology and climate are both stretched to fit." }
+          ],
+          what_an_expert_would_notice:
+            "The set leans on three celebrity-architect monuments and ignores everyday tropical library typologies, vernacular reading pavilions, and any post-2010 mixed-mode work. An expert would also flag that 'naturally ventilated' is used loosely — most of these buildings are mixed-mode at best."
+        },
+        obscure: {
+          critiques: [
+            { name: "(no confident precedent)", relevance_verdict: "drop", strongest_case_against: "There is nothing to critique because there is nothing real here. The correct adversarial move is to reject the premise and tell the student to redefine the prompt." }
+          ],
+          what_an_expert_would_notice:
+            "An expert would immediately reject the prompt as historically impossible and ask what the student is actually trying to study — earth-sheltering? floating structures? — then point them at real precedents for that narrower question."
+        }
+      };
+
+      function render(data) {
+        const { dossier, adversarial, meta } = data;
+        $("restatement").innerHTML = `<strong>Interpreted as:</strong> ${esc(dossier.topic_restatement)} <span style="opacity:.7">— ${meta.grounded ? "web-grounded" : "model-only, unverified"}, ${esc(meta.model)}</span>`;
+        renderMatrix(dossier.precedents);
+        renderCards(dossier.precedents);
+        renderAdversarial(adversarial);
+        $("gaps").innerHTML = `<h2>What's missing</h2><div class="note">${esc(dossier.gaps)}</div>`;
+        renderWorksheet(dossier.precedents);
+        $("provenance").innerHTML = `<h2>Provenance log</h2><pre class="provenance">${esc(provenanceText(data))}</pre>`;
+      }
+
+      function renderMatrix(precedents) {
+        const rows = precedents.map((p) => `<tr><td>${esc(p.name)}</td><td>${esc(p.architect)}</td><td>${esc(p.year)}</td><td>${esc(p.location)}</td><td>${esc(p.program)}</td><td><span class="exist ${esc(p.existence_confidence)}">${esc(p.existence_confidence)}</span></td></tr>`).join("");
+        $("matrix-wrap").innerHTML = `<h2>Comparison matrix</h2><table><thead><tr><th>Precedent</th><th>Architect</th><th>Year</th><th>Location</th><th>Program</th><th>Exists?</th></tr></thead><tbody>${rows}</tbody></table>`;
+      }
+
+      function renderCards(precedents) {
+        const html = precedents.map((p) => {
+          const claims = (p.claims || []).map((c) => {
+            const t = TAG[c.status] || TAG["plausible-unverified"];
+            const src = c.source ? `<div class="src"><a href="${esc(c.source)}" target="_blank" rel="noopener">${esc(c.source)}</a></div>` : "";
+            return `<div class="claim ${t.cls}"><div class="tag" title="${t.label}">${t.glyph}</div><div class="body"><div>${esc(c.claim)}</div><div class="reason">${esc(c.reason)}</div>${src}</div></div>`;
+          }).join("");
+          return `<div class="card"><h3>${esc(p.name)}</h3><p class="byline">${esc(p.architect)} · ${esc(p.year)} · ${esc(p.location)} · ${esc(p.program)} &nbsp;<span class="exist ${esc(p.existence_confidence)}">${esc(p.existence_confidence)}</span></p><p class="why">${esc(p.why_relevant)}</p>${claims}</div>`;
+        }).join("");
+        $("cards").innerHTML = `<h2>Precedents</h2>${html}`;
+      }
+
+      function renderAdversarial(adv) {
+        const crits = (adv.critiques || []).map((c) => `<div class="crit"><div class="verdict ${esc(c.relevance_verdict)}">${esc(c.relevance_verdict)}</div><strong>${esc(c.name)}</strong><div>${esc(c.strongest_case_against)}</div></div>`).join("");
+        $("adversarial").innerHTML = `<h2>Devil's advocate — the case against</h2>${crits}<div class="note"><strong>What an expert would notice:</strong> ${esc(adv.what_an_expert_would_notice)}</div>`;
+      }
+
+      function renderWorksheet(precedents) {
+        const rows = [];
+        for (const p of precedents) for (const c of p.claims || []) {
+          if (c.status === "verified") continue;
+          rows.push(`<tr><td>${esc(p.name)}</td><td>${esc(c.claim)}</td><td>${esc((TAG[c.status] || {}).label || c.status)}</td><td class="check">☐ true</td><td class="check">☐ false</td><td></td></tr>`);
+        }
+        $("worksheet").innerHTML = `<h2>Verification worksheet</h2><p style="color:var(--muted)">Every claim the tool could not back with a source. Check each one against a real source before you use it.</p><table class="worksheet"><thead><tr><th>Precedent</th><th>Claim to verify</th><th>Tool's flag</th><th>True</th><th>False</th><th>Source you found</th></tr></thead><tbody>${rows.join("") || '<tr><td colspan="6">No unverified claims.</td></tr>'}</tbody></table>`;
+      }
+
+      function provenanceText(data) {
+        const { meta, dossier } = data;
+        const total = dossier.precedents.reduce((n, p) => n + (p.claims || []).length, 0);
+        const flagged = dossier.precedents.reduce((n, p) => n + (p.claims || []).filter((c) => c.status === "likely-hallucination").length, 0);
+        return [
+          `Tool:     Precedent Researcher LITE (sample data, ${meta.grounded ? "web-grounded sample" : "model-only sample"})`,
+          `Asked:    "${meta.topic}" — ${meta.count} precedents, ${meta.generated_at}`,
+          `Kept/changed/rejected:  ${dossier.precedents.length} precedents, ${total} atomic claims; ${flagged} self-flagged as likely hallucination. [you fill in what you kept]`,
+          `Verified: [you fill in — see the verification worksheet above]`
+        ].join("\n");
+      }
+
+      // ---------------------------------------------------------------------
+      // Wiring
+      // ---------------------------------------------------------------------
+      function syncTopic() { $("topic").value = SAMPLES[$("sample").value].topic; }
+      $("sample").addEventListener("change", syncTopic);
+      syncTopic();
+
+      function build() {
+        $("run").disabled = true;
+        $("status").hidden = false;
+        $("status").style.background = "";
+        $("status").style.color = "";
+        $("status").textContent = "Loading sample dossier…";
+        try {
+          lastResult = buildResult();
+          render(lastResult);
+          $("results").hidden = false;
+          $("status").hidden = true;
+        } catch (err) {
+          // Never hang silently — surface the error in the status bar.
+          $("results").hidden = true;
+          $("status").style.background = "#fbe9e7";
+          $("status").style.color = "#c0392b";
+          $("status").textContent = "Error rendering sample: " + (err && err.message ? err.message : err);
+          console.error(err);
+        } finally {
+          $("run").disabled = false;
+        }
+      }
+
+      $("form").addEventListener("submit", (e) => { e.preventDefault(); build(); });
+
+      // Render the first sample immediately so the page is never blank on load.
+      build();
+
+      function download(filename, text, type) {
+        const blob = new Blob([text], { type });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url; a.download = filename; a.click();
+        URL.revokeObjectURL(url);
+      }
+      $("dl-json").addEventListener("click", () => lastResult && download("dossier.json", JSON.stringify(lastResult, null, 2), "application/json"));
+      $("dl-md").addEventListener("click", () => lastResult && download("dossier.md", toMarkdown(lastResult), "text/markdown"));
+
+      function toMarkdown(data) {
+        const { meta, dossier, adversarial } = data;
+        const L = [];
+        L.push(`# Precedent dossier — ${meta.topic}`, "");
+        L.push(`> Interpreted as: ${dossier.topic_restatement}`);
+        L.push(`> ${meta.grounded ? "Web-grounded sample" : "Model-only sample (unverified)"} · ${meta.model} · ${meta.generated_at}`, "");
+        for (const p of dossier.precedents) {
+          L.push(`## ${p.name}`);
+          L.push(`*${p.architect} · ${p.year} · ${p.location} · ${p.program}* — exists: **${p.existence_confidence}**`, "");
+          L.push(p.why_relevant, "");
+          for (const c of p.claims || []) {
+            const t = TAG[c.status] || {};
+            L.push(`- ${t.glyph || ""} **${(t.label || c.status).toUpperCase()}** — ${c.claim}`);
+            L.push(`  - _why:_ ${c.reason}${c.source ? `  ·  source: ${c.source}` : ""}`);
+          }
+          L.push("");
+        }
+        L.push(`## What's missing`, dossier.gaps, "");
+        L.push(`## Devil's advocate — the case against`, "");
+        for (const c of adversarial.critiques || []) { L.push(`### ${c.name} — _${c.relevance_verdict}_`); L.push(c.strongest_case_against, ""); }
+        L.push(`**What an expert would notice:** ${adversarial.what_an_expert_would_notice}`, "");
+        L.push(`## Verification worksheet`, "", `| Precedent | Claim to verify | Tool's flag | True/False | Source you found |`, `|---|---|---|---|---|`);
+        for (const p of dossier.precedents) for (const c of p.claims || []) { if (c.status === "verified") continue; L.push(`| ${p.name} | ${c.claim.replace(/\|/g, "\\|")} | ${(TAG[c.status] || {}).label || c.status} | ☐ / ☐ |  |`); }
+        L.push("", `## Provenance log`, "```", provenanceText(data), "```", "");
+        return L.join("\n");
+      }
+    </script>
+  </body>
+</html>
