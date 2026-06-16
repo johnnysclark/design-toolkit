@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Site Analyzer — lightweight CLI. No API key, no server, no npm install.
 //
-// Reuses the verified, dependency-free data modules from ../site-analyzer
+// Reuses the verified, dependency-free data modules from ../web
 // (everything except the Anthropic model passes, which need a key). Pure Node 18+
 // built-ins (global fetch). Run it straight from the terminal:
 //
@@ -17,10 +17,10 @@
 
 import { writeFile, mkdir } from "node:fs/promises";
 import { join } from "node:path";
-import { searchSites, getSite, climateYear, floodAt, elevationGrid } from "../site-analyzer/datasources.js";
-import { windRose, monthlyStats, sunPaths } from "../site-analyzer/geo.js";
-import { terrainOBJ, contoursDXF, boundaryDXF, boundaryGeoJSON, climateEPW } from "../site-analyzer/exporters.js";
-import { buildAnalysisModel } from "../site-analyzer/rhino3dm-export.js";
+import { searchSites, getSite, climateYear, floodAt, elevationGrid } from "../web/datasources.js";
+import { windRose, monthlyStats, sunPaths } from "../web/geo.js";
+import { terrainOBJ, contoursDXF, boundaryDXF, boundaryGeoJSON, climateEPW } from "../web/exporters.js";
+import { buildAnalysisModel } from "../web/rhino3dm-export.js";
 
 // --- tiny terminal helpers -------------------------------------------------
 

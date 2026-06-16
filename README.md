@@ -52,18 +52,24 @@ a **vibe-coded design instrument** for the studio's site, a **fully integrated
 **representational-translation engine** (text ↔ diagram ↔ model ↔ tactile ↔ audio)
 tied to the RAP research. — *decision pending.*
 
-### Demo tools
+### The tool set
 
-| Tool | What it demonstrates | Form | Status |
+One folder per high-level tool under [`TOOLS/`](TOOLS) — each with its own README
+spec. Built tools have working variants (web / standalone / CLI / lite); planned
+tools are spec stubs we'll flesh out.
+
+| Tool | What it does | Catalog | Status |
 |---|---|---|---|
-| [`TOOLS/precedent-researcher`](TOOLS/precedent-researcher) | Precedent research that **attacks its own work** — tags every claim, plays devil's advocate, hands you a verification worksheet + provenance log | Local web app (needs API key) | ✅ working |
-| [`TOOLS/precedent-researcher-lite`](TOOLS/precedent-researcher-lite) | Same interface, **zero setup** — one HTML file, canned sample dossiers, no key | Single HTML file | ✅ working |
-| [`TOOLS/site-analyzer`](TOOLS/site-analyzer) | Read a **Superfund site** through climate/terrain/water/contamination and **export the ground for Rhino**; hard data sourced, model claims tagged | Local web app (key only for model passes) | ✅ working |
-| [`TOOLS/site-analyzer-standalone`](TOOLS/site-analyzer-standalone) | The whole Site Analyzer in **one double-click HTML file**, live public-API data | Single HTML file | ✅ working |
-| [`TOOLS/site-analyzer-cli`](TOOLS/site-analyzer-cli) | No-setup CLI version for quick testing / Rhino export | Node CLI | ✅ working |
+| [`site-analyzer`](TOOLS/site-analyzer) | Feed a site → structured read for design: climate, orientation, terrain, water, constraints, history, links — and the ground exported for Rhino | §1 | ✅ working |
+| [`precedent-librarian`](TOOLS/precedent-librarian) | Dossier builder for design **and** technical references; tags every claim, plays devil's advocate, hands you a verification worksheet | §2 | ✅ working |
+| [`form-helper`](TOOLS/form-helper) | Form-finding governed by site forces (sun, wind, orientation…) acting on a chosen geometry | §5/§7 | 🟡 planned |
+| [`rhino-wizard`](TOOLS/rhino-wizard) | Tutor for Rhino / Grasshopper / GH-Python; mode toggles + Beginner/Moderate/Advanced levels | §6 | 🟡 planned |
+| [`code-zoning-agent`](TOOLS/code-zoning-agent) | Interpret code & zoning for a project, every claim clause-cited and checkable | §3 | 🟡 planned |
+| [`portfolio-storyteller`](TOOLS/portfolio-storyteller) | Review prep + portfolio narrative aid; keeps the student's voice and judgment | §13/§15 | 🟡 planned |
+| [`rap-tactile-cad`](TOOLS/rap-tactile-cad) | The RAP accessibility tool — non-visual / tactile CAD workflow (showcase candidate) | §11/§26 | 🟡 in progress |
 
-*More demos to come — this table grows as we build. Each new tool should name the
-`TOOL-CATALOG.md` item(s) it realizes.*
+*This table is the living index — it grows and statuses change as we build. Each tool's
+README names the `TOOL-CATALOG.md` item(s) it realizes. More tools likely (still mulling).*
 
 ---
 
@@ -73,14 +79,14 @@ Most tools have a **zero-setup** variant (a single HTML file or a CLI) and a ful
 web-app variant. Quick paths:
 
 ```bash
-# Precedent Researcher — no install, no key (canned samples):
-open "TOOLS/precedent-researcher-lite/index.html"
+# Precedent Librarian — no install, no key (canned samples):
+open "TOOLS/precedent-librarian/lite/index.html"
 
 # Site Analyzer — no install, no key, live data:
-open "TOOLS/site-analyzer-standalone/index.html"
+open "TOOLS/site-analyzer/standalone/index.html"
 
 # Site Analyzer CLI (Node 18+):
-cd TOOLS/site-analyzer-cli && node analyze.js "Gowanus Canal"
+node "TOOLS/site-analyzer/cli/analyze.js" "Gowanus Canal"
 ```
 
 The full web apps need `npm install` and (for the model passes) an

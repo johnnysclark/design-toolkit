@@ -3,7 +3,7 @@
 A no-setup version of the Site Analyzer for quick testing: **no API key, no server, no
 `npm install`.** Just Node 18+ (for built-in `fetch`).
 
-It reuses the verified, dependency-free data modules from `../site-analyzer` (`datasources.js`,
+It reuses the verified, dependency-free data modules from `../web` (`datasources.js`,
 `geo.js`, `exporters.js`), so keep that folder alongside this one. The only thing it skips is the
 two model passes (contamination + design read), which need an Anthropic key and live in the web
 version.
@@ -11,7 +11,7 @@ version.
 ## Use
 
 ```bash
-cd TOOLS/site-analyzer-cli
+cd "TOOLS/site-analyzer/cli"
 
 node analyze.js "Gowanus Canal"                 # search EPA NPL + analyze best match
 node analyze.js --id NYN000206222               # analyze an exact EPA ID
@@ -45,4 +45,4 @@ Same files as the web app; all share one metric origin so they align in Rhino.
 | `--year <YYYY>` | 2023 | climate / EPW source year |
 
 For the full experience — interactive map, charts, and the cited contamination & design-read
-briefs — use `../site-analyzer` (`npm start`).
+briefs — use `../web` (`npm start`).
