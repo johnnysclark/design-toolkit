@@ -15,13 +15,15 @@ primary showcase tool) that make the ideas concrete.
 
 ## The idea in one paragraph
 
-AI is treated as a **material with a grain** — fluent where its training data is
-dense, quietly wrong where it's thin, and the grain is invisible because the prose
-reads the same either way. The studio's job is to learn that material the way
-architects learn any material: through resistance, testing, and interrogation. So
-the throughlines are **"grade the trace, not the output,"** calibrated skepticism,
-provenance/logging, and keeping the student (not the model) as the cognitive agent.
-Full reasoning is in [`BRAINSTORM/SYNTHESIS.md`](BRAINSTORM/SYNTHESIS.md).
+The bet is that **design thinking is already AI-ready** — designers iterate, critique,
+prototype, and tolerate ambiguity, which are exactly the habits that working well with
+AI rewards. So the studio brings the design *feedback loop* to AI rather than treating
+it as an oracle: the throughlines are **"grade the trace, not the output,"** calibrated
+skepticism, provenance/logging, and keeping the student (not the model) as the
+cognitive agent. Full reasoning is in
+[`BRAINSTORM/SYNTHESIS.md`](BRAINSTORM/SYNTHESIS.md); the central *metaphor* for all
+this is still open — candidates in
+[`BRAINSTORM/METAPHOR IDEAS.md`](BRAINSTORM/METAPHOR%20IDEAS.md).
 
 ---
 

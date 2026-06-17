@@ -15,18 +15,20 @@ research, meant to be cut, rewritten, and made mine.*
 - **Audience:** ▢ (classmates / colleagues / students — pick per delivery; tone shifts)
 - **Format / length:** ▢
 - **One-sentence thesis:** ▢ my note:
-  - _seed candidate:_ "AI is a material with a grain; design education already knows how to teach materials — so teach AI the same way: through resistance, testing, and judgment, not obedience."
+  - _seed candidate (design-feedback-loop lean):_ "Design thinking is already AI-ready — designers iterate, critique, prototype, and tolerate ambiguity, which are exactly the habits AI rewards; the job of design education is to bring that loop to AI, not obedience."
+  - _the central metaphor is still open_ — see [`METAPHOR IDEAS.md`](BRAINSTORM/METAPHOR%20IDEAS.md). (Grain-of-the-machine is one option among many, not the thesis.)
 - **What I want them to leave believing / doing:** ▢ my note:
 
 ---
 
-## 1. The core metaphor — the grain of the machine
+## 1. The core metaphor — *still choosing* (see [`METAPHOR IDEAS.md`](BRAINSTORM/METAPHOR%20IDEAS.md))
 
-- _seed:_ AI has a **grain** — the statistical structure of its training data. It glides *with* the grain (common, well-documented things) and tears *against* it (rare, novel, hyper-local, precisely-constrained things).
-- _seed:_ The danger is the grain is **invisible** — "a confident paragraph about a building that doesn't exist reads exactly like one about a building that does." **Polish is not evidence.**
-- _seed:_ The grain **moves** every model release — so teach the *surveying method*, not the map.
-- ▢ my note (my own example of with-grain vs against-grain from my field):
-- ▢ my note (a demo I can run live to show the grain):
+Leaning toward a **design-feedback-loop** framing (design thinking applied to AI),
+not a single dramatic image. Candidates and trade-offs live in the metaphor doc.
+
+- ▢ my note (which metaphor / pair I want to lead with):
+- ▢ my note (a demo that makes that metaphor land live):
+- _one option among many — grain of the machine:_ AI has a "grain" (dense vs. sparse training data); glides or tears, and the tear is invisible because "polish is not evidence." Useful as a *supporting* point about verification; probably not the headline.
 
 ---
 
