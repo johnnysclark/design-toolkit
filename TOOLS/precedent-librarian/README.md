@@ -11,10 +11,10 @@ machine* visible.
 - **It hands you homework** — a verification worksheet of every claim it couldn't source, to check externally.
 - **It logs itself** — a four-line provenance log (tool / asked / kept-changed-rejected / verified).
 
-Folds several `TOOL-CATALOG.md` §2 items into one: precedent researcher,
+Folds several `TOOL CATALOG IDEAS.md` §2 items into one: precedent researcher,
 hallucinated-precedent hunt, citation/lineage tracer, devil's-advocate killer.
 
-**Status:** ✅ working (built). Maps to `TOOL-CATALOG.md` §2 — Precedent & Research.
+**Status:** ✅ working (built). Maps to `TOOL CATALOG IDEAS.md` §2 — Precedent & Research.
 
 ## Variants
 | Folder | Form | Setup |

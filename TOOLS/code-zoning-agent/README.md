@@ -6,7 +6,7 @@ egress, occupancy, accessibility) and translate dense ordinance language into pl
 terms — while always linking back to the source clause so the student verifies
 rather than trusts.
 
-**Status:** 🟡 planned / scoping. Maps to `TOOL-CATALOG.md` §3 — zoning/code
+**Status:** 🟡 planned / scoping. Maps to `TOOL CATALOG IDEAS.md` §3 — zoning/code
 interpreter, zoning-envelope generator, accessibility-code checker, code-objection
 tennis.
 

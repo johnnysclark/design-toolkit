@@ -3,7 +3,7 @@
 **Goal:** Integrate AI into my fall architecture/design studio.
 **Approach:** Not just a demo — a mix of build-a-tool, use-a-tool, and an integrated pipeline. The live demo below is one option among several.
 **Date started:** 2026-06-16
-**See also:** [Brainstorm-2026-06-16.md](Brainstorm-2026-06-16.md) — assignment ideas + pedagogy notes.
+**See also:** [Brainstorm-2026-06-16.md](BRAINSTORM%20DOCS%206-16-26/Brainstorm-2026-06-16.md) — assignment ideas + pedagogy notes.
 
 ---
 

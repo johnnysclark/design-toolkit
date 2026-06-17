@@ -6,7 +6,7 @@ argument, rehearse the narrative) and shape the **portfolio narrative** (project
 statements, sequencing, captions) — with the student's *voice* and *judgment* kept
 front and center.
 
-**Status:** 🟡 planned / scoping. Maps to `TOOL-CATALOG.md` §13 (Critique) and §15
+**Status:** 🟡 planned / scoping. Maps to `TOOL CATALOG IDEAS.md` §13 (Critique) and §15
 (Portfolio & Communication) — jury-prep simulator, crit weather report, portfolio
 narrative drafter, audience re-voicer, talk-track generator.
 

@@ -16,7 +16,7 @@ It makes the *grain of the machine* visible:
 - **It logs itself** — a four-line provenance log (tool / asked /
   kept-changed-rejected / verified) you complete and submit.
 
-This folds three `TOOL-CATALOG.md` items into one: precedent researcher,
+This folds three `TOOL CATALOG IDEAS.md` items into one: precedent researcher,
 hallucinated-precedent hunt, citation/lineage tracer, and devil's-advocate killer.
 
 ## Run it

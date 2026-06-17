@@ -21,19 +21,30 @@ reads the same either way. The studio's job is to learn that material the way
 architects learn any material: through resistance, testing, and interrogation. So
 the throughlines are **"grade the trace, not the output,"** calibrated skepticism,
 provenance/logging, and keeping the student (not the model) as the cognitive agent.
-Full reasoning is in [`SYNTHESIS.md`](SYNTHESIS.md).
+Full reasoning is in [`BRAINSTORM/SYNTHESIS.md`](BRAINSTORM/SYNTHESIS.md).
 
 ---
 
 ## Repo map
 
+### Top-level docs
+| Doc | What it is |
+|---|---|
+| [`TOOL CATALOG IDEAS.md`](TOOL%20CATALOG%20IDEAS.md) | The wide, un-pruned catalog — high-level list of **all** brainstormed tool/workflow ideas (~280 across 24 domains) |
+| [`TOOL IDEAS ANALYSIS.md`](TOOL%20IDEAS%20ANALYSIS.md) | Reflection on the tooling research — how the tools can be thought about, clustered, and delivered |
+| [`AI PEDAGOGY NOTES.md`](AI%20PEDAGOGY%20NOTES.md) | Working lecture notes on AI pedagogy (for classmates, colleagues, students) — *in progress* |
+| `README.md` | This file — the living index |
+
+### Folders
 | Path | What it is |
 |---|---|
-| [`SYNTHESIS.md`](SYNTHESIS.md) | The distilled argument — pedagogy, principles, and the three lenses for choosing assignments |
-| [`TOOL-CATALOG.md`](TOOL-CATALOG.md) | The wide, un-pruned catalog (~280 tool/workflow ideas across 24 domains) we draw from |
-| [`AI-Integration-Brainstorm.md`](AI-Integration-Brainstorm.md) | Early framing notes |
-| `BRAINSTORM DOCS 6-16-26/` | Source brainstorm documents (Grain of the Machine editions, idea menus, reflection exemplars) |
-| `TOOLS/` | The working tools (see below) |
+| [`BRAINSTORM/`](BRAINSTORM) | The brainstorm + synthesis material (see below) |
+| [`TOOLS/`](TOOLS) | The working tools — one folder per high-level tool (see below) |
+
+**`BRAINSTORM/`** contains:
+- [`SYNTHESIS.md`](BRAINSTORM/SYNTHESIS.md) — the distilled argument: pedagogy, principles, the three lenses for choosing assignments
+- [`AI-Integration-Brainstorm.md`](BRAINSTORM/AI-Integration-Brainstorm.md) — early framing notes
+- `BRAINSTORM DOCS 6-16-26/` — source brainstorm documents (Grain of the Machine editions, idea menus, reflection exemplars)
 
 ---
 
@@ -46,11 +57,9 @@ data is sourced and downloadable; every *model* claim is tagged
 material to interrogate, not an authority.
 
 ### 🌟 Primary showcase tool
-*To be chosen.* This is the one we go deep on. Candidate flagships from the catalog:
-a **vibe-coded design instrument** for the studio's site, a **fully integrated
-"AI for Architects" pipeline** (site → code → budget → iterative design), or a
-**representational-translation engine** (text ↔ diagram ↔ model ↔ tactile ↔ audio)
-tied to the RAP research. — *decision pending.*
+*To be chosen.* This is the one we go deep on. Leading candidate: **`rap-tactile-cad`**
+(the accessibility research tool). Other flagship options in
+[`TOOL IDEAS ANALYSIS.md`](TOOL%20IDEAS%20ANALYSIS.md). — *decision pending.*
 
 ### The tool set
 
@@ -69,7 +78,7 @@ tools are spec stubs we'll flesh out.
 | [`rap-tactile-cad`](TOOLS/rap-tactile-cad) | The RAP accessibility tool — non-visual / tactile CAD workflow (showcase candidate) | §11/§26 | 🟡 in progress |
 
 *This table is the living index — it grows and statuses change as we build. Each tool's
-README names the `TOOL-CATALOG.md` item(s) it realizes. More tools likely (still mulling).*
+README names the catalog item(s) it realizes. More tools likely (still mulling).*
 
 ---
 
@@ -107,4 +116,4 @@ gitignored.
 
 ---
 
-*Companion planning docs: [`SYNTHESIS.md`](SYNTHESIS.md) · [`TOOL-CATALOG.md`](TOOL-CATALOG.md)*
+*Planning docs: [`TOOL CATALOG IDEAS.md`](TOOL%20CATALOG%20IDEAS.md) · [`TOOL IDEAS ANALYSIS.md`](TOOL%20IDEAS%20ANALYSIS.md) · [`AI PEDAGOGY NOTES.md`](AI%20PEDAGOGY%20NOTES.md) · [`BRAINSTORM/SYNTHESIS.md`](BRAINSTORM/SYNTHESIS.md)*

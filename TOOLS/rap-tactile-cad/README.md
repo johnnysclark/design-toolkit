@@ -7,7 +7,7 @@ translated version of it. This is the lab's research frontier and a strong candi
 for the workshop's **primary showcase tool**.
 
 **Status:** 🟡 in progress — *workflow previously started; needs porting/connecting
-into this repo.* Maps to `TOOL-CATALOG.md` §11 (Accessibility/RAP) and §26 (RAP
+into this repo.* Maps to `TOOL CATALOG IDEAS.md` §11 (Accessibility/RAP) and §26 (RAP
 frontier gaps).
 
 > **Action item:** locate the earlier tactile-CAD work (likely in the

@@ -5,7 +5,7 @@ Ask how to do something; get guidance pitched to the mode and skill level you're
 Built to *teach the workflow*, not hand over black-box answers — the student stays
 the one who understands the definition.
 
-**Status:** 🟡 planned / scoping. Maps to `TOOL-CATALOG.md` §6 — Python-for-Rhino
+**Status:** 🟡 planned / scoping. Maps to `TOOL CATALOG IDEAS.md` §6 — Python-for-Rhino
 Tutor, Grasshopper error-doctor, GH-to-plain-English.
 
 ## Toggles

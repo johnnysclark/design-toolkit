@@ -6,7 +6,7 @@ Start from a chosen geometry and let real site forces — sun, wind, orientation
 building," but a force-driven sketch instrument where the student keeps authorship
 of the parti and reads *why* the form responds.
 
-**Status:** 🟡 planned / scoping. Maps to `TOOL-CATALOG.md` §5 (Concept & Form) and
+**Status:** 🟡 planned / scoping. Maps to `TOOL CATALOG IDEAS.md` §5 (Concept & Form) and
 §7 (Performance), with the **Solar-Envelope Carver** and **Section-First Generator**
 as close cousins.
 

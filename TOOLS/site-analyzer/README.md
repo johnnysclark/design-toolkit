@@ -9,7 +9,7 @@ Studio ethos: hard data is **sourced and downloadable**; every *model* claim is
 tagged (`✓ verified` / `? unverified` / `⚠ likely-hallucination`) and cited. AI is a
 material to interrogate, not an authority.
 
-**Status:** ✅ working (built). Maps to `TOOL-CATALOG.md` §1 — Site & Context Analysis.
+**Status:** ✅ working (built). Maps to `TOOL CATALOG IDEAS.md` §1 — Site & Context Analysis.
 
 ## What it reads
 - **Climate** — sun path, wind rose, temperature/humidity (Open-Meteo ERA5)
