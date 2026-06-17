@@ -58,10 +58,11 @@ data is sourced and downloadable; every *model* claim is tagged
 (`✓ verified` / `? unverified` / `⚠ likely-hallucination`) and cited; AI is a
 material to interrogate, not an authority.
 
-### 🌟 Primary showcase tool
-*To be chosen.* This is the one we go deep on. Leading candidate: **`rap-tactile-cad`**
-(the accessibility research tool). Other flagship options in
-[`TOOL IDEAS ANALYSIS.md`](TOOL%20IDEAS%20ANALYSIS.md). — *decision pending.*
+### 🌟 Showcase tools — two complementary picks
+- **[`design-thinking-showcase`](TOOLS/design-thinking-showcase)** — the **thesis showcase** ("The Crit Engine"): solve one brief twice (accept AI's first answer vs. run the design loop) and grade the *tape*, not the building. Argues the central claim — *design thinking is already AI-ready* — live, in 3 minutes, to any audience. Cheapest to make compelling, loudest pedagogically; at full stretch it **orchestrates the other tools**.
+- **[`rap-tactile-cad`](TOOLS/rap-tactile-cad)** — the **research showcase**: the accessibility (RAP) tool, deepest and most publishable (ACADIA/JAE), uncopyable.
+
+*The thesis showcase frames why any of it matters; the research showcase is the deep node inside that frame.*
 
 ### The tool set
 
@@ -77,7 +78,8 @@ tools are spec stubs we'll flesh out.
 | [`rhino-wizard`](TOOLS/rhino-wizard) | Tutor for Rhino / Grasshopper / GH-Python; mode toggles + Beginner/Moderate/Advanced levels | §6 | 🟡 planned |
 | [`code-zoning-agent`](TOOLS/code-zoning-agent) | Interpret code & zoning for a project, every claim clause-cited and checkable | §3 | 🟡 planned |
 | [`portfolio-storyteller`](TOOLS/portfolio-storyteller) | Review prep + portfolio narrative aid; keeps the student's voice and judgment | §13/§15 | 🟡 planned |
-| [`rap-tactile-cad`](TOOLS/rap-tactile-cad) | The RAP accessibility tool — non-visual / tactile CAD workflow (showcase candidate) | §11/§26 | 🟡 in progress |
+| [`rap-tactile-cad`](TOOLS/rap-tactile-cad) | 🌟 RAP accessibility tool — non-visual / tactile CAD workflow (**research showcase**) | §11/§26 | 🟡 in progress |
+| [`design-thinking-showcase`](TOOLS/design-thinking-showcase) | 🌟 "The Crit Engine" — solve a brief twice (vibe vs. loop), grade the tape (**thesis showcase**) | §13 | 🟡 new |
 
 *This table is the living index — it grows and statuses change as we build. Each tool's
 README names the catalog item(s) it realizes. More tools likely (still mulling).*
