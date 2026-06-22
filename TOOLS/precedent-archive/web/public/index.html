@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Precedent Archive · Summer AI Studio</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <a class="skip-link" href="#main">Skip to main content</a>
+
+    <header>
+      <h1>Precedent Archive <span class="sub">/ a lens over your folder</span></h1>
+      <p class="tagline">
+        Your files stay where they are. This reads them, builds a rebuildable index,
+        and writes notes <em>alongside</em> your images — never over them.
+      </p>
+      <p id="archive-info" class="archive-info" aria-live="polite"></p>
+    </header>
+
+    <main id="main">
+      <p id="status" class="status" role="status" aria-live="polite" hidden></p>
+      <p id="error" class="error" role="alert" hidden></p>
+
+      <section aria-labelledby="add-h" class="panel">
+        <h2 id="add-h">Add to the archive</h2>
+        <div class="add-grid">
+          <div
+            id="dropzone"
+            class="dropzone"
+            tabindex="0"
+            role="button"
+            aria-describedby="drop-help"
+          >
+            <strong>Drop images here</strong>, paste from the clipboard, or
+            <label class="file-label">
+              choose files
+              <input id="file-input" type="file" accept="image/*" multiple class="sr-only" />
+            </label>
+            <p id="drop-help" class="hint">Each becomes a stub entry immediately — enrich it later.</p>
+          </div>
+
+          <form id="url-form" class="url-form">
+            <label class="field" for="url-input"><span>Add from a URL</span></label>
+            <div class="row">
+              <input
+                id="url-input"
+                type="url"
+                inputmode="url"
+                placeholder="https://… (Open Graph / oEmbed page)"
+              />
+              <button type="submit">Fetch</button>
+            </div>
+            <p class="hint">
+              Pulls the page's preview image + title. Login-walled sites (e.g. Instagram)
+              fall back to a manual screenshot stub.
+            </p>
+          </form>
+        </div>
+      </section>
+
+      <section aria-labelledby="browse-h">
+        <h2 id="browse-h" class="sr-only">Browse the archive</h2>
+        <form id="filters" class="filters" role="search" aria-label="Filter entries">
+          <label class="field" for="q">
+            <span>Search</span>
+            <input id="q" type="search" placeholder="title, tag, note, alt text…" />
+          </label>
+          <label class="field small" for="type-filter">
+            <span>Type</span>
+            <select id="type-filter"><option value="">All types</option></select>
+          </label>
+          <label class="field small" for="tag-filter">
+            <span>Tag</span>
+            <select id="tag-filter"><option value="">All tags</option></select>
+          </label>
+          <fieldset class="view-toggle">
+            <legend class="sr-only">View</legend>
+            <label><input type="radio" name="view" value="gallery" checked /> Gallery</label>
+            <label><input type="radio" name="view" value="list" /> List</label>
+          </fieldset>
+          <div class="filter-actions">
+            <button id="rescan" type="button">Rescan</button>
+            <button id="bulk-alt" type="button">Generate all missing alt text</button>
+          </div>
+        </form>
+
+        <section id="orphans-wrap" aria-labelledby="orphans-h" hidden>
+          <h3 id="orphans-h">Un-cataloged images <span id="orphans-count" class="count"></span></h3>
+          <p class="hint">Images on disk with no entry yet. Adopt one to start a note for it.</p>
+          <ul id="orphans" class="gallery" aria-label="Un-cataloged images"></ul>
+        </section>
+
+        <h3 id="entries-h" class="section-h">Entries <span id="entries-count" class="count"></span></h3>
+        <ul id="entries" class="gallery" aria-labelledby="entries-h"></ul>
+        <p id="empty" class="hint" hidden>No entries match. Add an image above, or clear the filters.</p>
+      </section>
+
+      <section id="detail" class="detail" aria-labelledby="detail-title" tabindex="-1" hidden></section>
+    </main>
+
+    <footer>
+      Summer AI Studio · The filesystem is the truth; this app is additive and non-destructive.
+    </footer>
+
+    <template id="tpl-detail"></template>
+    <script src="app.js"></script>
+  </body>
+</html>

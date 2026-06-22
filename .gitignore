@@ -12,3 +12,6 @@ node_modules/
 .claude/settings.local.json
 # temp
 *.tmp
+# Precedent Archive — disposable index cache + generated artifacts (rebuilt from disk)
+**/.precedent/
+TOOLS/precedent-archive/sample-archive/Inbox/
