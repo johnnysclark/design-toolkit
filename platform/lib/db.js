@@ -26,6 +26,12 @@ export const pool = new Pool({
   ssl: isRemote ? { rejectUnauthorized: false } : undefined
 });
 
+// An idle backend connection can die (DB restart, network blip, Render Postgres
+// maintenance). Without a listener pg's 'error' event would crash the process.
+pool.on("error", (err) => {
+  console.error("idle pg client error (ignored, pool will recover):", err.message);
+});
+
 // Run a parameterized query. Returns the pg result; callers read `.rows`.
 export function query(text, params) {
   return pool.query(text, params);
@@ -35,20 +41,4 @@ export function query(text, params) {
 export async function one(text, params) {
   const { rows } = await pool.query(text, params);
   return rows[0] || null;
-}
-
-// Run fn inside a transaction with a dedicated client.
-export async function tx(fn) {
-  const client = await pool.connect();
-  try {
-    await client.query("BEGIN");
-    const result = await fn(client);
-    await client.query("COMMIT");
-    return result;
-  } catch (err) {
-    await client.query("ROLLBACK");
-    throw err;
-  } finally {
-    client.release();
-  }
 }

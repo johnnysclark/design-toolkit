@@ -1,6 +1,8 @@
-// Instructor dashboard. Reads the analytics endpoints (key-gated) and renders
-// KPIs, sticking points, a mode×level grid, roster, questions, sketches, and a
-// per-student trace. Vanilla JS, no framework — tables + CSS bars.
+// Instructor dashboard. Reads the analytics endpoints (key-gated via the
+// X-Instructor-Key header) and renders KPIs, sticking points, a mode×level grid,
+// roster, questions, sketches, and a per-student trace. Vanilla JS — tables + CSS
+// bars. Images are fetched with the key (the asset endpoint is gated) and shown
+// via object URLs, keeping the key out of <img src> / logs.
 
 const $ = (id) => document.getElementById(id);
 const esc = (s) =>
@@ -11,14 +13,36 @@ const MODES = ["rhino", "grasshopper", "ghpython"];
 const LEVELS = ["beginner", "moderate", "advanced"];
 
 const ctx = { classCode: "", key: "" };
+const assetCache = new Map();
 
 function api(path, params = {}) {
-  const qs = new URLSearchParams({ class_code: ctx.classCode, key: ctx.key, ...params });
-  return fetch(`/api/rhino/instructor/${path}?${qs}`).then(async (r) => {
+  const qs = new URLSearchParams({ class_code: ctx.classCode, ...params });
+  return fetch(`/api/rhino/instructor/${path}?${qs}`, {
+    headers: { "X-Instructor-Key": ctx.key }
+  }).then(async (r) => {
     const data = await r.json();
     if (!r.ok) throw new Error(data.error || "Request failed");
     return data;
   });
+}
+
+// Authenticated image load → object URL (cached). Used to hydrate <img data-asset>.
+async function loadAsset(id) {
+  if (assetCache.has(id)) return assetCache.get(id);
+  const res = await fetch(`/api/rhino/asset/${id}`, { headers: { "X-Instructor-Key": ctx.key } });
+  if (!res.ok) return null;
+  const url = URL.createObjectURL(await res.blob());
+  assetCache.set(id, url);
+  return url;
+}
+
+function hydrateImages(root = document) {
+  for (const img of root.querySelectorAll("img[data-asset]:not([data-loaded])")) {
+    img.dataset.loaded = "1";
+    loadAsset(img.dataset.asset).then((url) => {
+      if (url) img.src = url;
+    });
+  }
 }
 
 $("login-form").addEventListener("submit", async (e) => {
@@ -112,10 +136,11 @@ async function loadQuestions() {
         <div class="qmeta"><span class="chip">${esc(q.mode)}</span><span class="chip">${esc(q.level)}</span>
           <span class="muted">${esc(q.display_name)}</span></div>
         <div class="qtext">${esc(q.question) || "<em>(attachment only)</em>"}</div>
-        ${q.asset_id ? `<a href="/api/rhino/asset/${q.asset_id}" target="_blank"><img class="thumb" src="/api/rhino/asset/${q.asset_id}" /></a>` : ""}
+        ${q.asset_id ? `<img class="thumb" data-asset="${q.asset_id}" alt="attachment" />` : ""}
       </div>`
     )
     .join("");
+  hydrateImages($("questions"));
 }
 
 async function loadGallery() {
@@ -124,11 +149,12 @@ async function loadGallery() {
   $("gallery").innerHTML = assets
     .map(
       (a) => `<figure>
-        <a href="/api/rhino/asset/${a.id}" target="_blank"><img src="/api/rhino/asset/${a.id}" /></a>
+        <img data-asset="${a.id}" alt="sketch" />
         <figcaption>${esc(a.display_name)} · ${esc(a.kind)}</figcaption>
       </figure>`
     )
     .join("");
+  hydrateImages($("gallery"));
 }
 
 async function loadStudent(id, name) {
@@ -136,14 +162,11 @@ async function loadStudent(id, name) {
   $("student-name").textContent = name;
   $("student-panel").hidden = false;
 
-  const traceByConv = {};
-  for (const t of traces) (traceByConv[t.conversation_id] ||= []).push(t);
-
   const html = messages
     .map((m) => {
       if (m.role === "user") {
         return `<div class="t-user">${esc(m.question) || "<em>(attachment)</em>"}
-          ${m.asset_id ? `<a href="/api/rhino/asset/${m.asset_id}" target="_blank"><img class="thumb" src="/api/rhino/asset/${m.asset_id}" /></a>` : ""}</div>`;
+          ${m.asset_id ? `<img class="thumb" data-asset="${m.asset_id}" alt="attachment" />` : ""}</div>`;
       }
       const a = m.response_json || {};
       const next = a.next_single_step || a.fill_this_in || a.pitfalls || "";
@@ -173,5 +196,6 @@ async function loadStudent(id, name) {
     : "";
 
   $("student-trace").innerHTML = html + traceHtml;
+  hydrateImages($("student-trace"));
   $("student-panel").scrollIntoView({ behavior: "smooth" });
 }

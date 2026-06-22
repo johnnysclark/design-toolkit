@@ -43,6 +43,12 @@ export async function addUserMessage({ conversationId, question, mode, level, gr
 }
 
 export async function addAssistantMessage({ conversationId, responseJson, mode, level, grounding, claims, topicTags }) {
+  // node-pg serialization is type-driven, so the three "JSON-ish" columns each
+  // need a different shape — do NOT "normalize" them:
+  //   response_json (jsonb): a plain object → pg JSON-encodes it. Pass raw.
+  //   claims        (jsonb): an array → pg would emit a Postgres array literal,
+  //                          which is invalid for jsonb. Must JSON.stringify.
+  //   topic_tags    (text[]): an array → pg emits an array literal. Pass raw.
   return one(
     `INSERT INTO messages (conversation_id, role, response_json, mode, level, grounding, claims, topic_tags)
      VALUES ($1, 'assistant', $2, $3, $4, $5, $6, $7) RETURNING *`,

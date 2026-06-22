@@ -1,9 +1,13 @@
 // Rhino Wizard student UI. Join → ask (SSE) → report-back gate. Renders the
 // level-specific structured answer with claim-tag glyphs.
+//
+// Auth: join returns an opaque student token; we keep it in localStorage and send
+// it as X-Student-Token on every request. The integer id is never used client-side.
 
 const $ = (id) => document.getElementById(id);
 const esc = (s) =>
   String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const safeUrl = (u) => (/^https?:\/\//i.test(String(u || "")) ? u : null);
 
 const TAG = {
   stable: { glyph: "✓", cls: "stable", label: "stable" },
@@ -12,14 +16,22 @@ const TAG = {
 };
 
 const state = {
-  studentId: null,
+  token: localStorage.getItem("rw_token") || null,
   className: "",
   conversationId: null,
   mode: "grasshopper",
   level: "beginner",
-  pendingAssetId: null,
   lastMessageId: null
 };
+
+// fetch wrapper that attaches the student token.
+function apiFetch(path, body) {
+  return fetch(path, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "X-Student-Token": state.token || "" },
+    body: JSON.stringify(body)
+  });
+}
 
 // --- Join ------------------------------------------------------------------
 
@@ -36,7 +48,8 @@ $("join-form").addEventListener("submit", async (e) => {
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || "Could not join.");
-    state.studentId = data.student_id;
+    state.token = data.student_token;
+    localStorage.setItem("rw_token", state.token);
     state.className = data.class_name;
     $("who-name").textContent = data.display_name;
     $("who-class").textContent = data.class_name;
@@ -87,12 +100,8 @@ async function uploadIfNeeded() {
   const f = $("image").files[0];
   if (!f) return null;
   const data = await fileToBase64(f);
-  const kind = /screenshot|grasshopper|gh/i.test(f.name) ? "gh_screenshot" : "sketch";
-  const res = await fetch("/api/rhino/upload", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ student_id: state.studentId, kind, media_type: f.type, data })
-  });
+  const kind = $("kind").value; // student picks 'sketch' or 'gh_screenshot'
+  const res = await apiFetch("/api/rhino/upload", { kind, media_type: f.type, data });
   const out = await res.json();
   if (!res.ok) throw new Error(out.error || "Upload failed.");
   return out.asset_id;
@@ -131,7 +140,6 @@ async function send({ report_back }) {
 
   const bubble = appendAssistantPlaceholder();
   const payload = {
-    student_id: state.studentId,
     conversation_id: state.conversationId,
     mode: state.mode,
     level: state.level,
@@ -151,13 +159,8 @@ async function send({ report_back }) {
   hideGate();
 
   try {
-    const res = await fetch("/api/rhino/ask", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload)
-    });
+    const res = await apiFetch("/api/rhino/ask", payload);
 
-    // The gate returns a 409 JSON (not a stream).
     if (res.status === 409) {
       const g = await res.json();
       state.conversationId = g.conversation_id;
@@ -170,7 +173,6 @@ async function send({ report_back }) {
       const err = await res.json();
       throw new Error(err.error || "Request failed.");
     }
-
     await readSse(res, bubble);
   } catch (err) {
     bubble.querySelector(".content").innerHTML = `<div class="error">${esc(err.message)}</div>`;
@@ -184,6 +186,7 @@ async function readSse(res, bubble) {
   const decoder = new TextDecoder();
   const shimmer = bubble.querySelector(".shimmer");
   let buf = "";
+  let gotTerminal = false;
 
   while (true) {
     const { value, done } = await reader.read();
@@ -193,22 +196,36 @@ async function readSse(res, bubble) {
     buf = frames.pop();
     for (const frame of frames) {
       const ev = frame.match(/^event: (.+)$/m)?.[1];
-      const data = frame.match(/^data: (.+)$/m)?.[1];
-      if (!ev || !data) continue;
-      const payload = JSON.parse(data);
+      const dataLine = frame.match(/^data: (.+)$/m)?.[1];
+      if (!ev || !dataLine) continue; // skip heartbeat comments
+      const payload = JSON.parse(dataLine);
       if (ev === "meta") {
         state.conversationId = payload.conversation_id;
         if (shimmer) shimmer.textContent = "thinking…";
       } else if (ev === "token") {
         if (shimmer) shimmer.textContent = "writing…";
       } else if (ev === "result") {
+        gotTerminal = true;
         state.lastMessageId = payload.message_id;
         bubble.querySelector(".content").innerHTML = renderAnswer(payload.level, payload.answer);
+        maybeShowGate(payload.level, payload.answer);
       } else if (ev === "error") {
+        gotTerminal = true;
         bubble.querySelector(".content").innerHTML = `<div class="error">${esc(payload.message)}</div>`;
       }
     }
   }
+  if (!gotTerminal) {
+    bubble.querySelector(".content").innerHTML =
+      `<div class="error">Connection lost before the answer finished. Please try again.</div>`;
+  }
+}
+
+// Show the report-back gate proactively after a Beginner/Moderate answer — the
+// answer already ends with a checkpoint, so don't wait for the next 409.
+function maybeShowGate(level, answer) {
+  if (level === "beginner") showGate(answer?.check_yourself?.expected_symptom || "");
+  else if (level === "moderate") showGate(answer?.self_check || "");
 }
 
 // --- Rendering -------------------------------------------------------------
@@ -220,8 +237,11 @@ function claimsHtml(claims) {
     claims
       .map((c) => {
         const t = TAG[c.status] || TAG["version-dependent"];
-        const src = c.source
-          ? `<a class="src" href="${esc(c.source)}" target="_blank" rel="noopener">source</a>`
+        const url = safeUrl(c.source);
+        const src = url
+          ? `<a class="src" href="${esc(url)}" target="_blank" rel="noopener">source</a>`
+          : c.source
+          ? `<span class="src">${esc(c.source)}</span>`
           : "";
         return `<div class="claim ${t.cls}"><span class="tag" title="${t.label}">${t.glyph}</span>
           <span class="ctext">${esc(c.claim)} <span class="reason">— ${esc(c.reason)}</span> ${src}</span></div>`;

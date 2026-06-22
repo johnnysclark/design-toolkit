@@ -87,6 +87,7 @@ pre { background: #f4f4f0; padding: 10px; border-radius: 8px; overflow-x: auto; 
 .composer { max-width: 760px; margin: 0 auto; display: grid; gap: 8px; }
 .attach-row { display: flex; align-items: center; gap: 10px; font-size: .85rem; }
 .attach { cursor: pointer; color: var(--accent); }
+.kind { font: inherit; font-size: .82rem; padding: 3px 6px; border: 1px solid var(--line); border-radius: 6px; }
 .link { background: none; border: 0; color: var(--accent); text-decoration: underline; padding: 0; }
 .ghx { width: 100%; font-family: ui-monospace, monospace; font-size: .82rem; padding: 8px; border: 1px solid var(--line); border-radius: 8px; }
 .ask-row { display: flex; gap: 8px; }

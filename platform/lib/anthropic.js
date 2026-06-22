@@ -1,15 +1,19 @@
-// Shared Anthropic client + structured-output helpers.
+// Shared Anthropic client + JSON parsing helpers.
 //
-// runStructured / parseJson are lifted from TOOLS/precedent-librarian/web/server.js.
-// Ungrounded calls force a JSON schema via output_config.format. Grounded calls
-// (web_search) can't force a format, so they ask for fenced JSON and parse it.
-// The tutor's KB grounding is prompt-injected text (not the web_search tool), so
-// the tutor keeps the forced schema even when grounded — preserving the
-// withholding-by-schema guarantee.
+// The tutor streams a single forced-schema call (see apps/rhino-wizard/index.js);
+// parseJson/textOf are the only shared helpers it needs. The model is an env
+// override so an instructor can drop to a cheaper model (e.g. claude-sonnet-4-6)
+// for cost — withholding is enforced structurally by the schema, not by the
+// model's capability, so the guarantee holds on a cheaper model.
 
 import Anthropic from "@anthropic-ai/sdk";
 
-export const MODEL = "claude-opus-4-8";
+export const MODEL = process.env.RHINO_MODEL || "claude-opus-4-8";
+
+// Ceiling for a tutor answer. These schemas are short (a skeleton + a step + a
+// few claims); 4000 is comfortably above what they need without inviting runaway
+// output. Override with RHINO_MAX_TOKENS if a future schema grows.
+export const MAX_TOKENS = Number(process.env.RHINO_MAX_TOKENS) || 4000;
 
 if (!process.env.ANTHROPIC_API_KEY) {
   console.warn(
@@ -42,33 +46,4 @@ export function textOf(message) {
     .filter((b) => b.type === "text")
     .map((b) => b.text)
     .join("");
-}
-
-// One structured call. `messages` are full Anthropic message objects (so callers
-// can include image content blocks). Returns the parsed object.
-export async function runStructured({ system, messages, schema, webSearch = false }) {
-  const params = {
-    model: MODEL,
-    max_tokens: 20000,
-    thinking: { type: "adaptive" },
-    system,
-    messages
-  };
-
-  if (webSearch) {
-    params.tools = [{ type: "web_search_20260209", name: "web_search" }];
-  } else {
-    params.output_config = { format: { type: "json_schema", schema } };
-  }
-
-  const stream = client.messages.stream(params);
-  const message = await stream.finalMessage();
-
-  if (message.stop_reason === "refusal") {
-    throw new Error("The model declined this request (safety refusal).");
-  }
-  if (message.stop_reason === "max_tokens") {
-    throw new Error("Output was truncated (hit max_tokens).");
-  }
-  return parseJson(textOf(message));
 }

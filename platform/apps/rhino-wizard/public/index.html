@@ -58,9 +58,13 @@
 
     <form id="ask-form" class="composer">
       <div class="attach-row">
-        <label class="attach">📷 Sketch / screenshot
-          <input type="file" id="image" accept="image/*" hidden />
+        <label class="attach">📷 Attach image
+          <input type="file" id="image" accept="image/png,image/jpeg,image/gif,image/webp" hidden />
         </label>
+        <select id="kind" class="kind" title="What is this image?">
+          <option value="sketch">hand sketch</option>
+          <option value="gh_screenshot">GH screenshot</option>
+        </select>
         <span id="attach-name" class="muted"></span>
         <button type="button" id="ghx-toggle" class="link">paste .ghx</button>
       </div>

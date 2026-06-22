@@ -44,6 +44,23 @@ Adding another tool later = an `apps/<tool>/index.js` adapter (it can import the
 existing `../TOOLS/<tool>/web/prompts.js`) plus one mount line in `server.js`. One
 service, one Postgres, one domain — the `app` column namespaces shared rows.
 
+## Security model (studio scale)
+
+No passwords, but not trust-everything either:
+- **Students** get an unguessable bearer **token** at join (returned by `/join`,
+  stored in `localStorage`, sent as `X-Student-Token`). Integer ids are never
+  credentials — every conversation/asset is ownership-checked against the token,
+  so one student can't read or append to another's data.
+- **Images** (`GET /api/rhino/asset/:id`) are gated by the instructor key — only
+  the dashboard fetches them (the student thread shows the local file). This
+  closes the "enumerate every sketch by counting ids" hole.
+- **Instructor** endpoints require `INSTRUCTOR_PASSWORD` via the
+  `X-Instructor-Key` header (constant-time compared); unset == locked, with a
+  clear boot warning.
+- A per-student **rate limit** (in-memory token bucket) protects the API budget.
+- The **model** is `claude-opus-4-8` by default; set `RHINO_MODEL` to a cheaper
+  model — withholding is enforced by the response schema, not the model.
+
 ## Run locally
 
 Needs Node ≥18 and a Postgres you can reach.

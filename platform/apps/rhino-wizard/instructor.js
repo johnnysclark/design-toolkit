@@ -1,8 +1,9 @@
 // Instructor analytics for Rhino Wizard. All endpoints are gated by the shared
-// INSTRUCTOR_PASSWORD (passed as ?key=). Reads only — never mutates student data.
+// INSTRUCTOR_PASSWORD (X-Instructor-Key header, ?key= fallback for <img>). Reads
+// only — never mutates student data.
 
 import { sendJson, sendError } from "../../lib/http.js";
-import { instructorOk, findClass } from "../../lib/identity.js";
+import { instructorOk, instructorKeyFrom, findClass } from "../../lib/identity.js";
 import { query } from "../../lib/db.js";
 
 const APP = "rhino-wizard";
@@ -144,8 +145,10 @@ async function roster(res, cid) {
 }
 
 export async function handle(req, res, url) {
-  const key = url.searchParams.get("key");
-  if (!instructorOk(key)) return sendError(res, 401, "Instructor key required.");
+  if (!process.env.INSTRUCTOR_PASSWORD) {
+    return sendError(res, 503, "Instructor dashboard not configured (INSTRUCTOR_PASSWORD unset on the server).");
+  }
+  if (!instructorOk(instructorKeyFrom(req, url))) return sendError(res, 401, "Instructor key required.");
 
   const classCode = url.searchParams.get("class_code");
   const cid = await classId(classCode);

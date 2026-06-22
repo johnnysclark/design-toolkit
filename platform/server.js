@@ -10,9 +10,17 @@
 
 import { createServer } from "node:http";
 
+import { query } from "./lib/db.js";
 import * as rhino from "./apps/rhino-wizard/index.js";
 
 const PORT = process.env.PORT || 3000;
+
+if (!process.env.INSTRUCTOR_PASSWORD) {
+  console.warn(
+    "\n⚠  INSTRUCTOR_PASSWORD is not set — the instructor dashboard is locked.\n" +
+      "   Set it to enable analytics:  INSTRUCTOR_PASSWORD=… npm start\n"
+  );
+}
 
 const LAUNCHER = `<!doctype html>
 <meta charset="utf-8">
@@ -41,8 +49,14 @@ const server = createServer(async (req, res) => {
       return;
     }
     if (req.method === "GET" && url.pathname === "/healthz") {
-      res.writeHead(200, { "Content-Type": "text/plain" });
-      res.end("ok");
+      // Touch the DB so a broken-DB deploy fails the health check instead of
+      // looking healthy while every real request 500s.
+      try {
+        await query("SELECT 1");
+        res.writeHead(200, { "Content-Type": "text/plain" }).end("ok");
+      } catch {
+        res.writeHead(503, { "Content-Type": "text/plain" }).end("db unavailable");
+      }
       return;
     }
 

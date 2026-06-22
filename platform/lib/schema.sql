@@ -12,15 +12,21 @@ CREATE TABLE IF NOT EXISTS class_sessions (
   created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
--- Lightweight identity: class code + handle, no password.
+-- Lightweight identity: class code + handle, no password. `token` is an
+-- unguessable per-student bearer secret (generated in Node) returned at join and
+-- required on every student request — the integer id is not a credential.
 CREATE TABLE IF NOT EXISTS students (
   id                SERIAL PRIMARY KEY,
   class_session_id  INTEGER NOT NULL REFERENCES class_sessions(id) ON DELETE CASCADE,
   handle            TEXT NOT NULL,
   display_name      TEXT NOT NULL DEFAULT '',
+  token             TEXT UNIQUE,
   created_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
   UNIQUE (class_session_id, handle)
 );
+-- Idempotent add for databases created before the token column existed.
+ALTER TABLE students ADD COLUMN IF NOT EXISTS token TEXT UNIQUE;
+CREATE INDEX IF NOT EXISTS idx_students_token ON students(token);
 
 -- Generic analytics sink any app can write to.
 CREATE TABLE IF NOT EXISTS tool_events (

@@ -5,7 +5,7 @@
 // the tutor streams tokens to the browser for a live "typing" affordance.
 
 import { readFile } from "node:fs/promises";
-import { extname, join, normalize } from "node:path";
+import { extname, join, normalize, sep } from "node:path";
 
 export const MIME = {
   ".html": "text/html; charset=utf-8",
@@ -18,16 +18,26 @@ export const MIME = {
   ".jpeg": "image/jpeg"
 };
 
-// Read a request body with a hard size cap so a runaway upload can't OOM us.
-// Images go through /upload as base64 JSON, so 12MB covers a 5MB image + overhead.
+// Read a request body with a hard, BYTE-accurate size cap so a runaway upload
+// can't OOM us. A 5MB image is ~6.7MB of base64; 12MB covers it + JSON overhead.
+// On overflow we destroy the socket and reject with a TOO_LARGE error so callers
+// can map it to a 413.
 export function readBody(req, limit = 12_000_000) {
   return new Promise((resolve, reject) => {
-    let data = "";
+    const chunks = [];
+    let size = 0;
     req.on("data", (c) => {
-      data += c;
-      if (data.length > limit) reject(new Error("Request too large"));
+      size += c.length; // c is a Buffer — real bytes, not string length
+      if (size > limit) {
+        const err = new Error("Request too large");
+        err.code = "TOO_LARGE";
+        req.destroy();
+        reject(err);
+        return;
+      }
+      chunks.push(c);
     });
-    req.on("end", () => resolve(data));
+    req.on("end", () => resolve(Buffer.concat(chunks).toString("utf8")));
     req.on("error", reject);
   });
 }
@@ -56,7 +66,9 @@ export async function serveStatic(res, dir, urlPath) {
   let p = decodeURIComponent(urlPath);
   if (p === "" || p === "/") p = "/index.html";
   const filePath = normalize(join(dir, p));
-  if (!filePath.startsWith(dir)) {
+  // Resolve strictly under `dir` (exact dir or a child) — not a loose string
+  // prefix that `${dir}-secrets` would satisfy.
+  if (filePath !== dir && !filePath.startsWith(dir + sep)) {
     res.writeHead(403).end("Forbidden");
     return;
   }
@@ -78,7 +90,7 @@ export function sseInit(res) {
   res.writeHead(200, {
     "Content-Type": "text/event-stream; charset=utf-8",
     "Cache-Control": "no-store",
-    Connection: "keep-alive"
+    "X-Accel-Buffering": "no" // disable proxy buffering so frames flush promptly
   });
 }
 
@@ -89,4 +101,17 @@ export function sseSend(res, event, data) {
 
 export function sseEnd(res) {
   res.end();
+}
+
+// A comment frame (ignored by EventSource/clients) used as a heartbeat so proxies
+// don't time out long adaptive-thinking gaps before the first token. Returns a
+// timer the caller must clear when the stream ends.
+export function sseHeartbeat(res, ms = 15000) {
+  return setInterval(() => {
+    try {
+      res.write(`: keepalive\n\n`);
+    } catch {
+      /* socket gone — caller's clear() will fire */
+    }
+  }, ms);
 }

@@ -8,7 +8,7 @@
 //
 // Usage:  ANTHROPIC_API_KEY=sk-ant-... node eval/withholding.js
 
-import { client, MODEL, parseJson, textOf } from "../lib/anthropic.js";
+import { client, MODEL, MAX_TOKENS, parseJson, textOf } from "../lib/anthropic.js";
 import { buildSystem, BEGINNER_SCHEMA } from "../apps/rhino-wizard/prompts.js";
 
 const TASKS = [
@@ -31,7 +31,7 @@ async function askBeginner(task) {
   const system = buildSystem({ mode: task.mode, level: "beginner" });
   const stream = client.messages.stream({
     model: MODEL,
-    max_tokens: 20000,
+    max_tokens: MAX_TOKENS, // prove the production ceiling doesn't truncate the schema
     thinking: { type: "adaptive" },
     system,
     messages: [{ role: "user", content: task.q }],
