@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Rhino Wizard — Grasshopper tutor</title>
+  <link rel="stylesheet" href="/rhino/styles.css" />
+</head>
+<body>
+  <!-- Join gate -->
+  <section id="join" class="join">
+    <h1>Rhino Wizard</h1>
+    <p class="tagline">A Rhino / Grasshopper / GhPython tutor that teaches you the <em>workflow</em>,
+      then makes you build it. It will not hand you the fish at Beginner — on purpose.</p>
+    <form id="join-form">
+      <label>Class code <input id="class_code" autocomplete="off" required /></label>
+      <label>Your name / handle <input id="handle" autocomplete="off" required /></label>
+      <button type="submit">Enter</button>
+      <div id="join-error" class="error" hidden></div>
+    </form>
+  </section>
+
+  <!-- Tutor -->
+  <main id="tutor" hidden>
+    <header class="bar">
+      <div class="who"><strong id="who-name"></strong> · <span id="who-class" class="muted"></span></div>
+      <div class="toggles">
+        <div class="seg" id="mode-seg" data-name="mode">
+          <button data-v="rhino">Rhino</button>
+          <button data-v="grasshopper" class="on">Grasshopper</button>
+          <button data-v="ghpython">GhPython</button>
+        </div>
+        <div class="seg" id="level-seg" data-name="level">
+          <button data-v="beginner" class="on">Beginner</button>
+          <button data-v="moderate">Moderate</button>
+          <button data-v="advanced">Advanced</button>
+        </div>
+        <label class="ver">Version
+          <select id="version">
+            <option>Rhino 8</option>
+            <option>Rhino 7</option>
+            <option>Rhino 6</option>
+          </select>
+        </label>
+        <label class="ground"><input type="checkbox" id="grounded" /> Use KB</label>
+      </div>
+    </header>
+
+    <div id="thread" class="thread"></div>
+
+    <!-- Report-back gate (shown when the tutor is waiting) -->
+    <div id="gate" class="gate" hidden>
+      <strong>Report back first.</strong>
+      <div id="gate-prompt" class="muted"></div>
+      <textarea id="gate-input" rows="2" placeholder="What did you observe when you tried it? (branch count, error text, what changed…)"></textarea>
+      <button id="gate-send">Send observation</button>
+    </div>
+
+    <form id="ask-form" class="composer">
+      <div class="attach-row">
+        <label class="attach">📷 Sketch / screenshot
+          <input type="file" id="image" accept="image/*" hidden />
+        </label>
+        <span id="attach-name" class="muted"></span>
+        <button type="button" id="ghx-toggle" class="link">paste .ghx</button>
+      </div>
+      <textarea id="ghx" class="ghx" rows="4" placeholder="Paste .ghx / .gh XML here…" hidden></textarea>
+      <div class="ask-row">
+        <textarea id="question" rows="2" placeholder="Ask about a Rhino command, a Grasshopper definition, or a GhPython snippet…"></textarea>
+        <button id="ask" type="submit">Ask</button>
+      </div>
+    </form>
+  </main>
+
+  <script src="/rhino/app.js"></script>
+</body>
+</html>

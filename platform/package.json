@@ -1,0 +1,19 @@
+{
+  "name": "workshop-platform",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Composition root that hosts the workshop's AI tools under one domain — first the Rhino Wizard tutor, with shared class-code identity, persistence, and an instructor dashboard.",
+  "scripts": {
+    "start": "node server.js",
+    "migrate": "node lib/migrate.js",
+    "seed": "node lib/seed.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.70.0",
+    "pg": "^8.13.0"
+  }
+}

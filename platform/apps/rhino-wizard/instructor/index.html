@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Rhino Wizard — Instructor</title>
+  <link rel="stylesheet" href="/rhino/instructor/styles.css" />
+</head>
+<body>
+  <section id="login" class="login">
+    <h1>Instructor dashboard</h1>
+    <form id="login-form">
+      <label>Class code <input id="class_code" autocomplete="off" required /></label>
+      <label>Instructor key <input id="key" type="password" autocomplete="off" required /></label>
+      <button type="submit">Open</button>
+      <div id="login-error" class="error" hidden></div>
+    </form>
+  </section>
+
+  <main id="dash" hidden>
+    <header class="bar">
+      <h1>Rhino Wizard · <span id="class-label" class="muted"></span></h1>
+      <button id="refresh">↻ Refresh</button>
+    </header>
+
+    <div id="kpis" class="kpis"></div>
+
+    <div class="grid">
+      <section class="panel">
+        <h2>Sticking points</h2>
+        <p class="muted">Concept tags ranked by how many distinct students hit them.</p>
+        <div id="sticking"></div>
+      </section>
+      <section class="panel">
+        <h2>Mode × Level activity</h2>
+        <div id="matrix"></div>
+      </section>
+    </div>
+
+    <section class="panel">
+      <h2>Class roster</h2>
+      <div id="roster"></div>
+    </section>
+
+    <section class="panel">
+      <h2>Recent questions</h2>
+      <div id="questions"></div>
+    </section>
+
+    <section class="panel">
+      <h2>Sketch gallery</h2>
+      <div id="gallery" class="gallery"></div>
+    </section>
+
+    <section class="panel" id="student-panel" hidden>
+      <h2>Student trace · <span id="student-name"></span></h2>
+      <div id="student-trace"></div>
+    </section>
+  </main>
+
+  <script src="/rhino/instructor/dashboard.js"></script>
+</body>
+</html>

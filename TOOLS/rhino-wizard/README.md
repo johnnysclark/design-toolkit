@@ -11,7 +11,10 @@ A correct screenshot the student can't reproduce is a **failure state.**
 > fish at Beginner."* — Rhino Wizard is deliberately the slowest path to working
 > geometry and the fastest path to understanding it.
 
-**Status:** 🟡 planned / scoping. Maps to `TOOL CATALOG IDEAS.md` §6 (Python-for-Rhino Tutor, GH error-doctor, GH-to-plain-English).
+**Status:** 🟢 v1 building. The hosted web app (tutor API + multimodal sketch input +
+persistent tracking + instructor dashboard) lives at [`../../platform/`](../../platform)
+and runs as the first tool on the shared platform. This file remains the design spec.
+Maps to `TOOL CATALOG IDEAS.md` §6 (Python-for-Rhino Tutor, GH error-doctor, GH-to-plain-English).
 
 ---
 

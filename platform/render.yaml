@@ -1,0 +1,31 @@
+# Render Blueprint — one always-on Node web service + one managed Postgres.
+# Deploy: push this repo, then in Render → New → Blueprint, point at this file.
+# Set the three sync:false secrets in the dashboard after the first deploy.
+
+services:
+  - type: web
+    name: rhino-wizard
+    runtime: node
+    rootDir: platform
+    plan: starter            # free tier spins down when idle; starter stays warm
+    buildCommand: npm install
+    startCommand: npm run migrate && npm start   # migrate is idempotent
+    healthCheckPath: /healthz
+    envVars:
+      - key: ANTHROPIC_API_KEY
+        sync: false           # set in the Render dashboard — never committed
+      - key: INSTRUCTOR_PASSWORD
+        sync: false
+      - key: CLASS_CODE
+        sync: false           # seeds the default class on first migrate
+      - key: CLASS_NAME
+        sync: false
+      - key: DATABASE_URL
+        fromDatabase:
+          name: rhino-db
+          property: connectionString
+
+databases:
+  - name: rhino-db
+    plan: free                # studio scale fits free/starter; upgrade if needed
+    databaseName: workshop
