@@ -6,7 +6,7 @@
 // World coords: +X East, +Y North, +Z Up; three.js is Y-up so map (x,y,z)->(x,z,y).
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
-import { perFaceSolar, sunDirection, terrainHeight, rotZ } from "./core.js";
+import { solarField, sunDirection, terrainHeight, rotZ } from "./core.js";
 
 const v3 = (p) => new THREE.Vector3(p[0], p[2], p[1]);
 const tf = (lx, ly, lz, R, cx, cy, north) => { const p = rotZ([lx, ly, 0], R); const w = rotZ([p[0] + cx, p[1] + cy, 0], north); return [w[0], w[1], lz]; };
@@ -54,7 +54,7 @@ export function createViewport(canvas) {
   // legend overlay (analysis mode)
   const legend = document.createElement("div");
   legend.className = "lblegend"; legend.style.display = "none";
-  legend.innerHTML = `<span>more&nbsp;☀</span><div class="lbbar"></div><span>less</span>`;
+  legend.innerHTML = `<span class="lbtitle">yearly sun</span><span class="lbmax">–</span><div class="lbbar"></div><span class="lbmin">–</span>`;
   legend.querySelector(".lbbar").style.background = "linear-gradient(to top,#1946a0,#00a0cd,#00ac5c,#e8de34,#f28c1c,#c81e1e)";
   canvas.parentElement.appendChild(legend);
 
@@ -68,6 +68,7 @@ export function createViewport(canvas) {
   let model = null, display = { mode: "pen", shadowIntensity: 0.6, sunHour: 15 };
   let terrainKey = null;
   const faceMeshes = [];   // {mesh, edges, name}
+  const apMeshes = [];     // {mesh, id} aperture glass panels
 
   function setModel(m, d) {
     model = m; if (d) display = Object.assign(display, d);
@@ -97,7 +98,7 @@ export function createViewport(canvas) {
   }
 
   function buildBuilding() {
-    buildingGroup.clear(); faceMeshes.length = 0;
+    buildingGroup.clear(); faceMeshes.length = 0; apMeshes.length = 0;
     const P = model.P, n = model.north;
 
     // plinth slab
@@ -143,6 +144,7 @@ export function createViewport(canvas) {
       const gg = new THREE.BufferGeometry().setFromPoints([cs[0], cs[1], cs[2], cs[0], cs[2], cs[3]].map(v3));
       const glass = new THREE.Mesh(gg, new THREE.MeshBasicMaterial({ color: 0x6f8d96, transparent: true, opacity: 0.25, side: THREE.DoubleSide }));
       buildingGroup.add(glass);
+      apMeshes.push({ mesh: glass, id: ap.id });
     }
   }
 
@@ -204,16 +206,25 @@ export function createViewport(canvas) {
     sun.target.position.set(0, 0, 0);
 
     const analysis = display.mode === "analysis";
-    const solar = analysis && model ? perFaceSolar(model) : null;
+    const field = analysis && model ? solarField(model) : null;
+    const norm = (v) => field.max > 1e-9 ? (v - field.min) / (field.max - field.min) : 0;
     for (const fm of faceMeshes) {
       if (analysis) {
-        const val = solar[fm.name];
-        fm.mesh.material.color.setHex(val === undefined ? 0xd7d2c8 : spectral(val));
+        const val = field.faces[fm.name];
+        fm.mesh.material.color.setHex(val === undefined ? 0xd7d2c8 : spectral(norm(val)));
         fm.edges.visible = false;
       } else {
         fm.mesh.material.color.setHex(0xffffff);
         fm.edges.visible = true;
       }
+    }
+    if (analysis) {
+      const byId = Object.fromEntries(field.apertures.map((a) => [a.id, a.val]));
+      for (const am of apMeshes) { am.mesh.material.color.setHex(spectral(norm(byId[am.id] ?? field.min))); am.mesh.material.opacity = 0.92; }
+      legend.querySelector(".lbmax").textContent = field.max.toFixed(2);
+      legend.querySelector(".lbmin").textContent = field.min.toFixed(2);
+    } else {
+      for (const am of apMeshes) { am.mesh.material.color.setHex(0x6f8d96); am.mesh.material.opacity = 0.25; }
     }
     legend.style.display = analysis ? "flex" : "none";
     northArrow.setColor(new THREE.Color(analysis ? 0x888888 : 0x333333));

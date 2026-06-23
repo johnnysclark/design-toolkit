@@ -57,7 +57,7 @@ DEFAULTS = {
         ],
     },
     "site": {
-        "latitude": 42, "northAngle": 0, "windFromAz": 270, "windSpeed": 5,
+        "latitude": 42, "longitude": -71, "northAngle": 0, "windFromAz": 270, "windSpeed": 5,
         "deltaT": 6, "viewTargetAz": 180, "eyeHeight": 1.6,
         "terrain": {"plateauZ": -0.8, "ravineDepth": 9, "ravineEdge": 6, "ravineWidth": 5, "ravineAngle": 18, "undAmp": 0.25},
     },

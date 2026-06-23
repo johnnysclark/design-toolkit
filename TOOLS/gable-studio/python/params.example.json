@@ -66,6 +66,7 @@
   },
   "site": {
     "latitude": 42,
+    "longitude": -71,
     "northAngle": 0,
     "windFromAz": 270,
     "windSpeed": 5,

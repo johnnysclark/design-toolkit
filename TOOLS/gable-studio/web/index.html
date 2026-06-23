@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Gable Studio · site analyzer + constraint generator</title>
   <link rel="stylesheet" href="./styles.css" />
+  <link rel="stylesheet" href="./vendor/leaflet/leaflet.css" />
   <!-- Zero-build. three.js is VENDORED in ./vendor (works offline — good for
        classroom wifi). rhino3dm (only used for optional .3dm import) loads from
        CDN and is lazy: if it's blocked, the rest of the app still works. Serve
@@ -31,6 +32,8 @@
 
   <nav class="toolbar">
     <button id="btn-mode">◫ Pen mode</button>
+    <button id="btn-map">📍 Location</button>
+    <button id="btn-info">ⓘ Sources &amp; math</button>
     <span class="sep"></span>
     <button id="btn-export" class="primary">⤓ Export Rhino/GH scripts</button>
     <button id="btn-import-3dm">⤒ Import .3dm</button>
@@ -69,6 +72,53 @@
     </section>
   </main>
 
+  <!-- Location picker -->
+  <div id="mapModal" class="modal" style="display:none">
+    <div class="modal-box">
+      <div class="modal-head"><b>Set location</b> <span class="modal-sub" id="map-readout">—</span><button class="modal-x" data-close="mapModal">✕</button></div>
+      <p class="modal-note">Click the map to set latitude &amp; longitude. The solar model uses <b>latitude</b> (sun altitude/azimuth); longitude is recorded for reference (the proxy assumes local solar time).</p>
+      <div id="map"></div>
+    </div>
+  </div>
+
+  <!-- Sources & math -->
+  <div id="infoModal" class="modal" style="display:none">
+    <div class="modal-box wide">
+      <div class="modal-head"><b>Where the analysis comes from</b><button class="modal-x" data-close="infoModal">✕</button></div>
+      <div class="modal-scroll">
+        <p class="modal-note"><b>These are transparent teaching proxies, not validated simulation.</b> Each metric is a pure, deterministic function of the parameters — the same formula runs in the browser and in the exported Rhino/Grasshopper python (a parity test checks they agree). For certified analysis use Ladybug Tools / EnergyPlus (energy), Radiance (daylight), or CFD (wind).</p>
+
+        <h4>Frame &amp; sun position</h4>
+        <p>+X East, +Y North, +Z Up; azimuth clockwise from North. Sun is sampled at 3 declinations (δ = +23.45° summer, 0° equinox, −23.45° winter) × 5 hours (08–16). Altitude: <code>sin α = sin φ·sin δ + cos φ·cos δ·cos H</code>; azimuth: <code>cos A = (sin δ − sin φ·sin α)/(cos φ·cos α)</code>, with hour angle <code>H = 15°·(hour−12)</code>. <em>Standard solar geometry — Duffie &amp; Beckman, “Solar Engineering of Thermal Processes”; NOAA solar-position equations.</em></p>
+
+        <h4>Solar gain <span class="src">idx</span></h4>
+        <p>Direct-beam incidence proxy: <code>Σ area · max(0, n·L)</code> over the sun samples (Lambert cosine law), summed over the whole envelope and, separately, over the glazed apertures (“useful” gain), split by season and orientation. <em>Ignores diffuse/cloud, glazing transmittance, and self-shading — so read it as relative, not W.</em></p>
+
+        <h4>Wind exposure &amp; load <span class="src">m² · N</span></h4>
+        <p>Windward projected area <code>Σ A · max(0, n·f)</code> (f = wind-from direction). Load proxy = dynamic pressure <code>q = ½·ρ·V²</code> (ρ = 1.225 kg/m³) × exposure. <em>ASHRAE / Eurocode EN 1991-1-4 dynamic pressure; true pressure coefficients need wind-tunnel/CFD.</em></p>
+
+        <h4>Wind channelling <span class="src">×</span></h4>
+        <p>Plan “throat” ratio between the walls and the plinth across the wind (continuity/venturi heuristic): wider building ÷ narrowest side gap. A massing cue, not CFD.</p>
+
+        <h4>Stack ventilation <span class="src">idx · m</span></h4>
+        <p>Buoyancy-driven flow <code>Q = Cd · A* · √(2g·Δz·ΔT/T)</code>, effective opening area <code>A* = 1/√(1/A_in² + 1/A_out²)</code>, with low apertures as inlets and high ones (incl. the roof) as outlets; Cd = 0.61, T = 293 K. <em>CIBSE AM10 “Natural ventilation in non-domestic buildings”; ASHRAE Fundamentals.</em></p>
+
+        <h4>Views <span class="src">sr</span></h4>
+        <p>Projected solid angle of each aperture from an interior eye point, <code>Ω ≈ A·cos θ / r²</code>; “view toward target” weights Ω by alignment to a chosen azimuth; “sky view” uses the roof aperture upward. <em>Solid-angle / view-factor geometry.</em></p>
+
+        <h4>Earth coupling &amp; thermal mass <span class="src">m² · MJ/K·m³</span></h4>
+        <p>Soil-contact area = plinth faces below the terrain height; thermal-mass ratio = (slab volume × ≈2.0 MJ/m³·K for concrete) ÷ enclosed volume; buried fraction = slab side below grade ÷ thickness. <em>Concrete volumetric heat capacity ≈ 2.0 MJ/m³·K, CIBSE Guide A; steady-geometry proxy, not transient heat-flow.</em></p>
+
+        <h4>Terrain</h4>
+        <p>The ravine is procedural: a smoothstep drop across an edge plus gentle sinusoidal undulation (Perlin smoothstep <code>t²(3−2t)</code>) — illustrative ground, not survey data.</p>
+
+        <h4>Location</h4>
+        <p>Latitude/longitude are picked on an OpenStreetMap basemap (© OpenStreetMap contributors). Only latitude enters the solar proxy.</p>
+      </div>
+    </div>
+  </div>
+
+  <script src="./vendor/leaflet/leaflet.js"></script>
   <script type="module" src="./app.js"></script>
 </body>
 </html>

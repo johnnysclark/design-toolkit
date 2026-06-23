@@ -45,7 +45,7 @@ export const DEFAULTS = {
     ],
   },
   site: {
-    latitude: 42, northAngle: 0, windFromAz: 270, windSpeed: 5,
+    latitude: 42, longitude: -71, northAngle: 0, windFromAz: 270, windSpeed: 5,
     deltaT: 6, viewTargetAz: 180, eyeHeight: 1.6,
     terrain: { plateauZ: -0.8, ravineDepth: 9, ravineEdge: 6, ravineWidth: 5, ravineAngle: 18, undAmp: 0.25 },
   },
@@ -300,16 +300,16 @@ export function analyze(params, site) {
   return { model, metrics: computeMetrics(model) };
 }
 
-// Viewport-only: per-face average solar incidence, normalized 0..1.
-export function perFaceSolar(model) {
+// Viewport-only solar field for Analysis mode: average daylight incidence per
+// face AND per aperture (raw, comparable), plus the min/max for the legend.
+export function solarField(model) {
   const sun = sunSamples(model.site.latitude);
-  const res = {}; let mx = 1e-9;
-  for (const f of model.faces) {
-    let s = 0; for (const u of sun) if (u.up) s += Math.max(0, dot(f.n, u.L));
-    s /= N_SUN; res[f.name] = s; if (s > mx) mx = s;
-  }
-  for (const k in res) res[k] /= mx;
-  return res;
+  const inc = (nrm) => { let s = 0, c = 0; for (const u of sun) if (u.up) { s += Math.max(0, dot(nrm, u.L)); c++; } return c ? s / c : 0; };
+  const faces = {}; let mn = Infinity, mx = -Infinity;
+  for (const f of model.faces) { const v = inc(f.n); faces[f.name] = v; if (v < mn) mn = v; if (v > mx) mx = v; }
+  const apertures = model.apertures.map((a) => ({ id: a.id, val: inc(a.n) }));
+  for (const a of apertures) { if (a.val < mn) mn = a.val; if (a.val > mx) mx = a.val; }
+  return { faces, apertures, min: mn === Infinity ? 0 : mn, max: mx <= 0 ? 1e-9 : mx };
 }
 
 // ---------------------------------------------------------------------------

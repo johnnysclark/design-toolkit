@@ -66,9 +66,15 @@ the parity test.)
 - **Pen mode** (default) — a white-paper **hidden-line** drawing (white faces
   occlude the black edges behind them) with **crisp cast shadows** on the ravine
   terrain (with contour lines). Drag **shadow intensity** and **sun hour**.
-- **Analysis mode** — **Ladybug-style** spectral colouring of the envelope by
-  yearly solar incidence, with a legend and day-arc sun paths. Toggle with the
-  **◫ / ☀** button.
+- **Analysis mode** — **Ladybug-style** spectral colouring of the envelope **and
+  the apertures** by yearly solar incidence, with a numeric legend (min–max) and
+  day-arc sun paths. Toggle with the **◫ / ☀** button.
+
+## Toolbar extras
+- **📍 Location** — click an OpenStreetMap basemap to set **latitude & longitude**
+  (the solar proxy uses latitude; the map tiles need internet, the rest doesn't).
+- **ⓘ Sources & math** — every metric's formula, assumptions, and citations, so
+  students can see exactly where each number comes from (and that they're proxies).
 
 ---
 
@@ -121,8 +127,9 @@ the **browser-computed metrics** for the self-test), `ruleset.json`, and:
 
 | File | Use |
 |---|---|
+| `gable.3dm` | the massing as **native Rhino geometry**, baked in the browser (`rhino3dm` WASM) on `Plinth/Walls/Roof/Apertures` layers — open it straight in Rhino. Present unless `rhino3dm` is blocked, in which case `run_rhino3dm.py` regenerates it. |
 | `gable_core.py` | shared geometry + metric maths (no Rhino needed) |
-| `run_rhino3dm.py` | plain `python3` — recompute, **parity self-test**, rule table, writes `gable.3dm` |
+| `run_rhino3dm.py` | plain `python3` — recompute, **parity self-test**, rule table, (re)writes `gable.3dm` |
 | `run_rhinocommon.py` | paste into **Rhino 8 ScriptEditor** — builds + bakes on tidy layers |
 | `gh_component.py` | paste into a **Grasshopper Script (python 3)** component — geometry + metrics + pass/fail |
 
@@ -165,6 +172,8 @@ test/  parity.mjs · parity_check.py
 - Gable ends are left open (clerestory look) since walls and roof are independent rectangles.
 - No self-shading ray cast yet; the ravine terrain casts shadows but doesn't shade the solar metric.
 - `.3dm` import recovers footprints/heights, not rotations or roof pitches (bbox method).
+- The solar proxy uses **latitude** only (local solar time assumed); longitude is recorded but doesn't change the numbers. Map tiles need internet (clicking still works offline).
+- Every metric is checked by `test/sensitivity.mjs` to actually respond to parameter changes (all 29 respond; none dead/non-finite).
 
 ## Stretch (next)
 Self-shading ray casts · a real `.gh` definition / cluster · a parameter-sweep

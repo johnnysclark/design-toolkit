@@ -6,6 +6,8 @@
   "description": "Site-analyzer + constraint-generator + Rhino 8 round-trip for the prototypical gable massing. The web app is zero-build (no npm install needed) — this file only lets Node treat core.js as ESM for the parity test.",
   "scripts": {
     "serve": "python3 -m http.server 8000",
-    "parity": "node test/parity.mjs && python3 test/parity_check.py"
+    "parity": "node test/parity.mjs && python3 test/parity_check.py",
+    "sensitivity": "node test/sensitivity.mjs",
+    "test": "node test/parity.mjs && python3 test/parity_check.py && node test/sensitivity.mjs"
   }
 }

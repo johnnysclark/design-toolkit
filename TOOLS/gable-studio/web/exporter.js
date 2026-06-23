@@ -4,6 +4,7 @@
 // match (proving the loop). Zero codegen-by-string: the python is shipped as-is
 // from ../python so it can't drift from what's in the repo.
 import { makeZip } from "./zip.js";
+import { buildThreeDM } from "./rhinoExport.js";
 
 const PY_FILES = ["gable_core.py", "run_rhino3dm.py", "run_rhinocommon.py", "gh_component.py"];
 
@@ -21,10 +22,13 @@ ruleset.json holds your rules. The python recomputes the metrics and checks them
 against params.json (a built-in parity self-test).
 
 WHAT'S HERE
+  gable.3dm              the massing as native Rhino geometry, ready to open
+                        (Plinth / Walls / Roof / Apertures layers) — built in the
+                        browser; present unless rhino3dm failed to load
   params.json            your params + site + browser-computed metrics
   ruleset.json           your rules
   gable_core.py          the shared geometry+metric maths (no Rhino needed)
-  run_rhino3dm.py        plain python: recompute, evaluate rules, write a .3dm
+  run_rhino3dm.py        plain python: recompute, evaluate rules, (re)write a .3dm
   run_rhinocommon.py     paste into Rhino 8 ScriptEditor: builds + bakes geometry
   gh_component.py        paste into a Grasshopper GHPython / Script component
 
@@ -43,7 +47,7 @@ LAYER CONVENTION (so the web app can re-import):
   Plinth, Walls, Roof, Apertures, Report
 `;
 
-export async function buildExportZip(state, metrics) {
+export async function buildExportZip(state, metrics, model) {
   const dir = "gable-studio-export/";
   const files = [
     { name: dir + "params.json", data: JSON.stringify({ params: state.params, site: state.site, metrics }, null, 2) },
@@ -52,7 +56,10 @@ export async function buildExportZip(state, metrics) {
   ];
   const py = await Promise.all(PY_FILES.map((f) => fetchText(`../python/${f}`)));
   PY_FILES.forEach((f, i) => files.push({ name: dir + f, data: py[i] }));
-  return makeZip(files);
+  // native .3dm baked in the browser (best-effort; null if rhino3dm is blocked)
+  let dmOk = false;
+  try { const bytes = model ? await buildThreeDM(model) : null; if (bytes && bytes.length) { files.push({ name: dir + "gable.3dm", data: bytes }); dmOk = true; } } catch (e) { /* keep python fallback */ }
+  return { blob: makeZip(files), dmOk };
 }
 
 export function download(blob, name) {
