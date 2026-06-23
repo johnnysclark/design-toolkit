@@ -1,0 +1,12 @@
+{
+  "name": "Earth-coupled retreat",
+  "intent": "Bed the plinth into soil for thermal stability, shelter from wind, glaze conservatively but keep one good view.",
+  "rules": [
+    { "id": "ecr1", "lhs": "buriedFraction", "op": ">=", "rhs": 0.5, "weight": 2, "hard": true },
+    { "id": "ecr2", "lhs": "soilContactArea", "op": ">=", "rhs": 95, "weight": 1, "hard": false },
+    { "id": "ecr3", "lhs": "thermalMassRatio", "op": ">=", "rhs": 0.9, "weight": 1, "hard": false },
+    { "id": "ecr4", "lhs": "windExposure", "op": "<=", "rhs": 45, "weight": 2, "hard": true },
+    { "id": "ecr5", "lhs": "viewQuality", "op": ">=", "rhs": 0.18, "weight": 1, "hard": false },
+    { "id": "ecr6", "lhs": "glazingRatio", "op": "<=", "rhs": 0.08, "weight": 1, "hard": false }
+  ]
+}

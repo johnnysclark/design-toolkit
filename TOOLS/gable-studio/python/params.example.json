@@ -1,0 +1,91 @@
+{
+  "params": {
+    "Wp": 8,
+    "Dp": 10,
+    "Hp": 0.8,
+    "Rp": 0,
+    "e": 0.0,
+    "Wr": 6,
+    "Dr": 8,
+    "Hr": 3.2,
+    "Rr": 0,
+    "cx": 0,
+    "cy": 0,
+    "Wroof": 6,
+    "Droof": 8,
+    "Hg": 2.4,
+    "Rg": 0,
+    "apertures": [
+      {
+        "id": "A1",
+        "host": "wall_ny",
+        "u": 0.5,
+        "v": 0.5,
+        "w": 2.6,
+        "h": 1.6
+      },
+      {
+        "id": "A2",
+        "host": "wall_px",
+        "u": 0.5,
+        "v": 0.45,
+        "w": 1.2,
+        "h": 1.3
+      },
+      {
+        "id": "A3",
+        "host": "wall_py",
+        "u": 0.5,
+        "v": 0.35,
+        "w": 1.4,
+        "h": 1.0
+      },
+      {
+        "id": "A4",
+        "host": "roof_b",
+        "u": 0.7,
+        "v": 0.5,
+        "w": 1.0,
+        "h": 1.0
+      }
+    ]
+  },
+  "site": {
+    "latitude": 42,
+    "northAngle": 0,
+    "windFromAz": 270,
+    "windSpeed": 5,
+    "deltaT": 6,
+    "viewTargetAz": 180,
+    "eyeHeight": 1.6
+  },
+  "metrics": {
+    "solarEnvelope": 57.64061273787061,
+    "solarUseful": 2.8249548105740923,
+    "solarSouth": 1.9632938106662225,
+    "solarWinterUseful": 3.811080158765969,
+    "solarSummerUseful": 1.6765781919941447,
+    "overheatRatio": 0.43992204890726366,
+    "windExposure": 52.800000000000004,
+    "windPressure": 808.5000000000001,
+    "channelIndex": 7.999999999999993,
+    "stackIndex": 0.7068213645763604,
+    "stackHeight": 3.4094382022471907,
+    "effectiveOpenArea": 0.9902805384811981,
+    "viewAmount": 0.5182398561888073,
+    "viewQuality": 0.26,
+    "skyView": 0.08336118863248881,
+    "soilContactArea": 80.0,
+    "massVolume": 64.0,
+    "thermalMassRatio": 0.606060606060606,
+    "buriedFraction": 0.0,
+    "enclosedVolume": 211.20000000000002,
+    "envelopeArea": 179.86999267935536,
+    "glazingArea": 8.120000000000001,
+    "glazingRatio": 0.04514371674254244,
+    "surfaceToVolume": 0.8516571623075537,
+    "footprint": 80,
+    "ridgeHeight": 6.4,
+    "pitchDeg": 38.65980825409009
+  }
+}

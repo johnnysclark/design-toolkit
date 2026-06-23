@@ -74,6 +74,7 @@ tools are spec stubs we'll flesh out.
 |---|---|---|---|
 | [`site-analyzer`](TOOLS/site-analyzer) | Feed a site → structured read for design: climate, orientation, terrain, water, constraints, history, links — and the ground exported for Rhino | §1 | ✅ working |
 | [`precedent-librarian`](TOOLS/precedent-librarian) | Dossier builder for design **and** technical references; tags every claim, plays devil's advocate, hands you a verification worksheet | §2 | ✅ working |
+| [`gable-studio`](TOOLS/gable-studio) | Site-analyzer + constraint generator for the prototypical gable massing: shape it, watch live performance *proxies*, write testable rules, export the **same** rules as Rhino 8 / Grasshopper python, and re-import the `.3dm` to re-test (full design↔data loop) | §5/§7 | ✅ working |
 | [`form-helper`](TOOLS/form-helper) | Form-finding governed by site forces (sun, wind, orientation…) acting on a chosen geometry | §5/§7 | 🟡 planned |
 | [`rhino-wizard`](TOOLS/rhino-wizard) | Tutor for Rhino / Grasshopper / GH-Python; mode toggles + Beginner/Moderate/Advanced levels | §6 | 🟡 planned |
 | [`code-zoning-agent`](TOOLS/code-zoning-agent) | Interpret code & zoning for a project, every claim clause-cited and checkable | §3 | 🟡 planned |

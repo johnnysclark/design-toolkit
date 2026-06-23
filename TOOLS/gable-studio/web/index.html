@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Gable Studio · site analyzer + constraint generator</title>
+  <link rel="stylesheet" href="./styles.css" />
+  <!-- Zero-build. three.js is VENDORED in ./vendor (works offline — good for
+       classroom wifi). rhino3dm (only used for optional .3dm import) loads from
+       CDN and is lazy: if it's blocked, the rest of the app still works. Serve
+       the gable-studio/ folder with a static server (see README) and open /web/. -->
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "./vendor/three.module.js",
+      "three/addons/": "./vendor/addons/",
+      "rhino3dm": "https://cdn.jsdelivr.net/npm/rhino3dm@8.17.0/rhino3dm.module.js"
+    }
+  }
+  </script>
+</head>
+<body>
+  <header>
+    <div class="hwrap">
+      <h1>Gable Studio <span class="sub">· analyze → constrain → export → Rhino → re-test</span></h1>
+      <p class="tag">Shape the prototypical massing, watch the performance <em>data</em> move, encode your design
+        intent as testable <em>rules</em>, then export the same constraints as Rhino 8 + Grasshopper python — and
+        re-import the Rhino file to close the loop.</p>
+    </div>
+  </header>
+
+  <nav class="toolbar">
+    <button id="btn-heatmap">☀ Solar heatmap</button>
+    <span class="sep"></span>
+    <button id="btn-export" class="primary">⤓ Export Rhino/GH scripts</button>
+    <button id="btn-import-3dm">⤒ Import .3dm</button>
+    <input type="file" id="file-3dm" accept=".3dm" style="display:none" />
+    <span class="sep"></span>
+    <button id="btn-save-design">Save design</button>
+    <button id="btn-load-design">Load design</button>
+    <button id="btn-save-rules">Save rules</button>
+    <button id="btn-load-rules">Load rules</button>
+    <select id="examples" title="load an example ruleset">
+      <option value="">Example rules…</option>
+      <option value="passive-solar-shed.json">Passive solar shed</option>
+      <option value="earth-coupled-retreat.json">Earth-coupled retreat</option>
+    </select>
+    <span class="sep"></span>
+    <button id="btn-reset">Reset</button>
+  </nav>
+
+  <main>
+    <section class="panel left">
+      <h3>Parameters</h3>
+      <div id="controls"></div>
+    </section>
+
+    <section class="center">
+      <div class="viewbox"><canvas id="view"></canvas></div>
+      <div id="status" class="status"></div>
+    </section>
+
+    <section class="panel right">
+      <h3>Performance data <span class="proxy" title="Simplified, transparent proxies — not validated simulation. Identical maths in the browser and in Rhino.">proxies ⓘ</span></h3>
+      <div id="dashboard"></div>
+      <h3 class="rulesh">Rules <span class="rulesub">— testable constraints</span></h3>
+      <div id="score" class="score"></div>
+      <div id="rules"></div>
+    </section>
+  </main>
+
+  <script type="module" src="./app.js"></script>
+</body>
+</html>
