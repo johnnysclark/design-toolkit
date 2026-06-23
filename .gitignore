@@ -4,6 +4,9 @@
 ~$*
 # Node
 node_modules/
+# crit-board runtime data — SQLite DB (+ WAL sidecars) and uploaded images.
+# Seed assets live in TOOLS/crit-board/seed/assets and ARE committed.
+TOOLS/crit-board/data/
 # Secrets / local env
 .env
 .env.local
