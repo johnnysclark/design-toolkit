@@ -27,5 +27,8 @@ services:
 
 databases:
   - name: rhino-db
-    plan: free                # studio scale fits free/starter; upgrade if needed
+    # Paid so the database stays always-on and is NOT deleted after 90 days (the
+    # free tier is). If Render rejects this slug (they rename tiers occasionally),
+    # remove the `plan` line and pick the smallest paid Postgres in the dashboard.
+    plan: basic-256mb
     databaseName: workshop

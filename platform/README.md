@@ -85,7 +85,14 @@ code + instructor key.
 
 Add more class sections: `node lib/seed.js SECTION2 "Tuesday section"`.
 
-## Deploy (Render)
+## Deploy
+
+**See [`DEPLOY.md`](DEPLOY.md) for the full step-by-step recipe** — a local demo
+(run on your laptop in ~10 min), Render (managed, recommended for a term), and
+UIUC web services (campus cPanel or an Engineering IT VM). The Render quick
+version follows.
+
+### Deploy (Render)
 
 1. Push the repo. In Render → **New → Blueprint**, select `platform/render.yaml`.
    It provisions the web service + a managed Postgres and wires `DATABASE_URL`.

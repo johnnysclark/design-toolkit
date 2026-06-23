@@ -6,7 +6,9 @@
   "description": "Composition root that hosts the workshop's AI tools under one domain — first the Rhino Wizard tutor, with shared class-code identity, persistence, and an instructor dashboard.",
   "scripts": {
     "start": "node server.js",
+    "dev": "node --env-file=.env server.js",
     "migrate": "node lib/migrate.js",
+    "migrate:dev": "node --env-file=.env lib/migrate.js",
     "seed": "node lib/seed.js"
   },
   "engines": {

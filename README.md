@@ -42,7 +42,7 @@ this is still open — candidates in
 |---|---|
 | [`BRAINSTORM/`](BRAINSTORM) | The brainstorm + synthesis material (see below) |
 | [`TOOLS/`](TOOLS) | The working tools — one folder per high-level tool (see below) |
-| [`platform/`](platform) | Hosted multi-tool site: one Node service + Postgres + class-code identity + instructor dashboard. First tool mounted is Rhino Wizard; other tools can mount onto it later |
+| [`platform/`](platform) | Hosted multi-tool site: one Node service + Postgres + class-code identity + instructor dashboard. First tool mounted is Rhino Wizard; other tools can mount onto it later. Hosting recipe: [`platform/DEPLOY.md`](platform/DEPLOY.md) |
 
 **`BRAINSTORM/`** contains:
 - [`SYNTHESIS.md`](BRAINSTORM/SYNTHESIS.md) — the distilled argument: pedagogy, principles, the three lenses for choosing assignments
