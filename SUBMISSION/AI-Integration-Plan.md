@@ -1,83 +1,68 @@
-# AI Integration Plan — Second-Year Design Studio on the Tar Creek Superfund Site
+# AI Integration Plan — ARCH 273, Fundamentals of Design
 
+**John Clark · Teaching Assistant Professor**
 *Summer AI Studio · culminating submission (Part 1) · prepared for cohort share-out*
 
-**Studio:** second-year undergraduate architecture design studio (~16–20 students), fall term.
-**Site:** the Tar Creek Superfund site, Picher, Oklahoma — a lead-and-zinc mining district left with chat piles, undermined ground, contaminated water, and a federally bought-out town on Quapaw Nation land.
-**One-line thesis:** *Stop grading the artifact. Grade the trace.*
+**Stance in three words:** *trust, but verify.*
 
-> **Status note (in the spirit of "this is not a finished product"):** of the eight studio tools below, **two are built and student-testable today** (Site Analyzer, Precedent Librarian); the rest are **specified and in active development**, and one (the studio crit board) is **in design**. What follows is an honest account of where the integration plan has landed and what I still have to figure out — not a finished system.
+> **Status note (in the spirit of "this is not a finished product"):** of the seven tools below, **two are already working and student-testable** (Site Analyzer, Precedent Librarian); the rest are **in progress, specified, or newly scoped.** This is an honest account of where the plan has landed and what's still open — not a finished system.
 
 ---
 
 ## 1. The course and the problem I'm solving
 
-I teach a second-year architecture design studio. This fall I'm siting it on **Tar Creek** — a real, data-rich, genuinely poisoned place — because the problem there (what do you responsibly build on ground that is still remediating?) forces students to reason from evidence instead of from images.
+I teach **ARCH 273, Fundamentals of Design.** My students lack the sophistication to fully **justify their designs** — whether they're working from site-specific environmental forces, historical precedent analysis, or creative form generation. As we strive to do as design-studio teachers, we're trying to level up their **reasoning, synthesis, and analysis** of both a given real-world site *and* the invented buildings that get placed on that site.
 
-The problem I'm actually redesigning around is narrower and more uncomfortable: **my second-years have already adopted AI, and second-years are exactly the students AI hurts most.** They reach for chatbots and image generators for precedents, site "facts," code numbers, and renderings — and AI returns *polished, confident, frequently wrong* answers. A hallucinated precedent reads exactly like a real one. A plausible setback number reads exactly like the code-checked one. Expert designers can see when the output is wrong because they already have the eye; **a novice cannot.** The tool is most dangerous precisely for the learner.
-
-This collides with how studio has always been graded: **we grade the artifact** — the final board, the model, the render. That worked when producing a finished-looking artifact *required* the thinking. It no longer does. When AI can generate a finished-looking artifact in seconds, grading the artifact (a) rewards polish over judgment and (b) can't tell owned work from offloaded work. So the real risk isn't that students "cheat." It's that my novices quietly learn the wrong lesson at the worst possible moment — that **polish is architecture, and AI is an oracle** — and I have no way to see it happening.
-
-My redesign: **move the assessment from the artifact to the *process trace*** — make the whole design process, including every AI interaction, visible, logged, and assessable. If thinking is what I want them to build, then thinking — not the artifact — is what I have to be able to see and grade.
+What's new this year is the lever. **Agentically-coded AI tools can give students logics, language, and data** to make more sophisticated judgments, and let them take on **computational analysis that was out of reach until this year** — solar gain, wind exposure, thermal mass, views, and more, on a real site, in a fundamentals course. The redesign is about putting that reach in students' hands *responsibly*: fast and capable, but disciplined by verification.
 
 ## 2. My AI integration plan — where AI enters, and who does what
 
-AI doesn't enter as a single chatbot bolted onto the studio. It enters as a **suite of custom studio tools, one per phase of the design process**, all built on the same principle (the house pattern for this repo): *hard data is sourced and downloadable; every **model** claim is tagged `✓ verified` / `? unverified` / `⚠ likely-hallucination` and cited; the tool runs an adversarial pass on its own output; and a **verification worksheet + a four-line provenance log** fall out automatically.* The crucial move: **the process record is a byproduct of doing the work, not a reflection essay bolted on afterward.**
+AI enters two ways, and both matter:
 
-Mapped to the studio arc:
+- **Use.** I'll **demo how I vibe-code tools of a more sophisticated caliber** and give students access to use them. These do the heavy computational lifting that used to require expensive software or skills they don't have yet.
+- **Build.** **We'll vibe-code simpler tools together** in class. Students aren't only users — they see how the tools are made, and make some themselves.
 
-| Studio phase | Tool | Status | What the student does / what AI does |
+I foresee these tools becoming **as ubiquitous as the private software students already engage with in school and the profession** (Rhino, the Adobe suite, and the rest). So they should learn to **move quickly and embrace them, iterate often**, in a **"trust but verify" stance** that pushes them to **find edge-cases and failure modes**, and to engage in creative brainstorming with these tools in a **fluid but skeptical manner.**
+
+**The student's role:** the designer in charge. They use AI to extend their reach *and* they verify it — interrogating its output, hunting the places it breaks, deciding what to keep, change, or throw out. **AI's role:** a fast, powerful instrument for logic, language, data, and computational analysis — trusted provisionally and checked against reality, never obeyed.
+
+### The tool suite (and honest status)
+
+| # | Tool | What it does | Status |
 |---|---|---|---|
-| Site research | **Site Analyzer** | ✅ built | Pulls Tar Creek climate, terrain, flood, contamination — every model claim tagged + cited; exports the ground to Rhino. *Student prices each claim's trust; AI is a tagged informant, not a source of truth.* |
-| Precedent research | **Precedent Librarian** | ✅ built | Builds a tagged, cited, self-critiqued precedent dossier. *Student verifies; the tool even refuses to mark anything `✓` when it has no evidence — proving polish ≠ evidence.* |
-| Massing / form | **Form Helper** | 🟡 planned | **Student sets the parti**; site forces (sun, wind, slope, flood) critique it; every move is logged with its reason; an override is logged as authorship. *AI never generates the form.* |
-| Modeling skills | **Rhino Wizard** | 🟡 planned | Teaches Rhino/Grasshopper *workflow* and **refuses to hand finished geometry to a beginner**; a "report-back gate" makes the student observe and report before the next step unlocks. |
-| Code / zoning | **Code-Zoning Agent** | 🟡 planned | Every number points at a clause; "no clause, no number." *Student argues with the code instead of trusting a number a chatbot asserted.* |
-| Crit & portfolio | **Portfolio Storyteller** | 🟡 planned | Question-first (won't draft until the student speaks); attacks the **student's own words**; tracks "% in your words." *Guards against ghostwriting.* |
-| Shared pin-up / crit | **Studio Crit Board** | 🟡 in design | The studio's public board (a self-hosted replacement for Miro) where work **and its traces** live and get critiqued in the open. |
-| Accessibility | **RAP-Tactile-CAD** | 🟡 in progress | Non-visual CAD authoring + a fidelity test (read the drawing back with the screen off; measure what was lost). The equity throughline. |
-| Framing demo | **Design-Thinking Showcase** | 🟡 new | Solves one brief twice — accept-AI's-first-answer vs. run-the-design-loop — and **grades the tape, not the building.** |
-
-**The student's role** is the constant across all of it: the *cognitive agent and critic*. They set the parti, pose the questions, **price the trust** on every AI claim (`✓/?/⚠`), verify externally, decide what to keep / change / reject, and account for it in the log. **AI's role** is a *material with a grain to be interrogated* — by turns a specimen to study, an opponent to argue with, a translator to check, an instrument to wield, a referee to audit, a scribe to capture, a constraint engine to obey — but **never the author**. The tools are deliberately built so AI never hands over the deliverable: no finished parti, no finished geometry for beginners, no exportable AI-written portfolio prose.
-
-**Equity is built in, not asserted:** every *graded* path runs on free/approved tools (the zero-setup "standalone/lite" variants work with no API key), so no graded outcome depends on a paid model.
+| 1 | **Skills / Design Production Tutor** | Chatbot with predetermined expertise that **probes students into dialogue after testing their initial answer** — not an answer-vending machine. | planned |
+| 2 | **Site Analysis / Form Generator** | Analyze a design on a **real-world site** and understand how changes to site/form map to physical characteristics — **solar gain, wind exposure, thermal mass, views**, etc. | analysis ✅ built · form gen 🟡 planned |
+| 3 | **Precedent / Research Machine (Librarian)** | Get more information about the **reference images** students find; also serves as a **class library** of image/text references. | ✅ built (core) |
+| 4 | **Portfolio / Storyteller Helper** | Chatbot tuned to help with **presentations and portfolios**. | planned |
+| 5 | **RAP Toolkit** | Continued development of the **Radical Accessibility Project** — tools for blind/low-vision architectural production: **CLI Rhino driver, tactile-media generator, alt-text generator.** | in progress |
+| 6 | **Drawing Cleanup Tool** | **Photoshop-analog widgets** for various design-studio drawing tasks. | newly scoped |
+| 7 | **Miro Alternative / Studio Culture Generator** | A replacement for our Miro board that **encourages and tracks peer-to-peer engagement** of weekly process drawings. | in design |
 
 ## 3. The student learning outcome
 
-I'm developing **process literacy — the capacity to make design thinking visible.** In one sentence:
+The main outcome is the same one any design studio is after: **leveling up how students explain and justify both the final architectural design *and* the process of getting to that final design.** Teaching students to work with AI follows many of the same basic tenets as teaching them to become **resilient designers.** In one sentence:
 
-> **By the end of the studio, a second-year student can produce and defend a legible trace of their design process — showing where AI entered, what they trusted and why, what they verified, and what they changed — so that their reasoning is visible and ownable, independent of how finished the artifact looks.**
-
-This is deliberately *not* "use AI well" and *not* "make a good building." It's the underlying capacity that survives whatever the tools become: knowing what you did, why, what you trusted, and being able to stand behind it.
+> **By the end of ARCH 273, a student can justify their design — and the process that produced it — with more sophisticated reasoning, synthesis, and analysis, using AI to extend their reach while staying the designer who verifies, decides, and defends the work.**
 
 ## 4. My measurement approach
 
-Because the tools emit the process record automatically, I can collect evidence **without adding busywork**:
+I'll watch the **sophistication of students' justifications climb over the term**, and I'll look for evidence that "trust but verify" is real, not decorative.
 
-- **Four-line provenance logs** — *tool / what I asked / what I kept-changed-rejected / how I verified* — for each AI-touched move.
-- **Verification worksheets** — which claims the student tagged `✓/?/⚠` and how they checked them.
-- **Override events** — every time the student rejected or changed AI output, with the stated reason (logged as authorship).
-- **Trust calibration** — the student's `✓/?/⚠` tags vs. what actually turned out true (hallucinations caught, false trust given).
-- **"% in your words"** — edit-distance on crit/portfolio text, to catch ghostwriting.
-- **Re-derivation checks** — short, *unaided* exercises ("rebuild this move without the tool"; Rhino Wizard's report-back gate) to confirm the logged process is genuinely theirs.
-
-**When:** low-stakes checkpoints at each phase (site, precedent, massing, code, crit), a midterm trace review, and a final "grade-the-trace" assessment — then I compare **early-term vs. late-term** traces for growth.
-
-**How I'll know it's working:** a **trace rubric** scoring (a) specificity and honesty of the log, (b) the number and quality of *justified* overrides, (c) calibration accuracy, and (d) re-derivability. The signal of success is that over the term, traces get **more specific, catch more AI errors, and contain more justified overrides** — and that students can defend their process in crit *without* leaning on how finished the artifact looks. The counter-signal I'm watching for is fluent-but-generic traces — which is exactly my unsolved problem below.
+- **What I collect:** students' design justifications (verbal at pin-ups + written) at each milestone; what they did with AI output — **what they accepted, changed, or rejected, and why**; the **edge-cases and failure modes they caught**; and how many iterations they ran.
+- **When:** at project milestones across the term (early / mid / final), so I can **compare early vs. late** work for the same student.
+- **How I'll know it's working:** a rubric scoring the **sophistication of the justification** (of the design and of the process) and the **genuineness of verification** (did they actually stress-test the AI, or accept it?). Success = justifications get sharper and more specific, and verification gets more genuine, as the term goes on — and students can defend their decisions without hiding behind a finished-looking image.
 
 ## 5. My key challenge / design tension
 
-**The moment I grade the trace, I create an incentive to *perform* the trace.**
+**Performative verification.** "Trust but verify" is easy to *say* and easy to *fake*. A fundamentals student — a relative novice — can slide one of two ways: accept the AI's confident output uncritically, or **perform** skepticism (tick the boxes, say the right things) without genuinely hunting edge-cases and failure modes. And the obvious fix backfires: if I police the verification step too hard, it becomes a punitive, bureaucratic tax that kills the genuine, curious version right along with the fake one.
 
-A clever second-year can learn to *fake* a clean provenance log and stage a theatrical "critique of the AI" — ticking the `✓/?/⚠` boxes, writing reasonable-sounding overrides — without doing any of the actual thinking. Novices are *especially* good at telling a teacher what the teacher wants to see. And the obvious fix makes it worse: if I police the documentation hard and demand ever more of it, the trace becomes a punitive, bureaucratic tax that kills the *genuine* reflective version right alongside the fake one.
-
-**The stakes if I get this wrong:** the whole redesign inverts. "Grade the trace" silently becomes "grade the *performance* of a trace." My novices learn to **launder offloading through good-looking logs** — a more sophisticated, better-disguised version of the exact problem I started with. Process literacy collapses into theater, and I've made the problem more elegant instead of solving it. That is a real possibility, and I don't yet have a fix I trust. (Partial moves I'm weighing: unaided re-derivation checks, live oral defense in crit, designing the tools so the log is genuinely *useful* to the student — low incentive to fake what helps you — and calibration scoring that exposes faked trust tags when reality contradicts them. I don't know if they're enough, or if they just escalate an arms race.)
+**The stakes:** if I get this wrong, students walk away with **pro-level reach but not the judgment to wield it** — they can produce sophisticated computational analysis and polished output, but can't actually justify it. That's *sophistication without justification*, which is exactly the gap I set out to close, now hidden behind better tools.
 
 ---
 
 ## My question for the cohort
 
-> **I'm grading the design-process trace instead of the artifact — but that rewards students who can *perform* a process: fake a clean provenance log and stage a critique of the AI without real thinking, which my second-year novices are especially good at. How do you build accountability that distinguishes *genuine* reflection from *performed* reflection — without policing the documentation so hard that it becomes punitive and kills the honest version too?**
+> **I want students to genuinely "trust but verify" — to really hunt the edge-cases and failure modes in AI output, not just perform skepticism for a grade. How do you build that habit so it's authentic, especially with novices in a fundamentals course — without policing the verification step so hard that it turns punitive and kills the honest version too?**
 
 ---
 

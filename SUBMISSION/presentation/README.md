@@ -1,4 +1,4 @@
-# Presentation — "Grading the Trace" (Part 2)
+# Presentation — "Trust, but Verify" (Part 2)
 
 A self-contained 7-slide deck for the 5–7 minute cohort share-out. No build, no
 dependencies, no network needed — just open the HTML file.
@@ -29,10 +29,10 @@ export PPTX/PDF). It just needs the tool-approval that was declined earlier.
 ## Slide map
 | # | Beat | Content |
 |---|---|---|
-| 1 | Title | *Grading the Trace* — Tar Creek, 2nd-year studio |
-| 2 | The problem | AI is most dangerous for the novice; we've always graded the artifact |
-| 3 | The integration | A trace-generating tool at each studio phase; student = agent, AI = material |
-| 4 | The outcome | Process literacy — the one-sentence outcome |
-| 5 | Measurement | The tools emit the evidence; the trace rubric; the four-line log |
-| 6 | The challenge | Performative process — the unsolved tension and its stakes |
-| 7 | Cohort question | Genuine vs. performed reflection, without policing it into a tax |
+| 1 | Title | *Trust, but Verify* — John Clark · ARCH 273, Fundamentals of Design |
+| 2 | The problem | Students can't yet justify their designs; agentic tools put computational analysis within reach |
+| 3 | Where AI fits | **Use** sophisticated tools + **build** simpler ones together; the *trust but verify* stance |
+| 4 | The tool suite | Seven studio tools with honest built / in-progress / planned status |
+| 5 | Outcome + measurement | Justify the design **and** the process; rubric on sophistication + genuine verification, early → late |
+| 6 | The challenge | "Trust but verify" is easy to fake — performative verification and its stakes |
+| 7 | Cohort question | Making verification authentic without policing it into a punitive tax |
