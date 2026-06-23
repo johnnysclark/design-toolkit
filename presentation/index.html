@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI in the Design Studio — Cohort Presentation</title>
+<style>
+  :root{
+    --paper:#f7f4ef; --ink:#181613; --muted:#6f6a62; --rule:#e2dbcf;
+    --accent:#bb3b32;      /* crit red — the markup color */
+    --gold:#c08a2d;        /* override = authorship */
+    --green:#2f7d4f; --amber:#b07d12; --red:#b23b34;
+    --card:#fffdf9;
+    --mono:ui-monospace,"SF Mono","JetBrains Mono",Menlo,Consolas,monospace;
+    --sans:ui-sans-serif,system-ui,-apple-system,"Helvetica Neue",Arial,sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{
+    background:var(--paper); color:var(--ink); font-family:var(--sans);
+    overflow:hidden; -webkit-font-smoothing:antialiased;
+  }
+  /* ---- deck chrome ---- */
+  .topbar{
+    position:fixed; top:0; left:0; right:0; height:46px; z-index:50;
+    display:flex; align-items:center; justify-content:space-between;
+    padding:0 clamp(16px,3vw,42px); font-family:var(--mono);
+    font-size:12px; letter-spacing:.08em; text-transform:uppercase; color:var(--muted);
+    mix-blend-mode:multiply; pointer-events:none;
+  }
+  .topbar .brand{color:var(--ink)}
+  .topbar .brand b{color:var(--accent)}
+  .progress{position:fixed;top:0;left:0;height:3px;background:var(--accent);z-index:60;width:0;transition:width .4s ease}
+  .counter{position:fixed;bottom:14px;right:clamp(16px,3vw,42px);z-index:50;font-family:var(--mono);font-size:12px;color:var(--muted);pointer-events:none}
+  .hint{position:fixed;bottom:14px;left:clamp(16px,3vw,42px);z-index:50;font-family:var(--mono);font-size:11px;color:var(--muted);letter-spacing:.05em;opacity:.9;transition:opacity .6s;pointer-events:none}
+  .dots{position:fixed;bottom:13px;left:50%;transform:translateX(-50%);z-index:55;display:flex;gap:9px}
+  .dots button{width:8px;height:8px;border-radius:50%;border:1px solid var(--muted);background:transparent;cursor:pointer;padding:0;transition:all .25s}
+  .dots button.on{background:var(--accent);border-color:var(--accent);transform:scale(1.25)}
+
+  /* ---- slides ---- */
+  .stage{position:relative;height:100%;width:100%}
+  .slide{
+    position:absolute; inset:0; display:flex; flex-direction:column; justify-content:center;
+    padding:clamp(48px,7vw,120px) clamp(28px,7vw,130px) clamp(60px,7vh,90px);
+    opacity:0; transform:translateY(14px); pointer-events:none;
+    transition:opacity .5s ease,transform .5s ease;
+  }
+  .slide.active{opacity:1;transform:none;pointer-events:auto}
+  .kicker{font-family:var(--mono);font-size:clamp(11px,1.1vw,14px);letter-spacing:.18em;text-transform:uppercase;color:var(--accent);margin-bottom:18px}
+  .kicker .n{color:var(--muted)}
+  h1{font-size:clamp(34px,6.4vw,88px);line-height:1.02;letter-spacing:-.02em;font-weight:800}
+  h2{font-size:clamp(28px,4.6vw,62px);line-height:1.04;letter-spacing:-.015em;font-weight:800;max-width:18ch}
+  .lede{font-size:clamp(17px,1.9vw,26px);line-height:1.45;color:#36322c;max-width:40ch;margin-top:22px}
+  .muted{color:var(--muted)}
+  .accent{color:var(--accent)}
+  .gold{color:var(--gold)}
+  .rule{height:1px;background:var(--rule);margin:26px 0;border:0}
+  .small{font-size:clamp(13px,1.2vw,16px);line-height:1.5;color:#4a463f}
+
+  /* title slide */
+  #s1{justify-content:space-between}
+  #s1 .top{display:flex;flex-direction:column;gap:8px}
+  #s1 .eyebrow{font-family:var(--mono);font-size:clamp(12px,1.2vw,15px);letter-spacing:.16em;text-transform:uppercase;color:var(--muted)}
+  #s1 h1{max-width:16ch}
+  #s1 .sub{font-size:clamp(18px,2.1vw,30px);color:#3a362f;margin-top:20px;max-width:30ch;line-height:1.3}
+  #s1 .meta{display:flex;flex-wrap:wrap;gap:10px 26px;align-items:baseline;font-family:var(--mono);font-size:clamp(12px,1.15vw,15px);color:var(--muted);letter-spacing:.04em}
+  #s1 .meta .who{color:var(--ink)}
+  .onerule{font-family:var(--mono);font-size:clamp(13px,1.3vw,17px);color:var(--gold);letter-spacing:.02em}
+
+  /* two-column */
+  .cols{display:grid;grid-template-columns:1fr 1fr;gap:clamp(28px,5vw,72px);align-items:start}
+  .cols .col h3{font-family:var(--mono);font-size:13px;letter-spacing:.12em;text-transform:uppercase;color:var(--accent);margin-bottom:14px}
+  .cols .col p{font-size:clamp(15px,1.55vw,21px);line-height:1.46;color:#36322c}
+  .cols .col p + p{margin-top:14px}
+
+  .pull{font-size:clamp(26px,4.4vw,58px);line-height:1.08;letter-spacing:-.01em;font-weight:800;max-width:20ch}
+  .pull .accent{color:var(--accent)}
+
+  /* loop equivalence */
+  .loop{display:flex;flex-wrap:wrap;gap:14px 10px;align-items:center;margin-top:30px;font-family:var(--mono);font-size:clamp(13px,1.5vw,20px)}
+  .loop .chip{background:var(--card);border:1px solid var(--rule);border-radius:999px;padding:8px 16px;white-space:nowrap}
+  .loop .arr{color:var(--accent);font-weight:700}
+  .loop .eq{color:var(--gold);font-weight:800;font-size:1.3em;padding:0 6px}
+
+  /* tool grid */
+  .tools{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:26px}
+  .tcard{background:var(--card);border:1px solid var(--rule);border-radius:12px;padding:16px 16px 14px;display:flex;flex-direction:column;gap:7px;min-height:118px}
+  .tcard .nm{font-weight:800;font-size:clamp(14px,1.35vw,18px);letter-spacing:-.01em}
+  .tcard .ds{font-size:clamp(11.5px,1.05vw,13.5px);line-height:1.4;color:#4a463f}
+  .tcard .st{font-family:var(--mono);font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-top:auto}
+  .tcard.built{border-color:#cfe3d6;background:#f4faf6}
+  .tcard.built .st{color:var(--green)}
+  .roles{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:24px}
+  .role{border-left:3px solid var(--accent);padding:4px 0 4px 16px}
+  .role.ai{border-left-color:var(--muted)}
+  .role .lab{font-family:var(--mono);font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--accent);margin-bottom:6px}
+  .role.ai .lab{color:var(--muted)}
+  .role p{font-size:clamp(14px,1.4vw,19px);line-height:1.4;color:#322e28}
+  .role b{color:var(--ink)}
+
+  /* demo buttons */
+  .demos{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-top:30px;max-width:980px}
+  a.demo{display:flex;flex-direction:column;gap:8px;text-decoration:none;color:inherit;background:var(--card);border:1px solid var(--rule);border-radius:14px;padding:22px 22px 20px;transition:transform .18s ease,box-shadow .18s ease,border-color .18s}
+  a.demo:hover{transform:translateY(-3px);box-shadow:0 12px 28px rgba(40,30,20,.10);border-color:var(--accent)}
+  a.demo .nm{font-weight:800;font-size:clamp(17px,1.7vw,23px);display:flex;align-items:center;gap:10px}
+  a.demo .nm .go{font-family:var(--mono);font-size:12px;color:var(--accent);letter-spacing:.06em;border:1px solid var(--accent);border-radius:6px;padding:2px 8px}
+  a.demo .ds{font-size:clamp(13px,1.25vw,16px);line-height:1.45;color:#43403a}
+  .demonote{margin-top:22px;font-family:var(--mono);font-size:12.5px;color:var(--muted)}
+
+  /* tags */
+  .tag{display:inline-block;font-family:var(--mono);font-size:.78em;font-weight:700;padding:1px 7px;border-radius:5px;letter-spacing:.02em;vertical-align:middle}
+  .tag.v{background:#e7f3ec;color:var(--green)}
+  .tag.q{background:#f7efda;color:var(--amber)}
+  .tag.w{background:#f6e4e2;color:var(--red)}
+
+  /* outcome */
+  #s6 h2{max-width:26ch;font-size:clamp(30px,5vw,72px)}
+  #s6 .define{display:flex;gap:30px;margin-top:30px;flex-wrap:wrap}
+  #s6 .define div{font-size:clamp(14px,1.4vw,19px);color:#43403a;max-width:24ch}
+  #s6 .define b{color:var(--accent);font-family:var(--mono);font-size:.85em;letter-spacing:.06em;text-transform:uppercase;display:block;margin-bottom:4px}
+
+  /* measure / log */
+  .measure{display:grid;grid-template-columns:1.05fr .95fr;gap:clamp(28px,4vw,60px);align-items:center;margin-top:14px}
+  .mlist{list-style:none;display:flex;flex-direction:column;gap:13px}
+  .mlist li{display:flex;gap:13px;align-items:flex-start;font-size:clamp(14px,1.4vw,19px);line-height:1.34;color:#322e28}
+  .mlist li b{color:var(--ink)}
+  .mlist .ic{font-family:var(--mono);color:var(--accent);font-weight:800;flex:0 0 auto;margin-top:.1em}
+  .logbox{background:#1c1a17;border-radius:14px;padding:22px 22px;font-family:var(--mono);font-size:clamp(11px,1.05vw,14px);line-height:1.7;color:#e9e3d7;box-shadow:0 16px 40px rgba(30,20,10,.18)}
+  .logbox .h{color:#9a9486;text-transform:uppercase;letter-spacing:.12em;font-size:.82em;margin-bottom:12px}
+  .logbox .k{color:#e0a04a}
+  .logbox .ok{color:#7fc99a}
+  .logbox .warn{color:#e08b84}
+
+  /* challenge */
+  #s8 .stakes{margin-top:22px;display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  #s8 .stakes div{background:var(--card);border:1px solid var(--rule);border-left:3px solid var(--accent);border-radius:10px;padding:16px 18px;font-size:clamp(13.5px,1.3vw,17px);line-height:1.42;color:#3a362f}
+  #s8 .stakes b{color:var(--ink)}
+
+  /* question slide */
+  #s9{background:#181613;color:var(--paper)}
+  #s9 .kicker{color:#e3a64a}
+  #s9 .kicker .n{color:#857f73}
+  #s9 .q{font-size:clamp(24px,3.5vw,46px);line-height:1.22;font-weight:700;max-width:24ch;letter-spacing:-.01em}
+  #s9 .q .gold{color:#e3a64a}
+  #s9 .sig{margin-top:34px;font-family:var(--mono);font-size:clamp(12px,1.15vw,15px);color:#9a9488;letter-spacing:.05em}
+
+  @media (max-width:760px){
+    .cols,.measure,.roles,.demos,#s8 .stakes,#s6 .define{grid-template-columns:1fr}
+    .tools{grid-template-columns:1fr 1fr}
+    .dots{display:none}
+  }
+</style>
+</head>
+<body>
+
+<div class="progress" id="progress"></div>
+<div class="topbar">
+  <span class="brand">AI in the Design <b>Studio</b></span>
+  <span>Summer AI Studio · Cohort Share-out</span>
+</div>
+
+<div class="stage" id="stage">
+
+  <!-- 1 · TITLE -->
+  <section class="slide active" id="s1">
+    <div class="top">
+      <span class="eyebrow">Summer AI Studio — Integration Plan</span>
+    </div>
+    <div>
+      <h1>Integrating AI<br>without skipping<br>the&nbsp;reps.</h1>
+      <p class="sub">Redesigning a fall architecture design studio around one bet: <span class="accent">design thinking is already AI-ready.</span></p>
+    </div>
+    <div class="top">
+      <div class="meta">
+        <span class="who">[ your name ]</span>
+        <span>Fall Architecture Design Studio</span>
+        <span>June 2026</span>
+      </div>
+      <hr class="rule" style="margin:18px 0 14px">
+      <span class="onerule">“Use AI to extend your reach, never to skip your reps.”</span>
+    </div>
+  </section>
+
+  <!-- 2 · COURSE & PROBLEM -->
+  <section class="slide" id="s2">
+    <div class="kicker"><span class="n">01 —</span> The course &amp; the problem</div>
+    <div class="cols">
+      <div class="col">
+        <h3>The course</h3>
+        <p>A fall <b>design studio</b> — students carry a building from site through concept, form, and representation to a final review.</p>
+        <p>It's where architects are actually made: not by producing a board, but by building <b>judgment</b> and learning to <b>defend a decision</b> under questioning.</p>
+      </div>
+      <div class="col">
+        <h3>The problem</h3>
+        <p>AI is already in the studio. It isn't <i>bad</i> at architecture — it's <b>fluently good enough to look finished while being subtly wrong.</b></p>
+        <p>The default move — accept the first confident answer — attacks the exact skills studio exists to build. And it's <b>most dangerous for the learner</b>, who can't yet see the error.</p>
+      </div>
+    </div>
+    <hr class="rule">
+    <div class="pull">Polish is <span class="accent">not</span> evidence.</div>
+  </section>
+
+  <!-- 3 · THE BET -->
+  <section class="slide" id="s3">
+    <div class="kicker"><span class="n">02 —</span> The redesign</div>
+    <h2>Design thinking is already AI-ready.</h2>
+    <p class="lede">Don't treat AI as an oracle. Bring the design <b>feedback loop</b> to it — because the studio loop <i>is</i> the agent loop.</p>
+    <div class="loop">
+      <span class="chip">scheme</span><span class="arr">→</span>
+      <span class="chip">pin-up</span><span class="arr">→</span>
+      <span class="chip">crit</span><span class="arr">→</span>
+      <span class="chip">revise</span>
+      <span class="eq">≡</span>
+      <span class="chip">propose</span><span class="arr">→</span>
+      <span class="chip">act</span><span class="arr">→</span>
+      <span class="chip">observe</span><span class="arr">→</span>
+      <span class="chip">revise</span>
+    </div>
+    <p class="small" style="margin-top:26px;max-width:54ch">Designers already iterate, critique, prototype, and tolerate ambiguity — the exact habits that working well with AI rewards.</p>
+  </section>
+
+  <!-- 4 · WHERE AI FITS / ROLES -->
+  <section class="slide" id="s4">
+    <div class="kicker"><span class="n">03 —</span> Where AI enters — and whose job is whose</div>
+    <div class="tools">
+      <div class="tcard built"><div class="nm">Site Analyzer</div><div class="ds">Real site data into Rhino; every interpretive claim pre-tagged ✓ / ? / ⚠.</div><div class="st">● built</div></div>
+      <div class="tcard built"><div class="nm">Precedent Librarian</div><div class="ds">A dossier that cross-examines itself and hands back a verification worksheet.</div><div class="st">● built</div></div>
+      <div class="tcard"><div class="nm">Form Helper</div><div class="ds">You set the parti; site forces each make one legible, reversible move.</div><div class="st">in design</div></div>
+      <div class="tcard"><div class="nm">Rhino Wizard</div><div class="ds">Teaches the workflow; refuses to hand over the answer at Beginner.</div><div class="st">in design</div></div>
+      <div class="tcard"><div class="nm">Code-Zoning · Portfolio</div><div class="ds">Clause-cited code; a review aid that drafts but never ghostwrites.</div><div class="st">in design</div></div>
+      <div class="tcard"><div class="nm">RAP &amp; the Crit Engine</div><div class="ds">Accessibility/fidelity tooling + "solve the brief twice, grade the tape."</div><div class="st">showcase</div></div>
+    </div>
+    <div class="roles">
+      <div class="role"><div class="lab">The student — cognitive agent</div><p>Sets the parti, <b>prices the trust</b>, overrides the model, verifies the claims, and defends the result.</p></div>
+      <div class="role ai"><div class="lab">The AI — a material to interrogate</div><p>Critic, drafting partner, translator, research <b>suspect</b>. Built so it <b>can't be an oracle</b> — never the author.</p></div>
+    </div>
+  </section>
+
+  <!-- 5 · DEMO -->
+  <section class="slide" id="s5">
+    <div class="kicker"><span class="n">demo —</span> See it run</div>
+    <h2 style="font-size:clamp(26px,3.8vw,52px)">Two tools, already working.</h2>
+    <div class="demos">
+      <a class="demo" href="../TOOLS/site-analyzer/standalone/index.html" target="_blank" rel="noopener">
+        <div class="nm">Site Analyzer <span class="go">open ↗</span></div>
+        <div class="ds">Hard public data (climate, terrain, flood) downloads into Rhino. The model's reads arrive tagged <span class="tag v">✓ verified</span> <span class="tag q">? unverified</span> <span class="tag w">⚠ likely-hallucination</span>.</div>
+      </a>
+      <a class="demo" href="../TOOLS/precedent-librarian/lite/index.html" target="_blank" rel="noopener">
+        <div class="nm">Precedent Librarian <span class="go">open ↗</span></div>
+        <div class="ds">A research dossier that runs a hostile pass on <i>itself</i> — and refuses to fabricate a precedent that doesn't exist. Polish, with the receipts demanded.</div>
+      </a>
+    </div>
+    <p class="demonote">Run the same prompt grounded vs. ungrounded — watch the confident prose return <b>zero</b> verified claims. That delta is the lesson.</p>
+  </section>
+
+  <!-- 6 · OUTCOME -->
+  <section class="slide" id="s6">
+    <div class="kicker"><span class="n">04 —</span> The learning outcome</div>
+    <h2>Students develop <span class="accent">calibrated skepticism</span> — pricing their trust in AI against external evidence, while staying the author of their decisions.</h2>
+    <div class="define">
+      <div><b>not credulous</b>accepting everything the model says</div>
+      <div><b>not paralyzed</b>refusing to use it at all</div>
+      <div><b>but calibrated</b>trust priced, continuously, against evidence</div>
+    </div>
+    <p class="small" style="margin-top:24px">It's the crit — architecture's native skill — pointed at the machine.</p>
+  </section>
+
+  <!-- 7 · MEASURE -->
+  <section class="slide" id="s7">
+    <div class="kicker"><span class="n">05 —</span> How I'll measure it</div>
+    <h2 style="font-size:clamp(24px,3.4vw,46px);max-width:30ch">Grade the trace, not the output.</h2>
+    <div class="measure">
+      <ul class="mlist">
+        <li><span class="ic">1·</span><span><b>Four-line provenance log</b> — tool / asked / kept–changed–rejected / verified.</span></li>
+        <li><span class="ic">2·</span><span><b>Override ledger</b> — every time the student overruled the model, and why. An empty log is a red flag.</span></li>
+        <li><span class="ic">3·</span><span><b>Verification worksheet</b> — did the student's verdict agree with the tag? (calibration, not just facts)</span></li>
+        <li><span class="ic">4·</span><span><b>"% in your words"</b> + <b>fidelity scores</b> — catch ghostwriting; is the work <i>accurate</i>, not just plausible.</span></li>
+      </ul>
+      <div class="logbox">
+        <div class="h">provenance.log</div>
+        <div><span class="k">tool:</span> Precedent Librarian (grounded)</div>
+        <div><span class="k">asked:</span> naturally-ventilated libraries, hot-humid</div>
+        <div><span class="k">kept/changed/rejected:</span> <span class="warn">rejected</span> "33% energy cut" — no source</div>
+        <div><span class="k">verified:</span> 2 of 5 claims <span class="ok">✓</span> via journal DOI</div>
+      </div>
+    </div>
+    <p class="small" style="margin-top:18px">Using the tool <b>produces the assessment artifact for free</b> — and over the term, catch-rate should rise.</p>
+  </section>
+
+  <!-- 8 · CHALLENGE -->
+  <section class="slide" id="s8">
+    <div class="kicker"><span class="n">06 —</span> The challenge I haven't solved</div>
+    <h2 style="font-size:clamp(26px,3.8vw,52px)">"Grade the trace" is still a slogan — not yet a rubric.</h2>
+    <div class="stakes">
+      <div><b>The offload trap.</b> The same tool extends reach <i>or</i> skips reps — per use, not per tool. My defenses are structural, but I can't yet prove they survive a clever, exhausted student at 2&nbsp;a.m.</div>
+      <div><b>If I get it wrong:</b> students <i>perform</i> a trace instead of living it — overrides faked, logs tidied. Polish stands in for evidence again, now one level up, in the documentation of the thinking.</div>
+    </div>
+    <p class="small" style="margin-top:18px">Riding alongside: <b>equity</b> (the graded path must run on free tools) and <b>the novice</b> (most exposed to invisible error).</p>
+  </section>
+
+  <!-- 9 · QUESTION -->
+  <section class="slide" id="s9">
+    <div class="kicker"><span class="n">my question —</span> for the cohort</div>
+    <p class="q">A clever, exhausted student can <span class="gold">perform</span> a convincing trace without doing the thinking it's meant to evidence. How do you build a process rubric that rewards <span class="gold">genuine judgment</span> — without teaching students to fake the documentation of it?</p>
+    <p class="sig">What would you look for in a trace that tells real trust-calibration apart from performed compliance?</p>
+  </section>
+
+</div>
+
+<div class="counter"><span id="cur">1</span> / <span id="tot">9</span></div>
+<div class="hint" id="hint">← / → · space to advance</div>
+<div class="dots" id="dots"></div>
+
+<script>
+  const slides = Array.from(document.querySelectorAll('.slide'));
+  const dotsWrap = document.getElementById('dots');
+  const progress = document.getElementById('progress');
+  const cur = document.getElementById('cur');
+  const hint = document.getElementById('hint');
+  let i = 0;
+  document.getElementById('tot').textContent = slides.length;
+
+  slides.forEach((_, n) => {
+    const b = document.createElement('button');
+    b.setAttribute('aria-label', 'Go to slide ' + (n + 1));
+    b.addEventListener('click', () => go(n));
+    dotsWrap.appendChild(b);
+  });
+  const dots = Array.from(dotsWrap.children);
+
+  function go(n){
+    i = Math.max(0, Math.min(slides.length - 1, n));
+    slides.forEach((s, k) => {
+      s.classList.toggle('active', k === i);
+      s.setAttribute('aria-hidden', k === i ? 'false' : 'true');
+    });
+    dots.forEach((d, k) => d.classList.toggle('on', k === i));
+    progress.style.width = ((i) / (slides.length - 1) * 100) + '%';
+    cur.textContent = i + 1;
+    if (i > 0) hint.style.opacity = 0;
+  }
+  function next(){ go(i + 1); }
+  function prev(){ go(i - 1); }
+
+  document.addEventListener('keydown', e => {
+    if (['ArrowRight','ArrowDown','PageDown',' '].includes(e.key)){ e.preventDefault(); next(); }
+    else if (['ArrowLeft','ArrowUp','PageUp'].includes(e.key)){ e.preventDefault(); prev(); }
+    else if (e.key === 'Home'){ go(0); }
+    else if (e.key === 'End'){ go(slides.length - 1); }
+    else if (e.key === 'f' || e.key === 'F'){ toggleFs(); }
+  });
+  // click to advance (ignore clicks on links/buttons)
+  document.getElementById('stage').addEventListener('click', e => {
+    if (e.target.closest('a,button')) return;
+    const x = e.clientX / window.innerWidth;
+    x < 0.28 ? prev() : next();
+  });
+  function toggleFs(){
+    if (!document.fullscreenElement) document.documentElement.requestFullscreen?.();
+    else document.exitFullscreen?.();
+  }
+  go(0);
+</script>
+</body>
+</html>
