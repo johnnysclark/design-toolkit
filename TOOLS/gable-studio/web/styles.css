@@ -42,6 +42,7 @@ main { flex: 1; min-height: 0; display: grid; grid-template-columns: 290px 1fr 3
 .slider .slk { color: var(--muted); font-size: .8rem; }
 .slider input[type=range] { width: 100%; accent-color: var(--accent); }
 input.num { width: 100%; border: 1px solid var(--line); border-radius: 5px; padding: .12rem .25rem; text-align: right; }
+.slider .dispsel { grid-column: 2 / 4; border: 1px solid var(--line); border-radius: 5px; padding: .12rem .25rem; background: var(--card); }
 .apblock { border: 1px solid var(--line); border-radius: 8px; padding: .35rem .45rem; margin: .3rem 0; background: var(--card); }
 .aphead { display: flex; align-items: center; gap: .4rem; margin-bottom: .25rem; }
 .aphead select.hostsel { flex: 1; border: 1px solid var(--line); border-radius: 5px; padding: .1rem; }

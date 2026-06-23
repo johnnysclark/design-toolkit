@@ -6,7 +6,7 @@
 // World coords: +X East, +Y North, +Z Up; three.js is Y-up so map (x,y,z)->(x,z,y).
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
-import { solarField, sunDirection, terrainHeight, rotZ } from "./core.js";
+import { overlayField, sunDirection, terrainHeight, rotZ, dirAz } from "./core.js";
 
 const v3 = (p) => new THREE.Vector3(p[0], p[2], p[1]);
 const tf = (lx, ly, lz, R, cx, cy, north) => { const p = rotZ([lx, ly, 0], R); const w = rotZ([p[0] + cx, p[1] + cy, 0], north); return [w[0], w[1], lz]; };
@@ -48,6 +48,7 @@ export function createViewport(canvas) {
   const buildingGroup = new THREE.Group(); scene.add(buildingGroup);
   const terrainGroup = new THREE.Group(); scene.add(terrainGroup);
   const sunpathGroup = new THREE.Group(); scene.add(sunpathGroup);
+  const windGroup = new THREE.Group(); scene.add(windGroup);
   const northArrow = new THREE.ArrowHelper(new THREE.Vector3(0, 0, 1), new THREE.Vector3(0, 0.05, -16), 4, 0x333333, 1.2, 0.8);
   scene.add(northArrow);
 
@@ -65,7 +66,7 @@ export function createViewport(canvas) {
   new ResizeObserver(resize).observe(canvas.parentElement); resize();
   (function loop() { requestAnimationFrame(loop); controls.update(); renderer.render(scene, camera); })();
 
-  let model = null, display = { mode: "pen", shadowIntensity: 0.6, sunHour: 15 };
+  let model = null, display = { mode: "pen", shadowIntensity: 0.6, sunHour: 15, analysisField: "solarNow" };
   let terrainKey = null;
   const faceMeshes = [];   // {mesh, edges, name}
   const apMeshes = [];     // {mesh, id} aperture glass panels
@@ -195,6 +196,21 @@ export function createViewport(canvas) {
     }
   }
 
+  function buildWindArrows() {
+    windGroup.clear();
+    if (!model || display.mode !== "analysis" || (display.analysisField || "") !== "wind") return;
+    const f = dirAz(model.site.windFromAz, 0);   // points toward where wind comes FROM
+    const t = [-f[0], -f[1], 0];                  // travel direction
+    const u = rotZ(f, 90);
+    const speed = model.site.windSpeed || 0;
+    const len = 2.5 + speed * 0.5;
+    const dir = new THREE.Vector3(t[0], 0, t[1]).normalize();
+    for (const off of [-8, -4, 0, 4, 8]) for (const zc of [2.2, 5.2]) {
+      const origin = new THREE.Vector3(f[0] * 16 + u[0] * off, zc, f[1] * 16 + u[1] * off);
+      windGroup.add(new THREE.ArrowHelper(dir, origin, len, 0x2f6db0, Math.min(1.4, 0.5 + speed * 0.06), 0.55));
+    }
+  }
+
   // ---- look ----
   function applyDisplay() {
     const s = display.shadowIntensity;
@@ -206,7 +222,7 @@ export function createViewport(canvas) {
     sun.target.position.set(0, 0, 0);
 
     const analysis = display.mode === "analysis";
-    const field = analysis && model ? solarField(model) : null;
+    const field = analysis && model ? overlayField(model, display.analysisField || "solarNow", display.sunHour) : null;
     const norm = (v) => field.max > 1e-9 ? (v - field.min) / (field.max - field.min) : 0;
     for (const fm of faceMeshes) {
       if (analysis) {
@@ -221,6 +237,7 @@ export function createViewport(canvas) {
     if (analysis) {
       const byId = Object.fromEntries(field.apertures.map((a) => [a.id, a.val]));
       for (const am of apMeshes) { am.mesh.material.color.setHex(spectral(norm(byId[am.id] ?? field.min))); am.mesh.material.opacity = 0.92; }
+      legend.querySelector(".lbtitle").textContent = field.label;
       legend.querySelector(".lbmax").textContent = field.max.toFixed(2);
       legend.querySelector(".lbmin").textContent = field.min.toFixed(2);
     } else {
@@ -229,6 +246,7 @@ export function createViewport(canvas) {
     legend.style.display = analysis ? "flex" : "none";
     northArrow.setColor(new THREE.Color(analysis ? 0x888888 : 0x333333));
     buildSunPath();
+    buildWindArrows();
   }
 
   return { setModel, setDisplay };

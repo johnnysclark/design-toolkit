@@ -30,6 +30,12 @@ function slider(obj, key, label, min, max, step, onChange) {
   return el("label", { class: "slider" }, [el("span", { class: "slk" }, label), range, num]);
 }
 
+function selectRow(obj, key, label, options, onChange) {
+  const sel = el("select", { class: "dispsel", onchange: (e) => { obj[key] = e.target.value; onChange(); } },
+    options.map(([v, t]) => el("option", { value: v, selected: v === obj[key] ? "selected" : null }, t)));
+  return el("label", { class: "slider" }, [el("span", { class: "slk" }, label), sel]);
+}
+
 // group -> [obj-path, [ [key,label,min,max,step], ... ] ]
 const GROUPS = (state) => [
   ["Plinth (floor slab)", state.params.plinth, [["cx", "centre X", -6, 6, 0.1], ["cy", "centre Y", -6, 6, 0.1], ["W", "width", 2, 20, 0.1], ["L", "length", 2, 24, 0.1], ["R", "rotation°", -45, 45, 1], ["t", "thickness", 0.1, 2, 0.05]]],
@@ -43,6 +49,7 @@ export function renderControls(container, state, cb) {
   container.innerHTML = "";
   // display
   container.append(el("h4", {}, "Display"));
+  container.append(selectRow(state.display, "analysisField", "overlay", [["solarNow", "Solar — sun now"], ["solarYear", "Solar — yearly"], ["wind", "Wind — windward"]], cb.display));
   container.append(slider(state.display, "shadowIntensity", "shadow", 0, 1, 0.05, cb.display));
   container.append(slider(state.display, "sunHour", "sun hour", 5, 19, 0.25, cb.display));
   // form

@@ -9,7 +9,7 @@ const clone = (o) => JSON.parse(JSON.stringify(o));
 const state = {
   params: clone(DEFAULTS.params),
   site: clone(DEFAULTS.site),
-  display: { mode: "pen", shadowIntensity: 0.6, sunHour: 15 },
+  display: { mode: "pen", shadowIntensity: 0.6, sunHour: 15, analysisField: "solarNow" },
   ruleset: { name: "My rules", rules: [] },
   lastMetrics: null,
 };

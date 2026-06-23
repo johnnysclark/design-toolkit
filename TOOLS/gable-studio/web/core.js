@@ -300,16 +300,34 @@ export function analyze(params, site) {
   return { model, metrics: computeMetrics(model) };
 }
 
-// Viewport-only solar field for Analysis mode: average daylight incidence per
-// face AND per aperture (raw, comparable), plus the min/max for the legend.
-export function solarField(model) {
-  const sun = sunSamples(model.site.latitude);
-  const inc = (nrm) => { let s = 0, c = 0; for (const u of sun) if (u.up) { s += Math.max(0, dot(nrm, u.L)); c++; } return c ? s / c : 0; };
+// Viewport-only fields for Analysis mode. Each returns per-face AND per-aperture
+// intensity (0..1-ish), plus min/max for the legend and a label.
+function fieldFrom(model, inc, label) {
   const faces = {}; let mn = Infinity, mx = -Infinity;
   for (const f of model.faces) { const v = inc(f.n); faces[f.name] = v; if (v < mn) mn = v; if (v > mx) mx = v; }
   const apertures = model.apertures.map((a) => ({ id: a.id, val: inc(a.n) }));
   for (const a of apertures) { if (a.val < mn) mn = a.val; if (a.val > mx) mx = a.val; }
-  return { faces, apertures, min: mn === Infinity ? 0 : mn, max: mx <= 0 ? 1e-9 : mx };
+  return { faces, apertures, min: mn === Infinity ? 0 : mn, max: mx <= 1e-9 ? 1e-9 : mx, label };
+}
+// yearly average daylight incidence
+export function solarField(model) {
+  const sun = sunSamples(model.site.latitude);
+  return fieldFrom(model, (n) => { let s = 0, c = 0; for (const u of sun) if (u.up) { s += Math.max(0, dot(n, u.L)); c++; } return c ? s / c : 0; }, "sun · year");
+}
+// instantaneous incidence for the current sun position (updates with sun hour)
+export function solarNowField(model, hour) {
+  const L = sunDirection(model.site.latitude, hour, 0);
+  return fieldFrom(model, (n) => (L ? Math.max(0, dot(n, L)) : 0), `sun · ${(+hour).toFixed(0)}h`);
+}
+// windward exposure for the current wind direction
+export function windField(model) {
+  const f = dirAz(model.site.windFromAz, 0);
+  return fieldFrom(model, (n) => Math.max(0, dot([n[0], n[1], 0], f)), "windward");
+}
+export function overlayField(model, kind, hour) {
+  if (kind === "wind") return windField(model);
+  if (kind === "solarYear") return solarField(model);
+  return solarNowField(model, hour);
 }
 
 // ---------------------------------------------------------------------------

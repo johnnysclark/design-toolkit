@@ -67,8 +67,12 @@ the parity test.)
   occlude the black edges behind them) with **crisp cast shadows** on the ravine
   terrain (with contour lines). Drag **shadow intensity** and **sun hour**.
 - **Analysis mode** — **Ladybug-style** spectral colouring of the envelope **and
-  the apertures** by yearly solar incidence, with a numeric legend (min–max) and
-  day-arc sun paths. Toggle with the **◫ / ☀** button.
+  the apertures**, with a numeric legend (min–max) and a live overlay selector:
+  **Solar — sun now** (recolours as you drag the **sun hour** / move latitude, and
+  matches the cast shadow), **Solar — yearly**, or **Wind — windward** (windward
+  faces hot, leeward cold, with **wind-direction arrows** that scale with speed and
+  swing with the wind-from azimuth). Day-arc sun paths show the sun track. Toggle
+  the mode with the **◫ / ☀** button.
 
 ## Toolbar extras
 - **📍 Location** — click an OpenStreetMap basemap to set **latitude & longitude**
