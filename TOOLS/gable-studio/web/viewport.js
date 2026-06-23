@@ -6,7 +6,7 @@
 // World coords: +X East, +Y North, +Z Up; three.js is Y-up so map (x,y,z)->(x,z,y).
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
-import { overlayField, sunDirection, terrainHeight, rotZ, dirAz } from "./core.js";
+import { windField, sunDirection, terrainHeight, rotZ, dirAz, massingTriangles, sampleSolarGrid } from "./core.js";
 
 const v3 = (p) => new THREE.Vector3(p[0], p[2], p[1]);
 const tf = (lx, ly, lz, R, cx, cy, north) => { const p = rotZ([lx, ly, 0], R); const w = rotZ([p[0] + cx, p[1] + cy, 0], north); return [w[0], w[1], lz]; };
@@ -49,6 +49,7 @@ export function createViewport(canvas) {
   const terrainGroup = new THREE.Group(); scene.add(terrainGroup);
   const sunpathGroup = new THREE.Group(); scene.add(sunpathGroup);
   const windGroup = new THREE.Group(); scene.add(windGroup);
+  const analysisGroup = new THREE.Group(); scene.add(analysisGroup);
   const northArrow = new THREE.ArrowHelper(new THREE.Vector3(0, 0, 1), new THREE.Vector3(0, 0.05, -16), 4, 0x333333, 1.2, 0.8);
   scene.add(northArrow);
 
@@ -67,12 +68,13 @@ export function createViewport(canvas) {
   (function loop() { requestAnimationFrame(loop); controls.update(); renderer.render(scene, camera); })();
 
   let model = null, display = { mode: "pen", shadowIntensity: 0.6, sunHour: 15, analysisField: "solarNow" };
-  let terrainKey = null;
+  let terrainKey = null, occluders = null, analysisCells = [];
   const faceMeshes = [];   // {mesh, edges, name}
-  const apMeshes = [];     // {mesh, id} aperture glass panels
+  const apMeshes = [];     // {mesh, id, c, n} aperture glass panels
 
   function setModel(m, d) {
     model = m; if (d) display = Object.assign(display, d);
+    occluders = massingTriangles(m);
     buildBuilding();
     const tk = JSON.stringify(m.site.terrain);
     if (tk !== terrainKey) { terrainKey = tk; buildTerrain(); }
@@ -145,7 +147,24 @@ export function createViewport(canvas) {
       const gg = new THREE.BufferGeometry().setFromPoints([cs[0], cs[1], cs[2], cs[0], cs[2], cs[3]].map(v3));
       const glass = new THREE.Mesh(gg, new THREE.MeshBasicMaterial({ color: 0x6f8d96, transparent: true, opacity: 0.25, side: THREE.DoubleSide }));
       buildingGroup.add(glass);
-      apMeshes.push({ mesh: glass, id: ap.id });
+      apMeshes.push({ mesh: glass, id: ap.id, c: ap.c, n: ap.n });
+    }
+
+    // analysis grid cells (walls + roofs + plinth top) for the detailed overlay
+    analysisCells = [];
+    const plinthTop = { c: tf(0, 0, 0, Pl.R, Pl.cx, Pl.cy, n), uAxis: rotZ([1, 0, 0], Pl.R + n), vAxis: rotZ([0, 1, 0], Pl.R + n), faceWidth: Pl.W, faceHeight: Pl.L, n: [0, 0, 1] };
+    for (const f of [...model.walls, ...model.roofs, plinthTop]) gridCellsInto(f, analysisCells);
+  }
+
+  function gridCellsInto(f, out) {
+    const nu = Math.max(2, Math.min(14, Math.round(f.faceWidth / 0.5)));
+    const nv = Math.max(2, Math.min(14, Math.round(f.faceHeight / 0.5)));
+    const at = (uu, vv) => [f.c[0] + f.uAxis[0] * uu * f.faceWidth + f.vAxis[0] * vv * f.faceHeight,
+                            f.c[1] + f.uAxis[1] * uu * f.faceWidth + f.vAxis[1] * vv * f.faceHeight,
+                            f.c[2] + f.uAxis[2] * uu * f.faceWidth + f.vAxis[2] * vv * f.faceHeight];
+    for (let i = 0; i < nu; i++) for (let j = 0; j < nv; j++) {
+      const u0 = i / nu - 0.5, u1 = (i + 1) / nu - 0.5, v0 = j / nv - 0.5, v1 = (j + 1) / nv - 0.5;
+      out.push({ corners: [at(u0, v0), at(u1, v0), at(u1, v1), at(u0, v1)], center: at((i + 0.5) / nu - 0.5, (j + 0.5) / nv - 0.5), n: f.n });
     }
   }
 
@@ -211,6 +230,33 @@ export function createViewport(canvas) {
     }
   }
 
+  // detailed self-shadowing solar overlay: a colour per analysis cell, so the
+  // roof overhang's shadow band on the walls is visible and updates live.
+  function buildAnalysisGrid(kind) {
+    analysisGroup.clear();
+    if (!analysisCells.length || !occluders) return;
+    const cellPts = analysisCells.map((c) => ({ p: c.center, n: c.n }));
+    const apPts = apMeshes.map((a) => ({ p: a.c, n: a.n }));
+    const { values, min, max } = sampleSolarGrid([...cellPts, ...apPts], occluders, kind, model.site.latitude, display.sunHour);
+    const span = max - min > 1e-9 ? max - min : 1;
+    const pos = [], col = [], cc = new THREE.Color();
+    for (let k = 0; k < analysisCells.length; k++) {
+      const c = analysisCells[k]; cc.setHex(spectral((values[k] - min) / span));
+      const o = [c.n[0] * 0.02, c.n[1] * 0.02, c.n[2] * 0.02];
+      const Pc = c.corners.map((p) => [p[0] + o[0], p[1] + o[1], p[2] + o[2]]);
+      for (const idx of [0, 1, 2, 0, 2, 3]) { const p = Pc[idx]; pos.push(p[0], p[2], p[1]); col.push(cc.r, cc.g, cc.b); }
+    }
+    const g = new THREE.BufferGeometry();
+    g.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
+    g.setAttribute("color", new THREE.Float32BufferAttribute(col, 3));
+    analysisGroup.add(new THREE.Mesh(g, new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.DoubleSide })));
+    const apVals = values.slice(analysisCells.length);
+    for (let i = 0; i < apMeshes.length; i++) { apMeshes[i].mesh.material.color.setHex(spectral((apVals[i] - min) / span)); apMeshes[i].mesh.material.opacity = 0.95; }
+    legend.querySelector(".lbtitle").textContent = kind === "solarYear" ? "sun · year" : `sun · ${(+display.sunHour).toFixed(0)}h`;
+    legend.querySelector(".lbmax").textContent = max.toFixed(2);
+    legend.querySelector(".lbmin").textContent = min.toFixed(2);
+  }
+
   // ---- look ----
   function applyDisplay() {
     const s = display.shadowIntensity;
@@ -222,26 +268,24 @@ export function createViewport(canvas) {
     sun.target.position.set(0, 0, 0);
 
     const analysis = display.mode === "analysis";
-    const field = analysis && model ? overlayField(model, display.analysisField || "solarNow", display.sunHour) : null;
-    const norm = (v) => field.max > 1e-9 ? (v - field.min) / (field.max - field.min) : 0;
-    for (const fm of faceMeshes) {
-      if (analysis) {
-        const val = field.faces[fm.name];
-        fm.mesh.material.color.setHex(val === undefined ? 0xd7d2c8 : spectral(norm(val)));
-        fm.edges.visible = false;
-      } else {
-        fm.mesh.material.color.setHex(0xffffff);
-        fm.edges.visible = true;
-      }
-    }
-    if (analysis) {
+    const kind = display.analysisField || "solarNow";
+    if (!analysis) {
+      analysisGroup.clear();
+      for (const fm of faceMeshes) { fm.mesh.material.color.setHex(0xffffff); fm.edges.visible = true; }
+      for (const am of apMeshes) { am.mesh.material.color.setHex(0x6f8d96); am.mesh.material.opacity = 0.25; }
+    } else if (kind === "wind") {
+      analysisGroup.clear();
+      const field = windField(model);
+      const norm = (v) => field.max > 1e-9 ? (v - field.min) / (field.max - field.min) : 0;
+      for (const fm of faceMeshes) { const val = field.faces[fm.name]; fm.mesh.material.color.setHex(val === undefined ? 0xd7d2c8 : spectral(norm(val))); fm.edges.visible = false; }
       const byId = Object.fromEntries(field.apertures.map((a) => [a.id, a.val]));
-      for (const am of apMeshes) { am.mesh.material.color.setHex(spectral(norm(byId[am.id] ?? field.min))); am.mesh.material.opacity = 0.92; }
+      for (const am of apMeshes) { am.mesh.material.color.setHex(spectral(norm(byId[am.id] ?? field.min))); am.mesh.material.opacity = 0.9; }
       legend.querySelector(".lbtitle").textContent = field.label;
       legend.querySelector(".lbmax").textContent = field.max.toFixed(2);
       legend.querySelector(".lbmin").textContent = field.min.toFixed(2);
     } else {
-      for (const am of apMeshes) { am.mesh.material.color.setHex(0x6f8d96); am.mesh.material.opacity = 0.25; }
+      for (const fm of faceMeshes) { fm.mesh.material.color.setHex(0xf4f4f4); fm.edges.visible = false; }
+      buildAnalysisGrid(kind);
     }
     legend.style.display = analysis ? "flex" : "none";
     northArrow.setColor(new THREE.Color(analysis ? 0x888888 : 0x333333));

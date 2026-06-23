@@ -330,6 +330,84 @@ export function overlayField(model, kind, hour) {
   return solarNowField(model, hour);
 }
 
+// --- detailed self-shadowing solar grid (Ladybug-style analysis mesh) --------
+// Möller–Trumbore: does ray (o, dir) hit any triangle in the flat array `tris`
+// (= [ax,ay,az,bx,by,bz,cx,cy,cz, ...]) within maxT? Used for sun occlusion so
+// the roof overhang actually casts a shadow band onto the walls below.
+export function rayHitsAny(o, d, tris, maxT) {
+  const EPS = 1e-6;
+  for (let i = 0; i < tris.length; i += 9) {
+    const ax = tris[i], ay = tris[i + 1], az = tris[i + 2];
+    const e1x = tris[i + 3] - ax, e1y = tris[i + 4] - ay, e1z = tris[i + 5] - az;
+    const e2x = tris[i + 6] - ax, e2y = tris[i + 7] - ay, e2z = tris[i + 8] - az;
+    const px = d[1] * e2z - d[2] * e2y, py = d[2] * e2x - d[0] * e2z, pz = d[0] * e2y - d[1] * e2x;
+    const det = e1x * px + e1y * py + e1z * pz;
+    if (det > -EPS && det < EPS) continue;
+    const inv = 1 / det;
+    const tx = o[0] - ax, ty = o[1] - ay, tz = o[2] - az;
+    const u = (tx * px + ty * py + tz * pz) * inv;
+    if (u < 0 || u > 1) continue;
+    const qx = ty * e1z - tz * e1y, qy = tz * e1x - tx * e1z, qz = tx * e1y - ty * e1x;
+    const v = (d[0] * qx + d[1] * qy + d[2] * qz) * inv;
+    if (v < 0 || u + v > 1) continue;
+    const t = (e2x * qx + e2y * qy + e2z * qz) * inv;
+    if (t > 1e-4 && t < maxT) return true;
+  }
+  return false;
+}
+
+// All solid surfaces of the massing as a flat triangle array (occluders for the
+// shadow rays). Mirrors the rendered/baked geometry: plinth slab + 4 wall slabs
+// + 2 roof slabs. Shared by the viewport so the analysis shadows are real.
+export function massingTriangles(model) {
+  const P = model.P, n = model.north, G = model.roofGeom, tris = [];
+  const push = (a, b, c) => tris.push(a[0], a[1], a[2], b[0], b[1], b[2], c[0], c[1], c[2]);
+  const quad = (a, b, c, d) => { push(a, b, c); push(a, c, d); };
+  const wp = (lx, ly, lz, R, cx, cy) => { const p = rotZ([lx, ly, 0], R); const w = rotZ([p[0] + cx, p[1] + cy, 0], n); return [w[0], w[1], lz]; };
+  const prism = (corners2, zb, zt, R, cx, cy) => {
+    const b = corners2.map(([x, y]) => wp(x, y, zb, R, cx, cy)), t = corners2.map(([x, y]) => wp(x, y, zt, R, cx, cy));
+    quad(b[0], b[1], b[2], b[3]); quad(t[3], t[2], t[1], t[0]);
+    for (let i = 0; i < 4; i++) { const j = (i + 1) % 4; quad(b[i], b[j], t[j], t[i]); }
+  };
+  const Pl = P.plinth, rect = (W, L) => [[-W / 2, -L / 2], [W / 2, -L / 2], [W / 2, L / 2], [-W / 2, L / 2]];
+  prism(rect(Pl.W, Pl.L), -Pl.t, 0, Pl.R, Pl.cx, Pl.cy);
+  const Wl = P.walls, hw = Wl.W / 2, hl = Wl.L / 2, tw = Wl.wt;
+  for (const [x0, x1, y0, y1] of [[hw - tw, hw, -hl, hl], [-hw, -hw + tw, -hl, hl], [-hw, hw, hl - tw, hl], [-hw, hw, -hl, -hl + tw]])
+    prism([[x0, y0], [x1, y0], [x1, y1], [x0, y1]], 0, Wl.h, Wl.R, Wl.cx, Wl.cy);
+  const Rf = P.roof;
+  const slope = (eaveX, ridgeX, eaveZ, nx) => {
+    const k = Math.hypot(nx, 1) || 1, nl = [nx / k, 0, 1 / k];
+    const top = [[eaveX, -Rf.L / 2, eaveZ], [ridgeX, -Rf.L / 2, G.zRidge], [ridgeX, Rf.L / 2, G.zRidge], [eaveX, Rf.L / 2, eaveZ]];
+    const bot = top.map((p) => [p[0] - nl[0] * Rf.t, p[1], p[2] - nl[2] * Rf.t]);
+    const TW = (p) => wp(p[0], p[1], p[2], Rf.R, Rf.cx, Rf.cy), T = top.map(TW), B = bot.map(TW);
+    quad(T[0], T[1], T[2], T[3]); quad(B[3], B[2], B[1], B[0]);
+    for (let i = 0; i < 4; i++) { const j = (i + 1) % 4; quad(T[i], T[j], B[j], B[i]); }
+  };
+  slope(-Rf.W / 2, G.ridgeX, G.eaveZL, -Math.tan(Rf.pitchL * D2R));
+  slope(Rf.W / 2, G.ridgeX, G.eaveZR, Math.tan(Rf.pitchR * D2R));
+  return new Float64Array(tris);
+}
+
+// Per-sample solar incidence WITH self-shading. samples: [{p:[x,y,z], n:[..]}].
+// kind 'solarYear' averages the up-sun samples; otherwise the current sun hour.
+export function sampleSolarGrid(samples, tris, kind, lat, hour) {
+  let suns;
+  if (kind === "solarYear") suns = sunSamples(lat).filter((s) => s.up).map((s) => s.L);
+  else { const L = sunDirection(lat, hour, 0); suns = L ? [L] : []; }
+  const values = new Array(samples.length);
+  let mn = Infinity, mx = -Infinity;
+  for (let k = 0; k < samples.length; k++) {
+    const s = samples[k]; let acc = 0;
+    if (suns.length) {
+      const o = [s.p[0] + s.n[0] * 0.03, s.p[1] + s.n[1] * 0.03, s.p[2] + s.n[2] * 0.03];
+      for (const L of suns) { const c = s.n[0] * L[0] + s.n[1] * L[1] + s.n[2] * L[2]; if (c <= 0) continue; if (!rayHitsAny(o, L, tris, 1e9)) acc += c; }
+      acc /= suns.length;
+    }
+    values[k] = acc; if (acc < mn) mn = acc; if (acc > mx) mx = acc;
+  }
+  return { values, min: mn === Infinity ? 0 : mn, max: mx <= 1e-9 ? 1e-9 : mx };
+}
+
 // ---------------------------------------------------------------------------
 export const VARIABLE_DEFS = [
   { key: "walls_h", label: "Wall height", unit: "m", group: "Params" },

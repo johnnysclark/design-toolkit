@@ -66,13 +66,16 @@ the parity test.)
 - **Pen mode** (default) — a white-paper **hidden-line** drawing (white faces
   occlude the black edges behind them) with **crisp cast shadows** on the ravine
   terrain (with contour lines). Drag **shadow intensity** and **sun hour**.
-- **Analysis mode** — **Ladybug-style** spectral colouring of the envelope **and
-  the apertures**, with a numeric legend (min–max) and a live overlay selector:
-  **Solar — sun now** (recolours as you drag the **sun hour** / move latitude, and
-  matches the cast shadow), **Solar — yearly**, or **Wind — windward** (windward
-  faces hot, leeward cold, with **wind-direction arrows** that scale with speed and
-  swing with the wind-from azimuth). Day-arc sun paths show the sun track. Toggle
-  the mode with the **◫ / ☀** button.
+- **Analysis mode** — **Ladybug-style** colouring with a numeric legend (min–max)
+  and a live overlay selector:
+  - **Solar — sun now / yearly** paint a **fine analysis grid** over the walls,
+    roof and plinth, **with self-shadowing** (ray-cast against the massing) — so
+    extending the **roof overhang** visibly darkens the band it shades on the wall
+    below, and the grid updates as you drag **sun hour** or move latitude (it
+    matches the cast shadow). Day-arc sun paths show the track.
+  - **Wind — windward** colours faces hot (windward) → cold (leeward) with
+    **wind-direction arrows** that scale with speed and swing with the azimuth.
+  Toggle the mode with the **◫ / ☀** button.
 
 ## Toolbar extras
 - **📍 Location** — click an OpenStreetMap basemap to set **latitude & longitude**
@@ -174,10 +177,10 @@ test/  parity.mjs · parity_check.py
 - Proxies, not simulation. A green score means "it satisfies the rule I wrote," not "it performs."
 - Apertures render as inset panels (no CSG boolean); metrics use aperture area/orientation analytically.
 - Gable ends are left open (clerestory look) since walls and roof are independent rectangles.
-- No self-shading ray cast yet; the ravine terrain casts shadows but doesn't shade the solar metric.
+- The **analysis overlay** self-shadows (ray-cast), but the **headline metric numbers** (`solarUseful` etc.) are still whole-face proxies that ignore self-shading — so the colours can show an overhang's shadow before the single number does.
 - `.3dm` import recovers footprints/heights, not rotations or roof pitches (bbox method).
 - The solar proxy uses **latitude** only (local solar time assumed); longitude is recorded but doesn't change the numbers. Map tiles need internet (clicking still works offline).
-- Every metric is checked by `test/sensitivity.mjs` to actually respond to parameter changes (all 29 respond; none dead/non-finite).
+- Checked by tests: every metric responds to parameter changes (`test/sensitivity.mjs`, 29/29), JS↔python parity (`test/parity_check.py`), and the overhang actually shades the walls (`test/occlusion.mjs`). Run all with `npm test`.
 
 ## Stretch (next)
 Self-shading ray casts · a real `.gh` definition / cluster · a parameter-sweep
