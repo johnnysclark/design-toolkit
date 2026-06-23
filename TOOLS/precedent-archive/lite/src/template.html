@@ -1,0 +1,439 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Precedent Archive — canned demo · Summer AI Studio</title>
+    <style>
+      :root {
+        --bg:#f7f6f2; --ink:#1c1b18; --muted:#6b6862; --line:#d9d6cd; --card:#fffffe;
+        --accent:#8a4b2f; --accent-ink:#fff; --ok:#2e7d4f; --warn:#b88300; --bad:#c0392b; --focus:#1a52c4;
+      }
+      * { box-sizing:border-box; }
+      body { margin:0; font:16px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; background:var(--bg); color:var(--ink); }
+      :focus-visible { outline:3px solid var(--focus); outline-offset:2px; border-radius:4px; }
+      .sr-only { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; border:0; }
+      .skip-link { position:absolute; left:.5rem; top:-3rem; z-index:10; background:var(--ink); color:#fff; padding:.5rem .8rem; border-radius:8px; transition:top .15s; }
+      .skip-link:focus { top:.5rem; }
+      header { padding:2rem 1.5rem 1rem; max-width:1040px; margin:0 auto; }
+      h1 { margin:0; font-size:1.7rem; font-weight:650; }
+      h1 .sub { color:var(--muted); font-weight:400; }
+      .tagline { color:var(--muted); margin:.4rem 0 0; max-width:70ch; }
+      main { max-width:1040px; margin:0 auto; padding:0 1.5rem 3rem; }
+      h2 { font-size:1.25rem; margin:1.6rem 0 .7rem; }
+      h3.section-h { font-size:1.05rem; margin:1.6rem 0 .6rem; }
+      .count { color:var(--muted); font-weight:400; font-size:.9rem; }
+      .hint { color:var(--muted); font-size:.85rem; margin:.3rem 0; }
+      .demo-banner { max-width:1040px; margin:1rem auto 0; padding:.8rem 1rem; background:#fbf3ee; border:1px solid #e7cdbd; border-left:4px solid var(--accent); border-radius:8px; color:#5a3c28; font-size:.92rem; }
+      .demo-banner strong { color:var(--accent); }
+      .panel { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:1rem 1.2rem; margin-top:1rem; }
+      input,select,textarea,button { font:inherit; }
+      input[type=search],input[type=url],input[type=text],input[type=number],select,textarea { width:100%; padding:.55rem .6rem; border:1px solid var(--line); border-radius:8px; background:#fff; color:var(--ink); }
+      textarea { resize:vertical; }
+      .field { display:block; margin-bottom:.6rem; } .field>span { display:block; font-weight:600; margin-bottom:.25rem; font-size:.9rem; }
+      .field.small { width:180px; } .row { display:flex; gap:.6rem; align-items:center; flex-wrap:wrap; } .row>input { flex:1; }
+      button { font-weight:600; padding:.55rem 1rem; border:1px solid var(--accent); background:var(--accent); color:var(--accent-ink); border-radius:8px; cursor:pointer; }
+      button.secondary,.filter-actions button,.img-actions button,.rel-add button { background:#fff; color:var(--accent); }
+      button:disabled { opacity:.5; cursor:wait; } button.small { padding:.35rem .7rem; font-size:.85rem; }
+      .add-grid { display:grid; grid-template-columns:1.2fr 1fr; gap:1rem; } @media (max-width:720px){ .add-grid { grid-template-columns:1fr; } }
+      .dropzone { border:2px dashed var(--line); border-radius:12px; padding:1.2rem; background:#fff; text-align:center; display:flex; flex-direction:column; justify-content:center; gap:.3rem; }
+      .dropzone.drag { border-color:var(--accent); background:#fbf3ee; }
+      .file-label { color:var(--accent); text-decoration:underline; cursor:pointer; }
+      .filters { display:flex; gap:1rem; align-items:flex-end; flex-wrap:wrap; margin:1rem 0; padding:1rem 1.2rem; background:var(--card); border:1px solid var(--line); border-radius:12px; }
+      .filters .field { margin-bottom:0; flex:1; min-width:180px; }
+      .view-toggle { border:1px solid var(--line); border-radius:8px; padding:.4rem .6rem; margin:0; } .view-toggle label { margin-right:.6rem; }
+      .filter-actions { display:flex; gap:.5rem; flex-wrap:wrap; }
+      .gallery { list-style:none; padding:0; margin:.5rem 0 0; display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:1rem; }
+      .gallery.list { grid-template-columns:1fr; }
+      .card { background:var(--card); border:1px solid var(--line); border-radius:12px; overflow:hidden; display:flex; flex-direction:column; }
+      .gallery.list .card { flex-direction:row; }
+      .card .thumb { display:block; width:100%; aspect-ratio:4/3; object-fit:cover; background:#efece4; border:0; }
+      .gallery.list .card .thumb { width:160px; aspect-ratio:auto; }
+      .card .thumb.missing { display:flex; align-items:center; justify-content:center; color:var(--muted); font-size:.85rem; }
+      .card-body { padding:.7rem .8rem; text-align:left; } .card .card-title { font-weight:650; }
+      .card button.card-open { display:block; width:100%; text-align:left; background:none; border:0; color:inherit; padding:0; cursor:pointer; font:inherit; }
+      .byline { color:var(--muted); font-size:.82rem; margin:.2rem 0 0; }
+      .badges { display:flex; flex-wrap:wrap; gap:.3rem; margin-top:.4rem; }
+      .badge { font-size:.74rem; font-weight:600; padding:.08rem .5rem; border-radius:999px; border:1px solid var(--line); background:#f3f0e9; color:var(--muted); }
+      .badge.type { background:#ece4da; color:#5a3c28; } .badge.tag::before { content:"#"; opacity:.6; }
+      .badge.flag-alt { background:#fbe2de; color:var(--bad); border-color:#f0c4bd; }
+      .badge.flag-tactile { background:#e3f0e8; color:var(--ok); border-color:#bfe0cc; }
+      .detail { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:1.2rem 1.4rem; margin-top:1rem; }
+      .detail .back { margin-bottom:.8rem; } .detail h2 { margin-top:0; }
+      .detail .grid { display:grid; grid-template-columns:1fr 1fr; gap:.8rem; } @media (max-width:720px){ .detail .grid { grid-template-columns:1fr; } }
+      figure.image-block { margin:1rem 0; border-top:1px solid var(--line); padding-top:1rem; }
+      figure.image-block img { max-width:100%; height:auto; border:1px solid var(--line); border-radius:8px; background:#efece4; }
+      .credit { color:var(--muted); font-size:.78rem; margin:.3rem 0 0; }
+      .alt-region { background:#f3f0e9; border-left:3px solid var(--line); padding:.6rem .8rem; border-radius:0 8px 8px 0; margin:.5rem 0; }
+      .alt-region .alt-meta { color:var(--muted); font-size:.8rem; margin-bottom:.2rem; }
+      .img-actions { display:flex; flex-wrap:wrap; gap:.5rem; margin:.5rem 0; }
+      .action-panel { border:1px solid var(--line); border-radius:8px; padding:.8rem; margin:.5rem 0; background:#fbfaf7; }
+      .preview { margin-top:.5rem; } .preview img { max-width:320px; }
+      .download-link { display:inline-block; margin-top:.5rem; color:var(--accent); font-weight:600; }
+      .rel-list { list-style:none; padding:0; margin:.4rem 0; display:flex; flex-wrap:wrap; gap:.4rem; }
+      .rel-list li { display:flex; align-items:center; gap:.3rem; } .rel-add { display:flex; gap:.5rem; margin-top:.5rem; align-items:center; }
+      .warnings { color:var(--bad); font-size:.85rem; } .warnings::before { content:"⚠ "; }
+      .status,.error { margin:1rem 0; padding:.7rem 1rem; border-radius:8px; }
+      .status { background:#efece4; color:var(--ink); } .error { background:#fbe9e7; color:var(--bad); border:1px solid #f3c4bd; }
+      footer { text-align:center; color:var(--muted); font-size:.85rem; padding:2rem 1.5rem; border-top:1px solid var(--line); margin-top:2rem; }
+    </style>
+  </head>
+  <body>
+    <a class="skip-link" href="#main">Skip to main content</a>
+    <header>
+      <h1>Precedent Archive <span class="sub">/ canned demo</span></h1>
+      <p class="tagline">A pre-loaded, offline twin of the tool: six real precedents you can browse, search, link, and prep for tactile printing — entirely in your browser.</p>
+    </header>
+    <div class="demo-banner" role="note">
+      <strong>Canned demo — no API, no server, nothing saved to disk.</strong>
+      Browse, filter, relations, and <strong>local add</strong> all work; <strong>PIAF prep and image edits run live</strong> in your browser and download real files.
+      <em>Alt text</em> and <em>URL fetch</em> are pre-baked here (a static page can't call the model or fetch cross-origin) — both are live in the full <code>web/</code> tool.
+      Project images are clean <em>illustrations</em>; run the included pipeline on a normal network to swap in the real Wikimedia photographs.
+    </div>
+
+    <main id="main">
+      <p id="status" class="status" role="status" aria-live="polite" hidden></p>
+      <p id="error" class="error" role="alert" hidden></p>
+
+      <section aria-labelledby="add-h" class="panel">
+        <h2 id="add-h">Add to the archive</h2>
+        <div class="add-grid">
+          <div id="dropzone" class="dropzone" tabindex="0" role="button" aria-describedby="drop-help">
+            <strong>Drop images here</strong>, paste from the clipboard, or
+            <label class="file-label">choose files<input id="file-input" type="file" accept="image/*" multiple class="sr-only" /></label>
+            <p id="drop-help" class="hint">Works for real in this demo — each becomes an in-memory entry.</p>
+          </div>
+          <form id="url-form" class="url-form">
+            <label class="field" for="url-input"><span>Add from a URL</span></label>
+            <div class="row">
+              <input id="url-input" type="url" inputmode="url" placeholder="https://…" />
+              <button type="submit">Fetch</button>
+            </div>
+            <p class="hint">Demo: creates a manual stub (the live tool fetches Open Graph data server-side).</p>
+          </form>
+        </div>
+      </section>
+
+      <section aria-labelledby="browse-h">
+        <h2 id="browse-h" class="sr-only">Browse the archive</h2>
+        <form id="filters" class="filters" role="search" aria-label="Filter entries">
+          <label class="field" for="q"><span>Search</span><input id="q" type="search" placeholder="title, tag, note, alt text…" /></label>
+          <label class="field small" for="type-filter"><span>Type</span><select id="type-filter"><option value="">All types</option></select></label>
+          <label class="field small" for="tag-filter"><span>Tag</span><select id="tag-filter"><option value="">All tags</option></select></label>
+          <fieldset class="view-toggle"><legend class="sr-only">View</legend>
+            <label><input type="radio" name="view" value="gallery" checked /> Gallery</label>
+            <label><input type="radio" name="view" value="list" /> List</label>
+          </fieldset>
+          <div class="filter-actions">
+            <button id="rescan" type="button">Rescan</button>
+            <button id="bulk-alt" type="button">Generate all missing alt text</button>
+          </div>
+        </form>
+
+        <section id="orphans-wrap" aria-labelledby="orphans-h" hidden>
+          <h3 id="orphans-h">Un-cataloged images <span id="orphans-count" class="count"></span></h3>
+          <p class="hint">Images with no entry yet. Adopt one to start a note for it.</p>
+          <ul id="orphans" class="gallery" aria-label="Un-cataloged images"></ul>
+        </section>
+
+        <h3 id="entries-h" class="section-h">Entries <span id="entries-count" class="count"></span></h3>
+        <ul id="entries" class="gallery" aria-labelledby="entries-h"></ul>
+        <p id="empty" class="hint" hidden>No entries match. Add an image above, or clear the filters.</p>
+      </section>
+
+      <section id="detail" class="detail" aria-labelledby="detail-title" tabindex="-1" hidden></section>
+    </main>
+
+    <footer>Summer AI Studio · The filesystem is the truth; this app is additive and non-destructive.</footer>
+
+    <script>
+      const DATA = /*__DATA__*/null;
+
+      const $ = (id) => document.getElementById(id);
+      function h(tag, props = {}, ...kids) {
+        const e = document.createElement(tag);
+        for (const [k, v] of Object.entries(props || {})) {
+          if (v == null || v === false) continue;
+          if (k === "class") e.className = v;
+          else if (k === "for") e.htmlFor = v;
+          else if (k.startsWith("on") && typeof v === "function") e.addEventListener(k.slice(2), v);
+          else if (v === true) e.setAttribute(k, "");
+          else e.setAttribute(k, v);
+        }
+        for (const kid of kids.flat()) { if (kid == null || kid === false) continue; e.append(kid.nodeType ? kid : document.createTextNode(String(kid))); }
+        return e;
+      }
+      const clone = (x) => JSON.parse(JSON.stringify(x));
+      const state = { entries: clone(DATA.entries), orphans: clone(DATA.orphans), types: DATA.types, current: null, lastFocus: null };
+      const byId = (id) => state.entries.find((e) => e.id === id);
+      const primaryOf = (e) => e.images.find((i) => i.primary) || e.images[0] || null;
+
+      let statusTimer = null;
+      function status(msg, sticky) { const el = $("status"); el.textContent = msg; el.hidden = !msg; clearTimeout(statusTimer); if (msg && !sticky) statusTimer = setTimeout(() => { el.hidden = true; }, 4000); }
+      function showError(m) { const el = $("error"); el.textContent = m; el.hidden = !m; }
+
+      // --- render ---
+      function load() { fillFilters(); renderOrphans(); applyFilters(); }
+      function fillFilters() {
+        fillSelect($("type-filter"), "All types", state.types);
+        const tags = [...new Set(state.entries.flatMap((e) => e.tags || []))].sort();
+        fillSelect($("tag-filter"), "All tags", tags);
+      }
+      function fillSelect(sel, allLabel, values) {
+        const keep = sel.value;
+        sel.replaceChildren(h("option", { value: "" }, allLabel));
+        for (const v of values) sel.append(h("option", { value: v }, v));
+        if ([...sel.options].some((o) => o.value === keep)) sel.value = keep;
+      }
+      const currentView = () => (document.querySelector('input[name=view]:checked') || {}).value || "gallery";
+
+      function applyFilters() {
+        const q = $("q").value.trim().toLowerCase(), type = $("type-filter").value, tag = $("tag-filter").value;
+        const list = state.entries.filter((e) => {
+          if (type && e.type !== type) return false;
+          if (tag && !(e.tags || []).includes(tag)) return false;
+          if (!q) return true;
+          const hay = [e.title, e.type, (e.tags || []).join(" "), e.notes, e.images.map((i) => i.alt + " " + i.caption).join(" ")].join(" ").toLowerCase();
+          return hay.includes(q);
+        });
+        renderEntries(list);
+      }
+      function thumb(src, alt, cls) { return src ? h("img", { class: "thumb " + (cls || ""), src, alt: alt || "", loading: "lazy" }) : h("div", { class: "thumb missing " + (cls || "") }, "no image"); }
+
+      function renderEntries(entries) {
+        const ul = $("entries");
+        ul.className = "gallery" + (currentView() === "list" ? " list" : "");
+        ul.replaceChildren(...entries.map(entryCard));
+        $("entries-count").textContent = `(${entries.length})`;
+        $("empty").hidden = entries.length > 0;
+      }
+      function entryCard(e) {
+        const p = primaryOf(e), altMissing = e.images.filter((i) => !i.alt).length, tactile = e.images.filter((i) => i.tactilePrepped).length;
+        const badges = [h("span", { class: "badge type" }, e.type || "untyped")];
+        for (const t of (e.tags || []).slice(0, 4)) badges.push(h("span", { class: "badge tag" }, t));
+        if (altMissing) badges.push(h("span", { class: "badge flag-alt" }, `${altMissing} need alt`));
+        if (tactile) badges.push(h("span", { class: "badge flag-tactile" }, "tactile-prepped"));
+        const open = h("button", { class: "card-open", "aria-label": `Open entry: ${e.title || "untitled"}`, onclick: (ev) => openDetail(e.id, ev.currentTarget) },
+          thumb(p && p.src, p && p.alt),
+          h("span", { class: "card-body" }, h("span", { class: "card-title" }, e.title || "(untitled)"),
+            h("p", { class: "byline" }, `${e.type || "untyped"} · ${e.images.length} image${e.images.length === 1 ? "" : "s"}`)));
+        return h("li", { class: "card" }, open, h("div", { class: "card-body badges" }, ...badges));
+      }
+      function renderOrphans() {
+        $("orphans-wrap").hidden = state.orphans.length === 0;
+        $("orphans-count").textContent = `(${state.orphans.length})`;
+        $("orphans").replaceChildren(...state.orphans.map((o) =>
+          h("li", { class: "card" }, thumb(o.src, o.name),
+            h("div", { class: "card-body" }, h("p", { class: "byline" }, o.name),
+              h("button", { class: "small", onclick: () => adoptOrphan(o.id) }, "Create entry")))));
+      }
+
+      // --- detail ---
+      function openDetail(id, trigger) {
+        if (trigger) state.lastFocus = trigger;
+        state.current = id; renderDetail(byId(id));
+        const d = $("detail"); d.hidden = false; d.scrollIntoView({ block: "start" }); d.focus();
+      }
+      function closeDetail() { state.current = null; $("detail").hidden = true; if (state.lastFocus) state.lastFocus.focus(); }
+      function refresh() { fillFilters(); renderOrphans(); applyFilters(); if (state.current) renderDetail(byId(state.current)); }
+
+      function renderDetail(e) {
+        const sourcesWrap = h("div", {});
+        const addSourceRow = (s = { url: "", label: "" }) => sourcesWrap.append(h("div", { class: "row source-row" },
+          h("input", { type: "url", value: s.url, placeholder: "https://…", "aria-label": "Source URL" }),
+          h("input", { type: "text", value: s.label, placeholder: "Label", "aria-label": "Source label" }),
+          h("button", { type: "button", class: "small secondary", onclick: (ev) => ev.currentTarget.closest(".source-row").remove() }, "Remove")));
+        (e.sources || []).forEach(addSourceRow);
+
+        const typeSelect = h("select", { id: "d-type" }, h("option", { value: "" }, "(untyped)"),
+          ...state.types.map((t) => h("option", { value: t, ...(t === e.type ? { selected: true } : {}) }, t)));
+
+        $("detail").replaceChildren(
+          h("button", { class: "back secondary", onclick: closeDetail }, "← Back to all entries"),
+          h("h2", { id: "detail-title" }, e.title || "(untitled)"),
+          h("p", { class: "byline" }, `${e.images.length} image${e.images.length === 1 ? "" : "s"} · updated ${(e.updated || "").slice(0, 10)}`),
+          h("div", { class: "grid" },
+            h("label", { class: "field", for: "d-title" }, h("span", {}, "Title"), h("input", { type: "text", id: "d-title", value: e.title || "" })),
+            h("label", { class: "field", for: "d-type" }, h("span", {}, "Type"), typeSelect),
+            h("label", { class: "field", for: "d-tags" }, h("span", {}, "Tags (comma-separated)"), h("input", { type: "text", id: "d-tags", value: (e.tags || []).join(", ") })),
+            h("div", { class: "field" }, h("span", {}, "Sources"), sourcesWrap,
+              h("button", { type: "button", class: "small secondary", onclick: () => addSourceRow() }, "Add source"))),
+          h("label", { class: "field", for: "d-notes" }, h("span", {}, "Notes"), h("textarea", { id: "d-notes", rows: "5" }, e.notes || "")),
+          h("button", { onclick: () => saveEntry(e, sourcesWrap) }, "Save entry"),
+          h("h3", {}, "Images"), ...e.images.map((img) => imageBlock(e, img)),
+          h("h3", {}, "Related entries"), relatedBlock(e));
+      }
+
+      function imageBlock(e, img) {
+        const altRegion = h("div", { class: "alt-region", hidden: true },
+          h("p", { class: "alt-meta" }, `Stored alt text · source: ${img.altSource}`), h("p", {}, img.alt || "(no alt text yet)"));
+        const toggle = h("button", { type: "button", class: "small secondary", "aria-expanded": "false", onclick: (ev) => {
+          const open = altRegion.hidden; altRegion.hidden = !open; ev.currentTarget.setAttribute("aria-expanded", String(open));
+          ev.currentTarget.textContent = open ? "Hide alt text" : "Show alt text"; } }, "Show alt text");
+        const altEditor = h("textarea", { rows: "3", "aria-label": `Alt text for ${e.title}` }, img.alt || "");
+        const credit = img.credit && img.credit.placeholder
+          ? h("p", { class: "credit" }, "Demo illustration — run the build pipeline on a normal network for the real photograph.")
+          : (img.credit ? h("p", { class: "credit" }, `Photo: ${img.credit.author || "unknown"} · ${img.credit.license || ""} · `, img.credit.sourceUrl ? h("a", { href: img.credit.sourceUrl }, "Wikimedia Commons") : "Wikimedia Commons") : null);
+
+        return h("figure", { class: "image-block" },
+          thumb(img.src, img.alt), credit, img.caption ? h("figcaption", {}, img.caption) : null, altRegion,
+          h("label", { class: "field" }, h("span", {}, "Alt text"), altEditor),
+          h("div", { class: "img-actions" }, toggle,
+            h("button", { type: "button", class: "small", onclick: () => saveAlt(e, img, altEditor.value) }, "Save alt"),
+            h("button", { type: "button", class: "small secondary", onclick: () => regenAlt(e, img) }, "Regenerate alt"),
+            img.primary ? h("span", { class: "badge" }, "primary") : h("button", { type: "button", class: "small secondary", onclick: () => setPrimary(e, img) }, "Set as primary")),
+          h("label", { class: "field" }, h("span", {}, "Caption (visible, optional)"),
+            h("input", { type: "text", value: img.caption || "", onchange: (ev) => { img.caption = ev.currentTarget.value; status("Caption saved."); } })),
+          img.tactilePrepped ? h("p", { class: "badge flag-tactile" }, "tactile-prepped") : null,
+          piafPanel(img), editPanel(img));
+      }
+
+      // --- live canvas: PIAF + edit ---
+      const imageFromSrc = (src) => new Promise((res, rej) => { const im = new Image(); im.onload = () => res(im); im.onerror = rej; im.src = src; });
+      function scaled(im, cap = 1000) { let w = im.naturalWidth || im.width, hh = im.naturalHeight || im.height; const s = Math.min(1, cap / Math.max(w, hh)); return { w: Math.round(w * s), h: Math.round(hh * s) }; }
+
+      async function runPiaf(src, pct, edge) {
+        const im = await imageFromSrc(src); const { w, h: hh } = scaled(im);
+        const cv = document.createElement("canvas"); cv.width = w; cv.height = hh; const ctx = cv.getContext("2d");
+        ctx.drawImage(im, 0, 0, w, hh); const d = ctx.getImageData(0, 0, w, hh).data;
+        const lum = new Float32Array(w * hh);
+        for (let i = 0, p = 0; i < d.length; i += 4, p++) lum[p] = 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
+        const out = ctx.createImageData(w, hh), o = out.data, t = (pct / 100) * 255;
+        if (edge) {
+          const at = (x, y) => lum[y * w + x];
+          for (let y = 0; y < hh; y++) for (let x = 0; x < w; x++) {
+            let mag = 0;
+            if (x > 0 && y > 0 && x < w - 1 && y < hh - 1) {
+              const gx = -at(x-1,y-1)-2*at(x-1,y)-at(x-1,y+1)+at(x+1,y-1)+2*at(x+1,y)+at(x+1,y+1);
+              const gy = -at(x-1,y-1)-2*at(x,y-1)-at(x+1,y-1)+at(x-1,y+1)+2*at(x,y+1)+at(x+1,y+1);
+              mag = Math.sqrt(gx * gx + gy * gy);
+            }
+            const v = mag > t * 1.4 ? 0 : 255, q = (y * w + x) * 4; o[q] = o[q+1] = o[q+2] = v; o[q+3] = 255;
+          }
+        } else {
+          for (let p = 0; p < lum.length; p++) { const v = lum[p] < t ? 0 : 255, q = p * 4; o[q] = o[q+1] = o[q+2] = v; o[q+3] = 255; }
+        }
+        ctx.putImageData(out, 0, 0); return cv.toDataURL("image/png");
+      }
+      async function runEdit(src, { rotate = 0, contrast = 1, width }) {
+        const im = await imageFromSrc(src); let w = im.naturalWidth, hh = im.naturalHeight;
+        if (width) { const s = width / w; w = Math.round(width); hh = Math.round(hh * s); }
+        const rot = ((rotate % 360) + 360) % 360, swap = rot === 90 || rot === 270;
+        const cv = document.createElement("canvas"); cv.width = swap ? hh : w; cv.height = swap ? w : hh; const ctx = cv.getContext("2d");
+        ctx.save(); ctx.translate(cv.width / 2, cv.height / 2); ctx.rotate((rot * Math.PI) / 180); ctx.drawImage(im, -w / 2, -hh / 2, w, hh); ctx.restore();
+        if (Number(contrast) !== 1) { const id = ctx.getImageData(0, 0, cv.width, cv.height), dd = id.data, c = Number(contrast), b = 128 * (1 - c);
+          for (let i = 0; i < dd.length; i += 4) { dd[i] = dd[i]*c+b; dd[i+1] = dd[i+1]*c+b; dd[i+2] = dd[i+2]*c+b; } ctx.putImageData(id, 0, 0); }
+        return cv.toDataURL("image/png");
+      }
+      function downloadLink(dataUrl, name) { return h("a", { class: "download-link", href: dataUrl, download: name }, "Download " + name); }
+
+      function piafPanel(img) {
+        const thr = h("input", { type: "range", min: "1", max: "99", value: "50", "aria-label": "Threshold percent" }); const out = h("output", {}, "50%");
+        thr.addEventListener("input", () => { out.textContent = thr.value + "%"; });
+        const edge = h("input", { type: "checkbox" }); const preview = h("div", { class: "preview" });
+        return h("details", { class: "action-panel" }, h("summary", {}, "Prep for PIAF (tactile / swell paper)"),
+          h("p", { class: "hint" }, "Black raises on heating: aim for bold black-on-white with few mid-tones. Runs live in your browser."),
+          h("div", { class: "row" }, h("label", { class: "field", style: "flex:1" }, h("span", {}, "Threshold"), thr), out),
+          h("label", {}, edge, " Edge-detect (outlines instead of filled darks)"),
+          h("div", { class: "row" }, h("button", { type: "button", class: "small", onclick: async () => {
+            try { status("Rendering tactile version…", true); const url = await runPiaf(img.src, Number(thr.value), edge.checked);
+              img.tactilePrepped = true;
+              preview.replaceChildren(h("img", { src: url, alt: "Preview of the 1-bit tactile version" }), h("br"), downloadLink(url, "piaf.png")); status("Tactile version ready.");
+            } catch (err) { showError("PIAF failed: " + err.message); } } }, "Generate")), preview);
+      }
+      function editPanel(img) {
+        const rotate = h("select", {}, ...["0", "90", "180", "270"].map((v) => h("option", { value: v }, v + "°")));
+        const width = h("input", { type: "number", min: "1", placeholder: "px", "aria-label": "Resize width" });
+        const contrast = h("input", { type: "range", min: "0.5", max: "2", step: "0.1", value: "1", "aria-label": "Contrast" }); const cOut = h("output", {}, "1.0");
+        contrast.addEventListener("input", () => { cOut.textContent = Number(contrast.value).toFixed(1); });
+        const preview = h("div", { class: "preview" });
+        return h("details", { class: "action-panel" }, h("summary", {}, "Edit image (rotate · resize · contrast)"),
+          h("div", { class: "row" }, h("label", { class: "field" }, h("span", {}, "Rotate"), rotate),
+            h("label", { class: "field" }, h("span", {}, "Resize width"), width),
+            h("label", { class: "field", style: "flex:1" }, h("span", {}, "Contrast"), contrast), cOut),
+          h("div", { class: "row" }, h("button", { type: "button", class: "small", onclick: async () => {
+            try { status("Editing…", true); const url = await runEdit(img.src, { rotate: Number(rotate.value), contrast: Number(contrast.value), width: width.value ? Number(width.value) : undefined });
+              preview.replaceChildren(h("img", { src: url, alt: "Preview of the edited image" }), h("br"), downloadLink(url, "edited.png")); status("Edit ready.");
+            } catch (err) { showError("Edit failed: " + err.message); } } }, "Generate")), preview);
+      }
+
+      function relatedBlock(e) {
+        const list = h("ul", { class: "rel-list" }, ...(e.related || []).map((rid) => { const r = byId(rid);
+          return h("li", {}, r ? h("button", { class: "small secondary", onclick: () => openDetail(rid) }, r.title) : h("span", { class: "warnings" }, `missing: ${rid}`),
+            h("button", { class: "small secondary", "aria-label": `Remove relation ${r ? r.title : rid}`, onclick: () => relate(e, rid, "remove") }, "✕")); }));
+        if (!(e.related || []).length) list.append(h("li", { class: "hint" }, "None yet."));
+        const others = state.entries.filter((x) => x.id !== e.id && !(e.related || []).includes(x.id));
+        const select = h("select", { "aria-label": "Choose an entry to relate" }, h("option", { value: "" }, "Choose an entry…"), ...others.map((x) => h("option", { value: x.id }, x.title)));
+        return h("div", {}, list, h("div", { class: "rel-add" }, select, h("button", { class: "small", onclick: () => { if (select.value) relate(e, select.value, "add"); } }, "Add relation")));
+      }
+
+      // --- mutations (in-memory) ---
+      function saveEntry(e, sourcesWrap) {
+        e.title = $("d-title").value.trim(); e.type = $("d-type").value;
+        e.tags = $("d-tags").value.split(",").map((t) => t.trim()).filter(Boolean); e.notes = $("d-notes").value;
+        e.sources = [...sourcesWrap.querySelectorAll(".source-row")].map((row) => { const [u, l] = row.querySelectorAll("input"); return { url: u.value.trim(), label: l.value.trim() }; }).filter((s) => s.url);
+        e.updated = new Date().toISOString(); refresh(); status("Saved.");
+      }
+      function saveAlt(e, img, text) { img.alt = text; img.altSource = img.altSource === "ai" ? "edited" : "human"; refresh(); status("Alt text saved (human-edited — protected from regeneration)."); }
+      function regenAlt(e, img) {
+        if (img.altSource === "human" || img.altSource === "edited") { if (!confirm("This alt text was human-edited. Replace it with a generated one?")) return; }
+        img.alt = img.cannedAlt || img.alt || "Generated description (demo placeholder)."; img.altSource = "ai"; refresh(); status("Alt text regenerated (demo: pre-baked; the full tool calls claude-sonnet-4-6).");
+      }
+      function setPrimary(e, img) { e.images.forEach((i) => { i.primary = i === img; }); refresh(); status("Primary image set."); }
+      function relate(e, otherId, op) {
+        const other = byId(otherId); const upd = (x, id) => { x.related = x.related || []; const s = new Set(x.related); op === "remove" ? s.delete(id) : s.add(id); x.related = [...s]; };
+        upd(e, otherId); if (other) upd(other, e.id); refresh(); status(op === "remove" ? "Relation removed (both ways)." : "Relation added (both ways).");
+      }
+      function bulkAlt() {
+        let n = 0; for (const e of state.entries) for (const img of e.images) if (!img.alt) { img.alt = img.cannedAlt || "Generated description (demo placeholder)."; img.altSource = "ai"; n++; }
+        refresh(); status(`Generated ${n} missing alt text (demo: pre-baked; the full tool calls the model).`);
+      }
+      function rescan() { state.entries = clone(DATA.entries); state.orphans = clone(DATA.orphans); state.current = null; $("detail").hidden = true; load(); status("Reloaded the sample archive."); }
+
+      // --- add flows ---
+      const fileToDataUrl = (f) => new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result); r.onerror = rej; r.readAsDataURL(f); });
+      async function addFiles(files) {
+        const imgs = [...files].filter((f) => f.type.startsWith("image/")); if (!imgs.length) { showError("No images in that drop/paste."); return; }
+        const ids = [];
+        for (const f of imgs) { const src = await fileToDataUrl(f); const id = "added-" + Date.now() + "-" + ids.length;
+          state.entries.unshift({ id, title: f.name.replace(/\.[^.]+$/, ""), type: "precedent", tags: [], notes: "", sources: [], related: [], updated: new Date().toISOString(),
+            images: [{ src, alt: "", altSource: "empty", caption: "", primary: true, cannedAlt: "A newly added image. Write alt text, or use Generate (live in the full tool).", credit: { placeholder: true } }] }); ids.push(id); }
+        load(); status(`Added ${ids.length} image${ids.length === 1 ? "" : "s"} as ${ids.length === 1 ? "an entry" : "entries"}.`);
+        if (ids.length === 1) openDetail(ids[0]);
+      }
+      function adoptOrphan(id) {
+        const i = state.orphans.findIndex((o) => o.id === id); if (i < 0) return; const o = state.orphans[i]; state.orphans.splice(i, 1);
+        const eid = "entry-" + o.id;
+        state.entries.unshift({ id: eid, title: o.name.replace(/\.[^.]+$/, ""), type: "precedent", tags: [], notes: "", sources: [], related: [], updated: new Date().toISOString(),
+          images: [{ src: o.src, alt: o.cannedAlt || "", altSource: o.cannedAlt ? "ai" : "empty", caption: "", primary: true, credit: o.credit || { placeholder: true } }] });
+        load(); status("Created an entry from the un-cataloged image (alt auto-filled, as the full tool does on add)."); openDetail(eid);
+      }
+      function addUrl(url) {
+        const id = "link-" + Date.now();
+        state.entries.unshift({ id, title: url, type: "reference", tags: [], notes: "Demo stub: the live tool fetches Open Graph / oEmbed metadata + the preview image server-side. A static page can't fetch cross-origin, so add a screenshot in the full tool.", sources: [{ url, label: "Pasted link" }], related: [], updated: new Date().toISOString(), images: [] });
+        load(); status("Created a manual stub from the URL (the live tool fetches the page server-side)."); openDetail(id);
+      }
+
+      // --- wiring ---
+      $("filters").addEventListener("submit", (e) => e.preventDefault());
+      $("q").addEventListener("input", applyFilters);
+      $("type-filter").addEventListener("change", applyFilters);
+      $("tag-filter").addEventListener("change", applyFilters);
+      for (const r of document.querySelectorAll('input[name=view]')) r.addEventListener("change", applyFilters);
+      $("rescan").addEventListener("click", rescan);
+      $("bulk-alt").addEventListener("click", bulkAlt);
+      $("url-form").addEventListener("submit", (e) => { e.preventDefault(); const u = $("url-input").value.trim(); if (u) { addUrl(u); $("url-input").value = ""; } });
+      const dz = $("dropzone");
+      $("file-input").addEventListener("change", (e) => addFiles(e.target.files));
+      dz.addEventListener("click", (e) => { if (e.target === dz) $("file-input").click(); });
+      dz.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); $("file-input").click(); } });
+      ["dragover", "dragenter"].forEach((ev) => dz.addEventListener(ev, (e) => { e.preventDefault(); dz.classList.add("drag"); }));
+      ["dragleave", "drop"].forEach((ev) => dz.addEventListener(ev, () => dz.classList.remove("drag")));
+      dz.addEventListener("drop", (e) => { e.preventDefault(); if (e.dataTransfer.files.length) addFiles(e.dataTransfer.files); });
+      document.addEventListener("paste", (e) => { const f = [...(e.clipboardData?.items || [])].filter((i) => i.kind === "file").map((i) => i.getAsFile()).filter(Boolean); if (f.length) { e.preventDefault(); addFiles(f); } });
+      document.addEventListener("keydown", (e) => { if (e.key === "Escape" && state.current) closeDetail(); });
+
+      load();
+    </script>
+  </body>
+</html>
