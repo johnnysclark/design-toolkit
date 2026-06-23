@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Studio Crit Board</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <!-- Passcode screen -->
+  <div class="screen" id="screen-passcode" hidden>
+    <div class="card">
+      <h1>Studio Crit Board</h1>
+      <p class="tagline">Enter the studio passcode to continue.</p>
+      <form id="passcode-form">
+        <div class="field">
+          <label for="passcode">Passcode</label>
+          <input type="password" id="passcode" autocomplete="current-password" required />
+        </div>
+        <div class="err" id="passcode-err" hidden></div>
+        <button type="submit">Enter</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Name picker (students) -->
+  <div class="screen" id="screen-name" hidden>
+    <div class="card">
+      <h1>Who are you?</h1>
+      <p class="tagline">Pick your name from the roster.</p>
+      <div class="name-grid" id="name-grid"></div>
+      <div class="err" id="name-err" hidden></div>
+      <button class="subtle" id="name-signout" type="button">Use a different passcode</button>
+    </div>
+  </div>
+
+  <!-- Board -->
+  <div id="screen-board" hidden>
+    <header class="topbar">
+      <div class="brand">
+        <h1 id="studio-name">Studio Crit Board</h1>
+        <span class="sub" id="studio-sub"></span>
+      </div>
+      <div class="controls" id="controls"></div>
+    </header>
+    <main>
+      <div class="board-wrap">
+        <table class="grid" id="grid" aria-label="Crit board: students by week"></table>
+      </div>
+    </main>
+  </div>
+
+  <!-- Cell view -->
+  <dialog id="cell-dialog" aria-labelledby="cell-title">
+    <div class="dlg-head">
+      <h2 id="cell-title">Cell</h2>
+      <div class="spacer"></div>
+      <button class="ghost" id="cell-close" aria-label="Close cell">Close</button>
+    </div>
+    <div class="dlg-body" id="cell-body"></div>
+  </dialog>
+
+  <!-- Lightbox -->
+  <dialog id="lightbox" class="lightbox" aria-label="Image viewer">
+    <div class="lb-stage">
+      <button class="lb-nav lb-prev" id="lb-prev" aria-label="Previous image">‹</button>
+      <img id="lb-img" alt="" />
+      <button class="lb-nav lb-next" id="lb-next" aria-label="Next image">›</button>
+    </div>
+    <div class="lb-bar">
+      <span id="lb-count"></span>
+      <span class="cap" id="lb-cap"></span>
+      <button id="lb-close" aria-label="Close viewer">Close</button>
+    </div>
+  </dialog>
+
+  <!-- Admin -->
+  <dialog id="admin-dialog" aria-labelledby="admin-title">
+    <div class="dlg-head">
+      <h2 id="admin-title">Admin · studio setup</h2>
+      <div class="spacer"></div>
+      <button class="ghost" id="admin-close" aria-label="Close admin">Close</button>
+    </div>
+    <div class="dlg-body" id="admin-body"></div>
+  </dialog>
+
+  <script src="app.js"></script>
+</body>
+</html>
