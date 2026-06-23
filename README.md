@@ -107,6 +107,10 @@ The full web apps need `npm install` and (for the model passes) an
 to this repo** — only empty `.env.example` templates; `node_modules/` and `.env` are
 gitignored.
 
+**Putting these online?** See [`HOSTING.md`](HOSTING.md) — a step-by-step recipe with
+three UIUC hosting options and three private-service options, covering both the
+zero-setup static demos and the full AI apps, plus how to add a per-user login gate.
+
 ---
 
 ## How this repo evolves
