@@ -1,0 +1,266 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Grading the Trace — AI Integration Plan</title>
+<meta name="description" content="Summer AI Studio integration plan — second-year studio on the Tar Creek Superfund site.">
+<!-- Hints for a later Adobe Express import (one section.slide = one slide) -->
+<meta name="hz:slide-selector" content=".slide">
+<meta name="hz:canvas-width" content="1280">
+<meta name="hz:canvas-height" content="720">
+<style>
+  :root{
+    --paper:#F4F1EA; --ink:#1B1A17; --soft:#5A554C; --rust:#B4502E;
+    --line:#D8D2C4; --ok:#2E7D4F; --warn:#C8862A; --bad:#B23A2E; --letterbox:#0E0D0C;
+    --serif:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,"Times New Roman",serif;
+    --sans:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    --mono:ui-monospace,"SF Mono","Cascadia Code","Roboto Mono",Menlo,Consolas,monospace;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%;margin:0;background:var(--letterbox);font-family:var(--sans);color:var(--ink)}
+  .deck{height:100vh;display:flex;align-items:center;justify-content:center}
+  .slide{
+    position:relative;width:min(100vw,177.78vh);aspect-ratio:16/9;background:var(--paper);
+    container-type:size;overflow:hidden;display:none;
+    padding:7cqh 7cqw 6.5cqh;box-shadow:0 0 0 1px rgba(0,0,0,.04),0 2cqh 6cqh rgba(0,0,0,.35)
+  }
+  .slide.active{display:flex;flex-direction:column}
+  .slide::before{content:"";position:absolute;left:0;top:0;height:1.1cqh;width:100%;background:var(--rust)}
+
+  .kicker{font-size:2.2cqh;letter-spacing:.28cqh;text-transform:uppercase;color:var(--rust);font-weight:700}
+  h1{font-family:var(--serif);font-weight:700;line-height:1.02;margin:0}
+  h2{font-family:var(--serif);font-weight:700;line-height:1.04;margin:.4cqh 0 0;font-size:7.6cqh}
+  .lead{font-size:3.5cqh;line-height:1.4;color:var(--ink);max-width:78cqw}
+  .soft{color:var(--soft)}
+  ul{margin:0;padding:0;list-style:none}
+  li{font-size:3.2cqh;line-height:1.42;margin:2.1cqh 0;padding-left:4.2cqw;position:relative;max-width:84cqw}
+  li::before{content:"";position:absolute;left:0;top:1.7cqh;width:2.1cqw;height:.5cqh;background:var(--rust)}
+  em{font-style:italic;color:var(--rust);font-weight:600;font-family:var(--serif)}
+  strong{font-weight:700}
+  .spacer{flex:1 1 auto}
+  .foot{display:flex;justify-content:space-between;align-items:flex-end;font-size:2.05cqh;color:var(--soft)}
+  .foot .run{letter-spacing:.06cqh}
+
+  /* tag chips */
+  .tags{display:flex;gap:2.4cqw;margin-top:5cqh}
+  .chip{display:inline-flex;align-items:center;gap:1cqw;font-size:2.5cqh;font-weight:600;
+    padding:1cqh 2cqw;border-radius:10cqh;border:.28cqh solid}
+  .chip .g{font-family:var(--mono)}
+  .ok{color:var(--ok);border-color:var(--ok)}
+  .warn{color:var(--warn);border-color:var(--warn)}
+  .bad{color:var(--bad);border-color:var(--bad)}
+
+  /* title slide */
+  #s1 h1{font-size:13cqh;letter-spacing:-.1cqh}
+  #s1 .sub{font-size:4.4cqh;font-family:var(--serif);font-style:italic;color:var(--soft);margin-top:1.5cqh}
+  #s1 .meta{font-size:2.6cqh;color:var(--ink);margin-top:4cqh;line-height:1.6}
+  #s1 .meta b{color:var(--rust)}
+
+  /* two-column layouts */
+  .cols{display:grid;grid-template-columns:1.05fr .95fr;gap:6cqw;flex:1 1 auto;min-height:0;align-content:start}
+  .cols h3,.panel h3{font-size:2.5cqh;text-transform:uppercase;letter-spacing:.18cqh;color:var(--soft);margin:0 0 1.5cqh}
+  .cols li{font-size:2.85cqh;margin:1.5cqh 0}
+  .panel{background:#fff;border:.3cqh solid var(--line);border-radius:1.6cqh;padding:3cqh 3cqw}
+  .principle{background:var(--ink);color:var(--paper);border-radius:1.6cqh;padding:3cqh 3cqw;font-size:2.85cqh;line-height:1.5}
+  .principle b{color:#F0C04A}
+  .principle .ok2{color:#7FD3A1}.principle .warn2{color:#E7B25A}.principle .bad2{color:#E78B7F}
+
+  /* arc of tools */
+  .arc{display:flex;flex-wrap:wrap;gap:1.3cqw;margin-top:1cqh}
+  .step{background:#fff;border:.3cqh solid var(--line);border-radius:1cqh;padding:1.4cqh 1.6cqw;font-size:2.35cqh;line-height:1.2}
+  .step b{display:block;font-size:2.45cqh}
+  .step .st{font-size:1.9cqh}
+  .built{color:var(--ok)} .plan{color:var(--warn)}
+  .roles{margin-top:2.4cqh;font-size:2.7cqh;line-height:1.45}
+  .roles b{color:var(--rust)}
+
+  /* big statement slides */
+  .statement{font-family:var(--serif);font-size:6.4cqh;line-height:1.22;max-width:88cqw;flex:1 1 auto;display:flex;align-items:center}
+  .statement.q{font-size:6.8cqh}
+  .undertag{font-size:2.9cqh;color:var(--soft);margin-top:1cqh}
+
+  /* the four-line log motif */
+  .log{font-family:var(--mono);background:#fff;border:.3cqh solid var(--line);border-left:1.2cqh solid var(--rust);
+    border-radius:0 1.2cqh 1.2cqh 0;padding:2.4cqh 2.6cqw;font-size:2.25cqh;line-height:1.85}
+  .log .k{color:var(--soft)}
+  .log .rej{color:var(--bad);font-weight:600}
+  .log .ver{color:var(--ok);font-weight:600}
+
+  /* HUD */
+  .hud{position:fixed;left:0;right:0;bottom:0;height:4px;background:rgba(255,255,255,.12);z-index:20}
+  .hud .bar{height:100%;width:0;background:var(--rust);transition:width .25s ease}
+  .count{position:fixed;right:14px;bottom:12px;color:rgba(255,255,255,.55);font:600 12px/1 var(--sans);z-index:20}
+  .help{position:fixed;left:14px;bottom:12px;color:rgba(255,255,255,.4);font:500 12px/1 var(--sans);z-index:20}
+
+  @media print{
+    @page{size:landscape;margin:0}
+    html,body{background:#fff}
+    .deck{display:block;height:auto}
+    .slide{display:flex !important;flex-direction:column;width:100%;aspect-ratio:16/9;
+      box-shadow:none;page-break-after:always;break-after:page}
+    .hud,.count,.help{display:none}
+  }
+</style>
+</head>
+<body>
+<div class="deck">
+
+  <!-- 1 · TITLE -->
+  <section class="slide active" id="s1">
+    <div class="kicker">Summer AI Studio · Integration Plan</div>
+    <div class="spacer"></div>
+    <h1>Grading the Trace</h1>
+    <div class="sub">AI in a second-year studio on a poisoned site</div>
+    <div class="meta">
+      <b>Tar Creek Superfund Site</b>, Picher, Oklahoma &nbsp;·&nbsp; second-year undergraduate design studio (~16–20)
+    </div>
+    <div class="tags">
+      <span class="chip ok"><span class="g">✓</span> verified</span>
+      <span class="chip warn"><span class="g">?</span> unverified</span>
+      <span class="chip bad"><span class="g">⚠</span> likely-hallucination</span>
+    </div>
+    <div class="spacer"></div>
+    <div class="foot"><span class="run">Stop grading the artifact. Grade the trace.</span><span>June 2026</span></div>
+  </section>
+
+  <!-- 2 · PROBLEM -->
+  <section class="slide" id="s2">
+    <div class="kicker">01 · The course &amp; the problem</div>
+    <h2>AI is most dangerous for the novice.</h2>
+    <ul>
+      <li>My second-years already use AI — and <strong>can't yet see</strong> when its confident, polished output is wrong. A hallucinated precedent reads exactly like a real one.</li>
+      <li>Studio has always graded the <strong>artifact</strong>. When AI makes a finished-looking board in seconds, grading the artifact rewards polish over judgment — and can't tell owned work from offloaded work.</li>
+      <li>The risk isn't cheating. It's novices learning the wrong lesson at the worst time: <em>polish = architecture, AI = oracle.</em></li>
+    </ul>
+    <div class="spacer"></div>
+    <div class="foot"><span class="run">Tar Creek · 2nd-year studio</span><span class="run">So I'm changing <strong>what gets graded.</strong></span></div>
+  </section>
+
+  <!-- 3 · INTEGRATION -->
+  <section class="slide" id="s3">
+    <div class="kicker">02 · The redesign &amp; where AI fits</div>
+    <h2 style="font-size:6.4cqh">A trace-generating tool at every step.</h2>
+    <div class="cols" style="margin-top:2.4cqh">
+      <div>
+        <h3>The studio arc</h3>
+        <div class="arc">
+          <div class="step"><b>Site</b><span class="st built">Site Analyzer ✓ built</span></div>
+          <div class="step"><b>Precedent</b><span class="st built">Precedent Librarian ✓ built</span></div>
+          <div class="step"><b>Massing</b><span class="st plan">Form Helper · planned</span></div>
+          <div class="step"><b>Modeling</b><span class="st plan">Rhino Wizard · planned</span></div>
+          <div class="step"><b>Code</b><span class="st plan">Code-Zoning Agent · planned</span></div>
+          <div class="step"><b>Crit / Portfolio</b><span class="st plan">Storyteller · Crit Board · planned</span></div>
+        </div>
+        <div class="roles">
+          <b>Student</b> = cognitive agent &amp; critic: sets the parti, prices the trust, verifies, overrides.<br>
+          <b>AI</b> = a material with a grain to interrogate — <strong>never the author.</strong>
+        </div>
+      </div>
+      <div class="principle">
+        One shared principle, compiled into every tool:
+        <div style="margin-top:1.6cqh">
+          Hard data is <b>sourced</b>. Every <i>model</i> claim is tagged
+          <span class="ok2">✓</span><span class="warn2">?</span><span class="bad2">⚠</span> and <b>cited</b>.
+          The tool <b>attacks its own output</b>. A four-line provenance log + a verification worksheet
+          <b>fall out automatically.</b>
+        </div>
+        <div style="margin-top:1.8cqh;font-size:2.5cqh;color:#C9C3B5">The process record is a byproduct of the work — not a reflection essay bolted on after.</div>
+      </div>
+    </div>
+    <div class="foot"><span class="run">Tar Creek · 2nd-year studio</span><span class="run">Equity: every <strong>graded</strong> path runs on free tools.</span></div>
+  </section>
+
+  <!-- 4 · OUTCOME -->
+  <section class="slide" id="s4">
+    <div class="kicker">03 · The learning outcome</div>
+    <div class="statement">
+      A second-year can <em>produce and defend a legible trace</em> of their process — where AI entered, what they trusted and why, what they verified, and what they changed — so reasoning is visible and ownable, <span class="soft">no matter how finished the artifact looks.</span>
+    </div>
+    <div class="undertag"><strong>Process literacy.</strong> Not "use AI well." Not "make a good building." The capacity underneath both.</div>
+    <div class="foot" style="margin-top:3cqh"><span class="run">Tar Creek · 2nd-year studio</span><span></span></div>
+  </section>
+
+  <!-- 5 · MEASUREMENT -->
+  <section class="slide" id="s5">
+    <div class="kicker">04 · My measurement approach</div>
+    <h2 style="font-size:6.4cqh">The tools emit the evidence.</h2>
+    <div class="cols" style="margin-top:2.2cqh;grid-template-columns:1fr 1fr">
+      <div class="panel">
+        <h3>Collect (byproducts, no busywork)</h3>
+        <ul>
+          <li>Four-line provenance logs</li>
+          <li>Verification worksheets (✓ / ? / ⚠)</li>
+          <li>Override events — rejected/changed + the reason</li>
+          <li>Trust calibration — tags vs. what proved true</li>
+          <li>"% in your words" · unaided re-derivation checks</li>
+        </ul>
+      </div>
+      <div>
+        <h3 style="color:var(--soft)">Read it · trace rubric</h3>
+        <div style="font-size:2.7cqh;line-height:1.5;margin-bottom:2cqh">Specificity &amp; honesty · justified overrides · calibration accuracy · re-derivability. <strong>Compare early → late.</strong></div>
+        <div class="log">
+          <div><span class="k">tool:</span> Site Analyzer</div>
+          <div><span class="k">asked:</span> Tar Creek flood + contamination read</div>
+          <div><span class="k">kept/changed/rejected:</span> <span class="rej">rejected ⚠ "safe by 2030"</span></div>
+          <div><span class="k">verified:</span> <span class="ver">cross-checked EPA ROD + FEMA NFHL</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="foot"><span class="run">Tar Creek · 2nd-year studio</span><span class="run">Working = traces get sharper &amp; catch more errors over the term.</span></div>
+  </section>
+
+  <!-- 6 · CHALLENGE -->
+  <section class="slide" id="s6">
+    <div class="kicker">05 · The challenge I haven't solved</div>
+    <h2 style="font-size:6cqh">Grade the trace, and students learn to <em>perform</em> the trace.</h2>
+    <ul>
+      <li>A clean log and a staged "critique of the AI" can be <strong>faked</strong> — and novices are expert at telling teachers what they want to see.</li>
+      <li>Police it harder and the trace becomes a <strong>punitive tax</strong> that kills the honest version right alongside the fake one.</li>
+      <li><strong>Stakes:</strong> "grade the trace" silently becomes "grade the <em>performance</em> of a trace." Offloading, laundered through good-looking logs — <strong>worse than where I started.</strong></li>
+    </ul>
+    <div class="foot"><span class="run">Tar Creek · 2nd-year studio</span><span></span></div>
+  </section>
+
+  <!-- 7 · QUESTION -->
+  <section class="slide" id="s7">
+    <div class="kicker">My question for the cohort</div>
+    <div class="statement q">
+      How do you tell <em>genuine</em> reflection from <em>performed</em> reflection — without policing the documentation so hard it becomes punitive and kills the honest version too?
+    </div>
+    <div class="undertag">Grading process, not product, in a room of second-year novices.</div>
+    <div class="foot" style="margin-top:3cqh"><span class="run">Grading the Trace · Tar Creek · 2nd-year studio</span><span></span></div>
+  </section>
+
+</div>
+
+<div class="hud"><div class="bar" id="bar"></div></div>
+<div class="count" id="count"></div>
+<div class="help">← → navigate · F fullscreen · P print/PDF</div>
+
+<script>
+  const slides=[...document.querySelectorAll('.slide')];
+  let i=0;
+  const bar=document.getElementById('bar'),count=document.getElementById('count');
+  function show(n){
+    i=Math.max(0,Math.min(slides.length-1,n));
+    slides.forEach((s,k)=>s.classList.toggle('active',k===i));
+    bar.style.width=((i+1)/slides.length*100)+'%';
+    count.textContent=(i+1)+' / '+slides.length;
+  }
+  function next(){show(i+1)} function prev(){show(i-1)}
+  document.addEventListener('keydown',e=>{
+    if(['ArrowRight','PageDown',' ','j','l'].includes(e.key)){e.preventDefault();next()}
+    else if(['ArrowLeft','PageUp','k','h'].includes(e.key)){e.preventDefault();prev()}
+    else if(e.key==='Home'){show(0)} else if(e.key==='End'){show(slides.length-1)}
+    else if(e.key==='f'||e.key==='F'){(document.fullscreenElement?document.exitFullscreen():document.documentElement.requestFullscreen())}
+    else if(e.key==='p'||e.key==='P'){window.print()}
+  });
+  document.querySelector('.deck').addEventListener('click',e=>{
+    if(e.target.closest('a'))return;
+    (e.clientX < window.innerWidth*0.28)?prev():next();
+  });
+  show(0);
+</script>
+</body>
+</html>
