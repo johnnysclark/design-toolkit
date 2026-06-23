@@ -40,7 +40,7 @@ QUICK START
         + pass/fail booleans.
 
 LAYER CONVENTION (so the web app can re-import):
-  Plinth, Room, Roof, Apertures, Ridge, Report
+  Plinth, Walls, Roof, Apertures, Report
 `;
 
 export async function buildExportZip(state, metrics) {

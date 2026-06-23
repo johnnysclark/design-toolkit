@@ -1,12 +1,12 @@
 {
   "name": "Passive solar shed",
-  "intent": "Capture winter sun, avoid summer overheating, keep a working south window and a buildable pitch.",
+  "intent": "Capture winter sun, avoid summer overheating, keep a working south window, a buildable pitch, and enough glass.",
   "rules": [
-    { "id": "psh1", "lhs": "solarWinterUseful", "op": ">=", "rhs": 3.5, "weight": 2, "hard": true },
+    { "id": "psh1", "lhs": "solarWinterUseful", "op": ">=", "rhs": 4.0, "weight": 2, "hard": true },
     { "id": "psh2", "lhs": "overheatRatio", "op": "<=", "rhs": 0.6, "weight": 2, "hard": true },
     { "id": "psh3", "lhs": "solarSouth", "op": ">=", "rhs": 2.2, "weight": 1, "hard": false },
-    { "id": "psh4", "lhs": "pitchDeg", "op": "between", "rhs": [25, 45], "weight": 1, "hard": false },
-    { "id": "psh5", "lhs": "glazingRatio", "op": "between", "rhs": [0.03, 0.12], "weight": 1, "hard": false },
-    { "id": "psh6", "lhs": "stackIndex", "op": ">=", "rhs": 0.4, "weight": 1, "hard": false }
+    { "id": "psh4", "lhs": "pitchDeg", "op": "between", "rhs": [22, 40], "weight": 1, "hard": false },
+    { "id": "psh5", "lhs": "glazingRatio", "op": "between", "rhs": [0.035, 0.12], "weight": 1, "hard": false },
+    { "id": "psh6", "lhs": "stackIndex", "op": ">=", "rhs": 0.5, "weight": 1, "hard": false }
   ]
 }

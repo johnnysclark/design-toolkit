@@ -1,6 +1,5 @@
-// ui.js — DOM for the control panel, the live metrics dashboard, and the rule
-// builder. Pure view layer: it reads/writes the state object app.js owns and
-// calls back when something changes.
+// ui.js (v2) — control panel (nested params + display), live metrics dashboard,
+// and the rule builder. Pure view layer over the state object app.js owns.
 import { VARIABLE_DEFS, HOST_LABELS, WALL_HOSTS, ROOF_HOSTS } from "./core.js";
 
 export function el(tag, attrs = {}, kids = []) {
@@ -17,18 +16,10 @@ export function el(tag, attrs = {}, kids = []) {
 
 const fmt = (x, u) => {
   if (x === null || x === undefined || Number.isNaN(x)) return "—";
-  const abs = Math.abs(x);
-  const s = abs >= 100 ? x.toFixed(0) : abs >= 10 ? x.toFixed(1) : abs >= 1 ? x.toFixed(2) : x.toFixed(3);
+  const a = Math.abs(x);
+  const s = a >= 100 ? x.toFixed(0) : a >= 10 ? x.toFixed(1) : a >= 1 ? x.toFixed(2) : x.toFixed(3);
   return u ? `${s} ${u}` : s;
 };
-
-// --- parameter sliders ------------------------------------------------------
-const SLIDERS = {
-  Plinth: [["Wp", "width", 2, 20, 0.1], ["Dp", "depth", 2, 24, 0.1], ["Hp", "height", 0.2, 4, 0.05], ["Rp", "rotation°", -45, 45, 1], ["e", "soil depth", 0, 4, 0.05]],
-  Room: [["Wr", "width", 2, 18, 0.1], ["Dr", "depth", 2, 20, 0.1], ["Hr", "wall height", 2, 6, 0.05], ["Rr", "rotation°", -45, 45, 1], ["cx", "offset X", -3, 3, 0.05], ["cy", "offset Y", -3, 3, 0.05]],
-  Roof: [["Wroof", "width", 2, 18, 0.1], ["Droof", "depth", 2, 20, 0.1], ["Hg", "ridge rise", 0, 6, 0.05], ["Rg", "ridge rot°", -90, 90, 1]],
-};
-const SITE_SLIDERS = [["latitude", "latitude°", -60, 70, 1], ["northAngle", "north°", -180, 180, 1], ["windFromAz", "wind from°", 0, 360, 1], ["windSpeed", "wind m/s", 0, 25, 0.5], ["deltaT", "ΔT °K", 0, 20, 0.5], ["viewTargetAz", "view az°", 0, 360, 1], ["eyeHeight", "eye ht", 1, 2, 0.05]];
 
 function slider(obj, key, label, min, max, step, onChange) {
   const range = el("input", { type: "range", min, max, step, value: obj[key] });
@@ -39,19 +30,35 @@ function slider(obj, key, label, min, max, step, onChange) {
   return el("label", { class: "slider" }, [el("span", { class: "slk" }, label), range, num]);
 }
 
-export function renderControls(container, state, onChange) {
+// group -> [obj-path, [ [key,label,min,max,step], ... ] ]
+const GROUPS = (state) => [
+  ["Plinth (floor slab)", state.params.plinth, [["cx", "centre X", -6, 6, 0.1], ["cy", "centre Y", -6, 6, 0.1], ["W", "width", 2, 20, 0.1], ["L", "length", 2, 24, 0.1], ["R", "rotation°", -45, 45, 1], ["t", "thickness", 0.1, 2, 0.05]]],
+  ["Walls (tube)", state.params.walls, [["cx", "centre X", -6, 6, 0.1], ["cy", "centre Y", -6, 6, 0.1], ["W", "width", 2, 16, 0.1], ["L", "length", 2, 18, 0.1], ["R", "rotation°", -45, 45, 1], ["h", "height", 2, 6, 0.05], ["wt", "wall thick", 0.1, 0.6, 0.02]]],
+  ["Roof (overhang)", state.params.roof, [["cx", "centre X", -6, 6, 0.1], ["cy", "centre Y", -6, 6, 0.1], ["W", "width", 2, 18, 0.1], ["L", "length", 2, 20, 0.1], ["R", "rotation°", -90, 90, 1], ["ridgeRise", "ridge rise", 0, 5, 0.05], ["pitchL", "pitch L°", -45, 60, 1], ["pitchR", "pitch R°", -45, 60, 1], ["ridgePos", "ridge shift", -1, 1, 0.05], ["t", "thickness", 0.1, 0.8, 0.02]]],
+];
+const SITE = (state) => [["latitude", "latitude°", -60, 70, 1], ["northAngle", "north°", -180, 180, 1], ["windFromAz", "wind from°", 0, 360, 1], ["windSpeed", "wind m/s", 0, 25, 0.5], ["deltaT", "ΔT °K", 0, 20, 0.5], ["viewTargetAz", "view az°", 0, 360, 1], ["eyeHeight", "eye ht", 1, 2, 0.05]].map((r) => [state.site, ...r]);
+const TERR = (state) => [["plateauZ", "ground z", -3, 2, 0.1], ["ravineDepth", "ravine depth", 0, 15, 0.5], ["ravineEdge", "ravine edge", -4, 15, 0.5], ["ravineWidth", "ravine slope", 1, 12, 0.5], ["ravineAngle", "ravine dir°", -90, 90, 5], ["undAmp", "undulation", 0, 1, 0.05]].map((r) => [state.site.terrain, ...r]);
+
+export function renderControls(container, state, cb) {
   container.innerHTML = "";
-  for (const [group, rows] of Object.entries(SLIDERS)) {
-    container.append(el("h4", {}, group));
-    for (const [k, lbl, mn, mx, st] of rows) container.append(slider(state.params, k, lbl, mn, mx, st, onChange));
+  // display
+  container.append(el("h4", {}, "Display"));
+  container.append(slider(state.display, "shadowIntensity", "shadow", 0, 1, 0.05, cb.display));
+  container.append(slider(state.display, "sunHour", "sun hour", 5, 19, 0.25, cb.display));
+  // form
+  for (const [title, obj, rows] of GROUPS(state)) {
+    container.append(el("h4", {}, title));
+    for (const [k, lbl, mn, mx, st] of rows) container.append(slider(obj, k, lbl, mn, mx, st, cb.param));
   }
   container.append(el("h4", {}, "Apertures (3 walls + 1 roof)"));
-  state.params.apertures.forEach((ap, i) => container.append(apertureRow(ap, i, onChange)));
+  state.params.apertures.forEach((ap) => container.append(apertureRow(ap, cb.param)));
   container.append(el("h4", {}, "Site"));
-  for (const [k, lbl, mn, mx, st] of SITE_SLIDERS) container.append(slider(state.site, k, lbl, mn, mx, st, onChange));
+  for (const [obj, k, lbl, mn, mx, st] of SITE(state)) container.append(slider(obj, k, lbl, mn, mx, st, cb.param));
+  container.append(el("h4", {}, "Terrain (ravine edge)"));
+  for (const [obj, k, lbl, mn, mx, st] of TERR(state)) container.append(slider(obj, k, lbl, mn, mx, st, cb.param));
 }
 
-function apertureRow(ap, i, onChange) {
+function apertureRow(ap, onChange) {
   const opts = [...WALL_HOSTS, ...ROOF_HOSTS].map((h) => el("option", { value: h, selected: h === ap.host ? "selected" : null }, HOST_LABELS[h]));
   const host = el("select", { class: "hostsel", onchange: (e) => { ap.host = e.target.value; onChange(); } }, opts);
   const mini = (key, lbl, mn, mx, st) => {
@@ -61,18 +68,18 @@ function apertureRow(ap, i, onChange) {
   };
   return el("div", { class: "apblock" }, [
     el("div", { class: "aphead" }, [el("b", {}, ap.id), host]),
-    el("div", { class: "apgrid" }, [mini("u", "u", 0, 1, 0.01), mini("v", "v", 0, 1, 0.01), mini("w", "w m", 0.1, 6, 0.05), mini("h", "h m", 0.1, 4, 0.05)]),
+    el("div", { class: "apgrid" }, [mini("u", "u", 0, 1, 0.01), mini("v", "v", 0, 1, 0.01), mini("w", "w m", 0.1, 8, 0.05), mini("h", "h m", 0.1, 5, 0.05)]),
   ]);
 }
 
-// --- metrics dashboard ------------------------------------------------------
+// --- dashboard --------------------------------------------------------------
 const DASH = [
-  ["Solar", [["solarWinterUseful", 3], ["solarSummerUseful", 3], ["overheatRatio", 3], ["solarSouth", 3]]],
-  ["Wind", [["windExposure", 60], ["windPressure", 4000], ["channelIndex", 5]]],
-  ["Air", [["stackIndex", 1.2], ["stackHeight", 6]]],
-  ["View", [["viewQuality", 0.4], ["viewAmount", 1], ["skyView", 0.2]]],
-  ["Earth", [["soilContactArea", 140], ["thermalMassRatio", 6], ["buriedFraction", 1]]],
-  ["Form", [["enclosedVolume", 260], ["glazingRatio", 0.4], ["pitchDeg", 60]]],
+  ["Solar", [["solarWinterUseful", 4], ["solarSummerUseful", 4], ["overheatRatio", 3], ["solarSouth", 4]]],
+  ["Wind", [["windExposure", 80], ["windPressure", 5000], ["channelIndex", 10]]],
+  ["Air", [["stackIndex", 1.5], ["stackHeight", 6]]],
+  ["View", [["viewQuality", 0.5], ["viewAmount", 1.2], ["skyView", 0.3]]],
+  ["Earth", [["soilContactArea", 160], ["thermalMassRatio", 6], ["buriedFraction", 1]]],
+  ["Form", [["enclosedVolume", 280], ["glazingRatio", 0.4], ["pitchDeg", 60]]],
 ];
 const DEF = Object.fromEntries(VARIABLE_DEFS.map((d) => [d.key, d]));
 
@@ -96,12 +103,12 @@ export function renderDashboard(container, metrics) {
 // --- rule builder -----------------------------------------------------------
 const OPS = ["<", "<=", ">", ">=", "==", "between", "outside"];
 let RID = 1;
-export const newRule = () => ({ id: "R" + RID++, lhs: "solarWinterUseful", op: ">", rhs: 1.5, weight: 1, hard: false });
+export const newRule = () => ({ id: "R" + RID++, lhs: "solarWinterUseful", op: ">", rhs: 2, weight: 1, hard: false });
 
 export function renderRules(container, ruleset, onChange) {
   container.innerHTML = "";
-  const varOpts = () => VARIABLE_DEFS.map((d) => ({ v: d.key, t: `${d.label} (${d.unit})`, g: d.group }));
-  ruleset.rules.forEach((rule) => container.append(ruleRow(rule, ruleset, varOpts(), onChange)));
+  const varOpts = VARIABLE_DEFS.map((d) => ({ v: d.key, t: `${d.label} (${d.unit})`, g: d.group }));
+  ruleset.rules.forEach((rule) => container.append(ruleRow(rule, ruleset, varOpts, onChange)));
   container.append(el("button", { class: "addrule", onclick: () => { ruleset.rules.push(newRule()); onChange(true); } }, "+ add rule"));
 }
 
@@ -129,14 +136,9 @@ function ruleRow(rule, ruleset, varOpts, onChange) {
   hard.addEventListener("change", () => { rule.hard = hard.checked; onChange(); });
   const del = el("button", { class: "del", title: "delete", onclick: () => { ruleset.rules = ruleset.rules.filter((r) => r !== rule); onChange(true); } }, "✕");
   const dot = el("span", { class: "dot", "data-rid": rule.id });
-  return el("div", { class: "rule", "data-rid": rule.id }, [
-    dot, sel, op, rhsEls,
-    el("label", { class: "hardlbl", title: "must-pass" }, [hard, "hard"]),
-    del,
-  ]);
+  return el("div", { class: "rule", "data-rid": rule.id }, [dot, sel, op, rhsEls, el("label", { class: "hardlbl", title: "must-pass" }, [hard, "hard"]), del]);
 }
 
-// Update pass/fail dots + score without rebuilding inputs (keeps focus).
 export function paintResults(rulesContainer, scoreEl, evaluation) {
   if (!evaluation) return;
   for (const res of evaluation.results) {

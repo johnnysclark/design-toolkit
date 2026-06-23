@@ -16,20 +16,26 @@ Grasshopper python, model in Rhino, and re-IMPORT to re-test. A full loop:
 design → analyze → constrain → export → Rhino → re-import → re-test. MVP first,
 then iterate; make sensible defaults rather than stopping to ask.
 
-## Fixed prototypical form
-Three nested rectangular masses + aperture cuts, `+X East / +Y North / +Z Up`,
-metres, degrees, azimuth clockwise from North, base at `z=0`, grade at `z=e`:
-1. **Plinth** — rectangular platform/box (can embed in soil).
-2. **Room** — rectangular box on the plinth (four walls).
-3. **Gable roof** — single-ridge folded plane (two pitched planes, one ridge).
+## Fixed prototypical form (v2)
+Three INDEPENDENT plan rectangles (each its own centre/size/rotation, each can
+overhang the others) + aperture cuts, `+X East / +Y North / +Z Up`, metres,
+degrees, azimuth cw from North, floor (plinth top) at `z=0`:
+1. **Plinth** — a floating floor SLAB (thickness `t`). The only floor.
+2. **Walls** — a rectangular TUBE (height `h`, wall thickness `wt`). No floor/ceiling.
+3. **Roof** — the OVERHANGING plane: one ridge with TWO independent pitch angles
+   (`pitchL`, `pitchR`) → gable / shed / **butterfly**; plus ridge rise, ridge
+   shift, thickness.
 4. **Apertures** — **4 cutting volumes: 3 walls + 1 roof.**
+The ground is a **ravine-edge topography** (plinth can perch above or bed into it).
 
 ## Parameters
-- Plinth: `Wp, Dp, Hp, Rp` (Z-rot), `e` (burial depth).
-- Room: `Wr, Dr, Hr, Rr`, plan offset `cx, cy`.
-- Roof: `Wroof, Droof, Hg` (ridge rise; pitch derived), `Rg` (ridge Z-rot).
-- Each aperture: host (N/S/E/W wall or roof slope A/B), `u,v` (0..1 on face), `w,h`.
+- Plinth: `cx, cy, W, L, R, t`.
+- Walls: `cx, cy, W, L, R, h, wt`.
+- Roof: `cx, cy, W, L, R, ridgeRise, pitchL, pitchR, ridgePos, t`.
+- Each aperture: host (N/S/E/W wall or roof slope L/R), `u,v` (0..1 on face), `w,h`.
 - Site: latitude, north angle, prevailing wind (from-azimuth + speed), ΔT, view azimuth, eye height.
+- Terrain: ground level, ravine depth/edge/slope-width/direction, undulation.
+- Display: Pen / Analysis mode, shadow intensity, sun hour.
 
 ## Analyzer — metrics (pure, deterministic, identical in JS and python)
 Simplified PEDAGOGICAL PROXIES, not validated simulation (label them so). Each a
@@ -56,9 +62,11 @@ JSON; ship 2 examples ("Passive solar shed", "Earth-coupled retreat") tuned to
 start partly red so they're actionable.
 
 ## Web interface (forward-facing, local)
-- Center: live 3D viewport (three.js) of plinth + room + gable + aperture insets,
-  orbit controls, ground/soil plane, north arrow; optional solar heatmap colouring
-  the envelope.
+- Center: live 3D viewport (three.js). Two looks: PEN (white-paper hidden-line
+  drawing — white faces occlude rear black edges — with crisp cast shadows on a
+  ravine-edge terrain with contour lines; sliders for shadow intensity + sun hour)
+  and ANALYSIS (Ladybug-style spectral colouring of the envelope by yearly solar,
+  with a legend + day-arc sun paths).
 - Left: grouped parameter sliders + aperture controls.
 - Right: live metrics dashboard (numbers + bars) and the rule builder with
   green/red dots + overall score.

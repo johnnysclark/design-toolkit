@@ -1,18 +1,17 @@
 # run_rhinocommon.py — paste into the Rhino 8 ScriptEditor (Tools > Script,
-# python 3) and Run. Builds the massing on tidy layers, labels it with the live
-# metrics, evaluates your rules, and prints the report to the command line.
+# python 3) and Run. Builds the v2 massing (plinth SLAB + walls TUBE + two-pitch
+# ROOF) on tidy layers, labels it with the live score, evaluates your rules, and
+# prints the report.
 #
-# SETUP: this needs gable_core.py + params.json (+ ruleset.json) from your export
-# bundle. Either SAVE this script into that unzipped folder, or set BUNDLE_DIR
-# below to its path. The maths come straight from gable_core, so Rhino agrees
-# with the browser by construction.
-#
-# Layers baked: Plinth / Room / Roof / Apertures / Report  (the web app re-imports
-# Plinth/Room/Roof to recover parameters).
+# SETUP: needs gable_core.py + params.json (+ ruleset.json) from your export
+# bundle. SAVE this script into that unzipped folder, or set BUNDLE_DIR below.
+# Layers: Plinth / Walls / Roof / Apertures / Report (the web app re-imports
+# Plinth/Walls/Roof to recover parameters).
 
 import os
 import sys
 import json
+import math
 
 BUNDLE_DIR = r""   # <- set to your unzipped gable-studio-export folder, or save this file into it
 
@@ -37,70 +36,70 @@ def _layer(name, rgb):
     return name
 
 
-def _w(sx, sy, sz, rot, north, cx=0.0, cy=0.0):
-    x, y, _ = gc.rotZ([sx, sy, 0], rot)
-    wx, wy, _ = gc.rotZ([x + cx, y + cy, 0], north)
-    return (wx, wy, sz)
-
-
 def main():
     bundle = _load("params.json", "params.example.json")
     ruleset = _load("ruleset.json", "ruleset.example.json")
     P, site = bundle["params"], bundle["site"]
     model, metrics = gc.analyze(P, site)
     north = model["north"]
+    G = model["roofGeom"]
+
+    def w(lx, ly, lz, R, cx=0.0, cy=0.0):
+        x, y, _ = gc.rotZ([lx, ly, 0], R)
+        wx, wy, _ = gc.rotZ([x + cx, y + cy, 0], north)
+        return (wx, wy, lz)
 
     rs.EnableRedraw(False)
-    L = {n: _layer(n, c) for n, c in [
-        ("Plinth", (138, 127, 109)), ("Room", (210, 205, 190)),
-        ("Roof", (201, 183, 156)), ("Apertures", (47, 109, 122)), ("Report", (40, 40, 40))]}
+    for n, c in [("Plinth", (138, 127, 109)), ("Walls", (210, 205, 190)), ("Roof", (201, 183, 156)), ("Apertures", (47, 109, 122)), ("Report", (40, 40, 40))]:
+        _layer(n, c)
 
-    # plinth + room as boxes (8 corners each)
-    def box(layer, w, d, z0, z1, rot, cx=0.0, cy=0.0):
-        hw, hd = w / 2.0, d / 2.0
-        c = [_w(-hw, -hd, z0, rot, north, cx, cy), _w(hw, -hd, z0, rot, north, cx, cy),
-             _w(hw, hd, z0, rot, north, cx, cy), _w(-hw, hd, z0, rot, north, cx, cy),
-             _w(-hw, -hd, z1, rot, north, cx, cy), _w(hw, -hd, z1, rot, north, cx, cy),
-             _w(hw, hd, z1, rot, north, cx, cy), _w(-hw, hd, z1, rot, north, cx, cy)]
-        oid = rs.AddBox(c)
-        rs.ObjectLayer(oid, layer)
-        return oid
+    def box(layer, W, L, zb, zt, R, cx=0.0, cy=0.0):
+        c = [(-W / 2, -L / 2), (W / 2, -L / 2), (W / 2, L / 2), (-W / 2, L / 2)]
+        pts = [w(x, y, zb, R, cx, cy) for x, y in c] + [w(x, y, zt, R, cx, cy) for x, y in c]
+        oid = rs.AddBox(pts)
+        if oid:
+            rs.ObjectLayer(oid, layer)
 
-    box("Plinth", P["Wp"], P["Dp"], 0, P["Hp"], P["Rp"])
-    box("Room", P["Wr"], P["Dr"], P["Hp"], P["Hp"] + P["Hr"], P["Rr"], P["cx"], P["cy"])
+    Pl, Wl, Rf = P["plinth"], P["walls"], P["roof"]
+    box("Plinth", Pl["W"], Pl["L"], -Pl["t"], 0, Pl["R"], Pl["cx"], Pl["cy"])
 
-    # roof: two planar slopes meeting at the ridge (ridge along local Y)
-    wrf, drf = P["Wroof"] / 2.0, P["Droof"] / 2.0
-    eave, ridge = P["Hp"] + P["Hr"], P["Hp"] + P["Hr"] + P["Hg"]
-    A = [_w(-wrf, -drf, eave, P["Rg"], north, P["cx"], P["cy"]), _w(-wrf, drf, eave, P["Rg"], north, P["cx"], P["cy"]),
-         _w(0, drf, ridge, P["Rg"], north, P["cx"], P["cy"]), _w(0, -drf, ridge, P["Rg"], north, P["cx"], P["cy"])]
-    B = [_w(0, -drf, ridge, P["Rg"], north, P["cx"], P["cy"]), _w(0, drf, ridge, P["Rg"], north, P["cx"], P["cy"]),
-         _w(wrf, drf, eave, P["Rg"], north, P["cx"], P["cy"]), _w(wrf, -drf, eave, P["Rg"], north, P["cx"], P["cy"])]
-    for quad in (A, B):
-        sid = rs.AddSrfPt(quad)
-        if sid:
-            rs.ObjectLayer(sid, "Roof")
+    hw, hl, tw = Wl["W"] / 2, Wl["L"] / 2, Wl["wt"]
+    for (x0, x1, y0, y1) in [(hw - tw, hw, -hl, hl), (-hw, -hw + tw, -hl, hl), (-hw, hw, hl - tw, hl), (-hw, hw, -hl, -hl + tw)]:
+        c = [(x0, y0), (x1, y0), (x1, y1), (x0, y1)]
+        pts = [w(x, y, 0, Wl["R"], Wl["cx"], Wl["cy"]) for x, y in c] + [w(x, y, Wl["h"], Wl["R"], Wl["cx"], Wl["cy"]) for x, y in c]
+        oid = rs.AddBox(pts)
+        if oid:
+            rs.ObjectLayer(oid, "Walls")
 
-    # apertures as rectangles on their host faces
+    def slope(eaveX, ridgeX, eaveZ, nx):
+        k = math.hypot(nx, 1.0) or 1.0
+        nl = (nx / k, 0.0, 1.0 / k)
+        top = [(eaveX, -Rf["L"] / 2, eaveZ), (ridgeX, -Rf["L"] / 2, G["zRidge"]), (ridgeX, Rf["L"] / 2, G["zRidge"]), (eaveX, Rf["L"] / 2, eaveZ)]
+        bot = [(x - nl[0] * Rf["t"], y, z - nl[2] * Rf["t"]) for (x, y, z) in top]
+        pts = [w(x, y, z, Rf["R"], Rf["cx"], Rf["cy"]) for (x, y, z) in bot] + [w(x, y, z, Rf["R"], Rf["cx"], Rf["cy"]) for (x, y, z) in top]
+        oid = rs.AddBox(pts)
+        if oid:
+            rs.ObjectLayer(oid, "Roof")
+
+    slope(-Rf["W"] / 2, G["ridgeX"], G["eaveZL"], -math.tan(math.radians(Rf["pitchL"])))
+    slope(Rf["W"] / 2, G["ridgeX"], G["eaveZR"], math.tan(math.radians(Rf["pitchR"])))
+
     for ap in model["apertures"]:
         f = model["frames"][ap["host"]]
         hu = gc.scale(f["uAxis"], ap["w"] / 2.0)
         hv = gc.scale(f["vAxis"], ap["h"] / 2.0)
         c0 = gc.add(ap["c"], gc.scale(f["n"], 0.03))
-        cs = [gc.add(gc.add(c0, gc.scale(hu, -1)), gc.scale(hv, -1)),
-              gc.add(gc.add(c0, hu), gc.scale(hv, -1)),
-              gc.add(gc.add(c0, hu), hv),
-              gc.add(gc.add(c0, gc.scale(hu, -1)), hv)]
+        cs = [gc.add(gc.add(c0, gc.scale(hu, -1)), gc.scale(hv, -1)), gc.add(gc.add(c0, hu), gc.scale(hv, -1)),
+              gc.add(gc.add(c0, hu), hv), gc.add(gc.add(c0, gc.scale(hu, -1)), hv)]
         cid = rs.AddPolyline([tuple(p) for p in cs] + [tuple(cs[0])])
-        rs.ObjectLayer(cid, "Apertures")
+        if cid:
+            rs.ObjectLayer(cid, "Apertures")
 
-    # rules + labels
     vars = gc.flatten(P, metrics)
     ev = gc.evaluate_ruleset(ruleset, vars)
-    top = _w(0, 0, P["Hp"] + P["Hr"] + P["Hg"] + 1.0, 0, north, P["cx"], P["cy"])
-    dot = rs.AddTextDot("score %d%% (%d/%d)" % (round(ev["score"] * 100), ev["passCount"], ev["total"]), top)
+    dot = rs.AddTextDot("score %d%% (%d/%d)" % (round(ev["score"] * 100), ev["passCount"], ev["total"]),
+                        w(0, 0, Wl["h"] + Rf["ridgeRise"] + 1.0, 0, Wl["cx"], Wl["cy"]))
     rs.ObjectLayer(dot, "Report")
-
     rs.EnableRedraw(True)
 
     print("=" * 56)
@@ -112,12 +111,8 @@ def main():
     for res in ev["results"]:
         r = res["rule"]
         val = "—" if res["value"] is None else "%.3f" % res["value"]
-        print("  [%s] %-20s %-8s %s   value=%s%s" % (
-            "PASS" if res["ok"] else "FAIL", r["lhs"], r["op"], r["rhs"], val,
-            " (hard)" if r.get("hard") else ""))
-    print("\nSCORE %d%%  ·  %d/%d  ·  %s" % (
-        round(ev["score"] * 100), ev["passCount"], ev["total"],
-        "ALL HARD RULES PASS" if ev["hardPass"] else "A HARD RULE FAILS"))
+        print("  [%s] %-20s %-8s %s   value=%s%s" % ("PASS" if res["ok"] else "FAIL", r["lhs"], r["op"], r["rhs"], val, " (hard)" if r.get("hard") else ""))
+    print("\nSCORE %d%%  ·  %d/%d  ·  %s" % (round(ev["score"] * 100), ev["passCount"], ev["total"], "ALL HARD RULES PASS" if ev["hardPass"] else "A HARD RULE FAILS"))
 
 
 main()

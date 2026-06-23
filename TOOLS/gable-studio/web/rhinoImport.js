@@ -54,21 +54,21 @@ export async function importThreeDM(arrayBuffer) {
   };
 
   const find = (name) => unionBox(byLayer[name]);
-  const plinth = find("plinth"), room = find("room"), roof = find("roof");
+  const plinth = find("plinth"), roof = find("roof");
 
+  const room = find("walls") || find("room");
   if (plinth && room) {
+    const ctr = (b) => [(b.min[0] + b.max[0]) / 2, (b.min[1] + b.max[1]) / 2];
+    const [pcx, pcy] = ctr(plinth), [wcx, wcy] = ctr(room), [rcx, rcy] = roof ? ctr(roof) : [wcx, wcy];
     const params = {
-      Wp: r2(plinth.dx), Dp: r2(plinth.dy), Hp: r2(plinth.dz), Rp: 0, e: 0,
-      Wr: r2(room.dx), Dr: r2(room.dy), Hr: r2(room.dz), Rr: 0,
-      cx: r2((room.min[0] + room.max[0]) / 2 - (plinth.min[0] + plinth.max[0]) / 2),
-      cy: r2((room.min[1] + room.max[1]) / 2 - (plinth.min[1] + plinth.max[1]) / 2),
-      Wroof: r2(roof ? roof.dx : room.dx), Droof: r2(roof ? roof.dy : room.dy),
-      Hg: r2(roof ? roof.dz : 1.5), Rg: 0,
+      plinth: { cx: r2(pcx), cy: r2(pcy), W: r2(plinth.dx), L: r2(plinth.dy), t: r2(plinth.dz), R: 0 },
+      walls: { cx: r2(wcx), cy: r2(wcy), W: r2(room.dx), L: r2(room.dy), h: r2(room.dz), R: 0 },
+      roof: { cx: r2(rcx), cy: r2(rcy), W: r2(roof ? roof.dx : room.dx), L: r2(roof ? roof.dy : room.dy), ridgeRise: r2(roof ? roof.dz : 1.5), R: 0 },
     };
     return {
       mode: "convention", params,
-      message: `Read Plinth + Room${roof ? " + Roof" : ""} layers → recovered dimensions. ` +
-        `Rotations/north assumed 0 and apertures kept from the current design (bbox method).`,
+      message: `Read Plinth + Walls${roof ? " + Roof" : ""} layers → recovered footprints + heights. ` +
+        `Rotations/pitches/north assumed 0 and apertures kept from the current design (bbox method).`,
       summary,
     };
   }

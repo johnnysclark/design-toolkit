@@ -1,16 +1,12 @@
-"""gable_core.py — line-for-line python port of web/core.js.
+"""gable_core.py — line-for-line python port of web/core.js (v2).
 
-Pure-stdlib geometry + metric proxies + rule evaluation for the prototypical
-gable massing (plinth + room + single-ridge gable + 4 apertures). NO Rhino
-imports here, so it runs in any python and is unit-testable. run_rhino3dm.py /
-run_rhinocommon.py / gh_component.py import this module for the maths and only
-add geometry/baking on top.
+Pure-stdlib geometry + metric proxies + rule evaluation for the v2 form:
+three independent plan rectangles (PLINTH slab / WALLS tube / ROOF overhang with
+two independent pitches) + 4 apertures, on a ravine-edge terrain. NO Rhino
+imports. If you edit a formula, edit web/core.js to match (test/ proves parity).
 
-Conventions match core.js: +X East, +Y North, +Z Up, metres, degrees in.
-Azimuth = degrees clockwise from North. Building base at z=0, grade at z=e.
-
-Every metric is a simplified PEDAGOGICAL PROXY, identical to the browser tool.
-If you edit a formula, edit web/core.js to match (test/ proves they agree).
+Conventions: +X East, +Y North, +Z Up, metres, degrees in. Floor (plinth top)
+is the datum z=0; walls rise 0..h. Metrics are simplified proxies.
 """
 import math
 
@@ -21,7 +17,6 @@ def clamp(x, lo, hi):
     return max(lo, min(hi, x))
 
 
-# --- tiny vector helpers ----------------------------------------------------
 def add(a, b): return [a[0] + b[0], a[1] + b[1], a[2] + b[2]]
 def sub(a, b): return [a[0] - b[0], a[1] - b[1], a[2] - b[2]]
 def scale(a, s): return [a[0] * s, a[1] * s, a[2] * s]
@@ -46,100 +41,105 @@ def dirAz(az_deg, alt_deg):
 
 
 def azOf(n):
-    d = math.atan2(n[0], n[1]) / D2R
-    return (d + 360.0) % 360.0
+    return (math.atan2(n[0], n[1]) / D2R + 360.0) % 360.0
 
 
 DEFAULTS = {
     "params": {
-        "Wp": 8, "Dp": 10, "Hp": 0.8, "Rp": 0, "e": 0.0,
-        "Wr": 6, "Dr": 8, "Hr": 3.2, "Rr": 0, "cx": 0, "cy": 0,
-        "Wroof": 6, "Droof": 8, "Hg": 2.4, "Rg": 0,
+        "plinth": {"cx": 0, "cy": 0, "W": 10, "L": 12, "R": 0, "t": 0.5},
+        "walls": {"cx": 0, "cy": -0.5, "W": 7, "L": 9, "R": 0, "h": 3.2, "wt": 0.25},
+        "roof": {"cx": 0, "cy": -0.5, "W": 9.5, "L": 11, "R": 0, "ridgeRise": 2.4, "pitchL": 30, "pitchR": 30, "ridgePos": 0, "t": 0.35},
         "apertures": [
-            {"id": "A1", "host": "wall_ny", "u": 0.5, "v": 0.5, "w": 2.6, "h": 1.6},
-            {"id": "A2", "host": "wall_px", "u": 0.5, "v": 0.45, "w": 1.2, "h": 1.3},
-            {"id": "A3", "host": "wall_py", "u": 0.5, "v": 0.35, "w": 1.4, "h": 1.0},
-            {"id": "A4", "host": "roof_b", "u": 0.7, "v": 0.5, "w": 1.0, "h": 1.0},
+            {"id": "A1", "host": "wall_ny", "u": 0.5, "v": 0.5, "w": 3.0, "h": 1.8},
+            {"id": "A2", "host": "wall_px", "u": 0.5, "v": 0.45, "w": 1.2, "h": 1.4},
+            {"id": "A3", "host": "wall_py", "u": 0.5, "v": 0.32, "w": 1.4, "h": 1.0},
+            {"id": "A4", "host": "roof_r", "u": 0.7, "v": 0.5, "w": 1.2, "h": 1.2},
         ],
     },
     "site": {
         "latitude": 42, "northAngle": 0, "windFromAz": 270, "windSpeed": 5,
         "deltaT": 6, "viewTargetAz": 180, "eyeHeight": 1.6,
+        "terrain": {"plateauZ": -0.8, "ravineDepth": 9, "ravineEdge": 6, "ravineWidth": 5, "ravineAngle": 18, "undAmp": 0.25},
     },
 }
 
 WALL_HOSTS = ["wall_py", "wall_ny", "wall_px", "wall_nx"]
-ROOF_HOSTS = ["roof_a", "roof_b"]
+ROOF_HOSTS = ["roof_l", "roof_r"]
+
+
+def terrain_height(x, y, T):
+    a = T["ravineAngle"] * D2R
+    d = x * math.cos(a) + y * math.sin(a)
+    t = clamp((d - T["ravineEdge"]) / (T["ravineWidth"] or 1), 0, 1)
+    t = t * t * (3 - 2 * t)
+    return T["plateauZ"] - T["ravineDepth"] * t + T["undAmp"] * math.sin(x * 0.15) * math.cos(y * 0.17)
 
 
 def world_point(center_rel, z, elem_rot, center, north):
     p = rotZ([center_rel[0], center_rel[1], 0], elem_rot)
-    in_bldg = [p[0] + center[0], p[1] + center[1], z]
-    w = rotZ([in_bldg[0], in_bldg[1], 0], north)
+    w = rotZ([p[0] + center[0], p[1] + center[1], 0], north)
     return [w[0], w[1], z]
 
 
 def build_frames(P, north):
-    roomC = [P["cx"], P["cy"]]
-    wallZ = P["Hp"] + P["Hr"] / 2.0
     frames = {}
+    W = P["walls"]
+    Wc = [W["cx"], W["cy"]]
+    wallZ = W["h"] / 2.0
 
     def wall(key, n_local, tan_local, face_width, center_rel):
         frames[key] = {
-            "kind": "wall",
-            "n": norm(rotZ(n_local, P["Rr"] + north)),
-            "c": world_point(center_rel, wallZ, P["Rr"], roomC, north),
-            "uAxis": rotZ(tan_local, P["Rr"] + north),
-            "vAxis": [0, 0, 1],
-            "faceWidth": face_width, "faceHeight": P["Hr"],
-            "area": face_width * P["Hr"],
+            "kind": "wall", "n": norm(rotZ(n_local, W["R"] + north)),
+            "c": world_point(center_rel, wallZ, W["R"], Wc, north),
+            "uAxis": rotZ(tan_local, W["R"] + north), "vAxis": [0, 0, 1],
+            "faceWidth": face_width, "faceHeight": W["h"], "area": face_width * W["h"],
         }
 
-    wall("wall_px", [1, 0, 0], [0, 1, 0], P["Dr"], [P["Wr"] / 2, 0])
-    wall("wall_nx", [-1, 0, 0], [0, 1, 0], P["Dr"], [-P["Wr"] / 2, 0])
-    wall("wall_py", [0, 1, 0], [1, 0, 0], P["Wr"], [0, P["Dr"] / 2])
-    wall("wall_ny", [0, -1, 0], [1, 0, 0], P["Wr"], [0, -P["Dr"] / 2])
+    wall("wall_px", [1, 0, 0], [0, 1, 0], W["L"], [W["W"] / 2, 0])
+    wall("wall_nx", [-1, 0, 0], [0, 1, 0], W["L"], [-W["W"] / 2, 0])
+    wall("wall_py", [0, 1, 0], [1, 0, 0], W["W"], [0, W["L"] / 2])
+    wall("wall_ny", [0, -1, 0], [1, 0, 0], W["W"], [0, -W["L"] / 2])
 
-    eaveZ = P["Hp"] + P["Hr"]
-    s = math.hypot(P["Wroof"] / 2.0, P["Hg"]) or 1e-9
-
-    def roof(key, sign):
-        n_local = norm([sign * P["Hg"], 0, P["Wroof"] / 2.0])
-        uphill = norm([-sign * P["Wroof"] / 2.0, 0, P["Hg"]])
-        frames[key] = {
-            "kind": "roof",
-            "n": norm(rotZ(n_local, P["Rg"] + north)),
-            "c": world_point([sign * P["Wroof"] / 4.0, 0], eaveZ + P["Hg"] / 2.0, P["Rg"], roomC, north),
-            "uAxis": rotZ(uphill, P["Rg"] + north),
-            "vAxis": rotZ([0, 1, 0], P["Rg"] + north),
-            "faceWidth": s, "faceHeight": P["Droof"],
-            "area": s * P["Droof"],
-        }
-
-    roof("roof_a", 1)
-    roof("roof_b", -1)
+    Rf = P["roof"]
+    Rc = [Rf["cx"], Rf["cy"]]
+    zRidge = W["h"] + Rf["ridgeRise"]
+    ridgeX = Rf["ridgePos"] * (Rf["W"] / 2)
+    halfL = ridgeX + Rf["W"] / 2
+    halfR = Rf["W"] / 2 - ridgeX
+    tanL = math.tan(Rf["pitchL"] * D2R)
+    tanR = math.tan(Rf["pitchR"] * D2R)
+    eaveZL = zRidge - halfL * tanL
+    eaveZR = zRidge - halfR * tanR
+    frames["roof_l"] = {
+        "kind": "roof", "n": norm(rotZ([-tanL, 0, 1], Rf["R"] + north)),
+        "c": world_point([(ridgeX - Rf["W"] / 2) / 2, 0], (zRidge + eaveZL) / 2, Rf["R"], Rc, north),
+        "uAxis": rotZ(norm([1, 0, tanL]), Rf["R"] + north), "vAxis": rotZ([0, 1, 0], Rf["R"] + north),
+        "faceWidth": halfL * math.sqrt(1 + tanL * tanL), "faceHeight": Rf["L"],
+        "area": halfL * math.sqrt(1 + tanL * tanL) * Rf["L"],
+    }
+    frames["roof_r"] = {
+        "kind": "roof", "n": norm(rotZ([tanR, 0, 1], Rf["R"] + north)),
+        "c": world_point([(ridgeX + Rf["W"] / 2) / 2, 0], (zRidge + eaveZR) / 2, Rf["R"], Rc, north),
+        "uAxis": rotZ(norm([-1, 0, tanR]), Rf["R"] + north), "vAxis": rotZ([0, 1, 0], Rf["R"] + north),
+        "faceWidth": halfR * math.sqrt(1 + tanR * tanR), "faceHeight": Rf["L"],
+        "area": halfR * math.sqrt(1 + tanR * tanR) * Rf["L"],
+    }
+    frames["_roofGeom"] = {"zRidge": zRidge, "ridgeX": ridgeX, "halfL": halfL, "halfR": halfR, "eaveZL": eaveZL, "eaveZR": eaveZR}
     return frames
 
 
-def plinth_sides(P, north):
-    ag = max(0.0, P["Hp"] - P["e"])
-    if ag <= 1e-6:
-        return []
-    zc = P["e"] + ag / 2.0
+def plinth_faces(P, north, T):
+    Pl = P["plinth"]
+    Pc = [Pl["cx"], Pl["cy"]]
+    topZ, botZ = 0.0, -Pl["t"]
+    faces = [{"name": "plinth_top", "kind": "plinth", "area": Pl["W"] * Pl["L"], "n": [0, 0, 1], "c": world_point([0, 0], topZ, Pl["R"], Pc, north)}]
 
-    def mk(n_local, w, center_rel):
-        return {
-            "name": "plinth", "kind": "plinth", "area": w * ag,
-            "n": norm(rotZ(n_local, P["Rp"] + north)),
-            "c": world_point(center_rel, zc, P["Rp"], [0, 0], north),
-        }
+    def side(n_local, w, center_rel):
+        return {"name": "plinth_side", "kind": "plinth", "area": w * Pl["t"], "n": norm(rotZ(n_local, Pl["R"] + north)), "c": world_point(center_rel, (topZ + botZ) / 2, Pl["R"], Pc, north)}
 
-    return [
-        mk([1, 0, 0], P["Dp"], [P["Wp"] / 2, 0]),
-        mk([-1, 0, 0], P["Dp"], [-P["Wp"] / 2, 0]),
-        mk([0, 1, 0], P["Wp"], [0, P["Dp"] / 2]),
-        mk([0, -1, 0], P["Wp"], [0, -P["Dp"] / 2]),
-    ]
+    faces += [side([1, 0, 0], Pl["L"], [Pl["W"] / 2, 0]), side([-1, 0, 0], Pl["L"], [-Pl["W"] / 2, 0]),
+              side([0, 1, 0], Pl["W"], [0, Pl["L"] / 2]), side([0, -1, 0], Pl["W"], [0, -Pl["L"] / 2])]
+    return faces
 
 
 def build_apertures(P, frames):
@@ -151,22 +151,20 @@ def build_apertures(P, frames):
         du = (clamp(ap["u"], 0, 1) - 0.5) * f["faceWidth"]
         dv = (clamp(ap["v"], 0, 1) - 0.5) * f["faceHeight"]
         c = add(add(f["c"], scale(f["uAxis"], du)), scale(f["vAxis"], dv))
-        out.append({"id": ap["id"], "host": ap["host"], "kind": f["kind"],
-                    "area": w * h, "w": w, "h": h, "n": f["n"], "c": c})
+        out.append({"id": ap["id"], "host": ap["host"], "kind": f["kind"], "area": w * h, "w": w, "h": h, "n": f["n"], "c": c})
     return out
 
 
 def build_model(params, site):
-    P = dict(params)
     north = site.get("northAngle", 0) or 0
+    P = params
     frames = build_frames(P, north)
     walls = [dict(frames[k], name=k) for k in WALL_HOSTS]
     roofs = [dict(frames[k], name=k) for k in ROOF_HOSTS]
-    plinth = plinth_sides(P, north)
+    plinth = plinth_faces(P, north, site["terrain"])
     apertures = build_apertures(P, frames)
-    return {"P": P, "site": site, "frames": frames,
-            "faces": walls + roofs + plinth, "walls": walls, "roofs": roofs,
-            "plinth": plinth, "apertures": apertures, "north": north}
+    return {"P": P, "site": site, "north": north, "frames": frames, "roofGeom": frames["_roofGeom"],
+            "faces": walls + roofs + plinth, "walls": walls, "roofs": roofs, "plinth": plinth, "apertures": apertures}
 
 
 DECLS = [("summer", 23.45), ("equinox", 0), ("winter", -23.45)]
@@ -198,11 +196,9 @@ def sun_samples(lat_deg):
 
 def compute_metrics(model):
     P, site = model["P"], model["site"]
-    faces, apertures = model["faces"], model["apertures"]
-    north = model["north"]
+    faces, apertures, north = model["faces"], model["apertures"], model["north"]
     sun = sun_samples(site["latitude"])
 
-    # Solar
     solar_env = solar_use = solar_south = solar_winter = solar_summer = 0.0
     for s in sun:
         if not s["up"]:
@@ -216,8 +212,7 @@ def compute_metrics(model):
                 solar_winter += g
             if s["season"] == "summer":
                 solar_summer += g
-            az = azOf(a["n"])
-            if 135 <= az <= 225:
+            if 135 <= azOf(a["n"]) <= 225:
                 solar_south += g
     solar_env /= N_SUN
     solar_use /= N_SUN
@@ -226,7 +221,6 @@ def compute_metrics(model):
     solar_summer /= N_SEASON
     overheat = (solar_summer / solar_winter) if solar_winter > 1e-6 else (99 if solar_summer > 0 else 0)
 
-    # Wind
     f_wind = dirAz(site["windFromAz"], 0)
     wind_exposure = 0.0
     for f in faces:
@@ -242,16 +236,15 @@ def compute_metrics(model):
         ey = rotZ([0, 1, 0], rot)
         return hw * abs(dot(u, ex)) + hd * abs(dot(u, ey))
 
-    room_half_u = half_along(P["Rr"] + north, P["Wr"] / 2, P["Dr"] / 2)
-    plinth_half_u = half_along(P["Rp"] + north, P["Wp"] / 2, P["Dp"] / 2)
-    room_cw = rotZ([P["cx"], P["cy"], 0], north)
-    cu_room = dot(room_cw, u)
-    gap_plus = (0 + plinth_half_u) - (cu_room + room_half_u)
-    gap_minus = (cu_room - room_half_u) - (0 - plinth_half_u)
+    walls_half_u = half_along(P["walls"]["R"] + north, P["walls"]["W"] / 2, P["walls"]["L"] / 2)
+    plinth_half_u = half_along(P["plinth"]["R"] + north, P["plinth"]["W"] / 2, P["plinth"]["L"] / 2)
+    cu_walls = dot(rotZ([P["walls"]["cx"], P["walls"]["cy"], 0], north), u)
+    cu_plinth = dot(rotZ([P["plinth"]["cx"], P["plinth"]["cy"], 0], north), u)
+    gap_plus = (cu_plinth + plinth_half_u) - (cu_walls + walls_half_u)
+    gap_minus = (cu_walls - walls_half_u) - (cu_plinth - plinth_half_u)
     min_gap = min(gap_plus, gap_minus)
-    channel = (2 * room_half_u) / min_gap if min_gap > 0.05 else 0.0
+    channel = (2 * walls_half_u) / min_gap if min_gap > 0.05 else 0.0
 
-    # Stack
     zmean = 0.0
     atot = 0.0
     for a in apertures:
@@ -271,13 +264,11 @@ def compute_metrics(model):
     zout = zoutA / Aout if Aout > 0 else 0.0
     stack_height = max(0.0, zout - zin)
     Astar = 1.0 / math.sqrt(1 / (Ain * Ain) + 1 / (Aout * Aout)) if (Ain > 0 and Aout > 0) else 0.0
-    Cd, g, Tabs = 0.61, 9.81, 293.15
-    stack_index = (Cd * Astar * math.sqrt(2 * g * stack_height * max(0.0, site["deltaT"]) / Tabs)
+    stack_index = (0.61 * Astar * math.sqrt(2 * 9.81 * stack_height * max(0.0, site["deltaT"]) / 293.15)
                    if (Astar > 0 and stack_height > 0) else 0.0)
 
-    # Views
-    w = rotZ([P["cx"], P["cy"], 0], north)
-    eye = [w[0], w[1], P["Hp"] + site["eyeHeight"]]
+    eye_w = rotZ([P["walls"]["cx"], P["walls"]["cy"], 0], north)
+    eye = [eye_w[0], eye_w[1], site["eyeHeight"]]
     v_target = dirAz(site["viewTargetAz"], 0)
     view_amount = view_quality = sky_view = 0.0
     for a in apertures:
@@ -293,22 +284,27 @@ def compute_metrics(model):
             view_amount += omega
             view_quality += omega * max(0.0, dot(dh, v_target))
 
-    # Thermal mass / earth coupling
-    perim = 2 * (P["Wp"] + P["Dp"])
-    buried = min(P["e"], P["Hp"])
-    soil_contact = perim * buried + P["Wp"] * P["Dp"]
-    mass_volume = P["Wp"] * P["Dp"] * P["Hp"]
-    room_volume = P["Wr"] * P["Dr"] * P["Hr"] + 0.5 * P["Wroof"] * P["Droof"] * P["Hg"]
-    thermal_ratio = (mass_volume * 2.0) / room_volume if room_volume > 1e-6 else 0.0
-    buried_fraction = buried / P["Hp"] if P["Hp"] > 1e-6 else 0.0
+    Pl = P["plinth"]
+    gc = rotZ([Pl["cx"], Pl["cy"], 0], north)
+    ground = terrain_height(gc[0], gc[1], site["terrain"])
+    botZ = -Pl["t"]
+    buried_side = clamp(min(ground, 0) - botZ, 0, Pl["t"])
+    perim = 2 * (Pl["W"] + Pl["L"])
+    soil_contact = perim * buried_side + (Pl["W"] * Pl["L"] if buried_side > 1e-6 else 0.0)
+    mass_volume = Pl["W"] * Pl["L"] * Pl["t"]
+    buried_fraction = buried_side / Pl["t"] if Pl["t"] > 1e-6 else 0.0
 
-    # Derived
+    inner_w = max(0.0, P["walls"]["W"] - 2 * P["walls"]["wt"])
+    inner_l = max(0.0, P["walls"]["L"] - 2 * P["walls"]["wt"])
+    roof_void = 0.5 * P["roof"]["W"] * P["roof"]["L"] * max(0.0, P["roof"]["ridgeRise"])
+    enclosed_volume = inner_w * inner_l * P["walls"]["h"] + roof_void
+    thermal_ratio = (mass_volume * 2.0) / enclosed_volume if enclosed_volume > 1e-6 else 0.0
     envelope_area = sum(f["area"] for f in faces)
     glazing_area = sum(a["area"] for a in apertures)
     glazing_ratio = glazing_area / envelope_area if envelope_area > 1e-6 else 0.0
-    surface_to_volume = envelope_area / room_volume if room_volume > 1e-6 else 0.0
-    ridge_height = P["Hp"] + P["Hr"] + P["Hg"]
-    pitch_deg = math.atan2(P["Hg"], P["Wroof"] / 2) / D2R
+    surface_to_volume = envelope_area / enclosed_volume if enclosed_volume > 1e-6 else 0.0
+    ridge_height = P["walls"]["h"] + P["roof"]["ridgeRise"]
+    pitch_deg = (P["roof"]["pitchL"] + P["roof"]["pitchR"]) / 2
 
     return {
         "solarEnvelope": solar_env, "solarUseful": solar_use, "solarSouth": solar_south,
@@ -318,9 +314,10 @@ def compute_metrics(model):
         "viewAmount": view_amount, "viewQuality": view_quality, "skyView": sky_view,
         "soilContactArea": soil_contact, "massVolume": mass_volume, "thermalMassRatio": thermal_ratio,
         "buriedFraction": buried_fraction,
-        "enclosedVolume": room_volume, "envelopeArea": envelope_area, "glazingArea": glazing_area,
+        "enclosedVolume": enclosed_volume, "envelopeArea": envelope_area, "glazingArea": glazing_area,
         "glazingRatio": glazing_ratio, "surfaceToVolume": surface_to_volume,
-        "footprint": P["Wp"] * P["Dp"], "ridgeHeight": ridge_height, "pitchDeg": pitch_deg,
+        "footprint": Pl["W"] * Pl["L"], "ridgeHeight": ridge_height, "pitchDeg": pitch_deg,
+        "pitchLeft": P["roof"]["pitchL"], "pitchRight": P["roof"]["pitchR"],
     }
 
 
@@ -331,9 +328,10 @@ def analyze(params, site):
 
 def flatten(params, metrics):
     out = {}
-    for k, v in params.items():
-        if isinstance(v, (int, float)) and not isinstance(v, bool):
-            out[k] = v
+    for grp in ("plinth", "walls", "roof"):
+        for k, v in params[grp].items():
+            if isinstance(v, (int, float)) and not isinstance(v, bool):
+                out["%s_%s" % (grp, k)] = v
     out.update(metrics)
     return out
 
