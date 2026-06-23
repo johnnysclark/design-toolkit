@@ -6,6 +6,7 @@
 // Inserts ~6 students, 4 weeks, a few images (copied from the committed
 // seed/assets/*.png into DATA_DIR/uploads), and a few threaded discussions
 // with staggered timestamps so relative times look real.
+import "../loadenv.js"; // must be first: populates process.env before db/paths load
 import crypto from "node:crypto";
 import { copyFileSync, mkdirSync, readdirSync, unlink } from "node:fs";
 import { dirname, join } from "node:path";

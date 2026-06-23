@@ -46,14 +46,88 @@ npm start                     # → http://localhost:3000
 - **Persistence:** images on disk under `DATA_DIR/uploads/`, all metadata + comments in SQLite —
   surviving restarts and redeploys (when `DATA_DIR` is on a mounted persistent disk).
 
+## Configuration (env)
+Copy `.env.example` to `.env` and edit. (`.env` is gitignored.)
+
+| Var | Default | Notes |
+|---|---|---|
+| `STUDENT_PASSCODE` | — | Shared passcode for students. |
+| `INSTRUCTOR_PASSCODE` | — | Shared passcode for instructors (unlocks admin + moderation). |
+| `SESSION_SECRET` | insecure dev default | Signs the session cookie. **Set a long random value in production.** |
+| `DATA_DIR` | `./data` | DB + uploads live here. **Mount a persistent disk here in production.** |
+| `PORT` | `3000` | Listen port (hosts usually inject this). |
+| `MAX_UPLOAD_MB` | `25` | Max size per uploaded image. |
+
+Generate a secret: `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`
+
+## Deployment
+The app is a Node web service + a SQLite file + an uploads folder. A `Dockerfile` (`node:20-slim`)
+and a `render.yaml` Blueprint are included.
+
+> ⚠️ **Ephemeral filesystem warning.** On Render / Railway / Fly the container filesystem is wiped
+> on every deploy and restart. **You MUST attach a persistent disk/volume mounted at `DATA_DIR`
+> (e.g. `/data`)**, or every image and the entire database vanish on the next redeploy. This is the
+> single most important deployment step.
+
+### Render (step by step)
+1. Push this repo to GitHub.
+2. **New → Web Service** pointed at the repo. Set **Root Directory** to `TOOLS/crit-board` so Render
+   builds with this folder's Dockerfile.
+3. Add a **Disk**: name `crit-data`, **mount path `/data`**, size e.g. 5 GB. (Disks require a paid
+   instance type and pin the service to a single instance — exactly what this single-writer SQLite
+   app wants.)
+4. Set **env vars**: `DATA_DIR=/data`, `STUDENT_PASSCODE`, `INSTRUCTOR_PASSCODE`, `SESSION_SECRET`
+   (long random), optionally `MAX_UPLOAD_MB`. `PORT` is injected by Render.
+5. Deploy, then sign in with the instructor passcode and set up the board (or run `npm run seed`
+   once via a one-off shell for sample data).
+
+Or use the included **[`render.yaml`](render.yaml)** Blueprint (web service + disk at `/data` + env
+placeholders); `SESSION_SECRET` is auto-generated and you're prompted for the passcodes.
+
+### Railway / Fly.io (volumes)
+- **Railway:** add a **Volume** mounted at `/data`; set `DATA_DIR=/data` + the passcodes + `SESSION_SECRET`.
+- **Fly.io:** `fly volumes create crit_data --size 5`, then in `fly.toml` add
+  `[mounts]` with `source = "crit_data"` and `destination = "/data"`; `fly secrets set …` the env.
+
+Keep `DATA_DIR` on real block storage (Render/Railway/Fly disks are). Avoid NFS/SMB shares — SQLite
+WAL locking misbehaves on some network filesystems.
+
+## Data & backup
+Everything lives under `DATA_DIR`: `board.db` (+ the `board.db-wal` / `board.db-shm` WAL sidecars)
+and `uploads/`. To back up, copy the whole `DATA_DIR` (use `sqlite3 board.db ".backup backup.db"` for
+a consistent DB snapshot, plus the `uploads/` tree). To restore, drop the files back and restart.
+There is no external database to manage.
+
+## Security & trust model
+- **Light, soft identity.** Two shared passcodes; a student's identity is a name chosen from the
+  roster, stored in a *signed* (tamper-proof) cookie. The signature stops forgery, but nothing stops
+  a student from picking a different roster name — fitting for a trusted studio, **not** real
+  authentication. Own-row upload enforcement is a guard rail, not a wall.
+- **Hardening in place:** all user text is rendered as DOM text nodes (never `innerHTML`), so a
+  comment containing `<script>` displays as literal text; uploads are image-MIME-only, size-capped,
+  and renamed to random IDs stored outside the web root; images are served only through an
+  auth-gated route with a path-traversal guard + `X-Content-Type-Options: nosniff`; login, uploads,
+  and posts are rate-limited; the session cookie is `httpOnly`, `sameSite=lax`, and `secure` in
+  production. Run behind HTTPS in production (all the PaaS options do this by default).
+
+## Accessibility
+The grid is a real `<table>` with `scope`/`headers` associations; cells, the lightbox, and modals are
+keyboard-navigable (Enter/Space to open; arrows + `Esc` in the lightbox) with visible focus; alt-text
+is captured on upload and rendered on every `<img>`; the palette meets contrast in light and dark.
+
 ## Stretch / future
 `sharp` thumbnails, emoji reactions, mark-a-thread-resolved, a comment that references a specific
-image, light notifications, per-week due dates, export a column to PDF, CSV roster import. (Course-
-aligned AI hooks — flagging generic comments, per-cell crit summaries — are deliberately out of scope
-for now.)
+image, light notifications, per-week due dates, export a column to PDF, a formal CSV roster importer.
+(Course-aligned AI hooks — flagging generic comments, per-cell crit summaries — are deliberately out
+of scope for now.)
 
----
-
-*The server app (`server.js`, `db.js`, `auth.js`, uploads, routes, `public/`, seed, Dockerfile, deploy
-docs) is built incrementally in this folder. Full run/env/deploy/backup documentation lands with the
-deployment step. For now, the **[lite demo](lite/)** is fully working.*
+## Project layout
+```
+server.js  db.js  auth.js  upload.js  ratelimit.js  paths.js   # backend (ESM)
+routes/*.js                                                    # auth · board · images · comments · admin
+public/{index.html,app.js,styles.css}                          # vanilla-JS front-end (no build)
+seed/{seed.js,assets/*.png}                                    # npm run seed + committed placeholders
+lite/index.html                                                # zero-setup single-file demo
+Dockerfile  .dockerignore  render.yaml  .env.example           # deploy
+data/                                                          # runtime DB + uploads (gitignored)
+```

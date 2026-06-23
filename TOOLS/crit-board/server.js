@@ -11,6 +11,7 @@
 //   POST /api/cell/images (multipart) · GET /img/:id · DELETE /api/images/:id · PUT /api/cell/images/order
 //   POST /api/cell/threads · /api/threads/:id/comments
 //   /api/admin/* (instructor only)
+import "./loadenv.js"; // must be first: populates process.env before other modules read it
 import express from "express";
 import { PUBLIC_DIR } from "./paths.js";
 import { sessionMiddleware } from "./auth.js";
