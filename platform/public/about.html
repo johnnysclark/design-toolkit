@@ -1,0 +1,297 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>How Rhino Wizard works</title>
+<style>
+  :root{
+    --bg:#fbfbf9; --ink:#1a1a1a; --muted:#6a6a66; --line:#e3e3dd; --panel:#fff;
+    --accent:#2f6f4f; --accent-soft:#eef5f0;
+    --stable:#2f6f4f; --version:#b07a14; --wrong:#b23a2e;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{font:16px/1.6 system-ui,-apple-system,sans-serif;color:var(--ink);background:var(--bg);margin:0}
+  .wrap{max-width:920px;margin:0 auto;padding:0 20px 80px}
+  header.hero{padding:56px 0 8px}
+  .kicker{color:var(--accent);font-weight:700;letter-spacing:.08em;text-transform:uppercase;font-size:.74rem}
+  h1{font-size:2.3rem;line-height:1.1;margin:.25em 0 .15em}
+  .thesis{font-size:1.18rem;color:#333;max-width:48ch}
+  .muted{color:var(--muted)}
+  h2{font-size:1.3rem;margin:2.4em 0 .2em;display:flex;align-items:baseline;gap:.5em}
+  h2 .n{color:var(--accent);font-size:.9rem;font-weight:700}
+  .lead{color:#444;max-width:62ch}
+  a{color:var(--accent)}
+
+  /* step flow */
+  .steps{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin:18px 0}
+  .step{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px}
+  .step .ic{width:34px;height:34px;color:var(--accent)}
+  .step h3{font-size:.95rem;margin:.4em 0 .2em}
+  .step p{font-size:.84rem;color:var(--muted);margin:0}
+  @media(max-width:760px){.steps{grid-template-columns:repeat(2,1fr)}}
+
+  /* pedagogy cards */
+  .cards{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin:18px 0}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px}
+  .card.glow{border-left:4px solid var(--accent)}
+  .card h3{margin:.1em 0 .35em;font-size:1.02rem}
+  .card p{margin:0;font-size:.9rem;color:#444}
+  @media(max-width:760px){.cards{grid-template-columns:1fr}}
+
+  /* claim tag chips */
+  .tags{display:flex;gap:8px;flex-wrap:wrap;margin:.5em 0 0}
+  .tag{font-size:.8rem;border-radius:20px;padding:3px 10px;border:1px solid var(--line);display:inline-flex;gap:6px;align-items:center}
+  .tag b{font-weight:800}
+  .tag.s b{color:var(--stable)} .tag.v b{color:var(--version)} .tag.w b{color:var(--wrong)}
+
+  /* matrix */
+  table{width:100%;border-collapse:collapse;margin:14px 0;background:var(--panel);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+  th,td{padding:10px 12px;border-bottom:1px solid var(--line);border-right:1px solid var(--line);text-align:left;font-size:.9rem;vertical-align:top}
+  th{background:var(--accent-soft);color:#234}
+  td:last-child,th:last-child{border-right:0}
+  tr:last-child td{border-bottom:0}
+  .cellhead{font-weight:700;color:var(--accent)}
+
+  /* diagram */
+  .diagram{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:8px;margin:16px 0}
+  .diagram svg{width:100%;height:auto;display:block}
+
+  ul.track{columns:2;gap:24px;max-width:62ch;padding-left:1.1em}
+  ul.track li{margin:.2em 0;font-size:.92rem}
+  @media(max-width:600px){ul.track{columns:1}}
+
+  .footer{margin-top:40px;border-top:1px solid var(--line);padding-top:18px;display:flex;gap:10px;flex-wrap:wrap}
+  .btn{display:inline-block;border:1px solid var(--line);border-radius:9px;padding:9px 14px;text-decoration:none;color:var(--ink);background:var(--panel);font-size:.92rem}
+  .btn.primary{background:var(--accent);color:#fff;border-color:var(--accent);font-weight:600}
+  .note{background:var(--accent-soft);border-radius:10px;padding:12px 14px;font-size:.9rem;color:#234;margin:14px 0}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="hero">
+    <div class="kicker">Rhino Wizard</div>
+    <h1>How it works</h1>
+    <p class="thesis">A Rhino / Grasshopper / GhPython tutor that teaches you the
+      <em>workflow</em> behind a result — and, at Beginner, refuses to just hand
+      you the answer. It grades the <strong>trace</strong>, not the screenshot.</p>
+    <p class="muted">One page, two halves: <a href="#use">how a student uses it</a> ·
+      <a href="#build">how it's built</a>.</p>
+  </header>
+
+  <p class="lead">Pick a <strong>mode</strong> (Rhino commands, Grasshopper
+    components, or GhPython code) and a <strong>level</strong> (Beginner → Moderate →
+    Advanced). The level decides how much the tutor withholds; the mode decides the
+    vocabulary it speaks. Every factual claim it makes is tagged so you know what to
+    trust and what to check.</p>
+
+  <!-- ============================ HOW TO USE ============================ -->
+  <h2 id="use"><span class="n">PART 1</span> Using the tutor</h2>
+
+  <div class="steps">
+    <div class="step">
+      <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 7l9-4 9 4-9 4-9-4z"/><path d="M3 7v6l9 4 9-4V7"/></svg>
+      <h3>1 · Join</h3>
+      <p>Enter the class code your instructor gives you and a name. No password.</p>
+    </div>
+    <div class="step">
+      <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="5" width="18" height="4" rx="1"/><rect x="3" y="15" width="18" height="4" rx="1"/><circle cx="8" cy="7" r="1.6" fill="currentColor"/><circle cx="16" cy="17" r="1.6" fill="currentColor"/></svg>
+      <h3>2 · Set mode &amp; level</h3>
+      <p>Rhino / Grasshopper / GhPython, and Beginner / Moderate / Advanced.</p>
+    </div>
+    <div class="step">
+      <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+      <h3>3 · Ask</h3>
+      <p>Type a question, upload a <strong>sketch photo</strong> or GH screenshot, or paste a <code>.ghx</code>.</p>
+    </div>
+    <div class="step">
+      <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M20 6L9 17l-5-5"/></svg>
+      <h3>4 · Read &amp; check</h3>
+      <p>You get a structured answer; every claim is tagged ✓ / ? / ⚠.</p>
+    </div>
+    <div class="step">
+      <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 12a9 9 0 1 0 9-9"/><path d="M3 4v5h5"/></svg>
+      <h3>5 · Report back</h3>
+      <p>Tell it what you observed to unlock the next step. That's your trace.</p>
+    </div>
+  </div>
+
+  <div class="note">
+    <strong>Why it makes you report back:</strong> at Beginner and Moderate the tutor
+    ends with a "try it and tell me what you saw" checkpoint. It won't continue until
+    you report a real observation (a branch count, an error message). No report, no
+    next step — and that back-and-forth becomes the learning record your instructor sees.
+  </div>
+
+  <!-- ============================ THE IDEAS ============================ -->
+  <h2><span class="n">PART 1·5</span> The three ideas behind it</h2>
+  <div class="cards">
+    <div class="card glow">
+      <h3>It withholds on purpose</h3>
+      <p>At Beginner the answer format literally has <em>no place</em> to put a finished
+        solution — only a skeleton, the one next step, and the "why." The tutor can't
+        dump the answer because there's nowhere to put it.</p>
+    </div>
+    <div class="card glow">
+      <h3>Every claim is tagged</h3>
+      <p>The model is a material to interrogate, not an oracle. Each fact carries a
+        confidence tag and a reason, so you verify the rest.</p>
+      <div class="tags">
+        <span class="tag s"><b>✓</b> stable</span>
+        <span class="tag v"><b>?</b> version-dependent</span>
+        <span class="tag w"><b>⚠</b> likely wrong — check</span>
+      </div>
+    </div>
+    <div class="card glow">
+      <h3>The trace is the point</h3>
+      <p>Questions, answers, sketches, and your report-backs are all recorded. Success is
+        a rich trace you can re-derive from next week — not a screenshot you can't reproduce.</p>
+    </div>
+  </div>
+
+  <!-- ============================ MATRIX ============================ -->
+  <h2><span class="n">PART 1·6</span> Mode × Level, at a glance</h2>
+  <p class="lead">Mode changes the <em>vocabulary</em>; level changes <em>how much it withholds</em>.</p>
+  <table>
+    <tr><th></th><th>Beginner <span class="muted">(most scaffolding)</span></th><th>Moderate</th><th>Advanced <span class="muted">(assumes fluency)</span></th></tr>
+    <tr><td class="cellhead">Rhino<br><span class="muted">commands</span></td>
+      <td>Skeleton of commands + the one move left as a question; "try it &amp; report back."</td>
+      <td>Most of the steps, one load-bearing move left to you; a one-line self-check.</td>
+      <td>Full sequence + alternatives and trade-offs; where it breaks.</td></tr>
+    <tr><td class="cellhead">Grasshopper<br><span class="muted">components / data trees</span></td>
+      <td>Names the components &amp; the data-tree idea (graft/flatten), withholds the wiring.</td>
+      <td>Most of the definition with one gap; check the param-panel counts.</td>
+      <td>The definition + alternatives (Path Mapper vs GhPython) + pitfalls.</td></tr>
+    <tr><td class="cellhead">GhPython<br><span class="muted">code</span></td>
+      <td>Skeleton + the one line as a question; rhinoscriptsyntax vs Rhino.Geometry.</td>
+      <td>Most of the snippet, one line to fill; a self-check on the <code>out</code>.</td>
+      <td>Full snippet + I/O typing notes + where it breaks.</td></tr>
+  </table>
+
+  <!-- ============================ HOW BUILT ============================ -->
+  <h2 id="build"><span class="n">PART 2</span> How it's built</h2>
+  <p class="lead">A small, transparent stack — one Node server, one Postgres database,
+    and the Claude API. No build step, no framework; the seams are on purpose.</p>
+
+  <div class="diagram" role="img" aria-label="Data-flow diagram: the student browser sends questions and sketches with a session token to the Node platform, which calls the Claude API with a forced JSON schema and the image, stores everything in Postgres, and serves an instructor dashboard that reads analytics back from Postgres.">
+  <svg viewBox="0 0 920 430" font-family="system-ui,sans-serif">
+    <defs>
+      <marker id="arrow" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto">
+        <path d="M0 0L9 4.5L0 9z" fill="#7a8a80"/>
+      </marker>
+      <style>
+        .box{fill:#fff;stroke:#cfd8d2;stroke-width:1.5;rx:12}
+        .accent{fill:#eef5f0;stroke:#2f6f4f}
+        .t{font-size:14px;fill:#1a1a1a;font-weight:700}
+        .s{font-size:11.5px;fill:#6a6a66}
+        .lbl{font-size:11px;fill:#41705a;font-weight:600}
+        .wire{stroke:#7a8a80;stroke-width:1.8;fill:none}
+      </style>
+    </defs>
+
+    <!-- Student browser -->
+    <rect class="box" x="20" y="40" width="180" height="96" rx="12"/>
+    <text class="t" x="36" y="68">🎓 Student browser</text>
+    <text class="s" x="36" y="90">/rhino/ — ask, upload</text>
+    <text class="s" x="36" y="108">a sketch, report back</text>
+    <text class="s" x="36" y="126">holds a session token</text>
+
+    <!-- Platform -->
+    <rect class="box accent" x="350" y="30" width="210" height="120" rx="12"/>
+    <text class="t" x="368" y="58">⚙ Platform (Node)</text>
+    <text class="s" x="368" y="80">server.js + rhino app</text>
+    <text class="s" x="368" y="98">checks the token,</text>
+    <text class="s" x="368" y="116">ownership, rate limit</text>
+    <text class="s" x="368" y="134">builds the prompt</text>
+
+    <!-- Claude -->
+    <rect class="box" x="710" y="30" width="190" height="120" rx="12"/>
+    <text class="t" x="728" y="58">🧠 Claude (Opus 4.8)</text>
+    <text class="s" x="728" y="80">forced JSON schema</text>
+    <text class="s" x="728" y="98">(no field for a full</text>
+    <text class="s" x="728" y="116">solution at Beginner)</text>
+    <text class="s" x="728" y="134">+ reads the image</text>
+
+    <!-- Postgres -->
+    <rect class="box accent" x="350" y="250" width="210" height="140" rx="12"/>
+    <text class="t" x="368" y="278">🗄 Postgres</text>
+    <text class="s" x="368" y="300">students · conversations</text>
+    <text class="s" x="368" y="318">messages · claims</text>
+    <text class="s" x="368" y="336">assets (sketches, bytea)</text>
+    <text class="s" x="368" y="354">learning_traces</text>
+    <text class="s" x="368" y="372">tool_events</text>
+
+    <!-- Instructor -->
+    <rect class="box" x="20" y="262" width="180" height="116" rx="12"/>
+    <text class="t" x="36" y="290">📊 Instructor</text>
+    <text class="s" x="36" y="312">/rhino/instructor/</text>
+    <text class="s" x="36" y="330">sticking points,</text>
+    <text class="s" x="36" y="348">sketches, per-student</text>
+    <text class="s" x="36" y="366">traces (key-gated)</text>
+
+    <!-- wires -->
+    <!-- browser -> platform -->
+    <path class="wire" d="M200 78 L344 78" marker-end="url(#arrow)"/>
+    <text class="lbl" x="212" y="70">POST /ask · /upload</text>
+    <text class="lbl" x="212" y="98">X-Student-Token</text>
+    <!-- platform -> claude -->
+    <path class="wire" d="M560 78 L704 78" marker-end="url(#arrow)"/>
+    <text class="lbl" x="574" y="70">question + image</text>
+    <!-- claude -> platform (return) -->
+    <path class="wire" d="M704 112 L562 112" marker-end="url(#arrow)"/>
+    <text class="lbl" x="588" y="130">tagged answer</text>
+    <!-- platform <-> postgres -->
+    <path class="wire" d="M455 150 L455 246" marker-end="url(#arrow)"/>
+    <text class="lbl" x="462" y="200">writes every turn,</text>
+    <text class="lbl" x="462" y="216">sketch &amp; trace</text>
+    <!-- postgres -> instructor -->
+    <path class="wire" d="M350 320 L202 320" marker-end="url(#arrow)"/>
+    <text class="lbl" x="214" y="312">analytics reads</text>
+    <!-- instructor -> platform (request) dashed conceptually; draw up to platform -->
+    <path class="wire" d="M110 262 L110 78 L344 78" stroke-dasharray="4 4" opacity="0.5"/>
+  </svg>
+  </div>
+
+  <div class="cards">
+    <div class="card">
+      <h3>Identity, lightly</h3>
+      <p>Students join with a class code + name and get an unguessable token. No
+        passwords; one student can't read another's data.</p>
+    </div>
+    <div class="card">
+      <h3>Streaming answers</h3>
+      <p>The server streams the model's progress, then sends the final
+        schema-checked answer — so the page feels live but the structure is enforced.</p>
+    </div>
+    <div class="card">
+      <h3>Runs anywhere</h3>
+      <p>One always-on Node service + Postgres. Host it on Render, a UIUC server,
+        or your laptop for a demo. See the deploy guide.</p>
+    </div>
+  </div>
+
+  <h2><span class="n">PART 2·5</span> What gets tracked</h2>
+  <ul class="track">
+    <li>Every question a student asks</li>
+    <li>The tutor's full answer + the mode/level used</li>
+    <li>Each claim and its ✓ / ? / ⚠ tag</li>
+    <li>Uploaded sketches &amp; GH screenshots</li>
+    <li>Pasted <code>.ghx</code> definitions</li>
+    <li>The report-back observation (the trace)</li>
+    <li>Concept tags per answer (e.g. "graft", "flatten")</li>
+    <li>Class-wide "sticking points" — who's stuck on what</li>
+  </ul>
+
+  <div class="footer">
+    <a class="btn primary" href="/rhino/">Try the tutor →</a>
+    <a class="btn" href="/rhino/instructor/">Instructor dashboard</a>
+    <a class="btn" href="https://github.com/johnnysclark/26-Summer-AI-Workshop/blob/main/platform/DEPLOY.md">Deploy guide</a>
+    <a class="btn" href="https://github.com/johnnysclark/26-Summer-AI-Workshop">Source</a>
+  </div>
+  <p class="muted" style="margin-top:18px;font-size:.84rem">AI is a material to interrogate, not an authority. You keep the judgment.</p>
+
+</div>
+</body>
+</html>

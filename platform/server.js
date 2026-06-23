@@ -9,11 +9,15 @@
 // adding an apps/<tool>/index.js adapter and one line below.
 
 import { createServer } from "node:http";
+import { fileURLToPath } from "node:url";
+import { dirname, join } from "node:path";
 
+import { serveStatic } from "./lib/http.js";
 import { query } from "./lib/db.js";
 import * as rhino from "./apps/rhino-wizard/index.js";
 
 const PORT = process.env.PORT || 3000;
+const SITE_DIR = join(dirname(fileURLToPath(import.meta.url)), "public");
 
 if (!process.env.INSTRUCTOR_PASSWORD) {
   console.warn(
@@ -37,6 +41,7 @@ const LAUNCHER = `<!doctype html>
 <p class="muted">A small set of tools for the design studio. AI is a material to interrogate — every claim is tagged; you keep the judgment.</p>
 <a class="card" href="/rhino/"><strong>Rhino Wizard →</strong><div class="muted">Rhino / Grasshopper / GhPython tutor. Teaches the workflow, withholds the fish.</div></a>
 <a class="card" href="/rhino/instructor/"><strong>Instructor dashboard →</strong><div class="muted">What the class is asking, where they're stuck, the sketches they upload.</div></a>
+<a class="card" href="/about"><strong>How it works →</strong><div class="muted">One page: how a student uses the tutor, and how it's built.</div></a>
 `;
 
 const server = createServer(async (req, res) => {
@@ -46,6 +51,10 @@ const server = createServer(async (req, res) => {
     if (req.method === "GET" && url.pathname === "/") {
       res.writeHead(200, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" });
       res.end(LAUNCHER);
+      return;
+    }
+    if (req.method === "GET" && (url.pathname === "/about" || url.pathname === "/about.html")) {
+      await serveStatic(res, SITE_DIR, "/about.html");
       return;
     }
     if (req.method === "GET" && url.pathname === "/healthz") {
