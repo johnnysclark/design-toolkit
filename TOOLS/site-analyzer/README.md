@@ -64,6 +64,7 @@ node "TOOLS/site-analyzer/cli/analyze.js" "Gowanus Canal"
 - Accessible charts (table fallback + ARIA).
 
 ### Stretch
+- **Live link + Ladybug check** — replace the one-way `.3dm` download with a live web⇄Rhino link (so you can switch between the web app and the Rhino model) and run a validated Ladybug pass next to the home-grown analysis on the shared origin. Architecture in [`LIVE-LINK.md`](LIVE-LINK.md). *(This is the README's "analyze new designs back in Rhino" Phase 2.)*
 - **Generalize beyond Superfund** *(highest-leverage move)* — the climate/terrain/flood/export spine is already site-agnostic; only boundary + contamination are NPL-bound. Add geocoding (US Census Geocoder / Nominatim) + a parcel source (county ArcGIS / Regrid / OSM footprints) and it serves the whole studio.
 - **Adversarial / red-team pass** on the synthesis ("which opportunities rest on the coarsest data? where would a site visit most likely overturn this?").
 - **Hand-off bus** — a stable "site contract" JSON (below) consumed by form-helper, code-zoning-agent, precedent-librarian.

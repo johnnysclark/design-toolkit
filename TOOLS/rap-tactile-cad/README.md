@@ -85,7 +85,7 @@ The **Non-Visual Representation Benchmark** (held-out spaces + ground truth + sc
 Tactile legibility is **physical, not digital** (validate constants with a real embosser + blind testers; photo-based QA closes the loop on the printed artifact) · vision-LLM spatial **hallucination** (fixed schema + geometry-adjudicates + self-attack + fidelity quantifies it) · **embosser/swell hardware access** (the swell-paper + 1-bit PNG path needs only cheap capsule paper + a heat unit; BRF works on any embosser; document where to access hardware) · liblouis table correctness (pin versions, back-translate round-trip) · **DWG not browser-parseable** (require DXF/SVG/PDF) · **accessibility theater** (build the tool screen-reader-first from MVP; blind co-testers on the *tool*, not just its output).
 
 ## Integration / hand-offs
-IN ← Site Analyzer / form-helper geometry. Shares `sonify-engine.js` with form-helper, the semantic-HTML + alt-text/long-desc schema with portfolio-storyteller, ADA clearances with code-zoning-agent.
+IN ← Site Analyzer / form-helper geometry. Shares `sonify-engine.js` with form-helper, the semantic-HTML + alt-text/long-desc schema with portfolio-storyteller, ADA clearances with code-zoning-agent. The Site Analyzer **live link** ([`../site-analyzer/LIVE-LINK.md`](../site-analyzer/LIVE-LINK.md)) lets RAP read the *externally checked* geometry — a model whose analysis has passed a vibe-coded-vs-Ladybug pass — rather than the unverified one, reinforcing RAP's "fidelity, not plausibility" core.
 
 ## How to test it
 - **Tool's own accessibility (non-negotiable):** `axe-core`/Lighthouse zero criticals; scripted keyboard-only pass; manual NVDA+Firefox / VoiceOver+Safari / JAWS+Chrome; **the real test — blind users operate it end-to-end unaided.**
