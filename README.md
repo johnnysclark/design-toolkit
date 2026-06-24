@@ -117,6 +117,9 @@ gitignored.
 The build has started under [`platform/`](platform) — a Vercel + Supabase monorepo. The
 **Toolkit** app (Next.js) is up first with email login, the toolkit nav, a live Librarian
 tool, and the database-backed Pinup Wall. See [`platform/README.md`](platform/README.md).
+To deploy from scratch (incl. registering a domain) follow
+[`platform/DEPLOY.md`](platform/DEPLOY.md); to drive Supabase/Vercel/GitHub from Claude Code
+see [`platform/CLAUDE-CODE.md`](platform/CLAUDE-CODE.md) and [`CLAUDE.md`](CLAUDE.md).
 
 ---
 

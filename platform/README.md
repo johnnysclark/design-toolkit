@@ -72,6 +72,11 @@ Sign in with an invited email, click the magic link, and you're in. Try the
 
 ## 4. Deploy to Vercel
 
+> **Doing this from scratch (incl. registering a domain)?** Follow the full,
+> step-by-step walkthrough in [`DEPLOY.md`](DEPLOY.md) — it covers Supabase, the
+> domain, Vercel, DNS, email/SMTP, and the post-deploy wiring. The summary below is
+> the quick reference.
+
 Two Vercel projects from the **same repo**, one per app:
 
 | | Toolkit | Portfolio (later) |
