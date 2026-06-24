@@ -1,0 +1,657 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>John Clark · Studio Lab — Toolkit & Research</title>
+<meta name="description" content="An agentic toolkit and research lab for teaching design judgment — School of Architecture." />
+<style>
+  :root{
+    --paper:#f7f4ef; --ink:#181613; --muted:#6f6a62; --rule:#e6e0d4; --line:#dcd5c7;
+    --accent:#bb3b32;          /* crit red */
+    --gold:#c08a2d;            /* authorship / build */
+    --green:#2f7d4f; --amber:#b07d12; --blue:#3a6ea5;
+    --card:#fffdf9; --chip:#efe9dd;
+    --mono:ui-monospace,"SF Mono","JetBrains Mono",Menlo,Consolas,monospace;
+    --sans:ui-sans-serif,system-ui,-apple-system,"Helvetica Neue",Arial,sans-serif;
+    --serif:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,"Times New Roman",serif;
+    --shadow:0 18px 50px rgba(40,30,18,.16);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{scroll-behavior:smooth}
+  body{background:var(--paper);color:var(--ink);font-family:var(--sans);line-height:1.5;-webkit-font-smoothing:antialiased}
+  a{color:inherit}
+
+  /* ---------- masthead ---------- */
+  .mast{position:sticky;top:0;z-index:40;background:rgba(247,244,239,.86);backdrop-filter:blur(10px);border-bottom:1px solid var(--line)}
+  .mast .in{max-width:1180px;margin:0 auto;padding:14px clamp(16px,4vw,40px);display:flex;align-items:center;justify-content:space-between;gap:18px}
+  .brand{display:flex;flex-direction:column;line-height:1.05}
+  .brand .nm{font-family:var(--serif);font-weight:700;font-size:clamp(19px,2.1vw,24px);letter-spacing:-.01em}
+  .brand .rl{font-family:var(--mono);font-size:10.5px;letter-spacing:.13em;text-transform:uppercase;color:var(--muted);margin-top:3px}
+  .mnav{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+  .mnav button,.gear{font-family:var(--mono);font-size:12px;letter-spacing:.04em;border:1px solid transparent;background:none;color:var(--muted);padding:7px 11px;border-radius:8px;cursor:pointer;transition:.15s}
+  .mnav button:hover{color:var(--ink);background:var(--chip)}
+  .mnav button.on{color:var(--accent);border-color:var(--line);background:var(--card)}
+  .mnav button.soon{opacity:.5;cursor:not-allowed}
+  .mnav button.soon::after{content:"soon";font-size:8.5px;margin-left:6px;color:var(--gold);border:1px solid var(--line);border-radius:4px;padding:1px 4px;vertical-align:1px}
+  .gear{border-color:var(--line);background:var(--card);color:var(--ink);display:inline-flex;align-items:center;gap:6px}
+  .gear:hover{border-color:var(--accent);color:var(--accent)}
+  .gear .dot{width:7px;height:7px;border-radius:50%;background:var(--muted)}
+  .gear.ready .dot{background:var(--green)}
+
+  /* ---------- hero ---------- */
+  .hero{max-width:1180px;margin:0 auto;padding:clamp(34px,5vw,64px) clamp(16px,4vw,40px) 10px}
+  .hero .kick{font-family:var(--mono);font-size:12px;letter-spacing:.16em;text-transform:uppercase;color:var(--accent);margin-bottom:16px}
+  .hero h1{font-family:var(--serif);font-weight:700;font-size:clamp(30px,5.4vw,58px);line-height:1.04;letter-spacing:-.02em;max-width:17ch}
+  .hero h1 .i{font-style:italic;color:var(--accent)}
+  .hero .lede{font-size:clamp(16px,1.7vw,20px);color:#39342c;max-width:60ch;margin-top:22px;line-height:1.55}
+  .hero .lede b{color:var(--ink)}
+  .stats{display:flex;flex-wrap:wrap;gap:10px 22px;margin-top:26px;font-family:var(--mono);font-size:12.5px;color:var(--muted)}
+  .stats b{color:var(--accent);font-size:16px}
+  .stats span{display:inline-flex;align-items:baseline;gap:7px}
+
+  /* ---------- controls ---------- */
+  .controls{max-width:1180px;margin:0 auto;padding:26px clamp(16px,4vw,40px) 6px;display:flex;gap:14px;flex-wrap:wrap;align-items:center;justify-content:space-between}
+  .tabs{display:flex;gap:8px;flex-wrap:wrap}
+  .tabs button{font-family:var(--mono);font-size:12.5px;letter-spacing:.03em;border:1px solid var(--line);background:var(--card);color:var(--muted);padding:9px 15px;border-radius:999px;cursor:pointer;transition:.15s}
+  .tabs button:hover{color:var(--ink)}
+  .tabs button.on{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+  .tabs button .c{opacity:.6;margin-left:6px;font-size:11px}
+  .search{position:relative;flex:1 1 240px;max-width:320px}
+  .search input{width:100%;font-family:var(--sans);font-size:14px;padding:10px 12px 10px 32px;border:1px solid var(--line);border-radius:10px;background:var(--card);color:var(--ink);outline:none}
+  .search input:focus{border-color:var(--accent)}
+  .search::before{content:"⌕";position:absolute;left:11px;top:50%;transform:translateY(-50%);color:var(--muted);font-size:16px}
+
+  /* ---------- grid ---------- */
+  .wrap{max-width:1180px;margin:0 auto;padding:16px clamp(16px,4vw,40px) 40px}
+  .secthead{font-family:var(--mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);margin:22px 0 12px;display:flex;align-items:center;gap:12px}
+  .secthead::after{content:"";flex:1;height:1px;background:var(--line)}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(282px,1fr));gap:16px}
+  .card{position:relative;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px 18px 14px;cursor:pointer;display:flex;flex-direction:column;gap:9px;min-height:158px;transition:transform .16s ease,box-shadow .16s ease,border-color .16s}
+  .card:hover{transform:translateY(-3px);box-shadow:var(--shadow);border-color:#cfc6b4}
+  .card .cat{font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--accent)}
+  .card h3{font-family:var(--serif);font-size:21px;font-weight:700;letter-spacing:-.01em;line-height:1.1}
+  .card .bl{font-size:13.5px;line-height:1.46;color:#4b463e;flex:1}
+  .card .ft{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:4px}
+  .card .open{margin-left:auto;font-family:var(--mono);font-size:11px;color:var(--muted);transition:.15s}
+  .card:hover .open{color:var(--accent)}
+  .pill{font-family:var(--mono);font-size:10px;letter-spacing:.04em;text-transform:uppercase;padding:3px 8px;border-radius:999px;border:1px solid var(--line);color:var(--muted);background:var(--paper);white-space:nowrap}
+  .pill.live{color:var(--green);border-color:#cfe3d6;background:#f3faf5}
+  .pill.building{color:var(--gold);border-color:#ece0c6;background:#fbf6ec}
+  .pill.designing{color:var(--blue);border-color:#d4e0ee;background:#f1f6fb}
+  .badge-ai{font-family:var(--mono);font-size:9.5px;letter-spacing:.06em;color:var(--accent);border:1px solid #e7c9c6;background:#fbeeed;border-radius:5px;padding:2px 6px}
+  .empty{padding:50px 10px;text-align:center;color:var(--muted);font-family:var(--mono);font-size:13px}
+
+  /* ---------- detail slide-over ---------- */
+  .scrim{position:fixed;inset:0;background:rgba(24,22,19,.42);opacity:0;pointer-events:none;transition:.22s;z-index:50}
+  .scrim.on{opacity:1;pointer-events:auto}
+  .panel{position:fixed;top:0;right:0;height:100%;width:min(560px,100%);background:var(--paper);border-left:1px solid var(--line);transform:translateX(102%);transition:transform .26s cubic-bezier(.4,0,.2,1);z-index:55;overflow-y:auto;box-shadow:var(--shadow)}
+  .panel.on{transform:none}
+  .panel .ph{position:sticky;top:0;background:rgba(247,244,239,.92);backdrop-filter:blur(8px);border-bottom:1px solid var(--line);padding:16px clamp(20px,4vw,30px);display:flex;align-items:flex-start;justify-content:space-between;gap:14px}
+  .panel .ph .cat{font-family:var(--mono);font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--accent)}
+  .panel .ph h2{font-family:var(--serif);font-size:clamp(24px,3.4vw,32px);font-weight:700;letter-spacing:-.015em;line-height:1.06;margin-top:5px}
+  .panel .x{font-size:22px;line-height:1;border:none;background:none;color:var(--muted);cursor:pointer;padding:4px 6px;border-radius:8px}
+  .panel .x:hover{background:var(--chip);color:var(--ink)}
+  .pbody{padding:18px clamp(20px,4vw,30px) 60px}
+  .pbody .row{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:18px}
+  .pbody p.lede{font-size:16px;line-height:1.55;color:#322e28}
+  .pbody h4{font-family:var(--mono);font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:24px 0 10px}
+  .pbody .det{font-size:14.5px;line-height:1.6;color:#403b33}
+  .sub{list-style:none;display:flex;flex-direction:column;gap:7px;margin-top:4px}
+  .sub li{display:flex;gap:10px;align-items:baseline;font-size:14px;color:#3a352e}
+  .sub li .k{font-family:var(--mono);font-size:11px;color:var(--accent);min-width:fit-content;border:1px solid var(--line);border-radius:5px;padding:1px 7px;background:var(--card)}
+  .ai-note{font-size:13.5px;line-height:1.55;color:#403b33;background:#fbeeed;border:1px solid #eed6d3;border-left:3px solid var(--accent);border-radius:8px;padding:12px 14px}
+  .plinks{display:flex;gap:10px;flex-wrap:wrap;margin-top:6px}
+  .plinks a{font-family:var(--mono);font-size:12px;text-decoration:none;border:1px solid var(--line);background:var(--card);border-radius:8px;padding:8px 12px;transition:.15s}
+  .plinks a:hover{border-color:var(--accent);color:var(--accent)}
+
+  /* ---------- try-it console ---------- */
+  .try{margin-top:16px;border:1px solid var(--line);border-radius:12px;background:var(--card);overflow:hidden}
+  .try .th{font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);padding:10px 14px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:8px}
+  .try .th .live{width:7px;height:7px;border-radius:50%;background:var(--accent)}
+  .try .tin{padding:12px 14px}
+  .try textarea{width:100%;min-height:74px;resize:vertical;font-family:var(--sans);font-size:14px;border:1px solid var(--line);border-radius:8px;padding:9px 11px;background:var(--paper);color:var(--ink);outline:none}
+  .try textarea:focus{border-color:var(--accent)}
+  .try .trow{display:flex;align-items:center;gap:10px;margin-top:9px}
+  .try .ask{font-family:var(--mono);font-size:12px;letter-spacing:.04em;background:var(--ink);color:var(--paper);border:none;border-radius:8px;padding:9px 16px;cursor:pointer}
+  .try .ask:hover{background:var(--accent)}
+  .try .ask:disabled{opacity:.5;cursor:default}
+  .try .hint{font-family:var(--mono);font-size:11px;color:var(--muted)}
+  .try .hint a{color:var(--accent);cursor:pointer}
+  .out{white-space:pre-wrap;font-size:14px;line-height:1.6;color:#322e28;margin-top:12px;padding-top:12px;border-top:1px dashed var(--line);display:none}
+  .out.on{display:block}
+  .out.err{color:var(--accent)}
+
+  /* ---------- settings modal ---------- */
+  .modal{position:fixed;inset:0;display:grid;place-items:center;background:rgba(24,22,19,.5);opacity:0;pointer-events:none;transition:.2s;z-index:60;padding:20px}
+  .modal.on{opacity:1;pointer-events:auto}
+  .sheet{background:var(--paper);border:1px solid var(--line);border-radius:16px;width:min(480px,100%);box-shadow:var(--shadow);overflow:hidden}
+  .sheet .sh{padding:18px 22px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between}
+  .sheet .sh h3{font-family:var(--serif);font-size:22px;font-weight:700}
+  .sheet .sb{padding:18px 22px 22px}
+  .sheet label{font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);display:block;margin:14px 0 6px}
+  .sheet label:first-child{margin-top:0}
+  .sheet select,.sheet input{width:100%;font-family:var(--sans);font-size:14px;padding:10px 12px;border:1px solid var(--line);border-radius:9px;background:var(--card);color:var(--ink);outline:none}
+  .sheet select:focus,.sheet input:focus{border-color:var(--accent)}
+  .warn{font-size:12px;line-height:1.5;color:#6a4a18;background:#fbf3e3;border:1px solid #ecdcbb;border-radius:9px;padding:11px 13px;margin-top:16px}
+  .warn b{color:#7a3d12}
+  .sheet .sf{display:flex;gap:10px;margin-top:18px}
+  .sheet .save{font-family:var(--mono);font-size:12px;background:var(--ink);color:var(--paper);border:none;border-radius:9px;padding:11px 18px;cursor:pointer}
+  .sheet .save:hover{background:var(--accent)}
+  .sheet .ghost{font-family:var(--mono);font-size:12px;background:none;border:1px solid var(--line);border-radius:9px;padding:11px 16px;cursor:pointer;color:var(--muted)}
+  details.intg{margin-top:16px;font-size:12.5px;color:#4b463e}
+  details.intg summary{font-family:var(--mono);font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);cursor:pointer}
+  details.intg code{font-family:var(--mono);font-size:11.5px;background:var(--chip);padding:1px 5px;border-radius:4px}
+  details.intg pre{background:#1c1a17;color:#e9e3d7;border-radius:9px;padding:12px;overflow-x:auto;margin-top:8px;font-family:var(--mono);font-size:11px;line-height:1.55}
+
+  /* ---------- footer ---------- */
+  footer{border-top:1px solid var(--line);margin-top:30px}
+  footer .in{max-width:1180px;margin:0 auto;padding:30px clamp(16px,4vw,40px) 50px;display:flex;flex-wrap:wrap;gap:24px;justify-content:space-between;font-size:13px;color:var(--muted)}
+  footer a{color:var(--accent);text-decoration:none}
+  footer .note{max-width:46ch;line-height:1.55}
+  footer details{max-width:60ch}
+  footer summary{font-family:var(--mono);font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink);cursor:pointer;margin-bottom:8px}
+  footer details p{margin:8px 0;line-height:1.55;color:#4b463e}
+  footer details b{color:var(--ink)}
+
+  @media (max-width:680px){
+    .brand .rl{display:none}
+    .panel{width:100%}
+  }
+</style>
+</head>
+<body>
+
+<header class="mast">
+  <div class="in">
+    <div class="brand">
+      <span class="nm">John Clark</span>
+      <span class="rl">Teaching Assistant Professor · School of Architecture</span>
+    </div>
+    <nav class="mnav" id="topnav">
+      <button data-sec="toolkit" class="on">Toolkit</button>
+      <button data-sec="research">Research</button>
+      <button class="soon" disabled>Work</button>
+      <button class="soon" disabled>Teaching</button>
+      <button class="gear" id="gear" title="Connect a model"><span class="dot"></span>Connect&nbsp;model</button>
+    </nav>
+  </div>
+</header>
+
+<section class="hero">
+  <div class="kick">Studio Lab — Toolkit &amp; Research</div>
+  <h1>An agentic toolkit for teaching design <span class="i">judgment</span>.</h1>
+  <p class="lede">My students arrive able to make form but not yet to <b>justify</b> it. This is a growing kit of
+    agentically-coded tools — built with Claude Code — that hand them the <b>logics, language, and data</b> to reason
+    about a real site and the building they set on it: site forces, precedent, form, production, and the studio culture
+    around the work. Used in a <b>trust-but-verify</b> stance — move fast, hunt the edge cases, stay the author.</p>
+  <div class="stats" id="stats"></div>
+</section>
+
+<div class="controls">
+  <div class="tabs" id="tabs"></div>
+  <div class="search"><input id="q" type="search" placeholder="Search tools, tags, capabilities…" autocomplete="off" /></div>
+</div>
+
+<main class="wrap" id="wrap"></main>
+
+<!-- detail slide-over -->
+<div class="scrim" id="scrim"></div>
+<aside class="panel" id="panel" aria-hidden="true"></aside>
+
+<!-- settings modal -->
+<div class="modal" id="modal">
+  <div class="sheet">
+    <div class="sh"><h3>Connect a model</h3><button class="x ghost" id="mclose" style="border:none;background:none;font-size:22px;cursor:pointer;color:var(--muted)">×</button></div>
+    <div class="sb">
+      <label for="model">Model</label>
+      <select id="model">
+        <option value="claude-opus-4-8">Claude Opus 4.8 — most capable (default)</option>
+        <option value="claude-sonnet-4-6">Claude Sonnet 4.6 — fast &amp; balanced</option>
+        <option value="claude-haiku-4-5">Claude Haiku 4.5 — fastest / cheapest</option>
+      </select>
+      <label for="key">Anthropic API key</label>
+      <input id="key" type="password" placeholder="sk-ant-…" autocomplete="off" spellcheck="false" />
+      <div class="warn"><b>Dev / demo only.</b> The key is stored in <i>this browser</i> and sent straight from your
+        browser to Anthropic (via the <code style="font-family:var(--mono)">anthropic-dangerous-direct-browser-access</code> header).
+        Fine for trying the tools locally — but in a real deployment, route every model call through a small server so the
+        key is never exposed to students.</div>
+      <details class="intg">
+        <summary>How the integration works</summary>
+        <p style="margin:10px 0">Each AI tool calls one endpoint — <code>POST https://api.anthropic.com/v1/messages</code> — with a
+          tool-specific system prompt. The browser hook:</p>
+<pre>fetch("https://api.anthropic.com/v1/messages", {
+  method: "POST",
+  headers: {
+    "content-type": "application/json",
+    "x-api-key": KEY,
+    "anthropic-version": "2023-06-01",
+    "anthropic-dangerous-direct-browser-access": "true"
+  },
+  body: JSON.stringify({
+    model: "claude-opus-4-8",
+    max_tokens: 1024,
+    system: TOOL_SYSTEM_PROMPT,
+    messages: [{ role: "user", content: studentInput }]
+  })
+})
+// → data.content.find(b =&gt; b.type === "text").text</pre>
+      </details>
+      <div class="sf"><button class="save" id="msave">Save</button><button class="ghost" id="mclear">Clear key</button></div>
+    </div>
+  </div>
+</div>
+
+<footer>
+  <div class="in">
+    <p class="note">A living index — it grows as tools are built and the studio takes shape. Everything here is in some
+      stage of production, built with Claude Code. Source &amp; specs:
+      <a href="https://github.com/johnnysclark/26-Summer-AI-Workshop" target="_blank" rel="noopener">github.com/johnnysclark/26-Summer-AI-Workshop</a>.</p>
+    <details>
+      <summary>Notes on building the real site</summary>
+      <p>This page is a single self-contained HTML file; the "database" is just a JavaScript array rendered into cards —
+        easy to demo, easy to hand off. For the production version with a real DB, saved studio memory, peer-to-peer
+        tracking, and LLM tools, the cleanest path is <b>Next.js + Supabase on Vercel</b>: content/tools live in a table
+        (or typed config), and a <b>serverless API route proxies Claude</b> so the key stays server-side.</p>
+      <p>Lighter alternative: a <b>static build (Astro / Eleventy)</b> with content as Markdown/JSON, plus serverless
+        functions for the model calls. Either way, the <b>Tools / Research</b> split here becomes two collections, and
+        <b>Work / Teaching</b> drop in later as two more — one portfolio, four sections.</p>
+    </details>
+  </div>
+</footer>
+
+<script>
+/* ----------------------------------------------------------------------------
+   THE "DATABASE" — one record per tool / research thread.
+   group: toolkit | research   ·   status: live | building | designing
+   llm:true tools expose a live "Try it" console when a key is connected.
+---------------------------------------------------------------------------- */
+const DATA = [
+  /* ===== DESIGN TOOLKIT ===== */
+  {
+    id:"site-analysis", group:"toolkit", cat:"Site", status:"live", llm:true,
+    title:"Site Analysis",
+    blurb:"Feed a real-world site, get a structured read for design — climate, terrain, water, constraints, history, and links — with the ground exported for Rhino.",
+    tags:["site","climate","data","rhino","precedent"],
+    sub:[
+      {k:"data", t:"Climate, orientation, terrain, hydrology, flood, boundary — real public data, downloadable."},
+      {k:"history", t:"Site &amp; neighborhood history, plus linked references."},
+      {k:"tags", t:"Every interpretive claim arrives tagged ✓ verified / ? unverified / ⚠ likely-hallucination."}
+    ],
+    ai:"AI reads and summarizes the gathered data, but never invents it — hard facts are sourced and each interpretation is tagged so the student knows exactly what to verify.",
+    links:[{label:"Open live tool ↗", href:"../TOOLS/site-analyzer/standalone/index.html"},{label:"Spec", href:"../TOOLS/site-analyzer"}],
+    system:"You are Site Analysis, a tool inside an undergraduate architecture studio. Given a place or a set of site conditions, produce a concise, design-relevant read: climate and solar orientation, terrain and water, key constraints, and historical/cultural context. Be specific and cite what you are confident about. Crucially, tag every interpretive claim as [verified], [unverified], or [likely-hallucination], and end with a short 'Verify next' list the student must check against real sources. Never invent precise figures — if you don't know, say so and tag it."
+  },
+  {
+    id:"site-design", group:"toolkit", cat:"Form", status:"building", llm:true,
+    title:"Site Design",
+    blurb:"Form-finding governed by site forces. Watch how changing the massing changes solar gain, wind exposure, thermal mass, and views — analysis a beginner couldn't run before.",
+    tags:["form","solar","wind","thermal","views","massing"],
+    sub:[
+      {k:"forces", t:"Sun, wind, slope, water, and sightlines each get a legible, reversible vote on the mass."},
+      {k:"author", t:"The student sets the parti; the site pushes back — the student keeps the pen."}
+    ],
+    ai:"AI translates site forces into clear, reversible moves and explains the trade-offs — the student decides which moves to keep and must justify the call.",
+    links:[{label:"Spec", href:"../TOOLS/form-helper"}],
+    system:"You are Site Design, a form-finding coach in an architecture studio. The student describes a parti (a basic massing idea) and a site. Explain how specific site forces — solar gain, wind exposure, thermal mass, views, slope, water — would each push that form, proposing one legible, reversible move per force and naming the trade-off. Keep the student as the author: offer votes, not verdicts. End by asking which moves they want to keep and why."
+  },
+  {
+    id:"skills-coach", group:"toolkit", cat:"Skills", status:"building", llm:true,
+    title:"Skills Coach",
+    blurb:"A Socratic production tutor across the tools students actually use — it tests their first answer, then probes them into dialogue instead of handing over the solution.",
+    tags:["rhino","revit","adobe","vibe-coding","portfolio","tutor"],
+    sub:[
+      {k:"Rhino", t:"Modeling &amp; Grasshopper workflow, taught — not screenshotted."},
+      {k:"Revit", t:"BIM fundamentals and documentation."},
+      {k:"Adobe", t:"Plan/section/diagram production in Ps · Id · Ai."},
+      {k:"Vibe-Coding", t:"Building small tools with an AI coding agent."},
+      {k:"Portfolio / Storytelling", t:"Sharpening the presentation and the argument — drafts and provokes, never ghostwrites."}
+    ],
+    ai:"Predetermined expertise per skill; it probes after testing the student's initial answer. At the beginner level it refuses to hand over a complete solution — a correct screenshot the student can't reproduce is a failure state.",
+    links:[{label:"Spec", href:"../TOOLS/rhino-wizard"}],
+    system:"You are Skills Coach, a Socratic tutor for architecture-studio production skills (Rhino/Grasshopper, Revit, Adobe, vibe-coding, and portfolio/storytelling). Workflow: first ask the student for their current attempt or best guess; test it; then probe with questions that lead them to the next step. Teach the WORKFLOW, not the answer. For a beginner, never paste a complete finished solution — a result they can't reproduce next week is a failure. Keep turns short and end with a single concrete next action for them to try."
+  },
+  {
+    id:"librarian", group:"toolkit", cat:"Precedent", status:"live", llm:true,
+    title:"Librarian",
+    blurb:"Point it at a reference image and get grounded information back. Doubles as the class library of image + text references — and it cross-examines its own dossier.",
+    tags:["precedent","research","references","library","verification"],
+    sub:[
+      {k:"dossier", t:"Atomizes each claim, tags it, runs a hostile devil's-advocate pass."},
+      {k:"worksheet", t:"Returns a worksheet of what still needs human verification."},
+      {k:"library", t:"Accumulates the class's shared image + text references."}
+    ],
+    ai:"The AI builds the dossier and then attacks it — refusing to fabricate a precedent that doesn't exist, and handing back exactly what the student must go confirm.",
+    links:[{label:"Open live tool ↗", href:"../TOOLS/precedent-librarian/lite/index.html"},{label:"Spec", href:"../TOOLS/precedent-librarian"}],
+    system:"You are Librarian, a precedent/research assistant for an architecture studio. Given a reference (image description, building, architect, or topic), build a short dossier of design-relevant facts. Then cross-examine yourself: atomize each claim, tag it [verified]/[unverified]/[likely-hallucination], run a one-line devil's-advocate challenge, and finish with a 'Verification worksheet' listing what the student must confirm in a real source. Never fabricate a precedent, citation, date, or dimension — flag uncertainty instead."
+  },
+  {
+    id:"digital-wall", group:"toolkit", cat:"Studio Culture", status:"designing", llm:false,
+    title:"Digital Wall / Pinup Wall",
+    blurb:"A studio board to replace Miro — studio memory plus metadata. It encourages and tracks peer-to-peer engagement with the weekly process drawings.",
+    tags:["culture","miro","pinup","peer","process","memory"],
+    sub:[
+      {k:"memory", t:"Holds the semester's process drawings as a searchable studio memory."},
+      {k:"meta", t:"Tags each pin with metadata — author, week, phase, peer comments."},
+      {k:"peer", t:"Surfaces and credits peer-to-peer engagement, making studio culture visible."}
+    ],
+    ai:"AI is a light layer here — clustering pins, summarizing a week's wall, and nudging quiet threads — while the wall itself is the durable record of the studio's collective work.",
+    links:[],
+  },
+  {
+    id:"design-critic", group:"toolkit", cat:"Critique", status:"building", llm:true,
+    title:"Design Critic",
+    blurb:"A crit partner that gives you the lay of the land and can adopt different personas. Use with caution — always consult a range of critics, human and non-human.",
+    tags:["critique","crit","personas","feedback","trust-but-verify"],
+    sub:[
+      {k:"land", t:"Quick lay of the land: what's working, what's at risk, what to defend."},
+      {k:"personas", t:"Adopts a chosen critic persona — the pragmatist, the theorist, the builder, the skeptic."},
+      {k:"caution", t:"Built to provoke, not to decide. One voice among many."}
+    ],
+    ai:"The most oracle-tempting tool in the kit — so it's framed as a sparring partner, not an authority. Try a draft argument below and pressure-test it.",
+    links:[],
+    system:"You are Design Critic, a studio crit partner for undergraduate architecture students. When a student describes a design or a design argument, give a fast, honest 'lay of the land': name what is working, what is weak or unjustified, and what they should be ready to defend in review. If they name a persona (pragmatist, theorist, builder, sustainability hawk, skeptic), critique from that lens. Be specific and provocative but never final — explicitly remind the student that you are one voice among many and that they should test your read against human critics and the building itself. Do not redesign the project for them; sharpen their thinking."
+  },
+  {
+    id:"2d-media", group:"toolkit", cat:"2D Media", status:"designing", llm:false,
+    title:"2D Media Tools",
+    blurb:"Photoshop-analog widgets for routine studio production — clean a scan, prep a drawing, handle live video and fabrication output.",
+    tags:["drawing","photoshop","video","fabrication","production"],
+    sub:[
+      {k:"Drawing Cleanup", t:"Clean a scan, flatten a diagram, prep a drawing for pin-up."},
+      {k:"Live Video", t:"Capture and process live video for reviews and documentation."},
+      {k:"Fabrication", t:"Prep 2D output for laser, CNC, and plotter workflows."}
+    ],
+    ai:"AI assists the mechanical steps (background removal, line cleanup, layout) so the student spends their time on the drawing's content, not its busywork.",
+    links:[],
+  },
+  {
+    id:"3d-tools", group:"toolkit", cat:"3D", status:"designing", llm:false,
+    title:"3D Tools",
+    blurb:"A toolbox for three-dimensional work — scripting, tutorials, web 3D, and dialed-in print settings.",
+    tags:["3d","python","threejs","3d-print","tutorials","grasshopper"],
+    sub:[
+      {k:"Python", t:"Scripting for Rhino / Grasshopper and geometry work."},
+      {k:"Tutorials", t:"Skill-leveled, on-demand 3D modeling guidance."},
+      {k:"Three JS", t:"Lightweight web 3D for sharing and embedding models."},
+      {k:"3D Print Settings", t:"Material- and machine-specific print presets that actually work."}
+    ],
+    ai:"AI generates and explains scripts, levels tutorials to the student, and recommends print settings — always with the reasoning shown so the student learns the move.",
+    links:[],
+  },
+  {
+    id:"rap-toolkit", group:"toolkit", cat:"Accessibility · RAP", status:"building", llm:false,
+    title:"RAP Toolkit",
+    blurb:"The Radical Accessibility Project — tooling for blind / low-vision architectural production: a CLI Rhino driver, tactile-media generator, alt-text generator, and an accessibility layer over typical CAD work.",
+    tags:["accessibility","rap","tactile","alt-text","rhino-cli","inclusion"],
+    sub:[
+      {k:"Rhino CLI", t:"Drive Rhino from the command line — non-visual modeling."},
+      {k:"Tactile media", t:"Generate tactile drawings and models from digital geometry."},
+      {k:"Alt-text", t:"Architectural alt-text for drawings, diagrams, and references."},
+      {k:"Layer", t:"A general accessibility layer over typical CAD and research production."}
+    ],
+    ai:"AI does the heavy translation — geometry to tactile output, drawings to rigorous alt-text — extending what's possible in non-visual architectural production.",
+    links:[
+      {label:"Project repo ↗", href:"https://github.com/johnnysclark/Radical-Accessibility-Toolkit"},
+      {label:"Illinois news ↗", href:"https://news.illinois.edu/illinois-architecture-professors-project-aims-to-make-architecture-education-accessible-to-blind-students/"}
+    ],
+  },
+
+  /* ===== RESEARCH ===== */
+  {
+    id:"rap-research", group:"research", cat:"Accessibility", status:"building", llm:false,
+    title:"RAP — Radical Accessibility Project",
+    blurb:"The research program behind the toolkit: making architecture education and production accessible to blind and low-vision students and practitioners.",
+    tags:["accessibility","research","disability","pedagogy","tactile"],
+    sub:[
+      {k:"aim", t:"Reduce the visual bottleneck in CAD, drawing, and design research."},
+      {k:"output", t:"Tools, methods, and publishable findings (ACADIA / JAE-scale)."}
+    ],
+    ai:"The deepest, most publishable node in the lab — AI as the bridge between geometry and non-visual representation.",
+    links:[
+      {label:"Project repo ↗", href:"https://github.com/johnnysclark/Radical-Accessibility-Toolkit"},
+      {label:"Illinois news ↗", href:"https://news.illinois.edu/illinois-architecture-professors-project-aims-to-make-architecture-education-accessible-to-blind-students/"}
+    ],
+  },
+  {
+    id:"resonance", group:"research", cat:"Research thread", status:"designing", llm:false,
+    title:"Resonance",
+    blurb:"A research thread — placeholder. (One-line gloss needed: what does Resonance investigate?)",
+    tags:["research","tbd"],
+    sub:[],
+    ai:"Stubbed — tell me the thesis in a sentence and I'll write this card properly.",
+    links:[],
+  },
+  {
+    id:"game-pedagogy", group:"research", cat:"Pedagogy", status:"designing", llm:false,
+    title:"Game as Pedagogy",
+    blurb:"Investigating play, rules, and game structures as a way to teach design reasoning and iteration.",
+    tags:["games","play","pedagogy","iteration"],
+    sub:[],
+    ai:"Where it touches AI: the design loop (propose → act → observe → revise) is already a game loop — a natural frame for teaching trust-but-verify.",
+    links:[],
+  },
+  {
+    id:"creativity-pedagogy", group:"research", cat:"Pedagogy", status:"designing", llm:false,
+    title:"Creativity as Pedagogy",
+    blurb:"How creative practice itself — divergence, constraint, revision — can be taught, and what AI tools do to that process.",
+    tags:["creativity","pedagogy","process"],
+    sub:[],
+    ai:"Where it touches AI: tools change the cost of divergence and revision — the research question is whether that builds or erodes a student's own creative judgment.",
+    links:[],
+  },
+  {
+    id:"drawings", group:"research", cat:"Research thread", status:"designing", llm:false,
+    title:"Drawings",
+    blurb:"A thread on the drawing as a mode of architectural thinking. (Your note read \"Drawings — just make an integration\" — flagged for a one-line gloss.)",
+    tags:["drawing","representation","tbd"],
+    sub:[],
+    ai:"Stubbed — confirm the angle (drawing-as-research? an integration point across the tools?) and I'll flesh it out.",
+    links:[],
+  },
+];
+
+/* ---------------------------------------------------------------------------- */
+const $  = (s,r=document)=>r.querySelector(s);
+const $$ = (s,r=document)=>[...r.querySelectorAll(s)];
+const esc = s => String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const LS_KEY="jc_lab_apikey", LS_MODEL="jc_lab_model";
+
+const state = { sec:"toolkit", q:"", openId:null };
+
+/* ---- stats ---- */
+function paintStats(){
+  const tk = DATA.filter(d=>d.group==="toolkit").length;
+  const rs = DATA.filter(d=>d.group==="research").length;
+  const live = DATA.filter(d=>d.status==="live").length;
+  const ai = DATA.filter(d=>d.llm).length;
+  $("#stats").innerHTML =
+    `<span><b>${tk}</b> toolkit tools</span><span><b>${rs}</b> research threads</span>`+
+    `<span><b>${live}</b> live now</span><span><b>${ai}</b> AI-powered</span>`;
+}
+
+/* ---- tabs ---- */
+function paintTabs(){
+  const counts = {all:DATA.length, toolkit:DATA.filter(d=>d.group==="toolkit").length, research:DATA.filter(d=>d.group==="research").length};
+  const tabs=[["toolkit","Toolkit"],["research","Research"],["all","All"]];
+  $("#tabs").innerHTML = tabs.map(([k,l])=>
+    `<button data-sec="${k}" class="${state.sec===k?"on":""}">${l}<span class="c">${counts[k]}</span></button>`).join("");
+  $$("#tabs button").forEach(b=>b.onclick=()=>{state.sec=b.dataset.sec; syncNav(); render();});
+}
+function syncNav(){
+  $$("#topnav button[data-sec]").forEach(b=>b.classList.toggle("on", b.dataset.sec===state.sec));
+  $$("#tabs button").forEach(b=>b.classList.toggle("on", b.dataset.sec===state.sec));
+}
+
+/* ---- card ---- */
+function card(d){
+  const aiBadge = d.llm ? `<span class="badge-ai">AI</span>` : "";
+  return `<div class="card" data-id="${d.id}" tabindex="0" role="button" aria-label="${esc(d.title)}">
+    <div class="cat">${esc(d.cat)}</div>
+    <h3>${esc(d.title)}</h3>
+    <div class="bl">${esc(d.blurb)}</div>
+    <div class="ft">
+      <span class="pill ${d.status}">${d.status==="live"?"● live":d.status}</span>
+      ${aiBadge}
+      <span class="open">open →</span>
+    </div>
+  </div>`;
+}
+
+/* ---- render grid ---- */
+function render(){
+  const q = state.q.trim().toLowerCase();
+  const match = d => {
+    if(state.sec!=="all" && d.group!==state.sec) return false;
+    if(!q) return true;
+    const hay = (d.title+" "+d.blurb+" "+d.cat+" "+(d.tags||[]).join(" ")).toLowerCase();
+    return hay.includes(q);
+  };
+  const items = DATA.filter(match);
+  const wrap = $("#wrap");
+  if(!items.length){ wrap.innerHTML = `<div class="empty">No tools match “${esc(state.q)}”.</div>`; return; }
+
+  if(state.sec==="all"){
+    const tk = items.filter(d=>d.group==="toolkit"), rs = items.filter(d=>d.group==="research");
+    wrap.innerHTML =
+      (tk.length?`<div class="secthead">Design Toolkit</div><div class="grid">${tk.map(card).join("")}</div>`:"")+
+      (rs.length?`<div class="secthead">Research</div><div class="grid">${rs.map(card).join("")}</div>`:"");
+  } else {
+    wrap.innerHTML = `<div class="grid">${items.map(card).join("")}</div>`;
+  }
+  $$(".card").forEach(c=>{
+    c.onclick=()=>openDetail(c.dataset.id);
+    c.onkeydown=e=>{ if(e.key==="Enter"||e.key===" "){e.preventDefault();openDetail(c.dataset.id);} };
+  });
+}
+
+/* ---- detail panel ---- */
+function openDetail(id){
+  const d = DATA.find(x=>x.id===id); if(!d) return;
+  const subs = (d.sub&&d.sub.length)
+    ? `<h4>Inside</h4><ul class="sub">${d.sub.map(s=>`<li><span class="k">${esc(s.k)}</span><span>${s.t}</span></li>`).join("")}</ul>` : "";
+  const links = (d.links&&d.links.length)
+    ? `<h4>Links</h4><div class="plinks">${d.links.map(l=>`<a href="${esc(l.href)}" target="_blank" rel="noopener">${esc(l.label)}</a>`).join("")}</div>` : "";
+  const aiNote = d.ai ? `<h4>Where AI plugs in</h4><div class="ai-note">${d.ai}</div>` : "";
+  const tryBox = d.llm && d.system ? tryConsole(d) : "";
+
+  state.openId = id;
+  $("#panel").innerHTML = `
+    <div class="ph">
+      <div><div class="cat">${esc(d.cat)}</div><h2>${esc(d.title)}</h2></div>
+      <button class="x" id="pclose" aria-label="Close">×</button>
+    </div>
+    <div class="pbody">
+      <div class="row"><span class="pill ${d.status}">${d.status==="live"?"● live":d.status}</span>
+        ${d.llm?'<span class="badge-ai">AI-powered</span>':''}
+        ${(d.tags||[]).slice(0,5).map(t=>`<span class="pill">#${esc(t)}</span>`).join("")}</div>
+      <p class="lede">${esc(d.blurb)}</p>
+      ${subs}${aiNote}${tryBox}${links}
+    </div>`;
+  $("#pclose").onclick = closeDetail;
+  if(tryBox) wireTry(d);
+  $("#panel").classList.add("on"); $("#panel").setAttribute("aria-hidden","false");
+  $("#scrim").classList.add("on");
+}
+function closeDetail(){ state.openId=null; $("#panel").classList.remove("on"); $("#panel").setAttribute("aria-hidden","true"); $("#scrim").classList.remove("on"); }
+$("#scrim").onclick = closeDetail;
+
+/* ---- try-it console ---- */
+function tryConsole(d){
+  const ready = !!localStorage.getItem(LS_KEY);
+  const hint = ready
+    ? `<span class="hint">Model: <b id="ty-model">${esc(localStorage.getItem(LS_MODEL)||"claude-opus-4-8")}</b></span>`
+    : `<span class="hint"><a id="ty-connect">Connect a model</a> to run this live.</span>`;
+  return `<div class="try">
+    <div class="th"><span class="live"></span>Try it — live</div>
+    <div class="tin">
+      <textarea id="ty-in" placeholder="${esc(tryPlaceholder(d))}"></textarea>
+      <div class="trow"><button class="ask" id="ty-ask">Ask ${esc(d.title)}</button>${hint}</div>
+      <div class="out" id="ty-out"></div>
+    </div>
+  </div>`;
+}
+function tryPlaceholder(d){
+  return ({
+    "design-critic":"Paste a draft design argument — e.g. “I lifted the building on piloti to preserve the flood plain and the view corridor…”",
+    "librarian":"Name a reference or paste an image description — e.g. “a naturally-ventilated library in a hot-humid climate”",
+    "site-analysis":"Describe a site — e.g. “a steep north-facing lot above the Gowanus Canal, Brooklyn”",
+    "site-design":"Describe your parti + site — e.g. “a long bar on an east-west ridge, hot-dry climate”",
+    "skills-coach":"Ask a production question — e.g. “how do I loft a smooth surface across three section curves in Rhino?”"
+  })[d.id] || "Ask this tool a question…";
+}
+function wireTry(d){
+  const conn = $("#ty-connect"); if(conn) conn.onclick = openModal;
+  $("#ty-ask").onclick = ()=>runTry(d);
+}
+async function runTry(d){
+  const key = localStorage.getItem(LS_KEY);
+  const out = $("#ty-out"), btn = $("#ty-ask"), input = $("#ty-in").value.trim();
+  if(!key){ openModal(); return; }
+  if(!input){ out.className="out on err"; out.textContent="Type something first."; return; }
+  btn.disabled = true; out.className="out on"; out.textContent="Thinking…";
+  try{
+    const text = await callClaude({
+      apiKey:key,
+      model:localStorage.getItem(LS_MODEL)||"claude-opus-4-8",
+      system:d.system,
+      messages:[{role:"user",content:input}]
+    });
+    out.className="out on"; out.textContent = text;
+  }catch(e){
+    out.className="out on err"; out.textContent = "Error: "+e.message+"\n(Tip: a browser call needs a valid key and the dangerous-direct-browser-access header — both are set here, but the key must be real.)";
+  }finally{ btn.disabled = false; }
+}
+
+/* ---- the Claude integration hook (browser → Messages API) ---- */
+async function callClaude({apiKey, model, system, messages, maxTokens=1024}){
+  const res = await fetch("https://api.anthropic.com/v1/messages",{
+    method:"POST",
+    headers:{
+      "content-type":"application/json",
+      "x-api-key":apiKey,
+      "anthropic-version":"2023-06-01",
+      "anthropic-dangerous-direct-browser-access":"true"
+    },
+    body:JSON.stringify({ model, max_tokens:maxTokens, system, messages })
+  });
+  if(!res.ok){ throw new Error("HTTP "+res.status+" — "+(await res.text()).slice(0,300)); }
+  const data = await res.json();
+  if(data.stop_reason==="refusal") return "[The model declined to respond to this prompt.]";
+  const block = (data.content||[]).find(b=>b.type==="text");
+  return block ? block.text : "[No text returned.]";
+}
+
+/* ---- settings modal ---- */
+function openModal(){
+  $("#key").value = localStorage.getItem(LS_KEY)||"";
+  $("#model").value = localStorage.getItem(LS_MODEL)||"claude-opus-4-8";
+  $("#modal").classList.add("on");
+}
+function closeModal(){ $("#modal").classList.remove("on"); }
+function refreshGear(){ $("#gear").classList.toggle("ready", !!localStorage.getItem(LS_KEY)); }
+$("#gear").onclick = openModal;
+$("#mclose").onclick = closeModal;
+$("#modal").onclick = e=>{ if(e.target.id==="modal") closeModal(); };
+$("#msave").onclick = ()=>{
+  const k=$("#key").value.trim();
+  if(k) localStorage.setItem(LS_KEY,k); else localStorage.removeItem(LS_KEY);
+  localStorage.setItem(LS_MODEL,$("#model").value);
+  refreshGear(); closeModal();
+  if(state.openId) openDetail(state.openId); // refresh the panel's Try-it console with the new key/model
+};
+$("#mclear").onclick = ()=>{ localStorage.removeItem(LS_KEY); $("#key").value=""; refreshGear(); };
+
+/* ---- top nav + search + keys ---- */
+$$("#topnav button[data-sec]").forEach(b=>b.onclick=()=>{state.sec=b.dataset.sec; syncNav(); render();});
+$("#q").oninput = e=>{ state.q=e.target.value; render(); };
+document.addEventListener("keydown",e=>{
+  if(e.key==="Escape"){ closeDetail(); closeModal(); }
+  if(e.key==="/" && document.activeElement.tagName!=="INPUT" && document.activeElement.tagName!=="TEXTAREA"){ e.preventDefault(); $("#q").focus(); }
+});
+
+/* ---- boot ---- */
+paintStats(); paintTabs(); render(); refreshGear();
+</script>
+</body>
+</html>
