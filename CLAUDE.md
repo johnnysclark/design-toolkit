@@ -2,6 +2,9 @@
 
 Guidance for Claude Code working in this repository.
 
+> **Continuing the build? Read [`platform/STATUS.md`](platform/STATUS.md) first** — current
+> state, how to get the site live, and the tool-porting roadmap.
+
 ## What this is
 The **26 Summer AI Workshop**: planning docs + AI tools for an architecture design studio.
 The active build is the **platform** — a Vercel + Supabase web app. The current focus is
