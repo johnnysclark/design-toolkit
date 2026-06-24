@@ -114,6 +114,10 @@ gitignored.
   **Research/Work/Teaching portfolio** as two database-backed sites (stack, database,
   logins, LLM integration, UIUC vs. private hosting, and a phased build order).
 
+The build has started under [`platform/`](platform) — a Vercel + Supabase monorepo. The
+**Toolkit** app (Next.js) is up first with email login, the toolkit nav, a live Librarian
+tool, and the database-backed Pinup Wall. See [`platform/README.md`](platform/README.md).
+
 ---
 
 ## How this repo evolves
