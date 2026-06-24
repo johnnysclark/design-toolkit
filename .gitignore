@@ -10,5 +10,8 @@ node_modules/
 *.local
 # Claude local settings
 .claude/settings.local.json
+# Local MCP overrides (may contain tokens) — the committed .mcp.json uses env vars only
+.claude/.mcp.json
+.mcp.local.json
 # temp
 *.tmp

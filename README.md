@@ -107,6 +107,20 @@ The full web apps need `npm install` and (for the model passes) an
 to this repo** — only empty `.env.example` templates; `node_modules/` and `.env` are
 gitignored.
 
+**Putting these online?** Two guides:
+- [`HOSTING.md`](HOSTING.md) — quick recipe to host *today's* standalone demos and the
+  two Node apps (three UIUC + three private options, plus a per-user login gate).
+- [`WEBSITE-PLAN.md`](WEBSITE-PLAN.md) — the bigger build: the **Toolkit app** + the
+  **Research/Work/Teaching portfolio** as two database-backed sites (stack, database,
+  logins, LLM integration, UIUC vs. private hosting, and a phased build order).
+
+The build has started under [`platform/`](platform) — a Vercel + Supabase monorepo. The
+**Toolkit** app (Next.js) is up first with email login, the toolkit nav, a live Librarian
+tool, and the database-backed Pinup Wall. See [`platform/README.md`](platform/README.md).
+To deploy from scratch (incl. registering a domain) follow
+[`platform/DEPLOY.md`](platform/DEPLOY.md); to drive Supabase/Vercel/GitHub from Claude Code
+see [`platform/CLAUDE-CODE.md`](platform/CLAUDE-CODE.md) and [`CLAUDE.md`](CLAUDE.md).
+
 ---
 
 ## How this repo evolves
