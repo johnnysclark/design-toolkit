@@ -1,0 +1,20 @@
+{
+  "name": "crit-board",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Self-hosted studio crit board — a students x weeks grid of cells holding many uploaded images and threaded public feedback. Multi-user and persistent (Express + SQLite); the front-end is dependency-free vanilla JS.",
+  "scripts": {
+    "start": "node server.js",
+    "seed": "node seed/seed.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "better-sqlite3": "^11.8.0",
+    "cookie-session": "^2.1.0",
+    "express": "^4.21.2",
+    "multer": "^2.0.0"
+  }
+}

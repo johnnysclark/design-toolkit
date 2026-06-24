@@ -1,0 +1,1115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Crit Board (Demo) · Summer AI Studio</title>
+  <meta name="description" content="Zero-setup demo of the Studio Crit Board: a grid pinup board (students × weeks) with image uploads and threaded comments. Runs entirely in your browser." />
+  <style>
+    /* ---- Palette (house style; mirrors the repo's other tools) -------------- */
+    :root {
+      --bg: #f7f6f2;
+      --ink: #1c1b18;
+      --muted: #6b6862;
+      --line: #d9d6cd;
+      --card: #fffffe;
+      --accent: #8a4b2f;
+      --accent-ink: #fff;
+      --verified: #2e7d4f;
+      --unverified: #b88300;
+      --halluc: #c0392b;
+      --chip: #efece4;
+      --shadow: 0 6px 24px rgba(20, 18, 14, 0.18);
+      --radius: 12px;
+    }
+    /* Explicit dark theme (JS sets data-theme; initial value seeded from the OS). */
+    :root[data-theme="dark"] {
+      --bg: #17160f;
+      --ink: #f1ede3;
+      --muted: #a39d8f;
+      --line: #38352c;
+      --card: #232017;
+      --accent: #cf8a5f;
+      --accent-ink: #1a160f;
+      --verified: #6abf86;
+      --unverified: #e0b04a;
+      --halluc: #e8806f;
+      --chip: #2c2920;
+      --shadow: 0 6px 24px rgba(0, 0, 0, 0.5);
+    }
+
+    * { box-sizing: border-box; }
+    html, body { height: 100%; }
+    body {
+      margin: 0;
+      font: 16px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--ink);
+      -webkit-text-size-adjust: 100%;
+    }
+    a { color: var(--accent); }
+    button {
+      font: inherit;
+      font-weight: 600;
+      padding: 0.5rem 0.9rem;
+      border: 1px solid var(--accent);
+      background: var(--accent);
+      color: var(--accent-ink);
+      border-radius: 8px;
+      cursor: pointer;
+    }
+    button.ghost { background: var(--card); color: var(--accent); }
+    button.subtle { background: var(--chip); color: var(--ink); border-color: var(--line); }
+    button.danger { background: var(--card); color: var(--halluc); border-color: var(--halluc); }
+    button.tiny { padding: 0.2rem 0.5rem; font-size: 0.8rem; border-radius: 6px; }
+    button:disabled { opacity: 0.45; cursor: not-allowed; }
+    :focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+    input, select, textarea {
+      font: inherit;
+      color: var(--ink);
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 0.45rem 0.55rem;
+    }
+    label { font-weight: 600; font-size: 0.9rem; }
+
+    /* ---- Top bar ------------------------------------------------------------ */
+    header.topbar {
+      position: sticky; top: 0; z-index: 30;
+      display: flex; flex-wrap: wrap; gap: 0.75rem 1rem; align-items: center;
+      padding: 0.7rem 1rem;
+      background: var(--card);
+      border-bottom: 1px solid var(--line);
+    }
+    .brand { display: flex; flex-direction: column; gap: 0.05rem; margin-right: auto; }
+    .brand h1 { margin: 0; font-size: 1.15rem; font-weight: 650; }
+    .brand .sub { color: var(--muted); font-size: 0.78rem; font-weight: 500; }
+    .controls { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; }
+    .controls .group { display: flex; align-items: center; gap: 0.35rem; }
+    .controls label { color: var(--muted); font-size: 0.8rem; }
+
+    .banner {
+      padding: 0.55rem 1rem;
+      background: var(--chip);
+      color: var(--muted);
+      font-size: 0.85rem;
+      border-bottom: 1px solid var(--line);
+    }
+    .banner strong { color: var(--ink); }
+
+    main { padding: 1rem; }
+
+    /* ---- Grid (a real table; sticky header row + first column) -------------- */
+    .board-wrap {
+      overflow: auto;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--card);
+      max-height: calc(100vh - 9.5rem);
+    }
+    table.grid { border-collapse: separate; border-spacing: 0; width: max-content; min-width: 100%; }
+    table.grid th, table.grid td {
+      border-right: 1px solid var(--line);
+      border-bottom: 1px solid var(--line);
+      padding: 0; vertical-align: top;
+    }
+    table.grid thead th {
+      position: sticky; top: 0; z-index: 2;
+      background: var(--chip);
+      padding: 0.55rem 0.7rem;
+      text-align: left; font-size: 0.85rem; font-weight: 650;
+      min-width: 200px;
+    }
+    table.grid tbody th[scope="row"] {
+      position: sticky; left: 0; z-index: 1;
+      background: var(--chip);
+      padding: 0.55rem 0.7rem;
+      text-align: left; font-size: 0.9rem; font-weight: 650;
+      min-width: 150px; white-space: nowrap;
+    }
+    table.grid thead th.corner { position: sticky; left: 0; top: 0; z-index: 3; min-width: 150px; }
+
+    /* TA section-header row (sticky left so it stays visible when scrolling) */
+    table.grid tr.ta-row th.ta-head {
+      position: sticky; left: 0; z-index: 2;
+      background: color-mix(in srgb, var(--accent) 14%, var(--chip));
+      color: var(--ink); text-align: left; font-weight: 700;
+      padding: 0.4rem 0.7rem; border-top: 2px solid var(--accent);
+    }
+    table.grid tr.ta-row th.ta-head .ta-count { color: var(--muted); font-weight: 500; font-size: 0.85rem; }
+
+    /* two-box cell: work (top) + comments (bottom), each a button */
+    table.grid td { min-width: 200px; }
+    .cell-box {
+      display: block; width: 100%; text-align: left; cursor: pointer; font: inherit; font-weight: 400;
+      background: var(--card); color: var(--ink); border: none; border-radius: 0; padding: 0.45rem 0.5rem;
+    }
+    .cell-box + .cell-box { border-top: 1px dashed var(--line); }
+    .cell-box.work { min-height: 72px; }
+    .cell-box.comments { min-height: 56px; background: color-mix(in srgb, var(--chip) 45%, var(--card)); }
+    .cell-box:hover { background: color-mix(in srgb, var(--accent) 9%, var(--card)); }
+    .cell-box.work.mine { box-shadow: inset 3px 0 0 var(--accent); }
+    .box-meta { color: var(--muted); font-size: 0.72rem; margin-top: 0.2rem; }
+    .last-comment {
+      color: var(--muted); font-size: 0.76rem; margin-top: 0.25rem;
+      display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+    }
+    .last-comment .who { color: var(--ink); font-weight: 600; }
+    .thumb-stack { display: flex; flex-wrap: wrap; gap: 3px; }
+    .thumb-stack img {
+      width: 40px; height: 40px; object-fit: cover;
+      border-radius: 5px; border: 1px solid var(--line); background: var(--chip);
+    }
+    .thumb-more {
+      width: 40px; height: 40px; border-radius: 5px; border: 1px dashed var(--line);
+      display: grid; place-items: center; color: var(--muted); font-size: 0.8rem; font-weight: 700;
+    }
+    .cell-empty { color: var(--muted); font-size: 0.82rem; font-style: italic; }
+    .badge { display: flex; flex-wrap: wrap; gap: 0.4rem; font-size: 0.74rem; color: var(--muted); }
+    .badge .n { color: var(--ink); font-weight: 700; }
+
+    /* ---- Dialogs (cell, lightbox, admin) ------------------------------------ */
+    dialog {
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--card);
+      color: var(--ink);
+      box-shadow: var(--shadow);
+      padding: 0;
+      max-width: min(880px, 94vw);
+      width: 100%;
+    }
+    dialog::backdrop { background: rgba(20, 18, 14, 0.55); }
+    .dlg-head {
+      display: flex; align-items: center; gap: 0.75rem;
+      padding: 0.9rem 1.1rem; border-bottom: 1px solid var(--line);
+      position: sticky; top: 0; background: var(--card); z-index: 2;
+    }
+    .dlg-head h2 { margin: 0; font-size: 1.1rem; }
+    .dlg-head .spacer { margin-left: auto; }
+    .dlg-body { padding: 1.1rem; max-height: 78vh; overflow: auto; }
+    .dlg-body section { margin-bottom: 1.6rem; }
+    .dlg-body h3 { margin: 0 0 0.6rem; font-size: 0.95rem; text-transform: uppercase; letter-spacing: 0.03em; color: var(--muted); }
+
+    /* Gallery */
+    .gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 0.7rem; }
+    .gitem { border: 1px solid var(--line); border-radius: 10px; overflow: hidden; background: var(--bg); display: flex; flex-direction: column; }
+    .gitem img { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; cursor: zoom-in; background: var(--chip); display: block; }
+    .gitem .cap { padding: 0.35rem 0.5rem; font-size: 0.78rem; color: var(--muted); flex: 1; }
+    .gitem .gtools { display: flex; gap: 0.25rem; padding: 0 0.5rem 0.5rem; flex-wrap: wrap; }
+
+    /* Dropzone + staging */
+    .dropzone {
+      border: 2px dashed var(--line); border-radius: 10px;
+      padding: 1.1rem; text-align: center; color: var(--muted);
+      background: var(--bg); cursor: pointer;
+    }
+    .dropzone.drag { border-color: var(--accent); color: var(--accent); background: color-mix(in srgb, var(--accent) 8%, var(--bg)); }
+    .staged { margin-top: 0.8rem; display: flex; flex-direction: column; gap: 0.5rem; }
+    .staged .row { display: flex; gap: 0.6rem; align-items: center; }
+    .staged .row img { width: 54px; height: 54px; object-fit: cover; border-radius: 6px; border: 1px solid var(--line); }
+    .staged .row input { flex: 1; }
+
+    /* Threads */
+    .thread { border: 1px solid var(--line); border-radius: 10px; margin-bottom: 0.7rem; background: var(--bg); }
+    .thread > summary { list-style: none; cursor: pointer; padding: 0.6rem 0.8rem; display: flex; gap: 0.5rem; align-items: baseline; }
+    .thread > summary::-webkit-details-marker { display: none; }
+    .thread .ttitle { font-weight: 650; }
+    .thread .tmeta { color: var(--muted); font-size: 0.8rem; }
+    .thread .tmeta .spacer { margin: 0 0.25rem; }
+    .comments { padding: 0 0.8rem 0.5rem; }
+    .comment { border-top: 1px dashed var(--line); padding: 0.5rem 0; }
+    .comment .who { font-weight: 650; font-size: 0.88rem; }
+    .comment .when { color: var(--muted); font-size: 0.78rem; margin-left: 0.4rem; }
+    .comment .body { white-space: pre-wrap; overflow-wrap: anywhere; margin-top: 0.1rem; }
+    .reply-row { display: flex; gap: 0.4rem; padding: 0.4rem 0.8rem 0.7rem; }
+    .reply-row input { flex: 1; }
+    .new-thread { border: 1px dashed var(--line); border-radius: 10px; padding: 0.8rem; background: var(--bg); }
+    .new-thread .f { display: flex; flex-direction: column; gap: 0.4rem; margin-bottom: 0.5rem; }
+
+    /* Lightbox */
+    dialog.lightbox { max-width: 96vw; width: auto; background: #0d0c0a; border-color: #000; }
+    dialog.lightbox::backdrop { background: rgba(0, 0, 0, 0.82); }
+    .lb-stage { position: relative; display: grid; place-items: center; }
+    .lb-stage img { max-width: 92vw; max-height: 76vh; object-fit: contain; display: block; touch-action: pan-y; }
+    .lb-nav { position: absolute; top: 0; bottom: 0; width: 22%; border: none; background: transparent; color: #fff; font-size: 2rem; cursor: pointer; opacity: 0.65; }
+    .lb-nav:hover { opacity: 1; background: rgba(0,0,0,0.25); }
+    .lb-prev { left: 0; } .lb-next { right: 0; }
+    .lb-bar { display: flex; align-items: center; gap: 0.75rem; padding: 0.6rem 0.9rem; color: #eee; background: #0d0c0a; }
+    .lb-bar .cap { font-size: 0.85rem; color: #cfcabf; flex: 1; overflow-wrap: anywhere; }
+    .lb-bar button { background: transparent; border: 1px solid #555; color: #eee; }
+
+    /* Admin */
+    .admin-list { display: flex; flex-direction: column; gap: 0.4rem; }
+    .admin-row { display: flex; gap: 0.4rem; align-items: center; }
+    .admin-row input[type="text"] { flex: 1; }
+    .admin-row .ord { display: flex; gap: 0.2rem; }
+    .hint { color: var(--muted); font-size: 0.82rem; margin: 0.2rem 0 0.6rem; }
+
+    .role-chip { font-size: 0.78rem; font-weight: 700; padding: 0.12rem 0.5rem; border-radius: 999px; background: var(--chip); color: var(--muted); }
+    .role-chip.instructor { background: color-mix(in srgb, var(--accent) 18%, var(--card)); color: var(--accent); }
+
+    .err { color: var(--halluc); font-size: 0.85rem; margin-top: 0.4rem; }
+    .visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+    @media (max-width: 640px) {
+      header.topbar { padding: 0.6rem; }
+      .brand { width: 100%; margin-right: 0; }
+      .controls { width: 100%; }
+      .controls .group { flex: 1; }
+      dialog { max-width: 100vw; height: 100%; max-height: 100%; border-radius: 0; border: none; }
+      .dlg-body { max-height: calc(100vh - 3.6rem); }
+      .board-wrap { max-height: calc(100vh - 11rem); }
+      .lb-nav { width: 30%; }
+    }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <h1 id="studio-name">Studio Crit Board</h1>
+      <span class="sub">Demo · runs in your browser</span>
+    </div>
+    <div class="controls" id="controls"><!-- identity controls rendered by JS --></div>
+  </header>
+
+  <p class="banner">
+    <strong>Demo mode.</strong> Everything here lives only in <em>this browser</em> (localStorage) — it is
+    not multi-user or shared. For a real studio board (shared uploads, public feedback, accounts), run the
+    server app — see <code>../README.md</code>.
+  </p>
+
+  <main>
+    <div class="board-wrap">
+      <table class="grid" id="grid" aria-label="Crit board: students by week"></table>
+    </div>
+  </main>
+
+  <!-- Cell view -->
+  <dialog id="cell-dialog" aria-labelledby="cell-title">
+    <div class="dlg-head">
+      <h2 id="cell-title">Cell</h2>
+      <div class="spacer"></div>
+      <button class="ghost" id="cell-close" aria-label="Close cell">Close</button>
+    </div>
+    <div class="dlg-body" id="cell-body"></div>
+  </dialog>
+
+  <!-- Lightbox -->
+  <dialog id="lightbox" class="lightbox" aria-label="Image viewer">
+    <div class="lb-stage">
+      <button class="lb-nav lb-prev" id="lb-prev" aria-label="Previous image">‹</button>
+      <img id="lb-img" alt="" />
+      <button class="lb-nav lb-next" id="lb-next" aria-label="Next image">›</button>
+    </div>
+    <div class="lb-bar">
+      <span id="lb-count"></span>
+      <span class="cap" id="lb-cap"></span>
+      <button id="lb-close" aria-label="Close viewer">Close</button>
+    </div>
+  </dialog>
+
+  <!-- Admin -->
+  <dialog id="admin-dialog" aria-labelledby="admin-title">
+    <div class="dlg-head">
+      <h2 id="admin-title">Admin · studio setup</h2>
+      <div class="spacer"></div>
+      <button class="ghost" id="admin-close" aria-label="Close admin">Close</button>
+    </div>
+    <div class="dlg-body" id="admin-body"></div>
+  </dialog>
+
+  <script>
+  "use strict";
+  /* =======================================================================
+     Studio Crit Board — lite demo (single file, no build, no server).
+     Mirrors the server app's UX: a grid of students x weeks, each cell holding
+     many images + threaded comments. State persists to localStorage only.
+
+     Security note even in the demo: ALL user-supplied text (names, captions,
+     comments, titles) is rendered through createTextNode via el()/textContent —
+     never innerHTML. The same discipline is mandatory in the server front-end.
+     ======================================================================= */
+
+  // ---- tiny DOM helpers (mirrored from TOOLS/site-analyzer/web/public/app.js)
+  const $ = (id) => document.getElementById(id);
+  const el = (tag, attrs = {}, ...kids) => {
+    const n = document.createElement(tag);
+    for (const [k, v] of Object.entries(attrs)) {
+      if (v == null || v === false) continue;
+      if (k === "class") n.className = v;
+      else if (k === "html") n.innerHTML = v;          // trusted static markup ONLY (never user text)
+      else if (k.startsWith("on") && typeof v === "function") n.addEventListener(k.slice(2), v);
+      else if (k === "dataset") for (const [dk, dv] of Object.entries(v)) n.dataset[dk] = dv;
+      else n.setAttribute(k, v);
+    }
+    for (const kid of kids) {
+      if (kid == null || kid === false) continue;
+      n.append(kid?.nodeType ? kid : document.createTextNode(String(kid)));
+    }
+    return n;
+  };
+
+  // ---- storage keys
+  const K_BOARD = "critboard.lite.board.v3";
+  const K_ME = "critboard.lite.me.v1";
+  const K_THEME = "critboard.lite.theme.v1";
+
+  // ---- theme (explicit data-theme; initial value seeded from OS preference)
+  (function initTheme() {
+    let t = localStorage.getItem(K_THEME);
+    if (t !== "light" && t !== "dark") {
+      t = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+    }
+    document.documentElement.setAttribute("data-theme", t);
+  })();
+  function toggleTheme() {
+    const next = document.documentElement.getAttribute("data-theme") === "dark" ? "light" : "dark";
+    document.documentElement.setAttribute("data-theme", next);
+    localStorage.setItem(K_THEME, next);
+    renderControls();
+  }
+
+  // ---- relative time
+  function timeAgo(iso) {
+    const then = new Date(iso).getTime();
+    if (isNaN(then)) return "";
+    const s = Math.round((Date.now() - then) / 1000);
+    if (s < 45) return "just now";
+    const units = [[60, "min", "mins"], [60, "hr", "hrs"], [24, "hr", "hrs"]];
+    const m = Math.round(s / 60);
+    if (m < 60) return `${m} ${m === 1 ? "min" : "mins"} ago`;
+    const h = Math.round(m / 60);
+    if (h < 24) return `${h} ${h === 1 ? "hr" : "hrs"} ago`;
+    const d = Math.round(h / 24);
+    if (d < 7) return `${d} ${d === 1 ? "day" : "days"} ago`;
+    const w = Math.round(d / 7);
+    if (w < 5) return `${w} ${w === 1 ? "wk" : "wks"} ago`;
+    const mo = Math.round(d / 30);
+    if (mo < 12) return `${mo} ${mo === 1 ? "mo" : "mos"} ago`;
+    return `${Math.round(d / 365)} yr ago`;
+  }
+
+  // ---- inline SVG placeholder (keeps the demo self-contained)
+  function svgPlaceholder(label, bg) {
+    const safe = String(label).replace(/[<>&]/g, "");
+    const svg =
+      `<svg xmlns="http://www.w3.org/2000/svg" width="800" height="600">` +
+      `<rect width="100%" height="100%" fill="${bg}"/>` +
+      `<rect x="24" y="24" width="752" height="552" fill="none" stroke="rgba(255,255,255,.5)" stroke-width="3"/>` +
+      `<text x="50%" y="50%" font-family="-apple-system,Segoe UI,Roboto,sans-serif" font-size="46" ` +
+      `fill="#fff" text-anchor="middle" dominant-baseline="middle">${safe}</text></svg>`;
+    return "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svg);
+  }
+
+  // ---- seed board ---------------------------------------------------------
+  function seedBoard() {
+    const now = Date.now();
+    const iso = (minsAgo) => new Date(now - minsAgo * 60000).toISOString();
+
+    // 3 TAs, 12 students each (36), 6 weeks.
+    const taNames = ["TA · Maya Lin", "TA · Paul Rudolph", "TA · Denise Scott Brown"];
+    const tas = taNames.map((name, i) => ({ id: i + 1, name, sort_order: i }));
+    const roster = [
+      ["Ada Okafor", "Bruno Silva", "Chen Wei", "Dara Nguyen", "Esme Robinson", "Farid Haddad",
+       "Gina Alvarez", "Hugo Bauer", "Ivy Tan", "Jamal Reed", "Kira Volkov", "Liam O'Brien"],
+      ["Maya Patel", "Noah Kim", "Olga Petrova", "Pedro Gomez", "Qian Liu", "Rosa Marin",
+       "Sami Haddad", "Tara Singh", "Umar Farouk", "Vera Costa", "Will Hughes", "Xochitl Mora"],
+      ["Yara Saleh", "Zane Miller", "Amara Diop", "Ben Carter", "Cora Lee", "Dmitri Ivanov",
+       "Elena Rossi", "Femi Adeyemi", "Greta Vogel", "Hana Suzuki", "Ravi Menon", "Sofia Duarte"],
+    ];
+    const students = [];
+    let sid = 0;
+    roster.forEach((group, gi) => group.forEach((name) => {
+      students.push({ id: ++sid, name, sort_order: sid - 1, ta_id: tas[gi].id });
+    }));
+    const byId = (id) => students.find((s) => s.id === id);
+
+    const weeks = ["Week 1 · Site", "Week 2 · Concept", "Week 3 · Massing",
+                   "Week 4 · Systems", "Week 5 · Refinement", "Week 6 · Final Review"]
+      .map((label, i) => ({ id: i + 1, label, sort_order: i }));
+
+    const palette = ["#8a4b2f", "#3f6f52", "#3a5a8a", "#7a5a8a", "#9a7b2f", "#5a6b3a"];
+    let seq = 1000;
+    const images = [];
+    const addImg = (sId, wId, label, alt, minsAgo, idx) => {
+      images.push({
+        id: ++seq, student_id: sId, week_id: wId, uploader_name: byId(sId).name,
+        src: svgPlaceholder(label, palette[(sId + wId + idx) % palette.length]),
+        original_name: label.toLowerCase().replace(/[^a-z0-9]+/g, "-") + ".svg",
+        alt_text: alt, width: 800, height: 600, created_at: iso(minsAgo), sort_order: idx
+      });
+    };
+    addImg(1, 1, "Site plan", "Figure-ground site plan of the block, ink on trace", 600, 0);
+    addImg(1, 1, "Diagram", "Site analysis diagram — sun + circulation", 590, 1);
+    addImg(1, 2, "Concept A", "Massing concept A — three stacked bars around a courtyard", 410, 0);
+    addImg(2, 1, "Site model", "Chipboard site model, overhead view", 520, 0);
+    addImg(3, 3, "Circulation", "Hand-drawn circulation and program diagram", 300, 0);
+    addImg(5, 4, "Massing v1", "Foamcore massing study, first pass", 180, 0);
+    addImg(13, 1, "Context", "Context plan at 1:500", 540, 0);
+    addImg(14, 2, "Parti", "Parti sketches — three options", 360, 0);
+    addImg(25, 3, "Section", "Long section through the atrium", 240, 0);
+    addImg(26, 5, "Massing", "Refined massing study models", 90, 0);
+
+    const threads = [];
+    const comments = [];
+    const addThread = (sId, wId, title, by, minsAgo) => {
+      const t = { id: ++seq, student_id: sId, week_id: wId, title, created_by: by, created_at: iso(minsAgo) };
+      threads.push(t);
+      return t;
+    };
+    const addComment = (tid, author, body, minsAgo) =>
+      comments.push({ id: ++seq, thread_id: tid, author_name: author, body, created_at: iso(minsAgo) });
+
+    const t1 = addThread(1, 1, "Legibility of the site plan", taNames[0], 585);
+    addComment(t1.id, taNames[0], "Strong figure-ground. Push the contrast between the public edge and the private courtyard so the threshold reads at a glance.", 583);
+    addComment(t1.id, "Ada Okafor", "Good call — I'll redraw the courtyard threshold and re-post before Thursday.", 521);
+    const t2 = addThread(1, 1, "Scale figures?", "Bruno Silva", 300);
+    addComment(t2.id, "Bruno Silva", "Might help to drop a few people in for scale — hard to read the arcade height right now.", 299);
+    const t3 = addThread(3, 3, "Circulation clarity", taNames[0], 250);
+    addComment(t3.id, taNames[0], "The diagram reads well. What happens at the core when the two flows meet?", 248);
+    addComment(t3.id, "Chen Wei", "They share a double-height landing — I'll draw that next.", 120);
+    const t4 = addThread(13, 1, "Site boundary", taNames[1], 360);
+    addComment(t4.id, taNames[1], "Double-check the lot line on the north edge against the survey.", 358);
+    const t5 = addThread(25, 3, "Section poché", taNames[2], 200);
+    addComment(t5.id, taNames[2], "Love the atrium. Now show the structure holding that span.", 198);
+    addComment(t5.id, "Yara Saleh", "Adding a structural overlay next pass.", 60);
+
+    return { studioName: "Summer Studio — Crit Board", tas, students, weeks, images, threads, comments, seq };
+  }
+
+  // ---- load / save --------------------------------------------------------
+  let board, me;
+  function load() {
+    try {
+      const raw = localStorage.getItem(K_BOARD);
+      board = raw ? JSON.parse(raw) : seedBoard();
+    } catch { board = seedBoard(); }
+    try {
+      me = JSON.parse(localStorage.getItem(K_ME)) || null;
+    } catch { me = null; }
+    if (!me || !me.name) me = { name: (board.students[0] && board.students[0].name) || "Guest", role: "student" };
+    // make sure my name still exists on the roster (it may have been removed)
+    if (me.role === "student" && !board.students.some((s) => s.name === me.name) && board.students[0]) {
+      me.name = board.students[0].name;
+    }
+  }
+  function saveBoard() {
+    try {
+      localStorage.setItem(K_BOARD, JSON.stringify(board));
+    } catch (e) {
+      alert("Browser storage is full — this demo keeps images in localStorage (a few MB). " +
+            "Delete some images or hit “Reset demo”. (The real server app has no such limit.)");
+    }
+  }
+  function saveMe() { localStorage.setItem(K_ME, JSON.stringify(me)); }
+  const uid = () => ++board.seq;
+
+  // ---- selectors / permissions -------------------------------------------
+  const studentsSorted = () => [...board.students].sort((a, b) => a.sort_order - b.sort_order || a.id - b.id);
+  const weeksSorted = () => [...board.weeks].sort((a, b) => a.sort_order - b.sort_order || a.id - b.id);
+  const tasSorted = () => [...(board.tas || [])].sort((a, b) => a.sort_order - b.sort_order || a.id - b.id);
+  const cellImages = (sid, wid) =>
+    board.images.filter((i) => i.student_id === sid && i.week_id === wid)
+      .sort((a, b) => a.sort_order - b.sort_order || a.id - b.id);
+  const cellThreads = (sid, wid) =>
+    board.threads.filter((t) => t.student_id === sid && t.week_id === wid)
+      .sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+  const threadComments = (tid) =>
+    board.comments.filter((c) => c.thread_id === tid)
+      .sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+  const isInstructor = () => me.role === "instructor";
+  const isMyRow = (sid) => { const s = board.students.find((x) => x.id === sid); return !!s && s.name === me.name; };
+  const canUpload = (sid) => isInstructor() || isMyRow(sid);
+  const canManageImage = (img) => isInstructor() || img.uploader_name === me.name;
+
+  // ---- top-bar controls ---------------------------------------------------
+  function renderControls() {
+    const c = $("controls");
+    c.replaceChildren();
+
+    // "Acting as" name picker
+    const nameSel = el("select", { id: "who", "aria-label": "Acting as (name)" });
+    studentsSorted().forEach((s) =>
+      nameSel.append(el("option", { value: s.name, selected: s.name === me.name }, s.name)));
+    if (!studentsSorted().some((s) => s.name === me.name)) {
+      nameSel.append(el("option", { value: me.name, selected: true }, me.name));
+    }
+    nameSel.addEventListener("change", () => { me.name = nameSel.value; saveMe(); renderControls(); renderGrid(); });
+
+    // role toggle
+    const roleSel = el("select", { id: "role", "aria-label": "Role" },
+      el("option", { value: "student", selected: me.role === "student" }, "Student"),
+      el("option", { value: "instructor", selected: me.role === "instructor" }, "Instructor (TA)"));
+    roleSel.addEventListener("change", () => { me.role = roleSel.value; saveMe(); renderControls(); renderGrid(); });
+
+    c.append(
+      el("span", { class: "role-chip" + (isInstructor() ? " instructor" : "") }, isInstructor() ? "Instructor" : "Student"),
+      el("div", { class: "group" }, el("label", { for: "who" }, "As"), nameSel),
+      el("div", { class: "group" }, el("label", { for: "role" }, "Role"), roleSel)
+    );
+    if (isInstructor()) c.append(el("button", { class: "ghost", onclick: openAdmin }, "Admin"));
+    c.append(
+      el("button", {
+        class: "subtle", onclick: toggleTheme,
+        "aria-label": "Toggle dark mode"
+      }, document.documentElement.getAttribute("data-theme") === "dark" ? "☀ Light" : "☾ Dark"),
+      el("button", { class: "subtle", onclick: resetDemo, title: "Restore the sample board" }, "Reset demo")
+    );
+  }
+
+  function resetDemo() {
+    if (!confirm("Reset the demo board to the original sample? This clears your local changes.")) return;
+    board = seedBoard();
+    saveBoard();
+    renderAll();
+  }
+
+  // ---- grid ---------------------------------------------------------------
+  function renderGrid() {
+    $("studio-name").textContent = board.studioName || "Studio Crit Board";
+    document.title = (board.studioName || "Crit Board") + " (Demo)";
+    const grid = $("grid");
+    grid.replaceChildren();
+
+    const weeks = weeksSorted();
+    const students = studentsSorted();
+
+    // header row
+    const thead = el("thead");
+    const hr = el("tr");
+    hr.append(el("th", { scope: "col", class: "corner", id: "corner" }, "Student \\ Week"));
+    weeks.forEach((w) => hr.append(el("th", { scope: "col", id: "w" + w.id }, w.label)));
+    thead.append(hr);
+    grid.append(thead);
+
+    if (students.length === 0 || weeks.length === 0) {
+      const tb = el("tbody");
+      const tr = el("tr");
+      tr.append(el("td", { colspan: String(Math.max(1, weeks.length + 1)) },
+        el("div", { class: "cell-empty", style: "padding:1rem" },
+          isInstructor()
+            ? "Empty board. Open Admin to add students (rows) and weeks (columns)."
+            : "The board hasn't been set up yet. Ask an instructor to add students and weeks.")));
+      tb.append(tr);
+      grid.append(tb);
+      return;
+    }
+
+    // group rows by TA (TA order), trailing "Unassigned" if needed; flat if no TAs
+    const tas = tasSorted();
+    const groups = [];
+    if (tas.length) {
+      for (const t of tas) groups.push({ ta: t, students: students.filter((s) => s.ta_id === t.id) });
+      const un = students.filter((s) => !s.ta_id || !tas.some((t) => t.id === s.ta_id));
+      if (un.length) groups.push({ ta: null, students: un });
+    } else {
+      groups.push({ ta: null, students, flat: true });
+    }
+
+    const totalCols = String(weeks.length + 1);
+    const tbody = el("tbody");
+    groups.forEach((g) => {
+      if (!g.flat) {
+        const label = g.ta ? g.ta.name : "Unassigned";
+        tbody.append(el("tr", { class: "ta-row" },
+          el("th", { class: "ta-head", colspan: totalCols, scope: "colgroup" },
+            label, el("span", { class: "ta-count" }, ` · ${g.students.length} student${g.students.length === 1 ? "" : "s"}`))));
+      }
+      g.students.forEach((s) => {
+        const tr = el("tr");
+        tr.append(el("th", { scope: "row", id: "s" + s.id }, s.name));
+        weeks.forEach((w) => tr.append(cellTd(s, w)));
+        tbody.append(tr);
+      });
+    });
+    grid.append(tbody);
+  }
+
+  // Each cell holds two stacked boxes: work (top) + comments (bottom).
+  function cellTd(s, w) {
+    const imgs = cellImages(s.id, w.id);
+    const threads = cellThreads(s.id, w.id);
+    const allComments = threads.flatMap((t) => threadComments(t.id));
+    const last = allComments.length
+      ? allComments.slice().sort((a, b) => new Date(b.created_at) - new Date(a.created_at))[0]
+      : null;
+
+    const work = el("button", {
+      class: "cell-box work" + (isMyRow(s.id) ? " mine" : ""),
+      "aria-label": `Work — ${s.name}, ${w.label}: ${imgs.length} image${imgs.length === 1 ? "" : "s"}. Open to view or upload.`,
+      onclick: () => openCell(s.id, w.id, "work"),
+    });
+    if (imgs.length) {
+      const stack = el("div", { class: "thumb-stack" });
+      imgs.slice(0, 4).forEach((im) => stack.append(el("img", { src: im.src, alt: "", loading: "lazy" })));
+      if (imgs.length > 4) stack.append(el("div", { class: "thumb-more" }, "+" + (imgs.length - 4)));
+      work.append(stack, el("div", { class: "box-meta" }, `${imgs.length} image${imgs.length === 1 ? "" : "s"}`));
+    } else {
+      work.append(el("div", { class: "cell-empty" }, canUpload(s.id) ? "+ Add work" : "No work yet"));
+    }
+
+    const comments = el("button", {
+      class: "cell-box comments",
+      "aria-label": `Comments — ${s.name}, ${w.label}: ${threads.length} threads, ${allComments.length} comments. Open to read or reply.`,
+      onclick: () => openCell(s.id, w.id, "comments"),
+    });
+    comments.append(el("div", { class: "badge" },
+      el("span", {}, el("span", { class: "n" }, String(threads.length)), " threads"),
+      el("span", {}, el("span", { class: "n" }, String(allComments.length)), " comments")));
+    if (last) {
+      comments.append(el("div", { class: "last-comment" },
+        el("span", { class: "who" }, last.author_name + ": "), last.body));
+    } else {
+      comments.append(el("div", { class: "cell-empty" }, "No comments yet"));
+    }
+
+    return el("td", { headers: "w" + w.id + " s" + s.id }, work, comments);
+  }
+
+  // ---- cell view ----------------------------------------------------------
+  let openCellRef = null; // { sid, wid }
+  let focusTarget = "work";
+  function openCell(sid, wid, focus) {
+    openCellRef = { sid, wid };
+    focusTarget = focus || "work";
+    renderCell();
+    const dlg = $("cell-dialog");
+    if (!dlg.open) dlg.showModal();
+  }
+  function renderCell() {
+    if (!openCellRef) return;
+    const { sid, wid } = openCellRef;
+    const s = board.students.find((x) => x.id === sid);
+    const w = board.weeks.find((x) => x.id === wid);
+    if (!s || !w) { $("cell-dialog").close(); return; }
+
+    $("cell-title").textContent = `${s.name} · ${w.label}`;
+    const body = $("cell-body");
+    body.replaceChildren();
+
+    // ---- gallery
+    const imgs = cellImages(sid, wid);
+    const gal = el("section", { id: "sec-work" });
+    gal.append(el("h3", {}, `Work (${imgs.length})`));
+    if (imgs.length === 0) {
+      gal.append(el("p", { class: "hint" }, "No images posted to this cell yet."));
+    } else {
+      const grid = el("div", { class: "gallery" });
+      imgs.forEach((im, idx) => {
+        const item = el("div", { class: "gitem" });
+        item.append(el("img", {
+          src: im.src, alt: im.alt_text || "", loading: "lazy",
+          tabindex: "0", role: "button", "aria-label": "Enlarge image" + (im.alt_text ? ": " + im.alt_text : ""),
+          onclick: () => openLightbox(sid, wid, idx),
+          onkeydown: (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openLightbox(sid, wid, idx); } }
+        }));
+        item.append(el("div", { class: "cap" }, im.alt_text || el("em", {}, "No caption")));
+        if (canManageImage(im)) {
+          const tools = el("div", { class: "gtools" });
+          tools.append(
+            el("button", { class: "tiny subtle", title: "Move left", "aria-label": "Move image earlier", disabled: idx === 0, onclick: () => moveImage(im.id, -1) }, "←"),
+            el("button", { class: "tiny subtle", title: "Move right", "aria-label": "Move image later", disabled: idx === imgs.length - 1, onclick: () => moveImage(im.id, 1) }, "→"),
+            el("button", { class: "tiny danger", "aria-label": "Delete image", onclick: () => deleteImage(im.id) }, "Delete")
+          );
+          item.append(tools);
+        }
+        grid.append(item);
+      });
+      gal.append(grid);
+    }
+    body.append(gal);
+
+    // ---- upload (only where allowed)
+    if (canUpload(sid)) {
+      body.append(renderUploader(sid, wid));
+    } else {
+      const note = el("section");
+      note.append(el("p", { class: "hint" },
+        `Students upload to their own row. You're acting as “${me.name}”. Switch your name to ${s.name} (or Instructor role) to post here.`));
+      body.append(note);
+    }
+
+    // ---- threads
+    const threads = cellThreads(sid, wid);
+    const tsec = el("section", { id: "sec-comments" });
+    tsec.append(el("h3", {}, `Discussion (${threads.length} threads)`));
+    threads.forEach((t) => tsec.append(renderThread(t)));
+    tsec.append(renderNewThread(sid, wid));
+    body.append(tsec);
+
+    // scroll to whichever box was clicked (work or comments)
+    const target = focusTarget === "comments" ? tsec : gal;
+    requestAnimationFrame(() => { try { target.scrollIntoView({ block: "start" }); } catch { /* */ } });
+  }
+
+  function renderThread(t) {
+    const comments = threadComments(t.id);
+    const det = el("details", { class: "thread" });
+    if (comments.length <= 4) det.open = true;
+    const sum = el("summary");
+    sum.append(
+      el("span", { class: "ttitle" }, t.title || "(untitled thread)"),
+      el("span", { class: "tmeta" },
+        el("span", { class: "spacer" }, "·"), `${comments.length} ` + (comments.length === 1 ? "comment" : "comments"),
+        el("span", { class: "spacer" }, "·"), `started by ${t.created_by} ${timeAgo(t.created_at)}`)
+    );
+    det.append(sum);
+
+    const clist = el("div", { class: "comments" });
+    comments.forEach((c) => {
+      const cm = el("div", { class: "comment" });
+      cm.append(el("div", {},
+        el("span", { class: "who" }, c.author_name),
+        el("span", { class: "when" }, timeAgo(c.created_at))));
+      cm.append(el("div", { class: "body" }, c.body));
+      if (isInstructor()) {
+        cm.append(el("button", { class: "tiny danger", style: "margin-top:.3rem",
+          "aria-label": "Delete comment", onclick: () => deleteComment(c.id) }, "Delete"));
+      }
+      clist.append(cm);
+    });
+    det.append(clist);
+
+    // reply row
+    const input = el("input", { type: "text", placeholder: "Reply…", "aria-label": "Reply to thread" });
+    const send = () => { const v = input.value.trim(); if (!v) return; addComment(t.id, v); };
+    input.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); send(); } });
+    det.append(el("div", { class: "reply-row" }, input, el("button", { onclick: send }, "Reply")));
+    return det;
+  }
+
+  function renderNewThread(sid, wid) {
+    const box = el("div", { class: "new-thread" });
+    const title = el("input", { type: "text", placeholder: "New thread title (optional)", "aria-label": "New thread title" });
+    const body = el("textarea", { rows: "2", placeholder: "Start a new discussion on this cell…", "aria-label": "First comment" });
+    const err = el("div", { class: "err", hidden: true });
+    const submit = () => {
+      const b = body.value.trim();
+      if (!b) { err.textContent = "Write something to start the thread."; err.hidden = false; return; }
+      addThread(sid, wid, title.value.trim(), b);
+    };
+    box.append(
+      el("div", { class: "f" }, el("label", {}, "Start a new thread"), title, body),
+      err,
+      el("button", { onclick: submit }, "Post thread")
+    );
+    return box;
+  }
+
+  // ---- uploader (drag/drop + picker + per-image caption staging) ----------
+  function renderUploader(sid, wid) {
+    const sec = el("section");
+    sec.append(el("h3", {}, "Add images"));
+    const input = el("input", {
+      type: "file", accept: "image/*", multiple: true, capture: "environment",
+      class: "visually-hidden", id: "file-input"
+    });
+    const zone = el("div", {
+      class: "dropzone", tabindex: "0", role: "button",
+      "aria-label": "Upload images: drop files here or activate to browse"
+    }, "Drag & drop images here, or ", el("strong", {}, "click to browse"), " — multiple at once. Camera capture supported on phones.");
+
+    const staged = el("div", { class: "staged" });
+    let queue = []; // { src, width, height, name, capInput }
+
+    const refreshStaged = () => {
+      staged.replaceChildren();
+      if (!queue.length) return;
+      queue.forEach((q, i) => {
+        const cap = el("input", { type: "text", placeholder: "Caption / alt-text (optional but encouraged)", value: q.alt || "", "aria-label": "Caption for image " + (i + 1) });
+        q.capInput = cap;
+        staged.append(el("div", { class: "row" },
+          el("img", { src: q.src, alt: "" }), cap,
+          el("button", { class: "tiny danger", "aria-label": "Remove from queue", onclick: () => { queue.splice(i, 1); refreshStaged(); } }, "✕")));
+      });
+      staged.append(el("button", { onclick: commit }, `Add ${queue.length} image${queue.length === 1 ? "" : "s"} to this cell`));
+    };
+    const commit = () => {
+      queue.forEach((q) => addImage(sid, wid, { src: q.src, width: q.width, height: q.height, original_name: q.name, alt_text: q.capInput.value.trim() }));
+      queue = [];
+      refreshStaged();
+    };
+
+    const intake = async (files) => {
+      for (const f of files) {
+        if (!f.type.startsWith("image/")) continue;
+        try {
+          const r = await downscale(f);
+          queue.push({ src: r.dataURL, width: r.width, height: r.height, name: f.name, alt: "" });
+        } catch { /* skip unreadable file */ }
+      }
+      refreshStaged();
+    };
+
+    input.addEventListener("change", () => intake(input.files));
+    zone.addEventListener("click", () => input.click());
+    zone.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); input.click(); } });
+    zone.addEventListener("dragover", (e) => { e.preventDefault(); zone.classList.add("drag"); });
+    zone.addEventListener("dragleave", () => zone.classList.remove("drag"));
+    zone.addEventListener("drop", (e) => { e.preventDefault(); zone.classList.remove("drag"); intake(e.dataTransfer.files); });
+
+    sec.append(input, zone, staged);
+    return sec;
+  }
+
+  // downscale an image File via canvas → JPEG dataURL (keeps localStorage small)
+  function downscale(file, maxDim = 1280, quality = 0.82) {
+    return new Promise((resolve, reject) => {
+      const url = URL.createObjectURL(file);
+      const img = new Image();
+      img.onload = () => {
+        URL.revokeObjectURL(url);
+        const scale = Math.min(1, maxDim / Math.max(img.width, img.height));
+        const w = Math.max(1, Math.round(img.width * scale));
+        const h = Math.max(1, Math.round(img.height * scale));
+        const canvas = el("canvas");
+        canvas.width = w; canvas.height = h;
+        canvas.getContext("2d").drawImage(img, 0, 0, w, h);
+        try { resolve({ dataURL: canvas.toDataURL("image/jpeg", quality), width: w, height: h }); }
+        catch (e) { reject(e); }
+      };
+      img.onerror = () => { URL.revokeObjectURL(url); reject(new Error("unreadable image")); };
+      img.src = url;
+    });
+  }
+
+  // ---- mutations ----------------------------------------------------------
+  function addImage(sid, wid, { src, width, height, original_name, alt_text }) {
+    const maxOrder = cellImages(sid, wid).reduce((m, i) => Math.max(m, i.sort_order), -1);
+    board.images.push({
+      id: uid(), student_id: sid, week_id: wid, uploader_name: me.name,
+      src, original_name, alt_text, width, height,
+      created_at: new Date().toISOString(), sort_order: maxOrder + 1
+    });
+    saveBoard(); renderGrid(); renderCell();
+  }
+  function deleteImage(id) {
+    const img = board.images.find((i) => i.id === id);
+    if (!img || !canManageImage(img)) return;
+    if (!confirm("Delete this image?")) return;
+    board.images = board.images.filter((i) => i.id !== id);
+    saveBoard(); renderGrid(); renderCell();
+  }
+  function moveImage(id, dir) {
+    const img = board.images.find((i) => i.id === id);
+    if (!img) return;
+    const list = cellImages(img.student_id, img.week_id);
+    const idx = list.findIndex((i) => i.id === id);
+    const swap = list[idx + dir];
+    if (!swap) return;
+    const a = img.sort_order; img.sort_order = swap.sort_order; swap.sort_order = a;
+    saveBoard(); renderGrid(); renderCell();
+  }
+  function addThread(sid, wid, title, body) {
+    const t = { id: uid(), student_id: sid, week_id: wid, title, created_by: me.name, created_at: new Date().toISOString() };
+    board.threads.push(t);
+    board.comments.push({ id: uid(), thread_id: t.id, author_name: me.name, body, created_at: new Date().toISOString() });
+    saveBoard(); renderGrid(); renderCell();
+  }
+  function addComment(tid, body) {
+    board.comments.push({ id: uid(), thread_id: tid, author_name: me.name, body, created_at: new Date().toISOString() });
+    saveBoard(); renderGrid(); renderCell();
+  }
+  function deleteComment(id) {
+    if (!isInstructor()) return;
+    if (!confirm("Delete this comment? (moderation)")) return;
+    board.comments = board.comments.filter((c) => c.id !== id);
+    saveBoard(); renderGrid(); renderCell();
+  }
+
+  // ---- lightbox -----------------------------------------------------------
+  let lb = { list: [], idx: 0 };
+  function openLightbox(sid, wid, idx) {
+    lb.list = cellImages(sid, wid);
+    lb.idx = idx;
+    paintLightbox();
+    const dlg = $("lightbox");
+    if (!dlg.open) dlg.showModal();
+  }
+  function paintLightbox() {
+    const im = lb.list[lb.idx];
+    if (!im) { $("lightbox").close(); return; }
+    const big = $("lb-img");
+    big.src = im.src;
+    big.alt = im.alt_text || "";
+    $("lb-cap").textContent = im.alt_text || "";
+    $("lb-count").textContent = `${lb.idx + 1} / ${lb.list.length}`;
+    $("lb-prev").disabled = lb.list.length < 2;
+    $("lb-next").disabled = lb.list.length < 2;
+  }
+  function lbStep(d) {
+    if (!lb.list.length) return;
+    lb.idx = (lb.idx + d + lb.list.length) % lb.list.length;
+    paintLightbox();
+  }
+
+  // ---- admin --------------------------------------------------------------
+  function openAdmin() {
+    if (!isInstructor()) return;
+    renderAdmin();
+    const dlg = $("admin-dialog");
+    if (!dlg.open) dlg.showModal();
+  }
+  function renderAdmin() {
+    const body = $("admin-body");
+    body.replaceChildren();
+
+    // studio name
+    const nameSec = el("section");
+    const nameInput = el("input", { type: "text", value: board.studioName || "", "aria-label": "Studio name", style: "width:100%" });
+    nameSec.append(
+      el("h3", {}, "Studio name"),
+      el("div", { class: "admin-row" }, nameInput,
+        el("button", { onclick: () => { board.studioName = nameInput.value.trim() || "Studio Crit Board"; saveBoard(); renderGrid(); renderAdmin(); } }, "Save")));
+    body.append(nameSec);
+
+    // TAs (sections)
+    body.append(rosterEditor({
+      title: "TAs (sections)",
+      items: tasSorted(),
+      labelOf: (t) => t.name,
+      rename: (id, val) => { const t = board.tas.find((x) => x.id === id); if (t) t.name = val; },
+      remove: (id) => {
+        board.tas = (board.tas || []).filter((x) => x.id !== id);
+        board.students.forEach((s) => { if (s.ta_id === id) s.ta_id = null; }); // unassign
+      },
+      reorder: (arr) => arr.forEach((id, i) => { const t = board.tas.find((x) => x.id === id); if (t) t.sort_order = i; }),
+      bulkAdd: (names) => {
+        if (!board.tas) board.tas = [];
+        let max = board.tas.reduce((m, t) => Math.max(m, t.sort_order), -1);
+        names.forEach((n) => board.tas.push({ id: uid(), name: n, sort_order: ++max }));
+      },
+      bulkPlaceholder: "Add TA names — one per line.\nTA · Alex Rivera\nTA · Sam Park"
+    }));
+
+    // students
+    body.append(rosterEditor({
+      title: "Students (rows)",
+      items: studentsSorted(),
+      labelOf: (s) => s.name,
+      rowExtra: studentTaSelect,
+      rename: (id, val) => { const s = board.students.find((x) => x.id === id); if (s) s.name = val; },
+      remove: (id) => {
+        board.students = board.students.filter((x) => x.id !== id);
+        board.images = board.images.filter((i) => i.student_id !== id);
+        const tids = board.threads.filter((t) => t.student_id === id).map((t) => t.id);
+        board.threads = board.threads.filter((t) => t.student_id !== id);
+        board.comments = board.comments.filter((c) => !tids.includes(c.thread_id));
+      },
+      reorder: (arr) => arr.forEach((id, i) => { const s = board.students.find((x) => x.id === id); if (s) s.sort_order = i; }),
+      bulkAdd: (names) => {
+        let max = board.students.reduce((m, s) => Math.max(m, s.sort_order), -1);
+        names.forEach((n) => board.students.push({ id: uid(), name: n, sort_order: ++max }));
+      },
+      bulkPlaceholder: "Paste names — one per line or comma-separated.\nAda Okafor\nBruno Silva, Chen Wei"
+    }));
+
+    // weeks
+    body.append(rosterEditor({
+      title: "Weeks (columns)",
+      items: weeksSorted(),
+      labelOf: (w) => w.label,
+      rename: (id, val) => { const w = board.weeks.find((x) => x.id === id); if (w) w.label = val; },
+      remove: (id) => {
+        board.weeks = board.weeks.filter((x) => x.id !== id);
+        board.images = board.images.filter((i) => i.week_id !== id);
+        const tids = board.threads.filter((t) => t.week_id === id).map((t) => t.id);
+        board.threads = board.threads.filter((t) => t.week_id !== id);
+        board.comments = board.comments.filter((c) => !tids.includes(c.thread_id));
+      },
+      reorder: (arr) => arr.forEach((id, i) => { const w = board.weeks.find((x) => x.id === id); if (w) w.sort_order = i; }),
+      bulkAdd: (labels) => {
+        let max = board.weeks.reduce((m, w) => Math.max(m, w.sort_order), -1);
+        labels.forEach((l) => board.weeks.push({ id: uid(), label: l, sort_order: ++max }));
+      },
+      bulkPlaceholder: "Paste week labels — one per line or comma-separated.\nWeek 5 · Final\nWeek 6 · Review"
+    }));
+  }
+
+  // Per-student TA assignment dropdown (used as rowExtra in the students editor).
+  function studentTaSelect(s) {
+    const sel = el("select", { "aria-label": "Assign TA for " + s.name, title: "Assign TA" });
+    sel.append(el("option", { value: "", selected: !s.ta_id }, "— No TA —"));
+    tasSorted().forEach((t) => sel.append(el("option", { value: String(t.id), selected: s.ta_id === t.id }, t.name)));
+    sel.addEventListener("change", () => {
+      const st = board.students.find((x) => x.id === s.id);
+      if (st) st.ta_id = sel.value ? Number(sel.value) : null;
+      saveBoard(); renderGrid(); renderAdmin();
+    });
+    return sel;
+  }
+
+  function rosterEditor(cfg) {
+    const sec = el("section");
+    sec.append(el("h3", {}, cfg.title));
+    const list = el("div", { class: "admin-list" });
+    const ids = cfg.items.map((it) => it.id);
+    cfg.items.forEach((it, i) => {
+      const input = el("input", { type: "text", value: cfg.labelOf(it), "aria-label": "Rename" });
+      const row = el("div", { class: "admin-row" },
+        el("div", { class: "ord" },
+          el("button", { class: "tiny subtle", "aria-label": "Move up", disabled: i === 0, onclick: () => { const a = [...ids]; [a[i - 1], a[i]] = [a[i], a[i - 1]]; cfg.reorder(a); saveBoard(); renderGrid(); renderAdmin(); } }, "↑"),
+          el("button", { class: "tiny subtle", "aria-label": "Move down", disabled: i === cfg.items.length - 1, onclick: () => { const a = [...ids]; [a[i + 1], a[i]] = [a[i], a[i + 1]]; cfg.reorder(a); saveBoard(); renderGrid(); renderAdmin(); } }, "↓")),
+        input,
+        cfg.rowExtra ? cfg.rowExtra(it) : null,
+        el("button", { class: "tiny subtle", onclick: () => { const v = input.value.trim(); if (v) { cfg.rename(it.id, v); saveBoard(); renderGrid(); renderAdmin(); } } }, "Save"),
+        el("button", { class: "tiny danger", "aria-label": "Remove", onclick: () => { if (confirm("Remove “" + cfg.labelOf(it) + "” and all its work/comments?")) { cfg.remove(it.id); saveBoard(); renderGrid(); renderAdmin(); } } }, "Remove"));
+      list.append(row);
+    });
+    sec.append(list);
+
+    // bulk add
+    const ta = el("textarea", { rows: "3", placeholder: cfg.bulkPlaceholder, "aria-label": "Bulk add", style: "width:100%;margin-top:.6rem" });
+    sec.append(ta, el("div", {}, el("button", {
+      onclick: () => {
+        const items = ta.value.split(/[\n,]+/).map((s) => s.trim()).filter(Boolean);
+        const seen = new Set();
+        const unique = items.filter((x) => { const k = x.toLowerCase(); if (seen.has(k)) return false; seen.add(k); return true; });
+        if (unique.length) { cfg.bulkAdd(unique); ta.value = ""; saveBoard(); renderGrid(); renderAdmin(); }
+      }
+    }, "Bulk add")));
+    return sec;
+  }
+
+  // ---- wiring -------------------------------------------------------------
+  function renderAll() { renderControls(); renderGrid(); }
+
+  function wireDialogs() {
+    // close buttons
+    $("cell-close").addEventListener("click", () => $("cell-dialog").close());
+    $("admin-close").addEventListener("click", () => $("admin-dialog").close());
+    $("lb-close").addEventListener("click", () => $("lightbox").close());
+    $("lb-prev").addEventListener("click", () => lbStep(-1));
+    $("lb-next").addEventListener("click", () => lbStep(1));
+
+    // backdrop click closes
+    for (const id of ["cell-dialog", "admin-dialog", "lightbox"]) {
+      $(id).addEventListener("click", (e) => { if (e.target === $(id)) $(id).close(); });
+    }
+
+    // lightbox keyboard
+    $("lightbox").addEventListener("keydown", (e) => {
+      if (e.key === "ArrowLeft") { e.preventDefault(); lbStep(-1); }
+      else if (e.key === "ArrowRight") { e.preventDefault(); lbStep(1); }
+    });
+    // lightbox swipe
+    let sx = null;
+    const stage = document.querySelector(".lb-stage");
+    stage.addEventListener("touchstart", (e) => { sx = e.changedTouches[0].clientX; }, { passive: true });
+    stage.addEventListener("touchend", (e) => {
+      if (sx == null) return;
+      const dx = e.changedTouches[0].clientX - sx;
+      if (Math.abs(dx) > 40) lbStep(dx < 0 ? 1 : -1);
+      sx = null;
+    }, { passive: true });
+  }
+
+  // ---- boot ---------------------------------------------------------------
+  load();
+  wireDialogs();
+  renderAll();
+  </script>
+</body>
+</html>

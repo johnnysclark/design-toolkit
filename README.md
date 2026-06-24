@@ -74,6 +74,7 @@ tools are spec stubs we'll flesh out.
 |---|---|---|---|
 | [`site-analyzer`](TOOLS/site-analyzer) | Feed a site → structured read for design: climate, orientation, terrain, water, constraints, history, links — and the ground exported for Rhino | §1 | ✅ working |
 | [`precedent-librarian`](TOOLS/precedent-librarian) | Dossier builder for design **and** technical references; tags every claim, plays devil's advocate, hands you a verification worksheet | §2 | ✅ working |
+| [`crit-board`](TOOLS/crit-board) | Self-hosted studio pinup/crit board (Miro replacement): a students × weeks grid of cells, each holding many uploaded images + threaded public feedback. Multi-user + persistent; zero-setup `lite/` demo too | §16/§13 | ✅ working |
 | [`form-helper`](TOOLS/form-helper) | Form-finding governed by site forces (sun, wind, orientation…) acting on a chosen geometry | §5/§7 | 🟡 planned |
 | [`rhino-wizard`](TOOLS/rhino-wizard) | Tutor for Rhino / Grasshopper / GH-Python; mode toggles + Beginner/Moderate/Advanced levels | §6 | 🟡 planned |
 | [`code-zoning-agent`](TOOLS/code-zoning-agent) | Interpret code & zoning for a project, every claim clause-cited and checkable | §3 | 🟡 planned |
@@ -97,6 +98,9 @@ open "TOOLS/precedent-librarian/lite/index.html"
 
 # Site Analyzer — no install, no key, live data:
 open "TOOLS/site-analyzer/standalone/index.html"
+
+# Crit Board — no install, no server (single-browser demo of the studio board):
+open "TOOLS/crit-board/lite/index.html"
 
 # Site Analyzer CLI (Node 18+):
 node "TOOLS/site-analyzer/cli/analyze.js" "Gowanus Canal"

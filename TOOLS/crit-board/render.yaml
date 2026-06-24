@@ -1,0 +1,28 @@
+# Render Blueprint for crit-board.
+#
+# Create a Blueprint instance from this repo (or replicate these settings in the
+# dashboard). The persistent Disk mounted at /data is REQUIRED — without it, all
+# images and the database are wiped on every redeploy.
+services:
+  - type: web
+    name: crit-board
+    runtime: docker
+    dockerfilePath: TOOLS/crit-board/Dockerfile
+    dockerContext: TOOLS/crit-board
+    plan: starter            # a paid instance type is required to attach a Disk
+    healthCheckPath: /api/session
+    disk:
+      name: crit-data
+      mountPath: /data
+      sizeGB: 5
+    envVars:
+      - key: DATA_DIR
+        value: /data
+      - key: SESSION_SECRET
+        generateValue: true      # Render generates a strong random value
+      - key: STUDENT_PASSCODE
+        sync: false              # set in the dashboard (not stored in the repo)
+      - key: INSTRUCTOR_PASSCODE
+        sync: false
+      - key: MAX_UPLOAD_MB
+        value: "25"
