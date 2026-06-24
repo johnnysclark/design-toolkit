@@ -21,6 +21,12 @@ db.exec(`
 CREATE TABLE IF NOT EXISTS students (
   id          INTEGER PRIMARY KEY AUTOINCREMENT,
   name        TEXT    NOT NULL,
+  sort_order  INTEGER NOT NULL DEFAULT 0,
+  ta_id       INTEGER
+);
+CREATE TABLE IF NOT EXISTS tas (
+  id          INTEGER PRIMARY KEY AUTOINCREMENT,
+  name        TEXT    NOT NULL,
   sort_order  INTEGER NOT NULL DEFAULT 0
 );
 CREATE TABLE IF NOT EXISTS weeks (
@@ -65,10 +71,17 @@ CREATE INDEX IF NOT EXISTS idx_threads_cell  ON threads(student_id, week_id);
 CREATE INDEX IF NOT EXISTS idx_comments_thr  ON comments(thread_id);
 `);
 
+// Migrate older DBs (created before TA grouping) by adding the column in place.
+if (!db.prepare("PRAGMA table_info(students)").all().some((c) => c.name === "ta_id")) {
+  db.exec("ALTER TABLE students ADD COLUMN ta_id INTEGER");
+}
+
 // ---- prepared statements --------------------------------------------------
 const S = {
-  students:        db.prepare("SELECT id, name, sort_order FROM students ORDER BY sort_order, id"),
+  students:        db.prepare("SELECT id, name, sort_order, ta_id FROM students ORDER BY sort_order, id"),
   weeks:           db.prepare("SELECT id, label, sort_order FROM weeks ORDER BY sort_order, id"),
+  tas:             db.prepare("SELECT id, name, sort_order FROM tas ORDER BY sort_order, id"),
+  getTa:           db.prepare("SELECT id, name, sort_order FROM tas WHERE id = ?"),
   getSetting:      db.prepare("SELECT value FROM settings WHERE key = ?"),
   setSetting:      db.prepare("INSERT INTO settings(key, value) VALUES(?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value"),
 
@@ -80,6 +93,7 @@ const S = {
   countThreads:    db.prepare("SELECT student_id, week_id, COUNT(*) AS n FROM threads GROUP BY student_id, week_id"),
   countComments:   db.prepare("SELECT t.student_id AS student_id, t.week_id AS week_id, COUNT(c.id) AS n FROM threads t JOIN comments c ON c.thread_id = t.id GROUP BY t.student_id, t.week_id"),
   thumbIds:        db.prepare("SELECT id, student_id, week_id FROM images ORDER BY student_id, week_id, sort_order, id"),
+  latestComments:  db.prepare("SELECT t.student_id AS student_id, t.week_id AS week_id, c.author_name, c.body FROM comments c JOIN threads t ON t.id = c.thread_id ORDER BY c.created_at DESC, c.id DESC"),
 
   insertImage:     db.prepare("INSERT INTO images(student_id, week_id, uploader_name, stored_path, original_name, alt_text, width, height, sort_order) VALUES(@student_id, @week_id, @uploader_name, @stored_path, @original_name, @alt_text, @width, @height, @sort_order)"),
   getImage:        db.prepare("SELECT * FROM images WHERE id = ?"),
@@ -95,15 +109,23 @@ const S = {
   getComment:      db.prepare("SELECT id, thread_id, author_name, body, created_at FROM comments WHERE id = ?"),
   deleteComment:   db.prepare("DELETE FROM comments WHERE id = ?"),
 
-  addStudent:      db.prepare("INSERT INTO students(name, sort_order) VALUES(?, ?)"),
+  addStudent:      db.prepare("INSERT INTO students(name, sort_order, ta_id) VALUES(?, ?, ?)"),
   renameStudent:   db.prepare("UPDATE students SET name = ? WHERE id = ?"),
   deleteStudent:   db.prepare("DELETE FROM students WHERE id = ?"),
   setStudentOrder: db.prepare("UPDATE students SET sort_order = ? WHERE id = ?"),
+  setStudentTa:    db.prepare("UPDATE students SET ta_id = ? WHERE id = ?"),
   maxStudentOrder: db.prepare("SELECT COALESCE(MAX(sort_order), -1) AS m FROM students"),
+
+  addTa:           db.prepare("INSERT INTO tas(name, sort_order) VALUES(?, ?)"),
+  renameTa:        db.prepare("UPDATE tas SET name = ? WHERE id = ?"),
+  deleteTa:        db.prepare("DELETE FROM tas WHERE id = ?"),
+  setTaOrder:      db.prepare("UPDATE tas SET sort_order = ? WHERE id = ?"),
+  maxTaOrder:      db.prepare("SELECT COALESCE(MAX(sort_order), -1) AS m FROM tas"),
+  unassignTa:      db.prepare("UPDATE students SET ta_id = NULL WHERE ta_id = ?"),
 
   addWeek:         db.prepare("INSERT INTO weeks(label, sort_order) VALUES(?, ?)"),
   getWeek:         db.prepare("SELECT id, label, sort_order FROM weeks WHERE id = ?"),
-  getStudent:      db.prepare("SELECT id, name, sort_order FROM students WHERE id = ?"),
+  getStudent:      db.prepare("SELECT id, name, sort_order, ta_id FROM students WHERE id = ?"),
   renameWeek:      db.prepare("UPDATE weeks SET label = ? WHERE id = ?"),
   deleteWeek:      db.prepare("DELETE FROM weeks WHERE id = ?"),
   setWeekOrder:    db.prepare("UPDATE weeks SET sort_order = ? WHERE id = ?"),
@@ -113,6 +135,8 @@ const S = {
 // ---- reads ----------------------------------------------------------------
 export const getStudents = () => S.students.all();
 export const getWeeks = () => S.weeks.all();
+export const getTas = () => S.tas.all();
+export const getTa = (id) => S.getTa.get(id);
 export const getStudent = (id) => S.getStudent.get(id);
 export const getWeek = (id) => S.getWeek.get(id);
 export const getSetting = (key) => { const r = S.getSetting.get(key); return r ? r.value : null; };
@@ -136,6 +160,11 @@ export function getCellCounts() {
   for (const r of S.countThreads.all()) entry(r.student_id, r.week_id).threads = r.n;
   for (const r of S.countComments.all()) entry(r.student_id, r.week_id).comments = r.n;
   for (const r of S.thumbIds.all()) { const e = entry(r.student_id, r.week_id); if (e.thumbs.length < 4) e.thumbs.push(r.id); }
+  // latestComments is ordered newest-first, so the first row per cell is the latest.
+  for (const r of S.latestComments.all()) {
+    const e = entry(r.student_id, r.week_id);
+    if (!e.last) e.last = { author_name: r.author_name, body: r.body };
+  }
   return out;
 }
 
@@ -173,13 +202,30 @@ export function insertComment(threadId, author, body) {
 }
 export const deleteComment = (id) => S.deleteComment.run(id);
 
+// ---- admin: TAs -----------------------------------------------------------
+export function addTa(name) {
+  const order = S.maxTaOrder.get().m + 1;
+  const info = S.addTa.run(name, order);
+  return S.getTa.get(info.lastInsertRowid);
+}
+export const renameTa = (id, name) => S.renameTa.run(name, id);
+export const reorderTas = db.transaction((orderedIds) => {
+  orderedIds.forEach((id, i) => S.setTaOrder.run(i, id));
+});
+// Unassign this TA's students (ta_id -> NULL) before removing the TA row.
+export const deleteTa = db.transaction((id) => {
+  S.unassignTa.run(id);
+  S.deleteTa.run(id);
+});
+export const setStudentTa = (id, taId) => S.setStudentTa.run(taId == null ? null : taId, id);
+
 // ---- admin: students ------------------------------------------------------
-export function addStudent(name) {
+export function addStudent(name, taId = null) {
   const order = S.maxStudentOrder.get().m + 1;
-  const info = S.addStudent.run(name, order);
+  const info = S.addStudent.run(name, order, taId);
   return S.getStudent.get(info.lastInsertRowid);
 }
-export const bulkAddStudents = db.transaction((names) => {
+export const bulkAddStudents = db.transaction((names, taId = null) => {
   let order = S.maxStudentOrder.get().m;
   const existing = new Set(getStudents().map((s) => s.name.toLowerCase()));
   const added = [];
@@ -187,7 +233,7 @@ export const bulkAddStudents = db.transaction((names) => {
     const key = name.toLowerCase();
     if (existing.has(key)) continue;
     existing.add(key);
-    const info = S.addStudent.run(name, ++order);
+    const info = S.addStudent.run(name, ++order, taId);
     added.push(S.getStudent.get(info.lastInsertRowid));
   }
   return added;

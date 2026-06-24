@@ -22,20 +22,59 @@ router.put("/api/admin/studio-name", (req, res) => {
   res.json({ ok: true, studioName: name });
 });
 
+// ---- TAs ------------------------------------------------------------------
+router.post("/api/admin/tas", (req, res) => {
+  const name = String(req.body.name || "").trim().slice(0, 80);
+  if (!name) return res.status(400).json({ error: "TA name required." });
+  res.json({ ok: true, ta: db.addTa(name) });
+});
+router.patch("/api/admin/tas/:id", (req, res) => {
+  const name = String(req.body.name || "").trim().slice(0, 80);
+  if (!name) return res.status(400).json({ error: "TA name required." });
+  db.renameTa(Number(req.params.id), name);
+  res.json({ ok: true });
+});
+router.delete("/api/admin/tas/:id", (req, res) => {
+  db.deleteTa(Number(req.params.id)); // unassigns its students (ta_id -> NULL)
+  res.json({ ok: true });
+});
+router.put("/api/admin/tas/order", (req, res) => {
+  const order = (Array.isArray(req.body.order) ? req.body.order : []).map(Number).filter(Number.isFinite);
+  db.reorderTas(order);
+  res.json({ ok: true });
+});
+
+// Validate an optional ta_id from the body: returns {ok, taId} or sends a 400.
+function readTaId(req, res) {
+  if (!("ta_id" in req.body) || req.body.ta_id == null || req.body.ta_id === "") return { ok: true, taId: null };
+  const taId = Number(req.body.ta_id);
+  if (!Number.isFinite(taId) || !db.getTa(taId)) { res.status(400).json({ error: "No such TA." }); return { ok: false }; }
+  return { ok: true, taId };
+}
+
 // ---- students -------------------------------------------------------------
 router.post("/api/admin/students", (req, res) => {
   const name = String(req.body.name || "").trim().slice(0, 80);
   if (!name) return res.status(400).json({ error: "Name required." });
-  res.json({ ok: true, student: db.addStudent(name) });
+  const ta = readTaId(req, res); if (!ta.ok) return;
+  res.json({ ok: true, student: db.addStudent(name, ta.taId) });
 });
 router.post("/api/admin/students/bulk", (req, res) => {
   const names = String(req.body.text || "").split(/[\n,]+/).map((s) => s.trim().slice(0, 80)).filter(Boolean);
-  res.json({ ok: true, students: db.bulkAddStudents(names) });
+  const ta = readTaId(req, res); if (!ta.ok) return;
+  res.json({ ok: true, students: db.bulkAddStudents(names, ta.taId) });
 });
 router.patch("/api/admin/students/:id", (req, res) => {
-  const name = String(req.body.name || "").trim().slice(0, 80);
-  if (!name) return res.status(400).json({ error: "Name required." });
-  db.renameStudent(Number(req.params.id), name);
+  const id = Number(req.params.id);
+  if ("name" in req.body) {
+    const name = String(req.body.name || "").trim().slice(0, 80);
+    if (!name) return res.status(400).json({ error: "Name required." });
+    db.renameStudent(id, name);
+  }
+  if ("ta_id" in req.body) {
+    const ta = readTaId(req, res); if (!ta.ok) return;
+    db.setStudentTa(id, ta.taId);
+  }
   res.json({ ok: true });
 });
 router.delete("/api/admin/students/:id", (req, res) => {

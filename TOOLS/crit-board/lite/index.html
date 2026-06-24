@@ -130,26 +130,43 @@
     }
     table.grid thead th.corner { position: sticky; left: 0; top: 0; z-index: 3; min-width: 150px; }
 
-    .cell-btn {
-      display: block; width: 100%; min-height: 96px;
-      background: var(--card); color: var(--ink);
-      border: none; border-radius: 0;
-      padding: 0.5rem; text-align: left; cursor: pointer;
-      font-weight: 400;
+    /* TA section-header row (sticky left so it stays visible when scrolling) */
+    table.grid tr.ta-row th.ta-head {
+      position: sticky; left: 0; z-index: 2;
+      background: color-mix(in srgb, var(--accent) 14%, var(--chip));
+      color: var(--ink); text-align: left; font-weight: 700;
+      padding: 0.4rem 0.7rem; border-top: 2px solid var(--accent);
     }
-    .cell-btn:hover { background: color-mix(in srgb, var(--accent) 8%, var(--card)); }
-    .cell-btn.mine { box-shadow: inset 3px 0 0 var(--accent); }
-    .thumb-stack { display: flex; flex-wrap: wrap; gap: 3px; margin-bottom: 0.35rem; }
+    table.grid tr.ta-row th.ta-head .ta-count { color: var(--muted); font-weight: 500; font-size: 0.85rem; }
+
+    /* two-box cell: work (top) + comments (bottom), each a button */
+    table.grid td { min-width: 200px; }
+    .cell-box {
+      display: block; width: 100%; text-align: left; cursor: pointer; font: inherit; font-weight: 400;
+      background: var(--card); color: var(--ink); border: none; border-radius: 0; padding: 0.45rem 0.5rem;
+    }
+    .cell-box + .cell-box { border-top: 1px dashed var(--line); }
+    .cell-box.work { min-height: 72px; }
+    .cell-box.comments { min-height: 56px; background: color-mix(in srgb, var(--chip) 45%, var(--card)); }
+    .cell-box:hover { background: color-mix(in srgb, var(--accent) 9%, var(--card)); }
+    .cell-box.work.mine { box-shadow: inset 3px 0 0 var(--accent); }
+    .box-meta { color: var(--muted); font-size: 0.72rem; margin-top: 0.2rem; }
+    .last-comment {
+      color: var(--muted); font-size: 0.76rem; margin-top: 0.25rem;
+      display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+    }
+    .last-comment .who { color: var(--ink); font-weight: 600; }
+    .thumb-stack { display: flex; flex-wrap: wrap; gap: 3px; }
     .thumb-stack img {
-      width: 46px; height: 46px; object-fit: cover;
+      width: 40px; height: 40px; object-fit: cover;
       border-radius: 5px; border: 1px solid var(--line); background: var(--chip);
     }
     .thumb-more {
-      width: 46px; height: 46px; border-radius: 5px; border: 1px dashed var(--line);
+      width: 40px; height: 40px; border-radius: 5px; border: 1px dashed var(--line);
       display: grid; place-items: center; color: var(--muted); font-size: 0.8rem; font-weight: 700;
     }
-    .cell-empty { color: var(--muted); font-size: 0.85rem; font-style: italic; }
-    .badge { display: inline-flex; gap: 0.4rem; font-size: 0.76rem; color: var(--muted); }
+    .cell-empty { color: var(--muted); font-size: 0.82rem; font-style: italic; }
+    .badge { display: flex; flex-wrap: wrap; gap: 0.4rem; font-size: 0.74rem; color: var(--muted); }
     .badge .n { color: var(--ink); font-weight: 700; }
 
     /* ---- Dialogs (cell, lightbox, admin) ------------------------------------ */
@@ -335,7 +352,7 @@
   };
 
   // ---- storage keys
-  const K_BOARD = "critboard.lite.board.v2";
+  const K_BOARD = "critboard.lite.board.v3";
   const K_ME = "critboard.lite.me.v1";
   const K_THEME = "critboard.lite.theme.v1";
 
@@ -390,49 +407,76 @@
   function seedBoard() {
     const now = Date.now();
     const iso = (minsAgo) => new Date(now - minsAgo * 60000).toISOString();
-    const students = ["Ada Okafor", "Bruno Silva", "Chen Wei", "Dara Nguyen", "Esme Robinson", "Farid Haddad"]
-      .map((name, i) => ({ id: i + 1, name, sort_order: i }));
-    const weeks = ["Week 1 · Site", "Week 2 · Concept", "Week 3 · Massing", "Week 4 · Pinup"]
+
+    // 3 TAs, 12 students each (36), 6 weeks.
+    const taNames = ["TA · Maya Lin", "TA · Paul Rudolph", "TA · Denise Scott Brown"];
+    const tas = taNames.map((name, i) => ({ id: i + 1, name, sort_order: i }));
+    const roster = [
+      ["Ada Okafor", "Bruno Silva", "Chen Wei", "Dara Nguyen", "Esme Robinson", "Farid Haddad",
+       "Gina Alvarez", "Hugo Bauer", "Ivy Tan", "Jamal Reed", "Kira Volkov", "Liam O'Brien"],
+      ["Maya Patel", "Noah Kim", "Olga Petrova", "Pedro Gomez", "Qian Liu", "Rosa Marin",
+       "Sami Haddad", "Tara Singh", "Umar Farouk", "Vera Costa", "Will Hughes", "Xochitl Mora"],
+      ["Yara Saleh", "Zane Miller", "Amara Diop", "Ben Carter", "Cora Lee", "Dmitri Ivanov",
+       "Elena Rossi", "Femi Adeyemi", "Greta Vogel", "Hana Suzuki", "Ravi Menon", "Sofia Duarte"],
+    ];
+    const students = [];
+    let sid = 0;
+    roster.forEach((group, gi) => group.forEach((name) => {
+      students.push({ id: ++sid, name, sort_order: sid - 1, ta_id: tas[gi].id });
+    }));
+    const byId = (id) => students.find((s) => s.id === id);
+
+    const weeks = ["Week 1 · Site", "Week 2 · Concept", "Week 3 · Massing",
+                   "Week 4 · Systems", "Week 5 · Refinement", "Week 6 · Final Review"]
       .map((label, i) => ({ id: i + 1, label, sort_order: i }));
+
     const palette = ["#8a4b2f", "#3f6f52", "#3a5a8a", "#7a5a8a", "#9a7b2f", "#5a6b3a"];
-    let seq = 100;
+    let seq = 1000;
     const images = [];
-    const addImg = (sid, wid, label, alt, minsAgo, idx) => {
+    const addImg = (sId, wId, label, alt, minsAgo, idx) => {
       images.push({
-        id: ++seq, student_id: sid, week_id: wid, uploader_name: students[sid - 1].name,
-        src: svgPlaceholder(label, palette[(sid + wid + idx) % palette.length]),
+        id: ++seq, student_id: sId, week_id: wId, uploader_name: byId(sId).name,
+        src: svgPlaceholder(label, palette[(sId + wId + idx) % palette.length]),
         original_name: label.toLowerCase().replace(/[^a-z0-9]+/g, "-") + ".svg",
         alt_text: alt, width: 800, height: 600, created_at: iso(minsAgo), sort_order: idx
       });
     };
     addImg(1, 1, "Site plan", "Figure-ground site plan of the block, ink on trace", 600, 0);
-    addImg(1, 1, "Site photos", "Photo collage of the existing corner site", 590, 1);
+    addImg(1, 1, "Diagram", "Site analysis diagram — sun + circulation", 590, 1);
     addImg(1, 2, "Concept A", "Massing concept A — three stacked bars around a courtyard", 410, 0);
     addImg(2, 1, "Site model", "Chipboard site model, overhead view", 520, 0);
-    addImg(3, 2, "Circulation", "Hand-drawn circulation and program diagram", 300, 0);
-    addImg(3, 2, "Section", "Long section showing the stepped roof", 295, 1);
-    addImg(5, 3, "Massing v1", "Foamcore massing study, first pass", 180, 0);
+    addImg(3, 3, "Circulation", "Hand-drawn circulation and program diagram", 300, 0);
+    addImg(5, 4, "Massing v1", "Foamcore massing study, first pass", 180, 0);
+    addImg(13, 1, "Context", "Context plan at 1:500", 540, 0);
+    addImg(14, 2, "Parti", "Parti sketches — three options", 360, 0);
+    addImg(25, 3, "Section", "Long section through the atrium", 240, 0);
+    addImg(26, 5, "Massing", "Refined massing study models", 90, 0);
 
     const threads = [];
     const comments = [];
-    const addThread = (sid, wid, title, by, minsAgo) => {
-      const t = { id: ++seq, student_id: sid, week_id: wid, title, created_by: by, created_at: iso(minsAgo) };
+    const addThread = (sId, wId, title, by, minsAgo) => {
+      const t = { id: ++seq, student_id: sId, week_id: wId, title, created_by: by, created_at: iso(minsAgo) };
       threads.push(t);
       return t;
     };
     const addComment = (tid, author, body, minsAgo) =>
       comments.push({ id: ++seq, thread_id: tid, author_name: author, body, created_at: iso(minsAgo) });
 
-    const t1 = addThread(1, 1, "Legibility of the site plan", "Prof. Lang", 585);
-    addComment(t1.id, "Prof. Lang", "Strong figure-ground. Push the contrast between the public edge and the private courtyard so the threshold reads at a glance.", 583);
+    const t1 = addThread(1, 1, "Legibility of the site plan", taNames[0], 585);
+    addComment(t1.id, taNames[0], "Strong figure-ground. Push the contrast between the public edge and the private courtyard so the threshold reads at a glance.", 583);
     addComment(t1.id, "Ada Okafor", "Good call — I'll redraw the courtyard threshold and re-post before Thursday.", 521);
     const t2 = addThread(1, 1, "Scale figures?", "Bruno Silva", 300);
     addComment(t2.id, "Bruno Silva", "Might help to drop a few people in for scale — hard to read the arcade height right now.", 299);
-    const t3 = addThread(3, 2, "Circulation clarity", "Prof. Lang", 250);
-    addComment(t3.id, "Prof. Lang", "The diagram reads well. What happens at the core when the two flows meet?", 248);
+    const t3 = addThread(3, 3, "Circulation clarity", taNames[0], 250);
+    addComment(t3.id, taNames[0], "The diagram reads well. What happens at the core when the two flows meet?", 248);
     addComment(t3.id, "Chen Wei", "They share a double-height landing — I'll draw that next.", 120);
+    const t4 = addThread(13, 1, "Site boundary", taNames[1], 360);
+    addComment(t4.id, taNames[1], "Double-check the lot line on the north edge against the survey.", 358);
+    const t5 = addThread(25, 3, "Section poché", taNames[2], 200);
+    addComment(t5.id, taNames[2], "Love the atrium. Now show the structure holding that span.", 198);
+    addComment(t5.id, "Yara Saleh", "Adding a structural overlay next pass.", 60);
 
-    return { studioName: "Summer Studio — Crit Board", students, weeks, images, threads, comments, seq };
+    return { studioName: "Summer Studio — Crit Board", tas, students, weeks, images, threads, comments, seq };
   }
 
   // ---- load / save --------------------------------------------------------
@@ -465,6 +509,7 @@
   // ---- selectors / permissions -------------------------------------------
   const studentsSorted = () => [...board.students].sort((a, b) => a.sort_order - b.sort_order || a.id - b.id);
   const weeksSorted = () => [...board.weeks].sort((a, b) => a.sort_order - b.sort_order || a.id - b.id);
+  const tasSorted = () => [...(board.tas || [])].sort((a, b) => a.sort_order - b.sort_order || a.id - b.id);
   const cellImages = (sid, wid) =>
     board.images.filter((i) => i.student_id === sid && i.week_id === wid)
       .sort((a, b) => a.sort_order - b.sort_order || a.id - b.id);
@@ -552,47 +597,83 @@
       return;
     }
 
+    // group rows by TA (TA order), trailing "Unassigned" if needed; flat if no TAs
+    const tas = tasSorted();
+    const groups = [];
+    if (tas.length) {
+      for (const t of tas) groups.push({ ta: t, students: students.filter((s) => s.ta_id === t.id) });
+      const un = students.filter((s) => !s.ta_id || !tas.some((t) => t.id === s.ta_id));
+      if (un.length) groups.push({ ta: null, students: un });
+    } else {
+      groups.push({ ta: null, students, flat: true });
+    }
+
+    const totalCols = String(weeks.length + 1);
     const tbody = el("tbody");
-    students.forEach((s) => {
-      const tr = el("tr");
-      tr.append(el("th", { scope: "row", id: "s" + s.id }, s.name));
-      weeks.forEach((w) => {
-        const imgs = cellImages(s.id, w.id);
-        const threads = cellThreads(s.id, w.id);
-        const nComments = threads.reduce((sum, t) => sum + threadComments(t.id).length, 0);
-        const label = `Open ${s.name}, ${w.label}. ${imgs.length} images, ${threads.length} threads, ${nComments} comments.`;
-
-        const btn = el("button", {
-          class: "cell-btn" + (isMyRow(s.id) ? " mine" : ""),
-          "aria-label": label,
-          onclick: () => openCell(s.id, w.id)
-        });
-        if (imgs.length) {
-          const stack = el("div", { class: "thumb-stack" });
-          imgs.slice(0, 4).forEach((im) =>
-            stack.append(el("img", { src: im.src, alt: "", loading: "lazy" })));
-          if (imgs.length > 4) stack.append(el("div", { class: "thumb-more" }, "+" + (imgs.length - 4)));
-          btn.append(stack);
-        } else {
-          btn.append(el("div", { class: "cell-empty" }, canUpload(s.id) ? "+ Add work" : "—"));
-        }
-        btn.append(el("div", { class: "badge" },
-          el("span", {}, el("span", { class: "n" }, String(threads.length)), " threads"),
-          el("span", {}, el("span", { class: "n" }, String(nComments)), " comments")));
-
-        const td = el("td", { headers: "w" + w.id + " s" + s.id });
-        td.append(btn);
-        tr.append(td);
+    groups.forEach((g) => {
+      if (!g.flat) {
+        const label = g.ta ? g.ta.name : "Unassigned";
+        tbody.append(el("tr", { class: "ta-row" },
+          el("th", { class: "ta-head", colspan: totalCols, scope: "colgroup" },
+            label, el("span", { class: "ta-count" }, ` · ${g.students.length} student${g.students.length === 1 ? "" : "s"}`))));
+      }
+      g.students.forEach((s) => {
+        const tr = el("tr");
+        tr.append(el("th", { scope: "row", id: "s" + s.id }, s.name));
+        weeks.forEach((w) => tr.append(cellTd(s, w)));
+        tbody.append(tr);
       });
-      tbody.append(tr);
     });
     grid.append(tbody);
   }
 
+  // Each cell holds two stacked boxes: work (top) + comments (bottom).
+  function cellTd(s, w) {
+    const imgs = cellImages(s.id, w.id);
+    const threads = cellThreads(s.id, w.id);
+    const allComments = threads.flatMap((t) => threadComments(t.id));
+    const last = allComments.length
+      ? allComments.slice().sort((a, b) => new Date(b.created_at) - new Date(a.created_at))[0]
+      : null;
+
+    const work = el("button", {
+      class: "cell-box work" + (isMyRow(s.id) ? " mine" : ""),
+      "aria-label": `Work — ${s.name}, ${w.label}: ${imgs.length} image${imgs.length === 1 ? "" : "s"}. Open to view or upload.`,
+      onclick: () => openCell(s.id, w.id, "work"),
+    });
+    if (imgs.length) {
+      const stack = el("div", { class: "thumb-stack" });
+      imgs.slice(0, 4).forEach((im) => stack.append(el("img", { src: im.src, alt: "", loading: "lazy" })));
+      if (imgs.length > 4) stack.append(el("div", { class: "thumb-more" }, "+" + (imgs.length - 4)));
+      work.append(stack, el("div", { class: "box-meta" }, `${imgs.length} image${imgs.length === 1 ? "" : "s"}`));
+    } else {
+      work.append(el("div", { class: "cell-empty" }, canUpload(s.id) ? "+ Add work" : "No work yet"));
+    }
+
+    const comments = el("button", {
+      class: "cell-box comments",
+      "aria-label": `Comments — ${s.name}, ${w.label}: ${threads.length} threads, ${allComments.length} comments. Open to read or reply.`,
+      onclick: () => openCell(s.id, w.id, "comments"),
+    });
+    comments.append(el("div", { class: "badge" },
+      el("span", {}, el("span", { class: "n" }, String(threads.length)), " threads"),
+      el("span", {}, el("span", { class: "n" }, String(allComments.length)), " comments")));
+    if (last) {
+      comments.append(el("div", { class: "last-comment" },
+        el("span", { class: "who" }, last.author_name + ": "), last.body));
+    } else {
+      comments.append(el("div", { class: "cell-empty" }, "No comments yet"));
+    }
+
+    return el("td", { headers: "w" + w.id + " s" + s.id }, work, comments);
+  }
+
   // ---- cell view ----------------------------------------------------------
   let openCellRef = null; // { sid, wid }
-  function openCell(sid, wid) {
+  let focusTarget = "work";
+  function openCell(sid, wid, focus) {
     openCellRef = { sid, wid };
+    focusTarget = focus || "work";
     renderCell();
     const dlg = $("cell-dialog");
     if (!dlg.open) dlg.showModal();
@@ -610,7 +691,7 @@
 
     // ---- gallery
     const imgs = cellImages(sid, wid);
-    const gal = el("section");
+    const gal = el("section", { id: "sec-work" });
     gal.append(el("h3", {}, `Work (${imgs.length})`));
     if (imgs.length === 0) {
       gal.append(el("p", { class: "hint" }, "No images posted to this cell yet."));
@@ -652,11 +733,15 @@
 
     // ---- threads
     const threads = cellThreads(sid, wid);
-    const tsec = el("section");
+    const tsec = el("section", { id: "sec-comments" });
     tsec.append(el("h3", {}, `Discussion (${threads.length} threads)`));
     threads.forEach((t) => tsec.append(renderThread(t)));
     tsec.append(renderNewThread(sid, wid));
     body.append(tsec);
+
+    // scroll to whichever box was clicked (work or comments)
+    const target = focusTarget === "comments" ? tsec : gal;
+    requestAnimationFrame(() => { try { target.scrollIntoView({ block: "start" }); } catch { /* */ } });
   }
 
   function renderThread(t) {
@@ -880,11 +965,31 @@
         el("button", { onclick: () => { board.studioName = nameInput.value.trim() || "Studio Crit Board"; saveBoard(); renderGrid(); renderAdmin(); } }, "Save")));
     body.append(nameSec);
 
+    // TAs (sections)
+    body.append(rosterEditor({
+      title: "TAs (sections)",
+      items: tasSorted(),
+      labelOf: (t) => t.name,
+      rename: (id, val) => { const t = board.tas.find((x) => x.id === id); if (t) t.name = val; },
+      remove: (id) => {
+        board.tas = (board.tas || []).filter((x) => x.id !== id);
+        board.students.forEach((s) => { if (s.ta_id === id) s.ta_id = null; }); // unassign
+      },
+      reorder: (arr) => arr.forEach((id, i) => { const t = board.tas.find((x) => x.id === id); if (t) t.sort_order = i; }),
+      bulkAdd: (names) => {
+        if (!board.tas) board.tas = [];
+        let max = board.tas.reduce((m, t) => Math.max(m, t.sort_order), -1);
+        names.forEach((n) => board.tas.push({ id: uid(), name: n, sort_order: ++max }));
+      },
+      bulkPlaceholder: "Add TA names — one per line.\nTA · Alex Rivera\nTA · Sam Park"
+    }));
+
     // students
     body.append(rosterEditor({
       title: "Students (rows)",
       items: studentsSorted(),
       labelOf: (s) => s.name,
+      rowExtra: studentTaSelect,
       rename: (id, val) => { const s = board.students.find((x) => x.id === id); if (s) s.name = val; },
       remove: (id) => {
         board.students = board.students.filter((x) => x.id !== id);
@@ -923,6 +1028,19 @@
     }));
   }
 
+  // Per-student TA assignment dropdown (used as rowExtra in the students editor).
+  function studentTaSelect(s) {
+    const sel = el("select", { "aria-label": "Assign TA for " + s.name, title: "Assign TA" });
+    sel.append(el("option", { value: "", selected: !s.ta_id }, "— No TA —"));
+    tasSorted().forEach((t) => sel.append(el("option", { value: String(t.id), selected: s.ta_id === t.id }, t.name)));
+    sel.addEventListener("change", () => {
+      const st = board.students.find((x) => x.id === s.id);
+      if (st) st.ta_id = sel.value ? Number(sel.value) : null;
+      saveBoard(); renderGrid(); renderAdmin();
+    });
+    return sel;
+  }
+
   function rosterEditor(cfg) {
     const sec = el("section");
     sec.append(el("h3", {}, cfg.title));
@@ -935,6 +1053,7 @@
           el("button", { class: "tiny subtle", "aria-label": "Move up", disabled: i === 0, onclick: () => { const a = [...ids]; [a[i - 1], a[i]] = [a[i], a[i - 1]]; cfg.reorder(a); saveBoard(); renderGrid(); renderAdmin(); } }, "↑"),
           el("button", { class: "tiny subtle", "aria-label": "Move down", disabled: i === cfg.items.length - 1, onclick: () => { const a = [...ids]; [a[i + 1], a[i]] = [a[i], a[i + 1]]; cfg.reorder(a); saveBoard(); renderGrid(); renderAdmin(); } }, "↓")),
         input,
+        cfg.rowExtra ? cfg.rowExtra(it) : null,
         el("button", { class: "tiny subtle", onclick: () => { const v = input.value.trim(); if (v) { cfg.rename(it.id, v); saveBoard(); renderGrid(); renderAdmin(); } } }, "Save"),
         el("button", { class: "tiny danger", "aria-label": "Remove", onclick: () => { if (confirm("Remove “" + cfg.labelOf(it) + "” and all its work/comments?")) { cfg.remove(it.id); saveBoard(); renderGrid(); renderAdmin(); } } }, "Remove"));
       list.append(row);

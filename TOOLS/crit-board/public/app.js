@@ -176,12 +176,13 @@ async function signOut() {
 
 // ---- grid ------------------------------------------------------------------
 function countFor(sid, wid) {
-  return (state.board.counts && state.board.counts[`s${sid}_w${wid}`]) || { images: 0, threads: 0, comments: 0 };
+  return (state.board.counts && state.board.counts[`s${sid}_w${wid}`]) || { images: 0, threads: 0, comments: 0, thumbs: [], last: null };
 }
 function renderGrid() {
   const grid = $("grid");
   grid.replaceChildren();
   const { students, weeks } = state.board;
+  const tas = state.board.tas || [];
 
   const thead = el("thead");
   const hr = el("tr");
@@ -200,39 +201,80 @@ function renderGrid() {
     return;
   }
 
+  // Group rows by TA (in TA order); an "Unassigned" group trails only if needed.
+  // With no TAs defined, render a flat list (no section headers).
+  const groups = [];
+  if (tas.length) {
+    for (const t of tas) groups.push({ ta: t, students: students.filter((s) => s.ta_id === t.id) });
+    const un = students.filter((s) => !s.ta_id || !tas.some((t) => t.id === s.ta_id));
+    if (un.length) groups.push({ ta: null, students: un });
+  } else {
+    groups.push({ ta: null, students, flat: true });
+  }
+
+  const totalCols = String(weeks.length + 1);
   const tbody = el("tbody");
-  students.forEach((s) => {
-    const tr = el("tr");
-    tr.append(el("th", { scope: "row", id: "s" + s.id }, s.name));
-    weeks.forEach((w) => {
-      const cnt = countFor(s.id, w.id);
-      const btn = el("button", {
-        class: "cell-btn" + (isMyRow(s) ? " mine" : ""),
-        "aria-label": `Open ${s.name}, ${w.label}. ${cnt.images} images, ${cnt.threads} threads, ${cnt.comments} comments.`,
-        onclick: () => go(() => openCell(s.id, w.id)),
-      });
-      if (cnt.images > 0) {
-        const stack = el("div", { class: "thumb-stack" });
-        const thumbs = cnt.thumbs || [];
-        thumbs.forEach((id) => stack.append(el("img", { src: `/img/${id}`, alt: "", loading: "lazy" })));
-        if (cnt.images > thumbs.length) stack.append(el("div", { class: "thumb-more" }, "+" + (cnt.images - thumbs.length)));
-        btn.append(stack);
-      } else {
-        btn.append(el("div", { class: "cell-empty" }, canUpload(s) ? "+ Add work" : "—"));
-      }
-      btn.append(el("div", { class: "badge" },
-        el("span", {}, el("span", { class: "n" }, String(cnt.threads)), " threads"),
-        el("span", {}, el("span", { class: "n" }, String(cnt.comments)), " comments")));
-      tr.append(el("td", { headers: "w" + w.id + " s" + s.id }, btn));
-    });
-    tbody.append(tr);
+  groups.forEach((g) => {
+    if (!g.flat) {
+      const label = g.ta ? g.ta.name : "Unassigned";
+      tbody.append(el("tr", { class: "ta-row" },
+        el("th", { class: "ta-head", colspan: totalCols, scope: "colgroup" },
+          label, el("span", { class: "ta-count" }, ` · ${g.students.length} student${g.students.length === 1 ? "" : "s"}`))));
+    }
+    g.students.forEach((s) => tbody.append(studentRow(s, weeks)));
   });
   grid.append(tbody);
 }
 
+function studentRow(s, weeks) {
+  const tr = el("tr");
+  tr.append(el("th", { scope: "row", id: "s" + s.id }, s.name));
+  weeks.forEach((w) => tr.append(cellTd(s, w)));
+  return tr;
+}
+
+// Each cell holds two stacked boxes: work (top) + comments (bottom). Each box is
+// a button that opens the cell panel focused on that section.
+function cellTd(s, w) {
+  const cnt = countFor(s.id, w.id);
+  const thumbs = cnt.thumbs || [];
+
+  const work = el("button", {
+    class: "cell-box work" + (isMyRow(s) ? " mine" : ""),
+    "aria-label": `Work — ${s.name}, ${w.label}: ${cnt.images} image${cnt.images === 1 ? "" : "s"}. Open to view or upload.`,
+    onclick: () => go(() => openCell(s.id, w.id, "work")),
+  });
+  if (cnt.images > 0) {
+    const stack = el("div", { class: "thumb-stack" });
+    thumbs.forEach((id) => stack.append(el("img", { src: `/img/${id}`, alt: "", loading: "lazy" })));
+    if (cnt.images > thumbs.length) stack.append(el("div", { class: "thumb-more" }, "+" + (cnt.images - thumbs.length)));
+    work.append(stack, el("div", { class: "box-meta" }, `${cnt.images} image${cnt.images === 1 ? "" : "s"}`));
+  } else {
+    work.append(el("div", { class: "cell-empty" }, canUpload(s) ? "+ Add work" : "No work yet"));
+  }
+
+  const comments = el("button", {
+    class: "cell-box comments",
+    "aria-label": `Comments — ${s.name}, ${w.label}: ${cnt.threads} threads, ${cnt.comments} comments. Open to read or reply.`,
+    onclick: () => go(() => openCell(s.id, w.id, "comments")),
+  });
+  comments.append(el("div", { class: "badge" },
+    el("span", {}, el("span", { class: "n" }, String(cnt.threads)), " threads"),
+    el("span", {}, el("span", { class: "n" }, String(cnt.comments)), " comments")));
+  if (cnt.last) {
+    comments.append(el("div", { class: "last-comment" },
+      el("span", { class: "who" }, cnt.last.author_name + ": "), cnt.last.body));
+  } else {
+    comments.append(el("div", { class: "cell-empty" }, "No comments yet"));
+  }
+
+  return el("td", { headers: "w" + w.id + " s" + s.id }, work, comments);
+}
+
 // ---- cell view -------------------------------------------------------------
-async function openCell(sid, wid) {
+async function openCell(sid, wid, focus) {
   state.openCellRef = { sid, wid };
+  state.focus = focus || "work";
   await loadCell();
   if (!$("cell-dialog").open) $("cell-dialog").showModal();
 }
@@ -252,7 +294,7 @@ function renderCell() {
 
   // gallery
   const imgs = cell.images;
-  const gal = el("section");
+  const gal = el("section", { id: "sec-work" });
   gal.append(el("h3", {}, `Work (${imgs.length})`));
   if (!imgs.length) {
     gal.append(el("p", { class: "hint" }, "No images posted to this cell yet."));
@@ -285,11 +327,15 @@ function renderCell() {
     `Students upload to their own row. You're signed in as “${ME()}”.`)));
 
   // threads
-  const tsec = el("section");
+  const tsec = el("section", { id: "sec-comments" });
   tsec.append(el("h3", {}, `Discussion (${cell.threads.length} threads)`));
   cell.threads.forEach((t) => tsec.append(renderThread(t)));
   tsec.append(renderNewThread(cell.student.id, cell.week.id));
   body.append(tsec);
+
+  // Scroll to whichever box the user clicked (work or comments).
+  const target = state.focus === "comments" ? tsec : gal;
+  requestAnimationFrame(() => { try { target.scrollIntoView({ block: "start" }); } catch { /* */ } });
 }
 
 function renderThread(t) {
@@ -445,15 +491,33 @@ function renderAdmin() {
       el("button", { onclick: () => go(async () => { const r = await apiPut("/api/admin/studio-name", { name: nameInput.value.trim() }); state.board.studioName = r.studioName; renderControls(); renderAdmin(); }) }, "Save"))));
 
   body.append(rosterEditor({
+    title: "TAs (sections)", items: state.board.tas || [], labelOf: (t) => t.name,
+    base: "/api/admin/tas", field: "name",
+  }));
+  body.append(rosterEditor({
     title: "Students (rows)", items: state.board.students, labelOf: (s) => s.name,
     base: "/api/admin/students", field: "name",
     bulkPlaceholder: "Paste names — one per line or comma-separated.\nAda Okafor\nBruno Silva, Chen Wei",
+    rowExtra: taSelect,
   }));
   body.append(rosterEditor({
     title: "Weeks (columns)", items: state.board.weeks, labelOf: (w) => w.label,
     base: "/api/admin/weeks", field: "label",
     bulkPlaceholder: "Paste week labels — one per line or comma-separated.\nWeek 5 · Final\nWeek 6 · Review",
   }));
+}
+
+// A per-student TA assignment dropdown for the students roster editor.
+function taSelect(student) {
+  const tas = state.board.tas || [];
+  const sel = el("select", { "aria-label": `TA for ${student.name}`, title: "Assign TA" });
+  sel.append(el("option", { value: "", selected: !student.ta_id }, "— No TA —"));
+  tas.forEach((t) => sel.append(el("option", { value: String(t.id), selected: student.ta_id === t.id }, t.name)));
+  sel.addEventListener("change", () => go(async () => {
+    await apiPatch(`/api/admin/students/${student.id}`, { ta_id: sel.value || null });
+    await reloadAdmin();
+  }));
+  return sel;
 }
 
 function rosterEditor(cfg) {
@@ -471,15 +535,18 @@ function rosterEditor(cfg) {
         el("button", { class: "tiny subtle", "aria-label": "Move up", disabled: i === 0, onclick: () => { const a = ids.slice(); [a[i - 1], a[i]] = [a[i], a[i - 1]]; saveOrder(a); } }, "↑"),
         el("button", { class: "tiny subtle", "aria-label": "Move down", disabled: i === cfg.items.length - 1, onclick: () => { const a = ids.slice(); [a[i + 1], a[i]] = [a[i], a[i + 1]]; saveOrder(a); } }, "↓")),
       input,
+      cfg.rowExtra ? cfg.rowExtra(it) : null,
       el("button", { class: "tiny subtle", onclick: () => { const v = input.value.trim(); if (v) go(async () => { await apiPatch(`${cfg.base}/${it.id}`, { [cfg.field]: v }); await reloadAdmin(); }); } }, "Save"),
       el("button", { class: "tiny danger", "aria-label": "Remove", onclick: () => { if (confirm(`Remove “${cfg.labelOf(it)}” and all its work/comments?`)) go(async () => { await apiDelete(`${cfg.base}/${it.id}`); await reloadAdmin(); }); } }, "Remove")));
   });
   sec.append(list);
 
-  const ta = el("textarea", { rows: "3", placeholder: cfg.bulkPlaceholder, "aria-label": "Bulk add", style: "width:100%;margin-top:.6rem" });
-  sec.append(ta, el("div", {}, el("button", {
-    onclick: () => { const text = ta.value.trim(); if (text) go(async () => { await apiPost(`${cfg.base}/bulk`, { text }); ta.value = ""; await reloadAdmin(); }); },
-  }, "Bulk add")));
+  if (cfg.bulkPlaceholder) {
+    const bulkBox = el("textarea", { rows: "3", placeholder: cfg.bulkPlaceholder, "aria-label": "Bulk add", style: "width:100%;margin-top:.6rem" });
+    sec.append(bulkBox, el("div", {}, el("button", {
+      onclick: () => { const text = bulkBox.value.trim(); if (text) go(async () => { await apiPost(`${cfg.base}/bulk`, { text }); bulkBox.value = ""; await reloadAdmin(); }); },
+    }, "Bulk add")));
+  }
   return sec;
 }
 

@@ -1,7 +1,7 @@
 # Studio Crit Board
 
 A self-hosted, grid-based **pinup / crit board** for an architecture design studio — a replacement
-for the studio's Miro board. **Rows are students, columns are weeks.** Each **cell** (one student ×
+for the studio's Miro board. **Rows are students (grouped by TA section), columns are weeks.** Each **cell** (one student ×
 one week) holds **many uploaded images** (process + final work) and **multiple threaded comment
 discussions**. It's meant to be the studio's primary place to post work and to give and receive
 **public** feedback.
@@ -35,10 +35,13 @@ npm start                     # → http://localhost:3000
 ## What it does (server app)
 - **Entry:** a shared **student passcode** (then pick your name from the roster) or an **instructor
   passcode** (unlocks admin). Identity is a self-selected name — light auth for a trusted studio.
-- **Admin (instructor):** set the studio name; add / rename / reorder / remove **students** (rows) and
-  **weeks** (columns); bulk-paste a roster; delete any image or comment (moderation).
-- **The grid:** scrollable, with a sticky header row and first column; each cell shows a thumbnail
-  stack and a "*N* threads · *M* comments" badge; images lazy-load.
+- **Admin (instructor):** set the studio name; manage **TAs** (sections) and assign each student to one;
+  add / rename / reorder / remove **students** (rows) and **weeks** (columns); bulk-paste a roster;
+  delete any image or comment (moderation).
+- **The grid:** scrollable, with a sticky header row and first column; **rows are grouped under TA
+  section headers**. Each cell has **two stacked boxes** — a **work** box (thumbnail stack) on top and a
+  **comments** box (thread/comment counts + the latest comment) below; click either to open that side.
+  Images lazy-load.
 - **Cell view:** an image gallery with a keyboard- and swipe-navigable lightbox; a drag-and-drop
   **upload** dropzone (multiple images at once, camera capture on mobile, optional per-image
   alt-text/caption, with progress); and **threaded comments** (start a thread, reply, see author +

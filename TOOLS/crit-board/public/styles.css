@@ -109,17 +109,38 @@ table.grid tbody th[scope="row"] {
 }
 table.grid thead th.corner { position: sticky; left: 0; top: 0; z-index: 3; min-width: 150px; }
 
-.cell-btn {
-  display: block; width: 100%; min-height: 96px; background: var(--card); color: var(--ink);
-  border: none; border-radius: 0; padding: 0.5rem; text-align: left; cursor: pointer; font-weight: 400;
+/* TA section-header row (sticky to the left so it stays visible when scrolling) */
+table.grid tr.ta-row th.ta-head {
+  position: sticky; left: 0; z-index: 2;
+  background: color-mix(in srgb, var(--accent) 14%, var(--chip));
+  color: var(--ink); text-align: left; font-weight: 700;
+  padding: 0.4rem 0.7rem; border-top: 2px solid var(--accent);
 }
-.cell-btn:hover { background: color-mix(in srgb, var(--accent) 8%, var(--card)); }
-.cell-btn.mine { box-shadow: inset 3px 0 0 var(--accent); }
-.thumb-stack { display: flex; flex-wrap: wrap; gap: 3px; margin-bottom: 0.35rem; }
-.thumb-stack img { width: 46px; height: 46px; object-fit: cover; border-radius: 5px; border: 1px solid var(--line); background: var(--chip); }
-.thumb-more { width: 46px; height: 46px; border-radius: 5px; border: 1px dashed var(--line); display: grid; place-items: center; color: var(--muted); font-size: 0.8rem; font-weight: 700; }
-.cell-empty { color: var(--muted); font-size: 0.85rem; font-style: italic; }
-.badge { display: inline-flex; gap: 0.4rem; font-size: 0.76rem; color: var(--muted); }
+table.grid tr.ta-row th.ta-head .ta-count { color: var(--muted); font-weight: 500; font-size: 0.85rem; }
+
+/* two-box cell: work (top) + comments (bottom), each a button */
+table.grid td { min-width: 200px; }
+.cell-box {
+  display: block; width: 100%; text-align: left; cursor: pointer; font: inherit; font-weight: 400;
+  background: var(--card); color: var(--ink); border: none; border-radius: 0; padding: 0.45rem 0.5rem;
+}
+.cell-box + .cell-box { border-top: 1px dashed var(--line); }
+.cell-box.work { min-height: 72px; }
+.cell-box.comments { min-height: 56px; background: color-mix(in srgb, var(--chip) 45%, var(--card)); }
+.cell-box:hover { background: color-mix(in srgb, var(--accent) 9%, var(--card)); }
+.cell-box.work.mine { box-shadow: inset 3px 0 0 var(--accent); }
+.box-meta { color: var(--muted); font-size: 0.72rem; margin-top: 0.2rem; }
+.last-comment {
+  color: var(--muted); font-size: 0.76rem; margin-top: 0.25rem;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
+.last-comment .who { color: var(--ink); font-weight: 600; }
+
+.thumb-stack { display: flex; flex-wrap: wrap; gap: 3px; }
+.thumb-stack img { width: 40px; height: 40px; object-fit: cover; border-radius: 5px; border: 1px solid var(--line); background: var(--chip); }
+.thumb-more { width: 40px; height: 40px; border-radius: 5px; border: 1px dashed var(--line); display: grid; place-items: center; color: var(--muted); font-size: 0.8rem; font-weight: 700; }
+.cell-empty { color: var(--muted); font-size: 0.82rem; font-style: italic; }
+.badge { display: flex; flex-wrap: wrap; gap: 0.4rem; font-size: 0.74rem; color: var(--muted); }
 .badge .n { color: var(--ink); font-weight: 700; }
 
 /* ---- dialogs ------------------------------------------------------------ */

@@ -11,7 +11,10 @@ open "TOOLS/crit-board/lite/index.html"        # macOS
 It can also be dropped on any static host (GitHub Pages, Netlify drop, a USB stick) — it's one file.
 
 ## What you can do
-- **Browse the grid** — students (rows) × weeks (columns), with a sticky header row and first column.
+- **Browse the grid** — students (rows, grouped under **TA section** headers) × weeks (columns), with a
+  sticky header row and first column. The sample board has **3 TAs × 12 students = 36 students and 6 weeks**.
+- **Two boxes per cell** — a **work** box (thumbnails) on top and a **comments** box (counts + the latest
+  comment) below; click either to open that side.
 - **Open a cell** → see the image gallery, a drag-and-drop **upload** zone (with per-image captions),
   and the **threaded comment** discussions.
 - **Lightbox** — click any image to enlarge; arrow keys / on-screen arrows / swipe to move; `Esc` closes.

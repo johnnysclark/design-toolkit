@@ -4,7 +4,7 @@
 import { Router } from "express";
 import { requireSession, requireLoggedIn } from "../auth.js";
 import {
-  getStudents, getWeeks, getSetting, getCellCounts,
+  getStudents, getWeeks, getTas, getSetting, getCellCounts,
   getStudent, getWeek, getCellImages, getCellThreads, getThreadComments, toPublicImage,
 } from "../db.js";
 
@@ -24,6 +24,7 @@ router.get("/api/board", requireSession, (req, res) => {
     studioName: getSetting("studio_name") || "Studio Crit Board",
     role: req.session.role,
     me: req.session.name,
+    tas: getTas(),
     students: getStudents(),
     weeks: getWeeks(),
     counts: getCellCounts(),
