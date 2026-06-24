@@ -107,9 +107,12 @@ The full web apps need `npm install` and (for the model passes) an
 to this repo** — only empty `.env.example` templates; `node_modules/` and `.env` are
 gitignored.
 
-**Putting these online?** See [`HOSTING.md`](HOSTING.md) — a step-by-step recipe with
-three UIUC hosting options and three private-service options, covering both the
-zero-setup static demos and the full AI apps, plus how to add a per-user login gate.
+**Putting these online?** Two guides:
+- [`HOSTING.md`](HOSTING.md) — quick recipe to host *today's* standalone demos and the
+  two Node apps (three UIUC + three private options, plus a per-user login gate).
+- [`WEBSITE-PLAN.md`](WEBSITE-PLAN.md) — the bigger build: the **Toolkit app** + the
+  **Research/Work/Teaching portfolio** as two database-backed sites (stack, database,
+  logins, LLM integration, UIUC vs. private hosting, and a phased build order).
 
 ---
 

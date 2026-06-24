@@ -5,6 +5,11 @@ is *not* a full-time developer. It gives you **three University of Illinois (UIU
 options** and **three private-service options**, with enough detail to actually
 choose and act.
 
+> **Building the full database-backed platform** — a Toolkit *app* plus a
+> Research/Work/Teaching *portfolio*, with per-user logins, file uploads, and a
+> database? See [`WEBSITE-PLAN.md`](WEBSITE-PLAN.md). **This** file covers the simpler
+> job of hosting today's standalone demos and the two existing Node apps.
+
 > **Your situation (what this recipe is tuned for):** host **both** the simple
 > static demos **and** the full AI apps; make them reachable on a **public URL but
 > gated by per-user logins** (each user is handed a key / login), so the open
