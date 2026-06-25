@@ -35,10 +35,10 @@ Drop the sign-in wall so the cohort can browse, but keep the Anthropic key un-re
 - **Pinup Wall:** needs a logged-in user (RLS) → gate it as "sign-in required" for now.
 - Leave a clear TODO to re-enable auth before sharing widely.
 
-### I2 · Deploy the public site to the apex — **small**
-`apps/landing/` (landing + Work) → live at `allmeans.works`. New Vercel project (root
-`platform/apps/landing`, framework **Other**) + Porkbun apex **A record** + `www` CNAME. See
-[`DEPLOY.md`](DEPLOY.md).
+### I2 · Deploy the public site to the apex — ✅ **DONE (2026-06-24)**
+*Live: `allmeans.works` → 308 → `www.allmeans.works` (Vercel project `allmeans-web`, root
+`platform/apps/landing`). Porkbun: A `@`→`216.198.79.1`, CNAME `www`→`c105…vercel-dns-017.com`.
+Verified: apex + www + `/work` all 200, valid cert. (`www` is canonical — flippable in Vercel.)*
 
 ### I3 · Email so others can log in (when auth returns) — **small**
 Resend SMTP in Supabase (built-in email only reaches the owner, 2/hr) + an `@illinois.edu`
