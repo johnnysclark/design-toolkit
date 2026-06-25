@@ -30,7 +30,7 @@ studio) and the **public site / portfolio**.
 - `TOOLS/` — original standalone tools being ported in.
 - Operating docs: `RUNNING-MULTIPLE-AGENTS.md` (concurrent-agent workflow) · `platform/STATUS.md`
   (who's working on what). Reference: `WEBSITE-PLAN.md` · `platform/DEPLOY.md` (deploy from
-  scratch) · `platform/CLAUDE-CODE.md` · `HOSTING.md`.
+  scratch) · `platform/CLAUDE-CODE.md`.
 
 ## Commands (run from `platform/`)
 - Install: `npm install`
