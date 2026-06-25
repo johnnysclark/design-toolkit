@@ -53,7 +53,8 @@ export async function POST(req: Request) {
     max_tokens: 4000,
     system,
     messages,
-    tools: [{ type: "web_search_20260209", name: "web_search" }]
+    // Cap searches so a turn can't spiral (cost + the server-tool pause_turn limit).
+    tools: [{ type: "web_search_20260209", name: "web_search", max_uses: 6 }]
   } as any);
 
   const enc = new TextEncoder();
