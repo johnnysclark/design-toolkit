@@ -20,8 +20,8 @@ export default async function AppLayout({
     <div className="flex min-h-screen">
       <aside className="flex w-64 shrink-0 flex-col border-r border-neutral-200 bg-white">
         <div className="border-b border-neutral-200 px-4 py-4">
-          <p className="text-sm font-semibold tracking-tight">Design Toolkit</p>
-          <p className="text-xs text-neutral-500">All Means Works</p>
+          <p className="display-font text-base uppercase tracking-tight">Design Toolkit</p>
+          <p className="text-xs uppercase tracking-wide text-neutral-400">All Means Works</p>
         </div>
 
         <SidebarNav items={TOOLKIT_NAV} signedIn={!!user} />
