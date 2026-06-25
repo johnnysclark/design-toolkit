@@ -13,7 +13,9 @@
 // Structured-output constraints: every object needs additionalProperties:false;
 // enums for status; no numeric/length limits.
 
-export const MODEL = "claude-opus-4-8";
+// Sonnet 4.6 — faster + cheaper than Opus, which keeps the grounded passes under
+// Vercel's 60s function cap. Used by contamination, synthesis, and the follow-up chat.
+export const MODEL = "claude-sonnet-4-6";
 
 // Reusable atomic-claim shape — the load-bearing honesty primitive (matches the
 // Librarian's claim tags so the UI chips are shared).
@@ -250,6 +252,33 @@ export function synthesisUser(bundle: any): string {
     "",
     "```json",
     JSON.stringify(bundle, null, 2),
+    "```"
+  ].join("\n");
+}
+
+// ---------------------------------------------------------------------------
+// Follow-up chat (grounded — Sonnet + web search, streamed)
+// ---------------------------------------------------------------------------
+
+// The student asks free-form questions about the place after the structured read.
+// `context` is the JSON of what we already know (hard data + any AI passes) so the
+// model answers from it first and only searches the web for what's missing.
+export function chatSystem(context: string): string {
+  return [
+    "You are a research assistant helping an architecture design studio understand a real, physical place. You can search the web.",
+    "This studio treats AI as a material to interrogate, never an authority — be honest about what you do and don't know so students can verify the rest.",
+    "",
+    "You already have a dossier of hard data and (sometimes) an AI reading for this place. It is given below. Ground your answers in it first; only search the web for things it doesn't cover (history, current proposals, ownership, news, codes, nearby context, precedents).",
+    "",
+    "Rules:",
+    "- When you use the web, prefer primary/official sources (city/county GIS, EPA, USGS, news of record, the site's own pages). Name what you found.",
+    "- Flag any precise figure, date, name, or quote you can't source as unverified — say so plainly. Never invent a citation.",
+    "- Be concise and design-relevant. A student is deciding what to draw, where to dig, how to orient. Answer that.",
+    "- If asked something the data can't support and the web can't settle, say what a site visit, survey, or records request would be needed to confirm.",
+    "",
+    "The dossier for this place:",
+    "```json",
+    context,
     "```"
   ].join("\n");
 }
