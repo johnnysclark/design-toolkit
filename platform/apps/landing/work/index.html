@@ -1,0 +1,744 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>All Means Works</title>
+<style>
+  /* ============================================================
+     MOS-grammar index site.
+     Plainness is the aesthetic: black on white, one typeface,
+     numbered lists, underlined links. The one deviation from
+     pure pastiche: this site is built screen-reader-first,
+     because the practice's research is non-visual representation.
+     ============================================================ */
+  :root{
+    --ink:#000;
+    --paper:#fff;
+    --dim:#888;
+    --rule:#000;
+    --pad:1.25rem;
+    --fs:15px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{font-size:var(--fs)}
+  body{
+    font-family:"Helvetica Neue",Helvetica,Arial,sans-serif;
+    background:var(--paper);
+    color:var(--ink);
+    line-height:1.45;
+    -webkit-font-smoothing:antialiased;
+  }
+  a{color:var(--ink);text-decoration:underline;text-underline-offset:2px}
+  a:hover{text-decoration:none}
+  a:focus-visible, button:focus-visible{
+    outline:2px solid var(--ink);
+    outline-offset:2px;
+    text-decoration:none;
+  }
+  button{
+    font:inherit;background:none;border:none;color:var(--ink);
+    text-decoration:underline;text-underline-offset:2px;cursor:pointer;
+  }
+  button:hover{text-decoration:none}
+
+  /* ---------- header ---------- */
+  header{
+    position:sticky;top:0;z-index:10;
+    background:var(--paper);
+    display:flex;gap:1.5rem;align-items:baseline;
+    padding:var(--pad);
+    border-bottom:1px solid var(--rule);
+  }
+  header .wordmark{font-weight:400;font-size:1rem;text-decoration:none}
+  header .wordmark:hover{text-decoration:underline}
+  header nav{display:flex;gap:1.5rem;flex-wrap:wrap}
+  header .spacer{flex:1}
+
+  /* ---------- typology index panel ---------- */
+  #typology{
+    border-bottom:1px solid var(--rule);
+    padding:var(--pad);
+    display:none;
+  }
+  #typology.open{display:block}
+  #typology ul{
+    list-style:none;
+    columns:3;column-gap:2rem;
+  }
+  @media(max-width:700px){#typology ul{columns:2}}
+  @media(max-width:440px){#typology ul{columns:1}}
+  #typology li{break-inside:avoid;margin:0 0 .15rem}
+  #typology button[aria-pressed="true"]{
+    text-decoration:none;
+    background:var(--ink);color:var(--paper);
+    padding:0 .25em;
+  }
+  #typology .close{display:block;margin-top:1rem}
+
+  /* ---------- chronological index (unnumbered) ---------- */
+  #works{padding:var(--pad)}
+  ol.index{
+    list-style:none;
+  }
+  ol.index > li{
+    display:flex;gap:1rem;align-items:baseline;
+  }
+  ol.index > li.year{
+    margin-top:1.1rem;
+    font-weight:400;
+  }
+  ol.index > li.year:first-child{margin-top:0}
+  ol.index > li.hidden{display:none}
+  ol.index a{text-decoration:none}
+  ol.index a:hover, ol.index a:focus-visible{text-decoration:underline}
+
+  /* ---------- project pages ---------- */
+  article.project{
+    border-top:1px solid var(--rule);
+    padding:var(--pad);
+    scroll-margin-top:4.5rem;
+  }
+  article.project.hidden{display:none}
+  article.project h2{
+    font-size:1.6rem;font-weight:400;line-height:1.15;
+    max-width:34ch;
+  }
+  article.project .sub{
+    font-size:1.05rem;color:var(--ink);
+    margin:.2rem 0 1.1rem;
+  }
+  article.project .body{
+    max-width:62ch;
+    margin-bottom:1.1rem;
+  }
+  article.project .body p + p{margin-top:.8rem}
+  article.project .credits{
+    max-width:62ch;
+    color:var(--ink);
+    font-size:.95rem;
+    margin-bottom:1.25rem;
+  }
+  article.project .credits p + p{margin-top:.3rem}
+
+  /* numbered image strip — placeholder blocks until real assets exist */
+  ol.media{
+    list-style:none;
+    display:flex;flex-wrap:wrap;gap:1rem;
+  }
+  ol.media li{
+    counter-increment:media;
+    display:flex;flex-direction:column;gap:.25rem;
+  }
+  ol.media .ph{
+    background:#e9e9e9;
+    border:1px solid #d2d2d2;
+    display:flex;align-items:center;justify-content:center;
+    color:var(--dim);
+    font-size:.8rem;
+    width:300px;height:200px;
+  }
+  ol.media .ph.tall{width:200px;height:300px}
+  ol.media .cap{font-size:.8rem;color:var(--dim)}
+  @media(max-width:700px){
+    ol.media .ph{width:100%;max-width:340px}
+  }
+
+  /* ---------- about / writings ---------- */
+  section.page{
+    border-top:1px solid var(--rule);
+    padding:var(--pad);
+    scroll-margin-top:4.5rem;
+  }
+  section.page h2{font-size:1.6rem;font-weight:400;margin-bottom:1rem}
+  section.page .body{max-width:62ch}
+  section.page .body p + p{margin-top:.8rem}
+  section.page ol{
+    list-style:none;counter-reset:row;max-width:70ch;margin-top:.5rem;
+  }
+  section.page ol li{
+    counter-increment:row;display:flex;gap:1rem;align-items:baseline;
+  }
+  section.page ol li::before{
+    content:counter(row) ".";min-width:2.5rem;color:var(--dim);
+    font-variant-numeric:tabular-nums;
+  }
+
+  footer{
+    border-top:1px solid var(--rule);
+    padding:var(--pad);
+    color:var(--dim);
+    font-size:.85rem;
+  }
+
+  /* ---------- collage: hovered images persist, stack, layer ---------- */
+  #collage{
+    position:fixed;inset:0;
+    z-index:0;
+    pointer-events:none;
+    overflow:hidden;
+  }
+  #collage .stack{
+    position:absolute;
+    transform:translate(-50%,-50%) rotate(var(--r,0deg));
+    box-shadow:0 1px 0 rgba(0,0,0,.08);
+  }
+  #collage .stack .ph{
+    width:100%;height:100%;
+    background:#e9e9e9;border:1px solid #c8c8c8;
+    display:flex;align-items:center;justify-content:center;
+    color:var(--dim);font-size:1rem;
+  }
+  #collage .stack img, #collage .stack video{
+    width:100%;height:100%;object-fit:cover;display:block;
+    border:1px solid #c8c8c8;
+  }
+  @keyframes stack-in{
+    from{opacity:0;transform:translate(-50%,-50%) rotate(var(--r,0deg)) scale(.92)}
+    to{opacity:1;transform:translate(-50%,-50%) rotate(var(--r,0deg)) scale(1)}
+  }
+  #collage .stack{animation:stack-in .25s ease-out both}
+
+  /* foreground sits above the collage */
+  header, #typology{position:relative;z-index:10}
+  header{position:sticky}
+  main, footer{position:relative;z-index:1}
+
+  /* text stays legible as images accumulate behind it */
+  ol.index > li,
+  article.project h2, article.project .sub,
+  article.project .body p, article.project .credits p,
+  section.page h2, section.page .body p, section.page ol li,
+  ol.media .cap, footer p{
+    background:var(--paper);
+    width:fit-content;
+    max-width:100%;
+  }
+  article.project .body p, section.page .body p{max-width:62ch}
+
+  /* popup preview — ~60% of the viewport, centered, opens on click */
+  #preview{
+    position:fixed;inset:0;
+    z-index:50;
+    display:none;
+    pointer-events:none;
+    align-items:center;justify-content:center;
+  }
+  #preview.show{display:flex}
+  #preview img, #preview video, #preview .ph{
+    width:60vw;height:60vh;
+    object-fit:cover;        /* switch to `contain` to letterbox instead of crop */
+    display:block;
+    background:var(--paper);
+    border:1px solid #c8c8c8;
+    box-shadow:0 2px 12px rgba(0,0,0,.12);
+    pointer-events:auto;
+    cursor:zoom-out;
+  }
+  #preview .ph{
+    background:#e9e9e9;
+    display:flex;align-items:center;justify-content:center;
+    color:var(--dim);font-size:1.4rem;
+  }
+
+  ol.media li{position:relative}
+  ol.media .ph, ol.media img, ol.media video{cursor:zoom-in}
+
+  /* reset button shows a count once the collage is non-empty */
+  #collageReset{display:none}
+  #collageReset.active{display:inline}
+
+  /* respect reduced motion (smooth scroll is the only motion) */
+  html{scroll-behavior:smooth}
+  @media(prefers-reduced-motion:reduce){
+    html{scroll-behavior:auto}
+    #collage .stack{animation:none}
+  }
+
+  .visually-hidden{
+    position:absolute;width:1px;height:1px;overflow:hidden;
+    clip:rect(0 0 0 0);white-space:nowrap;
+  }
+  .skip{
+    position:absolute;left:var(--pad);top:-3rem;
+    background:var(--ink);color:var(--paper);
+    padding:.4rem .8rem;z-index:20;text-decoration:none;
+    transition:top .1s;
+  }
+  .skip:focus{top:.5rem}
+</style>
+</head>
+<body>
+
+<div id="collage" aria-hidden="true"></div>
+<div id="preview" aria-hidden="true"></div>
+
+<a class="skip" href="#works">Skip to index</a>
+
+<header>
+  <a class="wordmark" href="../" id="top">All Means Works</a>
+  <nav aria-label="Primary">
+    <button id="indexToggle" aria-expanded="false" aria-controls="typology">Index</button>
+    <a href="#about">About</a>
+    <a href="#writings">Writings</a>
+    <button id="collageReset" aria-label="Clear accumulated images">Reset (0)</button>
+  </nav>
+  <span class="spacer"></span>
+</header>
+
+<!-- Work filters. Entries can carry multiple tags (e.g. the map is
+     research + teaching; the built objects also appear under projects). -->
+<div id="typology" role="region" aria-label="Filter works by category">
+  <ul>
+    <li><button data-type="all" aria-pressed="true">All</button></li>
+    <li><button data-type="projects" aria-pressed="false">Projects</button></li>
+    <li><button data-type="teaching" aria-pressed="false">Teaching</button></li>
+    <li><button data-type="research" aria-pressed="false">Research</button></li>
+    <li><button data-type="objects" aria-pressed="false">Objects</button></li>
+  </ul>
+  <button class="close" id="indexClose">Close</button>
+</div>
+
+<!-- Chronological index. Numbering per type is provisional — establish
+     your own count before publishing. -->
+<main>
+<nav id="works" aria-label="Index of works">
+  <ol class="index">
+    <li class="year">2026</li>
+    <li data-type="research"><a href="#sonic-navigator">Software No. 7, Sonic Navigator</a></li>
+    <li data-type="research"><a href="#ghx-gen">Software No. 6, A Grasshopper Generator (ghx-gen)</a></li>
+    <li data-type="research"><a href="#swell-paper">Tactile No. 2, A Drawing You Can Touch</a></li>
+    <li data-type="research"><a href="#acadia-paper">Writing No. 3, On a Non-Visual CAD Pipeline</a></li>
+    <li data-type="objects projects"><a href="#bbq-cart">Object No. 2, A Mobile BBQ Cart</a></li>
+    <li class="year">2025</li>
+    <li data-type="research"><a href="#mcp-server">Software No. 2–5, 53 Functions for Rhino</a></li>
+    <li data-type="research"><a href="#cli-watcher">Software No. 1, CLI → JSON → Watcher</a></li>
+    <li data-type="research"><a href="#laser-fab">Tactile No. 1, Laser Fabrication Workflow</a></li>
+    <li data-type="teaching"><a href="#superfund">Studio No. 8, Eco-Lounges for Superfund Sites</a></li>
+    <li data-type="teaching"><a href="#chicago-frame">Studio No. 7, An Updated Chicago Frame</a></li>
+    <li data-type="teaching"><a href="#discover">Outreach No. 1–, Discover Architecture</a></li>
+    <li class="year">2024</li>
+    <li data-type="objects projects"><a href="#monumental-table">Object No. 1, A Monumental Table</a></li>
+    <li data-type="research teaching"><a href="#skyscraper-map">Map No. 1, Early Chicago Skyscrapers</a></li>
+    <li data-type="teaching"><a href="#gizmos">Studio No. 6, Gizmos for the Kankakee River</a></li>
+    <li data-type="projects"><a href="#tbh">Exhibition No. 1–, TBH</a></li>
+  </ol>
+</nav>
+
+<!-- ============ PROJECT PAGES ============ -->
+
+<article class="project" id="sonic-navigator" data-type="research">
+  <h2>Software No. 7, Sonic Navigator</h2>
+  <p class="sub">Spatial audio, 2026</p>
+  <div class="body">
+    <p>A tool for hearing a model. Geometry is rendered as spatialized sound rather than pixels. Walls have a tone. Openings have a silence. A plan can be walked with the ears. Part of an ongoing effort to make CAD legible without sight, built with and for blind designers, not merely about them. [Replace with your own project text.]</p>
+  </div>
+  <div class="credits">
+    <p>Project Team: John Clark, Daniel [LAST NAME], [others]</p>
+    <p>Radical Accessibility Project, University of Illinois Urbana-Champaign</p>
+  </div>
+  <ol class="media">
+    <li><span class="ph">image 1 — 3:2</span><span class="cap">1</span></li>
+    <li><span class="ph">image 2 — 3:2</span><span class="cap">2</span></li>
+    <li><span class="ph tall">image 3 — 2:3</span><span class="cap">3</span></li>
+  </ol>
+</article>
+
+<article class="project" id="ghx-gen" data-type="research">
+  <h2>Software No. 6, A Grasshopper Generator (ghx-gen)</h2>
+  <p class="sub">XML, 2026</p>
+  <div class="body">
+    <p>Grasshopper definitions are XML. XML is text. Text can be written by anything that writes text. A generator that writes definitions directly, skipping the canvas, the wires, the eyes. [Replace with your own project text.]</p>
+  </div>
+  <div class="credits">
+    <p>Project Team: John Clark, [others]</p>
+  </div>
+  <ol class="media">
+    <li><span class="ph">image 1 — 3:2</span><span class="cap">1</span></li>
+    <li><span class="ph">image 2 — 3:2</span><span class="cap">2</span></li>
+  </ol>
+</article>
+
+<article class="project" id="swell-paper" data-type="research">
+  <h2>Tactile No. 2, A Drawing You Can Touch</h2>
+  <p class="sub">PIAF swell paper, 2026</p>
+  <div class="body">
+    <p>A pipeline from digital model to raised line. Heat swells the ink. The drawing becomes terrain. Plans, sections, and diagrams read by hand, produced as routinely as a print to PDF. [Replace with your own project text.]</p>
+  </div>
+  <div class="credits">
+    <p>Project Team: John Clark, Daniel [LAST NAME], [others]</p>
+  </div>
+  <ol class="media">
+    <li><span class="ph">image 1 — 3:2</span><span class="cap">1</span></li>
+    <li><span class="ph">image 2 — 3:2</span><span class="cap">2</span></li>
+    <li><span class="ph">image 3 — 3:2</span><span class="cap">3</span></li>
+  </ol>
+</article>
+
+<article class="project" id="acadia-paper" data-type="research">
+  <h2>Writing No. 3, On a Non-Visual CAD Pipeline</h2>
+  <p class="sub">ACADIA, 2026 [status pending — update on notification]</p>
+  <div class="body">
+    <p>[Paper abstract or short description here once acceptance is confirmed. Do not publish before notification.]</p>
+  </div>
+  <div class="credits">
+    <p>Authors: [TBD]</p>
+  </div>
+</article>
+
+<article class="project" id="bbq-cart" data-type="objects projects">
+  <h2>Object No. 2, A Mobile BBQ Cart</h2>
+  <p class="sub">Design-build, 2026 — In development</p>
+  <div class="body">
+    <p>A cart. It moves. It cooks. A small piece of social infrastructure for a school of architecture: smoke, gathering, grease, conversation. The follow-up to a monumental table. [Replace with your own project text.]</p>
+  </div>
+  <div class="credits">
+    <p>Exhibit Committee, UIUC School of Architecture</p>
+  </div>
+  <ol class="media">
+    <li><span class="ph">image 1 — 3:2</span><span class="cap">1</span></li>
+  </ol>
+</article>
+
+<article class="project" id="mcp-server" data-type="research">
+  <h2>Software No. 2–5, 53 Functions for Rhino</h2>
+  <p class="sub">MCP server, 2025–26</p>
+  <div class="body">
+    <p>Fifty-three functions. Draw a line. Loft a surface. Ask what is there. An agent speaks; Rhino listens. Modeling becomes a conversation, which means modeling becomes possible for someone who cannot see the viewport. [Replace with your own project text.]</p>
+  </div>
+  <div class="credits">
+    <p>Project Team: John Clark, Daniel [LAST NAME], [collaborators]</p>
+  </div>
+  <ol class="media">
+    <li><span class="ph">image 1 — 3:2</span><span class="cap">1</span></li>
+    <li><span class="ph">image 2 — 3:2</span><span class="cap">2</span></li>
+  </ol>
+</article>
+
+<article class="project" id="cli-watcher" data-type="research">
+  <h2>Software No. 1, CLI → JSON → Watcher</h2>
+  <p class="sub">Pipeline, 2025</p>
+  <div class="body">
+    <p>The first piece. A command line writes JSON. A watcher reads JSON. Rhino obeys. No mouse, no menus, no screen required. The architecture of the architecture tools. [Replace with your own project text.]</p>
+  </div>
+  <div class="credits">
+    <p>Project Team: John Clark, Daniel [LAST NAME]</p>
+  </div>
+  <ol class="media">
+    <li><span class="ph">image 1 — 3:2</span><span class="cap">1</span></li>
+  </ol>
+</article>
+
+<article class="project" id="laser-fab" data-type="research">
+  <h2>Tactile No. 1, Laser Fabrication Workflow</h2>
+  <p class="sub">2025</p>
+  <div class="body">
+    <p>From model to cut sheet to physical artifact, automatically. Models you can hold are models you can read with your hands. [Replace with your own project text — credit Ethan's contribution as appropriate.]</p>
+  </div>
+  <div class="credits">
+    <p>Project Team: John Clark, Ethan [LAST NAME], [others]</p>
+  </div>
+  <ol class="media">
+    <li><span class="ph">image 1 — 3:2</span><span class="cap">1</span></li>
+    <li><span class="ph">image 2 — 3:2</span><span class="cap">2</span></li>
+  </ol>
+</article>
+
+<article class="project" id="superfund" data-type="teaching">
+  <h2>Studio No. 8, Eco-Lounges for Superfund Sites</h2>
+  <p class="sub">Second-year design studio, UIUC, 2025</p>
+  <div class="body">
+    <p>Tar Creek. Libby. Iron Mountain. Onondaga Lake. McCormick &amp; Baxter. Sites where the supply chain ended badly. Students design lounges — places of rest — as instruments of remediation, reversing the supply chain one program at a time. [Replace with your own studio text.]</p>
+  </div>
+  <div class="credits">
+    <p>Instructor: John Clark</p>
+  </div>
+  <ol class="media">
+    <li><span class="ph">student work 1</span><span class="cap">1</span></li>
+    <li><span class="ph">student work 2</span><span class="cap">2</span></li>
+    <li><span class="ph">student work 3</span><span class="cap">3</span></li>
+  </ol>
+</article>
+
+<article class="project" id="chicago-frame" data-type="teaching">
+  <h2>Studio No. 7, An Updated Chicago Frame</h2>
+  <p class="sub">Graduate design studio, UIUC, 2025</p>
+  <div class="body">
+    <p>A CLT tower on Randolph Street. An 18-foot bay. The Chicago Frame, but in wood, a century and a half later. Paradise on the Prairie. [Replace with your own studio text.]</p>
+  </div>
+  <div class="credits">
+    <p>Instructor: John Clark</p>
+  </div>
+  <ol class="media">
+    <li><span class="ph">student work 1</span><span class="cap">1</span></li>
+    <li><span class="ph">student work 2</span><span class="cap">2</span></li>
+  </ol>
+</article>
+
+<article class="project" id="discover" data-type="teaching">
+  <h2>Outreach No. 1–, Discover Architecture</h2>
+  <p class="sub">Summer program, UIUC — Ongoing</p>
+  <div class="body">
+    <p>One hundred high school students. Studios, workshops, a day in St. Louis: the Pulitzer, CAM, City Foundry, the Arch. An annual introduction to the discipline, run as a small institution of its own. [Replace with your own program text.]</p>
+  </div>
+  <div class="credits">
+    <p>Director: John Clark</p>
+  </div>
+  <ol class="media">
+    <li><span class="ph">image 1 — 3:2</span><span class="cap">1</span></li>
+  </ol>
+</article>
+
+<article class="project" id="monumental-table" data-type="objects projects">
+  <h2>Object No. 1, A Monumental Table</h2>
+  <p class="sub">Design-build, 2024</p>
+  <div class="body">
+    <p>A table, but monumental. Built by committee, in the good sense. [Replace with your own project text.]</p>
+  </div>
+  <div class="credits">
+    <p>Exhibit Committee, UIUC School of Architecture</p>
+  </div>
+  <ol class="media">
+    <li><span class="ph">image 1 — 3:2</span><span class="cap">1</span></li>
+    <li><span class="ph">image 2 — 3:2</span><span class="cap">2</span></li>
+  </ol>
+</article>
+
+<article class="project" id="skyscraper-map" data-type="research teaching">
+  <h2>Map No. 1, Early Chicago Skyscrapers</h2>
+  <p class="sub">Interactive map, 2024</p>
+  <div class="body">
+    <p>Where the frame began. An interactive map of the first generation of Chicago skyscrapers, built as a teaching instrument for a studio that asks what the frame becomes next. [Replace with your own project text / embed the map.]</p>
+  </div>
+  <div class="credits">
+    <p>Project Team: John Clark</p>
+  </div>
+  <ol class="media">
+    <li><span class="ph">map screenshot</span><span class="cap">1</span></li>
+  </ol>
+</article>
+
+<article class="project" id="gizmos" data-type="teaching">
+  <h2>Studio No. 6, Gizmos for the Kankakee River</h2>
+  <p class="sub">First-year design studio, UIUC, 2024</p>
+  <div class="body">
+    <p>Small machines for a river. First projects, first models, first drawings. [Replace with your own studio text.]</p>
+  </div>
+  <div class="credits">
+    <p>Instructor: John Clark</p>
+  </div>
+  <ol class="media">
+    <li><span class="ph">student work 1</span><span class="cap">1</span></li>
+    <li><span class="ph">student work 2</span><span class="cap">2</span></li>
+  </ol>
+</article>
+
+<article class="project" id="tbh" data-type="projects">
+  <h2>Exhibition No. 1–, TBH</h2>
+  <p class="sub">Exhibition program, UIUC — Ongoing</p>
+  <div class="body">
+    <p>An annual cycle of exhibitions, workshops, and built objects for a school of architecture. Chaired, charted, chartered. [Replace with your own program text.]</p>
+  </div>
+  <div class="credits">
+    <p>Chair, Exhibit Committee: John Clark</p>
+  </div>
+  <ol class="media">
+    <li><span class="ph">installation view</span><span class="cap">1</span></li>
+  </ol>
+</article>
+
+<!-- ============ ABOUT ============ -->
+<section class="page" id="about">
+  <h2>About</h2>
+  <div class="body">
+    <p>All Means Works is a design and research practice led by John Clark, based in Urbana-Champaign and Chicago, Illinois. The practice makes software, objects, drawings, tactile documents, exhibitions, and studios. Its current research, the Radical Accessibility Project, builds non-visual tools for computer-aided design with blind co-researchers.</p>
+    <p>John is a Teaching Assistant Professor at the University of Illinois Urbana-Champaign School of Architecture. [Add bio, contact, and any LLC / disclosure language your outside-activity agreement requires.]</p>
+    <p>Contact: jsclark2@illinois.edu</p>
+  </div>
+</section>
+
+<!-- ============ WRITINGS ============ -->
+<section class="page" id="writings">
+  <h2>Writings</h2>
+  <ol>
+    <li><a href="#acadia-paper">On a Non-Visual CAD Pipeline (ACADIA 2026, pending)</a></li>
+    <li>[JAE article, in progress]</li>
+    <li>[Book, Oxford University Press, under contract]</li>
+  </ol>
+</section>
+</main>
+
+<footer>
+  <p>© 2026 All Means Works. All project texts and numbering provisional.</p>
+</footer>
+
+<script>
+(function(){
+  const toggle = document.getElementById('indexToggle');
+  const closeBtn = document.getElementById('indexClose');
+  const panel = document.getElementById('typology');
+  const filterButtons = panel.querySelectorAll('button[data-type]');
+  const rows = document.querySelectorAll('ol.index > li[data-type]');
+  const years = document.querySelectorAll('ol.index > li.year');
+  const projects = document.querySelectorAll('article.project');
+
+  function setPanel(open){
+    panel.classList.toggle('open', open);
+    toggle.setAttribute('aria-expanded', String(open));
+  }
+  toggle.addEventListener('click', () => setPanel(!panel.classList.contains('open')));
+  closeBtn.addEventListener('click', () => { setPanel(false); toggle.focus(); });
+
+  function hasTag(el, type){
+    return el.dataset.type.split(' ').includes(type);
+  }
+
+  function applyFilter(type){
+    filterButtons.forEach(b => b.setAttribute('aria-pressed', String(b.dataset.type === type)));
+    rows.forEach(li => li.classList.toggle('hidden', type !== 'all' && !hasTag(li, type)));
+    projects.forEach(a => a.classList.toggle('hidden', type !== 'all' && !hasTag(a, type)));
+    // hide year rows that have no visible entries beneath them
+    years.forEach(y => {
+      let sib = y.nextElementSibling, any = false;
+      while (sib && !sib.classList.contains('year')) {
+        if (!sib.classList.contains('hidden')) any = true;
+        sib = sib.nextElementSibling;
+      }
+      y.classList.toggle('hidden', !any);
+    });
+  }
+  filterButtons.forEach(b => b.addEventListener('click', () => applyFilter(b.dataset.type)));
+
+  /* ---------- persistent hover collage + full-screen preview ---------- */
+  const collage = document.getElementById('collage');
+  const preview = document.getElementById('preview');
+  const resetBtn = document.getElementById('collageReset');
+  const MAX_STACK = 60;        // oldest pieces drop off beyond this
+  const DWELL_MS = 150;        // dwell before a hover lands in the collage
+  let count = 0;
+
+  function mediaOf(sourceEl){
+    return sourceEl.querySelector('img, video, .ph');
+  }
+
+  function showPreview(sourceEl){
+    const media = mediaOf(sourceEl);
+    if(!media) return;
+    preview.innerHTML = '';
+    const clone = media.cloneNode(true);
+    if (clone.tagName === 'VIDEO'){
+      clone.muted = true; clone.loop = true; clone.autoplay = true;
+      clone.removeAttribute('controls');
+      clone.play && clone.play().catch(()=>{});
+    }
+    preview.appendChild(clone);
+    preview.classList.add('show');
+  }
+
+  function updateReset(){
+    const n = collage.children.length;
+    resetBtn.textContent = 'Reset (' + n + ')';
+    resetBtn.classList.toggle('active', n > 0);
+  }
+
+  function spawn(sourceEl){
+    // Clone whatever the thumbnail holds: placeholder block now,
+    // <img>/<video> later — the same code path works for both.
+    const media = mediaOf(sourceEl);
+    if(!media) return;
+
+    const piece = document.createElement('div');
+    piece.className = 'stack';
+
+    const vw = window.innerWidth, vh = window.innerHeight;
+    const w = vw * (0.35 + Math.random() * 0.25);            // 35–60vw wide
+    const ratio = media.classList && media.classList.contains('tall') ? 1.5 : (2/3);
+    piece.style.width = w + 'px';
+    piece.style.height = (w * ratio) + 'px';
+    piece.style.left = (vw * (0.15 + Math.random() * 0.7)) + 'px';
+    piece.style.top  = (vh * (0.15 + Math.random() * 0.7)) + 'px';
+    piece.style.setProperty('--r', ((Math.random() * 8) - 4).toFixed(1) + 'deg');
+    piece.style.zIndex = String(++count);
+
+    const clone = media.cloneNode(true);
+    if (clone.tagName === 'VIDEO'){
+      clone.muted = true; clone.loop = true; clone.autoplay = true;
+      clone.removeAttribute('controls');
+      clone.play && clone.play().catch(()=>{});
+    }
+    piece.appendChild(clone);
+    collage.appendChild(piece);
+
+    while (collage.children.length > MAX_STACK){
+      collage.removeChild(collage.firstChild);
+    }
+    updateReset();
+  }
+
+  let currentLi = null;
+
+  function hidePreview(){
+    preview.classList.remove('show');
+    preview.innerHTML = '';
+    currentLi = null;
+  }
+
+  document.querySelectorAll('ol.media li').forEach(li => {
+    let timer = null;
+    // hover only feeds the background collage (after a dwell)
+    li.addEventListener('mouseenter', () => {
+      timer = setTimeout(() => spawn(li), DWELL_MS);
+    });
+    li.addEventListener('mouseleave', () => clearTimeout(timer));
+    // click toggles the popup preview (and stacks a piece)
+    li.setAttribute('tabindex', '0');
+    li.addEventListener('click', e => {
+      e.stopPropagation();
+      if (currentLi === li){ hidePreview(); return; }
+      showPreview(li);
+      spawn(li);
+      currentLi = li;
+    });
+    li.addEventListener('keydown', e => {
+      if (e.key === 'Enter' || e.key === ' '){
+        e.preventDefault();
+        if (currentLi === li){ hidePreview(); }
+        else { showPreview(li); spawn(li); currentLi = li; }
+      }
+    });
+  });
+
+  // click the popup, click anywhere else, or press Escape to dismiss
+  preview.addEventListener('click', hidePreview);
+  document.addEventListener('click', e => {
+    if (currentLi && !e.target.closest('ol.media li')) hidePreview();
+  });
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') hidePreview();
+  });
+
+  resetBtn.addEventListener('click', () => {
+    collage.innerHTML = '';
+    count = 0;
+    updateReset();
+  });
+
+  /* ---------- test palette for placeholders ----------
+     Colors each gray placeholder so the stacking effect is
+     legible before real images exist. Inline styles copy into
+     the preview and collage clones automatically.
+     DELETE this block when real assets go in. */
+  const palette = [
+    '#d96c4f', '#4f7dd9', '#5fae6e', '#e0b73f',
+    '#9a6fd0', '#d96ca8', '#4fb8c9', '#8a8a3d',
+    '#c95f5f', '#5f86a8', '#7a9e57', '#b07fd9'
+  ];
+  document.querySelectorAll('ol.media .ph').forEach((ph, i) => {
+    ph.style.background = palette[i % palette.length];
+    ph.style.color = 'rgba(255,255,255,.85)';
+    ph.style.borderColor = 'rgba(0,0,0,.25)';
+  });
+})();
+</script>
+</body>
+</html>

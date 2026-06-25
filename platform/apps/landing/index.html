@@ -1,0 +1,193 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>All Means Works</title>
+  <meta name="description" content="All Means Works — John Clark. Design Toolkit and selected work." />
+  <meta property="og:title" content="All Means Works" />
+  <meta property="og:description" content="John Clark — Design Toolkit and selected work." />
+  <meta property="og:url" content="https://allmeans.works/" />
+  <style>
+    :root {
+      --ink: #111;
+      --muted: #8a8a8a;
+      --hairline: #e7e7e7;
+      --accent: #b1543b;
+    }
+    * { box-sizing: border-box; }
+    html, body { height: 100%; }
+    body {
+      margin: 0;
+      background: #fff;
+      color: var(--ink);
+      font: 400 16px/1.5 ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      -webkit-font-smoothing: antialiased;
+      display: flex;
+      flex-direction: column;
+      min-height: 100vh;
+    }
+
+    .wordmark {
+      position: absolute;
+      top: clamp(1.25rem, 4vw, 2.5rem);
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: .72rem;
+      font-weight: 600;
+      letter-spacing: .24em;
+      text-transform: uppercase;
+      color: var(--muted);
+      white-space: nowrap;
+    }
+
+    main {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: clamp(1.25rem, 4vw, 2.25rem);
+      padding: 6rem 1.5rem;
+      text-align: center;
+    }
+
+    .choices {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: clamp(.25rem, 2vw, 1rem);
+    }
+    .choice {
+      font-family: Georgia, "Times New Roman", serif;
+      font-size: clamp(3rem, 13vw, 6.5rem);
+      line-height: 1.02;
+      font-weight: 600;
+      letter-spacing: -.02em;
+      color: var(--ink);
+      text-decoration: none;
+      transition: color .15s ease;
+    }
+    .choice:hover { color: var(--accent); }
+    .choice:focus-visible {
+      outline: none;
+      color: var(--accent);
+      text-decoration: underline;
+      text-underline-offset: .1em;
+    }
+
+    .bio-btn {
+      margin-top: .5rem;
+      background: none;
+      border: 0;
+      cursor: pointer;
+      font: inherit;
+      font-size: .95rem;
+      color: var(--muted);
+      border-bottom: 1px solid var(--hairline);
+      padding: .15rem .1rem;
+      transition: color .15s, border-color .15s;
+    }
+    .bio-btn:hover, .bio-btn:focus-visible {
+      color: var(--ink);
+      border-color: var(--ink);
+      outline: none;
+    }
+
+    dialog {
+      border: 0;
+      border-radius: 14px;
+      padding: 0;
+      max-width: 34rem;
+      width: calc(100% - 2.5rem);
+      color: var(--ink);
+      box-shadow: 0 30px 80px -30px rgba(0,0,0,.4);
+    }
+    dialog::backdrop { background: rgba(20,18,16,.45); }
+    .sheet { position: relative; padding: clamp(1.75rem, 5vw, 2.5rem); }
+    .sheet h2 {
+      font-family: Georgia, "Times New Roman", serif;
+      font-weight: 600;
+      font-size: 1.6rem;
+      letter-spacing: -.01em;
+      margin: 0 0 1rem;
+    }
+    .sheet p { margin: 0 0 1rem; line-height: 1.6; color: #2a2a2a; }
+    .sheet .more { font-size: .95rem; margin-bottom: 0; }
+    .sheet a {
+      color: var(--accent);
+      text-decoration: none;
+      border-bottom: 1px solid color-mix(in srgb, var(--accent) 40%, transparent);
+    }
+    .close {
+      position: absolute;
+      top: .5rem;
+      right: .65rem;
+      background: none;
+      border: 0;
+      cursor: pointer;
+      font-size: 1.6rem;
+      line-height: 1;
+      color: var(--muted);
+      padding: .2rem .5rem;
+      border-radius: 8px;
+    }
+    .close:hover, .close:focus-visible { color: var(--ink); background: #f2f2f2; outline: none; }
+
+    @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+  </style>
+</head>
+<body>
+  <div class="wordmark">All Means Works</div>
+
+  <main>
+    <nav class="choices" aria-label="Primary">
+      <a class="choice" href="https://toolkit.allmeans.works">Toolkit</a>
+      <a class="choice" href="work/">Work</a>
+    </nav>
+    <button class="bio-btn" type="button" aria-haspopup="dialog" id="bioOpen">Bio</button>
+  </main>
+
+  <dialog id="bioDialog" aria-labelledby="bioTitle">
+    <div class="sheet">
+      <button class="close" type="button" id="bioClose" aria-label="Close">&times;</button>
+      <h2 id="bioTitle">John Clark</h2>
+      <p>
+        A Midwest-based designer and educator, and Teaching Assistant Professor in the
+        School of Architecture at the University of Illinois Urbana-Champaign, where he
+        co-coordinates the first- and second-year design studios.
+      </p>
+      <p>
+        His work spans spatial design, object design, fabrication, planning, computation,
+        and photography. His research asks how tools and workflows shape
+        <em>who can participate in design</em> — with an emphasis on hybrid digital/analog
+        practice and accessible methods, including AI-assisted visualization and low-vision
+        technologies.
+      </p>
+      <p class="more"><a href="work/">Full profile &amp; work →</a></p>
+    </div>
+  </dialog>
+
+  <script>
+    (function () {
+      var dlg = document.getElementById('bioDialog');
+      var openBtn = document.getElementById('bioOpen');
+      var closeBtn = document.getElementById('bioClose');
+
+      openBtn.addEventListener('click', function () {
+        if (typeof dlg.showModal === 'function') dlg.showModal();
+        else dlg.setAttribute('open', '');
+      });
+      closeBtn.addEventListener('click', function () { dlg.close(); });
+
+      // Click outside the dialog content (the backdrop) closes it.
+      dlg.addEventListener('click', function (e) {
+        var r = dlg.getBoundingClientRect();
+        var inside = e.clientX >= r.left && e.clientX <= r.right &&
+                     e.clientY >= r.top && e.clientY <= r.bottom;
+        if (!inside) dlg.close();
+      });
+    })();
+  </script>
+</body>
+</html>
