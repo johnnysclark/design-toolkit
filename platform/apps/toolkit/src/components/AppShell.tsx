@@ -36,7 +36,7 @@ export default function AppShell({
           <form action="/auth/signout" method="post">
             <button
               type="submit"
-              className="display-font text-xs uppercase tracking-wide text-neutral-500 hover:text-neutral-900"
+              className="display-font text-xs uppercase tracking-wide text-neutral-900 hover:text-[#ff3b21]"
             >
               Sign out
             </button>
@@ -44,7 +44,7 @@ export default function AppShell({
         ) : (
           <Link
             href="/login"
-            className="display-font text-xs uppercase tracking-wide text-neutral-500 hover:text-neutral-900"
+            className="display-font text-xs uppercase tracking-wide text-neutral-900 hover:text-[#ff3b21]"
           >
             Sign in
           </Link>
@@ -55,8 +55,8 @@ export default function AppShell({
         {open && (
           <aside className="flex w-64 shrink-0 flex-col border-r border-neutral-200 bg-white">
             <SidebarNav items={TOOLKIT_NAV} signedIn={signedIn} />
-            <div className="mt-auto border-t border-neutral-200 px-4 py-4 text-xs leading-relaxed text-neutral-500">
-              <p className="text-neutral-700">Built by John Clark &amp; Claude, 2026</p>
+            <div className="mt-auto border-t border-neutral-200 px-4 py-4 text-xs leading-relaxed text-neutral-900">
+              <p className="text-neutral-900">Built by John Clark &amp; Claude, 2026</p>
               <p className="mt-1.5">
                 Feedback?{" "}
                 <a

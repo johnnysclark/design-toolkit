@@ -386,10 +386,15 @@ const STYLES = `
   .di-doc .stack-table td::before{ content:attr(data-label); display:block; font-size:10px; letter-spacing:.1em; text-transform:uppercase; color:#999; margin-bottom:3px; }
   .di-doc .stack-table td:first-child{ font-size:16px; }
 }
+
+/* Site rule — all text is black, never grey. (SVG mocks keep their own fills.) */
+.di-doc, .di-doc *:not(a){ color:#111 !important; }
+.di-doc a{ color:#1A45F0 !important; }
+.di-doc .te-link{ color:#111 !important; }
+.di-doc .te-link span{ color:#1A45F0 !important; }
 `;
 
 export default function Overview() {
-  const liveTools = TOOLKIT_NAV.filter((t) => t.href !== "/" && t.status === "live");
   // Show the tool cards in the SAME order as the left sidebar; any card with no
   // matching tool page (href:null) sorts to the end.
   const navIndex = Object.fromEntries(TOOLKIT_NAV.map((t, i) => [t.href, i]));
@@ -403,15 +408,13 @@ export default function Overview() {
 
       <div className="wrap">
         <header>
-          <div className="kicker">All Means Works · Teaching statement · School of Architecture</div>
-          <h1>Teaching design studio with agentic AI</h1>
+          <h1>Agentic Design Studio Instruments</h1>
           <p className="byline">
             <b>John Clark</b> — Teaching Assistant Professor · 1st–3rd year undergraduate design studios
           </p>
         </header>
 
         <section className="exec">
-          <div className="lbl">Executive summary</div>
           <p className="sum">
             Studio students often can&rsquo;t yet defend their designs with rigor. This is a plan to change
             that by teaching them to work with agentically coded AI tools —{" "}
@@ -438,17 +441,6 @@ export default function Overview() {
               <div className="gv">When to offload thinking to a tool, and when to build the skill the slow way.</div>
             </div>
           </div>
-
-          {liveTools.length > 0 && (
-            <div className="jump">
-              <span className="jlbl">Live now</span>
-              {liveTools.map((t) => (
-                <Link key={t.href} href={t.href}>
-                  {t.label} →
-                </Link>
-              ))}
-            </div>
-          )}
         </section>
 
         <div className="khead">

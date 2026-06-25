@@ -44,7 +44,7 @@ export default function SidebarNav({
               <span
                 className={[
                   "shrink-0 rounded-full px-1.5 py-0.5 text-[10px] uppercase tracking-wide",
-                  active ? "bg-white/20 text-white" : "bg-neutral-200 text-neutral-600"
+                  active ? "bg-white/20 text-white" : "bg-neutral-200 text-neutral-900"
                 ].join(" ")}
               >
                 sign in
