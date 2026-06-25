@@ -75,7 +75,7 @@ export const TOOLKIT_NAV: ToolItem[] = [
   {
     href: "/rap",
     label: "RAP",
-    blurb: "Accessibility (RAP) — non-visual / tactile CAD workflow.",
-    status: "soon"
+    blurb: "Radical Accessibility Project — a non-visual / tactile CAD workflow that drives Rhino. The studio's research showcase.",
+    status: "live"
   }
 ];
