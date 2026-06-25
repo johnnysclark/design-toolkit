@@ -1,0 +1,428 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Summer AI Studio · Course Hub</title>
+<meta name="description" content="The front door for an architecture design studio that treats AI as a material to be interrogated. Grade the trace, not the output." />
+<!-- UniQuick platform SDK: silent @illinois.edu SSO + built-in AI (no API keys). Same-origin when served at /s/<slug>/. Fails gracefully off-platform. -->
+<script src="https://quick.disruptionlab.illinois.edu/sdk.js" defer onerror="window.__uqSdkFailed=true"></script>
+<style>
+  :root{
+    --paper:#f7f4ee; --paper-2:#fffdf8; --ink:#1c1b19; --ink-soft:#544f46;
+    --line:#e0d9cb; --line-2:#cfc6b4;
+    --accent:#b4502a; --accent-deep:#8c3c1f; --accent-soft:#f2e4da;
+    --good:#2e6f4e; --good-soft:#e3efe7;
+    --plan:#9a7a1f; --plan-soft:#f1e9d4;
+    --serif:Georgia,"Iowan Old Style","Times New Roman",serif;
+    --sans:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,"Liberation Mono",monospace;
+    --maxw:980px;
+  }
+  *{box-sizing:border-box}
+  html{-webkit-text-size-adjust:100%}
+  body{
+    margin:0; background:var(--paper); color:var(--ink);
+    font-family:var(--sans); line-height:1.6; font-size:17px;
+    text-rendering:optimizeLegibility; -webkit-font-smoothing:antialiased;
+  }
+  a{color:var(--accent-deep); text-underline-offset:2px; text-decoration-thickness:1px}
+  a:hover{color:var(--accent)}
+  .wrap{max-width:var(--maxw); margin:0 auto; padding:0 22px}
+
+  /* status / whoami bar */
+  #whoami{
+    font-family:var(--mono); font-size:12.5px; letter-spacing:.02em;
+    color:var(--ink-soft); background:var(--paper-2);
+    border-bottom:1px solid var(--line); padding:9px 0;
+  }
+  #whoami .wrap{display:flex; gap:10px; align-items:center; flex-wrap:wrap}
+  #whoami .dot{width:8px; height:8px; border-radius:50%; background:var(--line-2); flex:0 0 auto}
+  body.live #whoami .dot{background:var(--good)}
+
+  /* masthead */
+  header.mast{padding:46px 0 30px; border-bottom:1px solid var(--line)}
+  .kicker{font-family:var(--mono); font-size:12.5px; letter-spacing:.16em; text-transform:uppercase; color:var(--accent-deep); margin:0 0 16px}
+  h1.hero{font-family:var(--serif); font-weight:700; font-size:clamp(2.1rem,6vw,3.5rem); line-height:1.04; letter-spacing:-.01em; margin:0 0 14px}
+  .hatch{height:9px; margin:18px 0 16px; background:repeating-linear-gradient(45deg,var(--accent) 0 1.5px,transparent 1.5px 8px); opacity:.5; border-radius:2px}
+  .lede{font-size:1.16rem; color:var(--ink-soft); max-width:60ch; margin:0}
+
+  /* sections */
+  section{padding:40px 0; border-bottom:1px solid var(--line)}
+  .eyebrow{font-family:var(--mono); font-size:12px; letter-spacing:.13em; text-transform:uppercase; color:var(--accent-deep); margin:0 0 6px}
+  h2{font-family:var(--serif); font-weight:700; font-size:clamp(1.5rem,3.6vw,2.05rem); letter-spacing:-.01em; margin:0 0 6px; line-height:1.12}
+  .sub{color:var(--ink-soft); margin:0 0 22px; max-width:64ch}
+  p{margin:0 0 14px}
+
+  blockquote.rule{
+    margin:6px 0 0; padding:20px 22px; background:var(--paper-2);
+    border:1px solid var(--line); border-left:4px solid var(--accent); border-radius:4px;
+  }
+  blockquote.rule .big{font-family:var(--serif); font-size:1.32rem; font-weight:700; line-height:1.25; margin:0 0 8px}
+  blockquote.rule .gloss{color:var(--ink-soft); margin:0; font-size:.97rem}
+
+  /* card grids */
+  .grid{display:grid; gap:14px}
+  .grid.cols-2{grid-template-columns:repeat(auto-fit,minmax(260px,1fr))}
+  .grid.cols-3{grid-template-columns:repeat(auto-fit,minmax(220px,1fr))}
+  .card{background:var(--paper-2); border:1px solid var(--line); border-radius:6px; padding:16px 17px}
+  .card h3{margin:0 0 6px; font-size:1.02rem; font-family:var(--sans); font-weight:700; letter-spacing:.01em}
+  .card .n{font-family:var(--mono); color:var(--accent-deep); font-size:.82rem; margin-right:6px}
+  .card p{margin:0; color:var(--ink-soft); font-size:.95rem}
+
+  /* tools table-ish list */
+  .tool{display:flex; gap:14px; align-items:flex-start; padding:14px 0; border-top:1px solid var(--line)}
+  .tool:first-child{border-top:0}
+  .tool .body{flex:1 1 auto; min-width:0}
+  .tool .name{font-weight:700}
+  .tool .name a{font-family:var(--mono); font-size:.95em}
+  .tool .desc{color:var(--ink-soft); font-size:.95rem; margin:3px 0 0}
+  .badge{font-family:var(--mono); font-size:11px; letter-spacing:.04em; text-transform:uppercase; padding:3px 8px; border-radius:999px; white-space:nowrap; border:1px solid transparent; align-self:flex-start}
+  .badge.work{background:var(--good-soft); color:var(--good); border-color:#bcd9c7}
+  .badge.plan{background:var(--plan-soft); color:var(--plan); border-color:#e0d2a6}
+  .badge.prog{background:var(--accent-soft); color:var(--accent-deep); border-color:#e6c8b6}
+  .star{color:var(--accent)}
+
+  /* apparatus table */
+  table.app{width:100%; border-collapse:collapse; font-size:.96rem}
+  table.app th,table.app td{text-align:left; padding:10px 12px; border-bottom:1px solid var(--line); vertical-align:top}
+  table.app th{font-family:var(--mono); font-size:11.5px; letter-spacing:.08em; text-transform:uppercase; color:var(--ink-soft); font-weight:600}
+  table.app td:first-child{font-weight:600; width:38%}
+  .app-cap{color:var(--ink-soft); font-size:.93rem; margin:12px 0 0}
+
+  /* interactive panels */
+  .panel{background:var(--paper-2); border:1px solid var(--line-2); border-radius:8px; padding:20px}
+  textarea,input.line{
+    width:100%; font-family:var(--sans); font-size:1rem; color:var(--ink);
+    background:var(--paper); border:1px solid var(--line-2); border-radius:6px; padding:11px 12px;
+  }
+  textarea{min-height:120px; resize:vertical; line-height:1.5}
+  textarea:focus,input.line:focus{outline:2px solid var(--accent); outline-offset:1px; border-color:var(--accent)}
+  .btn{
+    font-family:var(--sans); font-size:.97rem; font-weight:600; cursor:pointer;
+    background:var(--accent); color:#fff; border:1px solid var(--accent-deep);
+    border-radius:6px; padding:10px 16px;
+  }
+  .btn:hover{background:var(--accent-deep)}
+  .btn:disabled{opacity:.55; cursor:default}
+  .btn.ghost{background:transparent; color:var(--accent-deep); border-color:var(--line-2)}
+  .btn.ghost:hover{background:var(--accent-soft); color:var(--accent-deep)}
+  .row{display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-top:12px}
+  .out{
+    white-space:pre-wrap; font-size:.97rem; line-height:1.55; color:var(--ink);
+    background:var(--paper); border:1px dashed var(--line-2); border-radius:6px;
+    padding:14px; margin-top:14px; min-height:42px;
+  }
+  .hint{font-size:.86rem; color:var(--ink-soft); margin:10px 0 0}
+  .hint.warn{color:var(--accent-deep)}
+  .status{font-family:var(--mono); font-size:12px; color:var(--good); min-height:16px}
+
+  .loglines{display:grid; gap:11px; margin-top:4px}
+  .loglines label{display:block; font-family:var(--mono); font-size:11.5px; letter-spacing:.06em; text-transform:uppercase; color:var(--ink-soft); margin:0 0 4px}
+
+  footer{padding:34px 0 60px; color:var(--ink-soft); font-size:.9rem}
+  footer .wrap{display:grid; gap:8px}
+  footer code{font-family:var(--mono); font-size:.85em; background:var(--paper-2); border:1px solid var(--line); padding:1px 5px; border-radius:4px}
+  .preview-note{display:none}
+  body.preview .preview-note{display:inline}
+
+  @media (max-width:560px){
+    body{font-size:16px}
+    table.app td:first-child{width:auto}
+    .tool{flex-direction:column; gap:6px}
+  }
+</style>
+</head>
+<body>
+
+<div id="whoami"><div class="wrap"><span class="dot"></span><span id="whoami-text">Checking your Illinois sign-in…</span></div></div>
+
+<header class="mast"><div class="wrap">
+  <p class="kicker">Summer AI Studio → Fall Design Studio · University of Illinois</p>
+  <h1 class="hero">Grade the trace,<br>not the output.</h1>
+  <div class="hatch" aria-hidden="true"></div>
+  <p class="lede">A studio that treats AI as a <em>material to be interrogated</em> — and keeps you, not the model, as the cognitive agent. This page is the course's front door.</p>
+</div></header>
+
+<main>
+
+  <!-- THE IDEA -->
+  <section><div class="wrap">
+    <p class="eyebrow">§1 · The idea in one paragraph</p>
+    <h2>Design thinking is already AI-ready.</h2>
+    <p class="sub">The bet of the studio.</p>
+    <p>Designers iterate, critique, prototype, and tolerate ambiguity — exactly the habits that working well with AI rewards. So the studio brings the design <em>feedback loop</em> to AI rather than treating it as an oracle. The through-lines: <strong>grade the trace, not the output</strong>; price trust against evidence; keep provenance; and keep the student — not the model — as the cognitive agent.</p>
+    <blockquote class="rule">
+      <p class="big">&ldquo;Use AI to extend your reach, never to skip your reps.&rdquo;</p>
+      <p class="gloss">The assignment was never the product — <em>you</em> are the product; the assignment is the gym. Capability is rented; judgment is owned.</p>
+    </blockquote>
+  </div></section>
+
+  <!-- MATERIALS INDEX -->
+  <section><div class="wrap">
+    <p class="eyebrow">§2 · Course materials</p>
+    <h2>The working tools</h2>
+    <p class="sub">A set of small AI demos that each make one idea legible, plus two showcase tools that go deep. Each links to its spec in the repository.</p>
+
+    <div class="tool">
+      <div class="body">
+        <div class="name"><a href="https://github.com/johnnysclark/26-summer-ai-workshop/tree/main/TOOLS/site-analyzer">site-analyzer</a></div>
+        <p class="desc">Feed a site → a structured read for design: climate, orientation, terrain, water, constraints, history — and the ground exported for Rhino.</p>
+      </div><span class="badge work">working</span>
+    </div>
+    <div class="tool">
+      <div class="body">
+        <div class="name"><a href="https://github.com/johnnysclark/26-summer-ai-workshop/tree/main/TOOLS/precedent-librarian">precedent-librarian</a></div>
+        <p class="desc">Dossier builder for design &amp; technical references; tags every claim, plays devil's advocate, hands you a verification worksheet.</p>
+      </div><span class="badge work">working</span>
+    </div>
+    <div class="tool">
+      <div class="body">
+        <div class="name"><span class="star">★</span> <a href="https://github.com/johnnysclark/26-summer-ai-workshop/tree/main/TOOLS/rap-tactile-cad">rap-tactile-cad</a></div>
+        <p class="desc">The RAP accessibility tool — a non-visual / tactile CAD workflow. The studio's research showcase.</p>
+      </div><span class="badge prog">in progress</span>
+    </div>
+    <div class="tool">
+      <div class="body">
+        <div class="name"><span class="star">★</span> <a href="https://github.com/johnnysclark/26-summer-ai-workshop/tree/main/TOOLS/design-thinking-showcase">design-thinking-showcase</a></div>
+        <p class="desc">&ldquo;The Crit Engine&rdquo; — solve one brief twice (accept AI's first answer vs. run the design loop) and grade the <em>tape</em>, not the building. The thesis showcase.</p>
+      </div><span class="badge prog">new</span>
+    </div>
+    <div class="tool">
+      <div class="body">
+        <div class="name"><a href="https://github.com/johnnysclark/26-summer-ai-workshop/tree/main/TOOLS/rhino-wizard">rhino-wizard</a></div>
+        <p class="desc">Tutor for Rhino / Grasshopper / GH-Python; mode toggles and Beginner → Advanced levels.</p>
+      </div><span class="badge plan">planned</span>
+    </div>
+    <div class="tool">
+      <div class="body">
+        <div class="name"><a href="https://github.com/johnnysclark/26-summer-ai-workshop/tree/main/TOOLS/code-zoning-agent">code-zoning-agent</a></div>
+        <p class="desc">Interpret code &amp; zoning for a project, every claim clause-cited and checkable.</p>
+      </div><span class="badge plan">planned</span>
+    </div>
+    <div class="tool">
+      <div class="body">
+        <div class="name"><a href="https://github.com/johnnysclark/26-summer-ai-workshop/tree/main/TOOLS/form-helper">form-helper</a></div>
+        <p class="desc">Form-finding governed by site forces (sun, wind, orientation…) acting on a chosen geometry.</p>
+      </div><span class="badge plan">planned</span>
+    </div>
+    <div class="tool">
+      <div class="body">
+        <div class="name"><a href="https://github.com/johnnysclark/26-summer-ai-workshop/tree/main/TOOLS/portfolio-storyteller">portfolio-storyteller</a></div>
+        <p class="desc">Review prep + portfolio narrative aid; keeps the student's voice and judgment.</p>
+      </div><span class="badge plan">planned</span>
+    </div>
+
+    <p class="sub" style="margin-top:22px"><strong>Planning &amp; pedagogy docs:</strong>
+      <a href="https://github.com/johnnysclark/26-summer-ai-workshop/blob/main/BRAINSTORM/SYNTHESIS.md">Synthesis</a> ·
+      <a href="https://github.com/johnnysclark/26-summer-ai-workshop/blob/main/AI%20PEDAGOGY%20NOTES.md">AI Pedagogy Notes</a> ·
+      <a href="https://github.com/johnnysclark/26-summer-ai-workshop/blob/main/TOOL%20CATALOG%20IDEAS.md">Tool Catalog</a> ·
+      <a href="https://github.com/johnnysclark/26-summer-ai-workshop/blob/main/TOOL%20IDEAS%20ANALYSIS.md">Tool Ideas Analysis</a> ·
+      <a href="https://github.com/johnnysclark/26-summer-ai-workshop/blob/main/BRAINSTORM/METAPHOR%20IDEAS.md">Metaphor Ideas</a>
+      &nbsp;—&nbsp; <a href="https://github.com/johnnysclark/26-summer-ai-workshop">open the full repository →</a></p>
+  </div></section>
+
+  <!-- PRINCIPLES -->
+  <section><div class="wrap">
+    <p class="eyebrow">§3 · The spine</p>
+    <h2>Six governing principles</h2>
+    <p class="sub">These recur across every brainstorm document; together they form the course's posture toward the machine.</p>
+    <div class="grid cols-2">
+      <div class="card"><h3><span class="n">1</span>Grade the trace, not the output</h3><p>Assess the reasoning log and the AI interaction — transcript, refactor diff, failure museum — not just the final artifact.</p></div>
+      <div class="card"><h3><span class="n">2</span>Interrogation is the method</h3><p>The crit, pointed at the machine. <em>&ldquo;Make the strongest case that this is wrong&rdquo;</em> is the highest-value prompt.</p></div>
+      <div class="card"><h3><span class="n">3</span>Calibrated skepticism</h3><p>Trust is neither given nor withheld; it is <em>priced</em>, continuously, against evidence.</p></div>
+      <div class="card"><h3><span class="n">4</span>Verification must be external</h3><p>The model cannot be the court that acquits itself. Triangulate; run the code; check every citation.</p></div>
+      <div class="card"><h3><span class="n">5</span>You stay the cognitive agent</h3><p>AI is argued with, wielded, checked, or constrained — never the second brain.</p></div>
+      <div class="card"><h3><span class="n">6</span>Provenance — the log</h3><p>Four lines for any AI-touched work: tool · asked · kept-changed-rejected · verified. Disclosure as process, not detection.</p></div>
+    </div>
+  </div></section>
+
+  <!-- APPARATUS -->
+  <section><div class="wrap">
+    <p class="eyebrow">§4 · The bridge</p>
+    <h2>The architect's apparatus maps onto AI work</h2>
+    <p class="sub">Architecture's 600-year-old delegation machinery already <em>is</em> the skillset for directing AI.</p>
+    <table class="app">
+      <thead><tr><th>Architecture</th><th>AI workflow</th></tr></thead>
+      <tbody>
+        <tr><td>Bid package</td><td>Context engineering — &ldquo;what is not in the window does not exist.&rdquo;</td></tr>
+        <tr><td>RFI (request for information)</td><td>The agent's clarifying questions.</td></tr>
+        <tr><td>Shop-drawing review</td><td>Reading the diff — review for conformance to intent; don't redo.</td></tr>
+        <tr><td>Spec / dimension string / detail</td><td>A natural-language program with tolerances.</td></tr>
+        <tr><td>Literal-but-wrong contractor</td><td>The model's native failure mode: fluent, compliant, wrong.</td></tr>
+      </tbody>
+    </table>
+    <p class="app-cap">The studio loop <em>is</em> the agent loop: propose → act → observe → revise = scheme → pin-up → crit → revision.</p>
+  </div></section>
+
+  <!-- INTERROGATION BENCH -->
+  <section><div class="wrap">
+    <p class="eyebrow">§5 · Built-in AI · do the method</p>
+    <h2>The Interrogation Bench</h2>
+    <p class="sub">The studio's core move, made live. Paste a claim, a design rationale, or an answer an AI gave you. The bench argues <em>against</em> it — surfacing hidden assumptions, demanding external verification, and separating polish from evidence.</p>
+    <div class="panel">
+      <textarea id="bench-input" placeholder="e.g. &quot;The precedent AI gave me says this façade system meets the energy code for our climate zone, so we can proceed.&quot;"></textarea>
+      <div class="row">
+        <button class="btn" id="bench-go">Make the strongest case it's wrong →</button>
+        <span class="hint preview-note warn">Preview mode — built-in AI activates once this page is deployed to UniQuick and you're signed in with your Illinois account.</span>
+      </div>
+      <div class="out" id="bench-output" aria-live="polite">The bench's critique appears here.</div>
+      <p class="hint warn">Then interrogate the interrogation. The model cannot be the court that acquits itself — verification must be external.</p>
+      <p class="hint">Powered by UniQuick's built-in AI (Azure OpenAI inside the U of I tenant). No API key — and never put one in an app.</p>
+    </div>
+  </div></section>
+
+  <!-- PROVENANCE LOG -->
+  <section><div class="wrap">
+    <p class="eyebrow">§6 · Keep the trace</p>
+    <h2>Four-line provenance log</h2>
+    <p class="sub">Authorship in this studio is constituted by the log, not asserted. For any AI-touched work, record four lines.</p>
+    <div class="panel">
+      <div class="loglines">
+        <div><label for="log-tool">Tool</label><input class="line" id="log-tool" placeholder="Which model / tool, which version" /></div>
+        <div><label for="log-asked">Asked</label><input class="line" id="log-asked" placeholder="What you asked it to do" /></div>
+        <div><label for="log-kept">Kept / changed / rejected</label><input class="line" id="log-kept" placeholder="What you took, what you altered, what you threw out" /></div>
+        <div><label for="log-verified">Verified</label><input class="line" id="log-verified" placeholder="How you checked it — externally" /></div>
+      </div>
+      <div class="row">
+        <button class="btn" id="log-save">Save draft</button>
+        <button class="btn ghost" id="log-copy">Copy log</button>
+        <button class="btn ghost" id="log-clear">Clear</button>
+        <span class="status" id="log-status"></span>
+      </div>
+      <p class="hint">Saved in this browser only. A shared <em>studio wall</em> — every student's log, attributed and live — is the planned next version, using UniQuick's shared data + realtime.</p>
+    </div>
+  </div></section>
+
+</main>
+
+<footer><div class="wrap">
+  <div>Built for the Summer AI Studio · linked into Canvas via <strong>UniQuick</strong> (UIUC Gies Disruption Lab).</div>
+  <div>Anyone at Illinois with the link can open this page; only the owner can change it. <strong>Don't post FERPA-protected or sensitive data.</strong></div>
+  <div>Manage or remove this site at <a href="https://quick.disruptionlab.illinois.edu/my">/my</a> · source: <a href="https://github.com/johnnysclark/26-summer-ai-workshop">github.com/johnnysclark/26-summer-ai-workshop</a></div>
+</div></footer>
+
+<script>
+(function(){
+  var $ = function(s){ return document.querySelector(s); };
+
+  /* ---------- platform detection + Illinois SSO ---------- */
+  function onPlatform(){ return typeof window.quick !== "undefined" && window.quick; }
+
+  async function initPlatform(){
+    var bar = $("#whoami-text");
+    if(!onPlatform()){
+      document.body.classList.add("preview");
+      bar.textContent = "Preview mode — deploy to UniQuick to sign in silently with your @illinois.edu account.";
+      return false;
+    }
+    try{
+      if(window.quick.ready){ await window.quick.ready; }
+      var u = window.quick.user || {};
+      var name = u.name || "";
+      var upn = u.upn || "";
+      var netid = upn ? String(upn).split("@")[0] : "";
+      document.body.classList.remove("preview");
+      document.body.classList.add("live");
+      bar.textContent = "Signed in" + (name ? " · " + name : "") + (netid ? " · " + netid : "");
+      return true;
+    }catch(e){
+      bar.textContent = "Signed in with your Illinois account.";
+      document.body.classList.add("live");
+      return true;
+    }
+  }
+
+  /* ---------- §5 Interrogation Bench (built-in AI) ---------- */
+  function hasAI(){
+    return onPlatform() && window.quick.ai && typeof window.quick.ai.chat === "function";
+  }
+  function buildPrompt(text){
+    return [
+      "You are a rigorous design critic in an architecture studio that treats AI as a material to be interrogated, not an oracle.",
+      "A student submits the claim, rationale, or AI-generated answer below. Make the strongest, most specific case that it is WRONG, unreliable, or unverified. Do not retreat into both-sides hedging.",
+      "Specifically:",
+      "1. Name the hidden assumptions it rests on.",
+      "2. Identify exactly what would need EXTERNAL verification — sources to check, things to measure, code to run, citations to confirm. Never treat the text's own confidence as evidence.",
+      "3. Point out where fluency or polish is masquerading as accuracy.",
+      "4. Give 2-4 concrete, checkable objections a sharp critic would raise.",
+      "Be direct and concise. End with one line: the single most important thing to verify first.",
+      "",
+      "SUBMISSION:",
+      '"""',
+      text,
+      '"""'
+    ].join("\n");
+  }
+  async function interrogate(){
+    var ta = $("#bench-input"), out = $("#bench-output"), btn = $("#bench-go");
+    var text = (ta.value || "").trim();
+    if(!text){ out.textContent = "Paste a claim, rationale, or AI answer to interrogate first."; return; }
+    if(!hasAI()){
+      out.textContent = "Built-in AI activates once this page is deployed to UniQuick and you're signed in with your @illinois.edu account. (You're seeing preview mode.)";
+      return;
+    }
+    var label = btn.textContent;
+    btn.disabled = true; btn.textContent = "Interrogating…";
+    out.textContent = "Thinking…";
+    try{
+      var res = await window.quick.ai.chat(buildPrompt(text));
+      out.textContent = (typeof res === "string") ? res : JSON.stringify(res, null, 2);
+    }catch(e){
+      out.textContent = "The bench couldn't reach the built-in AI just now" + (e && e.message ? (": " + e.message) : ".") + "\nTry again in a moment.";
+    }finally{
+      btn.disabled = false; btn.textContent = label;
+    }
+  }
+
+  /* ---------- §6 Provenance log (local draft) ---------- */
+  var LOG_KEY = "studio-hub:prov-log:v1";
+  var FIELDS = ["tool","asked","kept","verified"];
+  function flash(msg){ var el = $("#log-status"); if(!el) return; el.textContent = msg; setTimeout(function(){ if(el.textContent === msg) el.textContent = ""; }, 2500); }
+  function saveLog(){
+    var data = {}; FIELDS.forEach(function(f){ data[f] = $("#log-"+f).value; });
+    try{ localStorage.setItem(LOG_KEY, JSON.stringify(data)); flash("Saved in this browser."); }
+    catch(e){ flash("Couldn't save locally."); }
+  }
+  function loadLog(){
+    try{
+      var raw = localStorage.getItem(LOG_KEY); if(!raw) return;
+      var data = JSON.parse(raw);
+      FIELDS.forEach(function(f){ if(data[f] != null) $("#log-"+f).value = data[f]; });
+    }catch(e){}
+  }
+  function logText(){
+    return [
+      "Tool:                  " + $("#log-tool").value,
+      "Asked:                 " + $("#log-asked").value,
+      "Kept/changed/rejected: " + $("#log-kept").value,
+      "Verified:              " + $("#log-verified").value
+    ].join("\n");
+  }
+  async function copyLog(){
+    var t = logText();
+    try{ await navigator.clipboard.writeText(t); flash("Copied to clipboard."); }
+    catch(e){ window.prompt("Copy your provenance log:", t); }
+  }
+  function clearLog(){
+    FIELDS.forEach(function(f){ $("#log-"+f).value = ""; });
+    try{ localStorage.removeItem(LOG_KEY); }catch(e){}
+    flash("Cleared.");
+  }
+
+  /* ---------- wire up ---------- */
+  function ready(fn){ if(document.readyState !== "loading"){ fn(); } else { document.addEventListener("DOMContentLoaded", fn); } }
+  ready(function(){
+    initPlatform();
+    loadLog();
+    $("#bench-go").addEventListener("click", interrogate);
+    $("#log-save").addEventListener("click", saveLog);
+    $("#log-copy").addEventListener("click", copyLog);
+    $("#log-clear").addEventListener("click", clearLog);
+  });
+  /* SDK may finish loading after DOMContentLoaded; re-check once on full load. */
+  window.addEventListener("load", function(){ if(!document.body.classList.contains("live")) initPlatform(); });
+})();
+</script>
+</body>
+</html>
