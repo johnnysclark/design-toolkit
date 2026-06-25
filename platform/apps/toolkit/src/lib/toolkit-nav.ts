@@ -36,7 +36,7 @@ export const TOOLKIT_NAV: ToolItem[] = [
   },
   {
     href: "/skills-pathways",
-    label: "Skills Pathways",
+    label: "Cartographer",
     blurb: "A beginner→advanced trail map of 2D & 3D skills — with a tutorial video behind every step.",
     status: "live"
   },
@@ -68,7 +68,7 @@ export const TOOLKIT_NAV: ToolItem[] = [
   },
   {
     href: "/tools-3d",
-    label: "3D Tools",
+    label: "3D Tooling",
     blurb: "Python · tutorials · Three.js · 3D-print settings.",
     status: "soon"
   },
