@@ -35,6 +35,12 @@ export const TOOLKIT_NAV: ToolItem[] = [
     requiresAuth: true
   },
   {
+    href: "/skills-pathways",
+    label: "Skills Pathways",
+    blurb: "A beginner→advanced trail map of 2D & 3D skills — with a tutorial video behind every step.",
+    status: "live"
+  },
+  {
     href: "/librarian",
     label: "Librarian",
     blurb: "Context for any image you find — related plans, drawings, photos + background, catalogued into a growing project library.",
@@ -69,7 +75,7 @@ export const TOOLKIT_NAV: ToolItem[] = [
   {
     href: "/rap",
     label: "RAP",
-    blurb: "Accessibility (RAP) — non-visual / tactile CAD workflow.",
-    status: "soon"
+    blurb: "Radical Accessibility Project — a non-visual / tactile CAD workflow that drives Rhino. The studio's research showcase.",
+    status: "live"
   }
 ];
