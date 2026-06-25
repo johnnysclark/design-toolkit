@@ -18,3 +18,6 @@ TOOLS/crit-board/data/
 .mcp.local.json
 # temp
 *.tmp
+# Precedent Archive — disposable index cache + generated artifacts (rebuilt from disk)
+**/.precedent/
+TOOLS/precedent-archive/sample-archive/Inbox/

@@ -1,0 +1,19 @@
+{
+  "name": "precedent-archive",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "A non-destructive lens over your own folder of architectural precedents — markdown + image files on disk, enriched with AI alt text, tactile (PIAF) prep, and basic image edits. The filesystem is the truth; this app is additive.",
+  "scripts": {
+    "start": "node server.js",
+    "seed": "node seed.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.70.0",
+    "gray-matter": "^4.0.3",
+    "sharp": "^0.34.2"
+  }
+}
