@@ -21,7 +21,7 @@ export default function Dashboard() {
             className="group rounded-xl border border-neutral-200 bg-white p-5 transition hover:border-neutral-400 hover:shadow-sm"
           >
             <div className="flex items-center justify-between">
-              <h2 className="font-medium">{t.label}</h2>
+              <h2 className="display-font text-lg uppercase tracking-tight">{t.label}</h2>
               <span
                 className={[
                   "rounded-full px-2 py-0.5 text-[10px] uppercase tracking-wide",
