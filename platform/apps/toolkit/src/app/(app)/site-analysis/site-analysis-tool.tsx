@@ -29,6 +29,26 @@ type Candidate = GeoPlace | SiteCandidate;
 const PLACE_EXAMPLES = ["Millennium Park, Chicago", "Venice, Italy", "1600 Pennsylvania Ave"];
 const SUPERFUND_EXAMPLES = ["Love Canal", "Times Beach", "Berkeley Pit"];
 
+// Parse a response defensively: on a timeout/edge error the platform can return a
+// plain-text body (e.g. "An error occurred…") that would otherwise blow up
+// res.json() with a cryptic "Unexpected token" — turn that into a clear message.
+async function readJson(res: Response): Promise<any> {
+  const text = await res.text();
+  try {
+    return text ? JSON.parse(text) : {};
+  } catch {
+    if (
+      res.status === 504 ||
+      /timed out|timeout|FUNCTION_INVOCATION_TIMEOUT|took too long|an error occurred/i.test(text)
+    ) {
+      throw new Error(
+        "That site took too long and the request timed out. Try again — very large sites can be slow."
+      );
+    }
+    throw new Error(`The server returned an unexpected response (HTTP ${res.status}). Please try again.`);
+  }
+}
+
 export default function SiteAnalysisTool({ signedIn }: { signedIn: boolean }) {
   const [mode, setMode] = useState<Mode>("place");
   const [query, setQuery] = useState("");
@@ -68,7 +88,7 @@ export default function SiteAnalysisTool({ signedIn }: { signedIn: boolean }) {
           `/api/site-analysis/search?mode=${mode}&q=${encodeURIComponent(query.trim())}`,
           { signal: ctrl.signal }
         );
-        const data = await res.json();
+        const data = await readJson(res);
         if (!res.ok) throw new Error(data?.error || "Search failed.");
         setCandidates(data.results || []);
       } catch (e: any) {
@@ -116,7 +136,7 @@ export default function SiteAnalysisTool({ signedIn }: { signedIn: boolean }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload)
       });
-      const data = await res.json();
+      const data = await readJson(res);
       if (!res.ok) throw new Error(data?.error || "Analysis failed.");
       setResult(data as AnalyzeResult);
     } catch (e: any) {
@@ -139,7 +159,7 @@ export default function SiteAnalysisTool({ signedIn }: { signedIn: boolean }) {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ epaId: result.site.epaId, grounded: true })
         });
-        const cd = await cr.json();
+        const cd = await readJson(cr);
         if (cr.status === 401) throw new Error("Sign in to run the AI analysis.");
         if (!cr.ok) throw new Error(cd?.error || "Contamination pass failed.");
         contam = cd.contamination as Contamination;
@@ -151,7 +171,7 @@ export default function SiteAnalysisTool({ signedIn }: { signedIn: boolean }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ bundle: leanBundle(result, contam) })
       });
-      const sd = await sr.json();
+      const sd = await readJson(sr);
       if (sr.status === 401) throw new Error("Sign in to run the AI analysis.");
       if (!sr.ok) throw new Error(sd?.error || "Synthesis pass failed.");
       setSynthesis(sd.synthesis as Synthesis);

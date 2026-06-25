@@ -21,6 +21,21 @@ export const maxDuration = 60;
 
 const CLIMATE_YEAR = 2023;
 
+// Terrain study box. Some sites are huge (Tar Creek Superfund is ~485 sq mi) — a
+// grid across the whole span is both slow (it spans many source rasters) and
+// meaningless as a "site" read. Cap it to a ~6.6 km box around the centroid so the
+// terrain sample is fast and local; normal-sized sites pass through unchanged.
+function terrainBox(
+  bbox: [number, number, number, number],
+  centroid: { lat: number; lon: number },
+  maxHalfDeg = 0.03
+): [number, number, number, number] {
+  const [w, s, e, n] = bbox;
+  if (e - w <= 2 * maxHalfDeg && n - s <= 2 * maxHalfDeg) return bbox;
+  const { lat, lon } = centroid;
+  return [lon - maxHalfDeg, lat - maxHalfDeg, lon + maxHalfDeg, lat + maxHalfDeg];
+}
+
 // Condense the hourly year into the display + export summary (ported from the
 // original server.js summarizeClimate).
 function summarizeClimate(climate: ClimateRaw) {
@@ -126,7 +141,7 @@ export async function POST(req: Request) {
       }),
       floodAt(site.centroid.lon, site.centroid.lat).catch(() => null),
       site.bbox
-        ? elevationGrid(site.bbox, gridN).catch((e) => {
+        ? elevationGrid(terrainBox(site.bbox, site.centroid), gridN).catch((e) => {
             console.error("topo:", e.message);
             return null;
           })
