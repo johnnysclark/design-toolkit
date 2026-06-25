@@ -1,9 +1,13 @@
 # Site Analysis — Build Plan & Feature Spec
 
-> **Status: DRAFT for John to edit.** This is the outline + feature list we agree on
-> *before* I write the detailed implementation plan. Edit anything — strike features,
-> move them between phases, answer the **decision points** marked 🟦. Once you've
-> marked it up, I'll turn it into a concrete build plan and we start.
+> **Status: BUILT (2026-06-25), with two changes from this draft —** the tool is now
+> **general-purpose** (a *Place mode* geocodes any address via OSM Nominatim; *Superfund mode*
+> keeps the EPA flow for the class), and the screen is organized by a **Macro ⇄ Micro** toggle
+> at the top that reframes the map zoom + which data shows (climate/region = macro;
+> site/terrain/flood = micro). The AI band (contamination + synthesis) is always-visible and
+> auth-gated. Resolved decisions: D1 public-data/gated-AI split ✅ · D3 reuse claim chips ✅ ·
+> D4 client-side `.3dm` (rhino3dm from CDN) ✅ · D5 split fast hard-data vs. separate AI
+> requests ✅ · D7 straight-to-native ✅. The original draft below is kept for provenance.
 
 ---
 
