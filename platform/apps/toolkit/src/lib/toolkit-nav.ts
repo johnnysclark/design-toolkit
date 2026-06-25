@@ -21,8 +21,8 @@ export const TOOLKIT_NAV: ToolItem[] = [
   {
     href: "/site-design",
     label: "Site Design",
-    blurb: "Form-finding driven by site forces (sun, wind, terrain).",
-    status: "soon"
+    blurb: "Gable Studio — form-finding by site forces (sun, wind, terrain), with testable rules + a Rhino 8 round-trip.",
+    status: "live"
   },
   {
     href: "/skills-coach",
