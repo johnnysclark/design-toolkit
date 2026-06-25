@@ -21,8 +21,8 @@ studio) and the **public site / portfolio**.
     https://toolkit.allmeans.works.**
     - `public/tools/gable-studio/` — the **Site Design tool** (Gable Studio): `web/` + `python/`
       + `test/`. Embedded by `src/app/(app)/site-design/page.tsx` via an iframe (`STUDIO_URL`).
-  - `apps/landing/` — static HTML public site: a minimal landing (**Toolkit · Work · Bio**) and
-    a `work/` portfolio page. **Targets the apex https://allmeans.works** (apex DNS not wired
+  - `apps/landing/` — static HTML public site: a minimal landing (**TOOLS · WORKS · ALL MEANS BIO**)
+    with a `works/` portfolio and a `bio/` page. **Targets the apex https://allmeans.works** (apex DNS not wired
     yet). No build step — open `index.html` directly.
   - `apps/portfolio/` — Astro. Scaffolded, deferred (the static `landing/` is the interim
     public face).
