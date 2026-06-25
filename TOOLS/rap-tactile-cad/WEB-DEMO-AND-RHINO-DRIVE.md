@@ -144,7 +144,7 @@ its own mini-build; physical tactile legibility can't be fully judged on screen.
 compelling.
 
 ### A5 · Real-system video / screen capture
-**What:** Embedded clips of Daniel using the actual CLI + Rhino + PIAF loop at The Desk.
+**What:** Embedded clips of the student using the actual CLI + Rhino + PIAF loop at The Desk.
 **Effort:** S (capture + edit). **Fidelity:** maximal (it's the real thing). **Backend:** none.
 **Pros:** authenticity nothing synthetic matches; carries the human center. **Cons:** passive;
 captioning/audio-description needed for access.
