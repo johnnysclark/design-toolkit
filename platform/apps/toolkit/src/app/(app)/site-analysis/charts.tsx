@@ -7,6 +7,11 @@
 import type { WindRose, SunPath, MonthStat } from "./types";
 
 const MONTHS = ["J", "F", "M", "A", "M", "J", "J", "A", "S", "O", "N", "D"];
+const MONTH_NAMES = [
+  "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+  "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
+];
+const r0fmt = (v: number | null) => (v == null ? "—" : Math.round(v).toString());
 
 // Polar helper: bearing measured clockwise from north (0 = up), SVG y-down.
 function polar(cx: number, cy: number, r: number, bearing: number): [number, number] {
@@ -104,7 +109,9 @@ export function WindRoseChart({ rose }: { rose: WindRose }) {
                     fill={WIND_BANDS[b] ?? WIND_BANDS[WIND_BANDS.length - 1]}
                     stroke="#fff"
                     strokeWidth={0.5}
-                  />
+                  >
+                    <title>{`${rose.dirs[d]} · ${bandLabels[b]} m/s · ${pct(frac)} of hours`}</title>
+                  </polygon>
                 );
               })}
             </g>
@@ -121,7 +128,9 @@ export function WindRoseChart({ rose }: { rose: WindRose }) {
             {l}
           </span>
         ))}
-        <span className="text-neutral-400">m/s · ring = {pct(maxTotal)} max</span>
+        <span className="text-neutral-400">
+          m/s · ring = {pct(maxTotal)} max · calm {pct(rose.calmFraction)}
+        </span>
       </figcaption>
     </figure>
   );
@@ -201,7 +210,9 @@ export function SunPathChart({ paths }: { paths: SunPath[] }) {
               strokeWidth={2.5}
               strokeLinecap="round"
               strokeLinejoin="round"
-            />
+            >
+              <title>{`${p.label} — peak altitude ${p.peakAltitude.toFixed(0)}°`}</title>
+            </path>
           );
         })}
       </svg>
@@ -299,7 +310,9 @@ export function MonthlyClimate({
               height={Math.max(1, y(m.min) - y(m.max))}
               rx={2}
               fill="#fcd9b6"
-            />
+            >
+              <title>{`${MONTH_NAMES[i]}: ${r0fmt(m.min)}–${r0fmt(m.max)}°, mean ${r0fmt(m.mean)}°`}</title>
+            </rect>
           )
         )}
         {/* mean line */}

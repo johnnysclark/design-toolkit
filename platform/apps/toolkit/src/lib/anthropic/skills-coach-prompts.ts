@@ -13,7 +13,9 @@ import {
   conceptIndexForPrompt
 } from "@/lib/skills-coach/concepts";
 
-export const MODEL = "claude-opus-4-8";
+// Toolkit-wide policy: AI tool calls run on Sonnet 4.6 (faster + cheaper; keeps
+// streamed/grounded passes under Vercel's 60s cap). Supports vision + structured output.
+export const MODEL = "claude-sonnet-4-6";
 
 export type Level = "beginner" | "intermediate" | "advanced";
 

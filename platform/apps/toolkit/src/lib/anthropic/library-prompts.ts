@@ -6,7 +6,9 @@
 // VERIFY, never a fact. The model is told to hedge or abstain rather than invent
 // a confident name — interiors, models, and sketches are the high-risk cases.
 
-export const MODEL = "claude-opus-4-8";
+// Toolkit-wide policy: AI tool calls run on Sonnet 4.6 (faster + cheaper). Supports
+// vision + structured output, which is all this perception pass needs.
+export const MODEL = "claude-sonnet-4-6";
 
 export const IMAGE_ANALYSIS_SCHEMA = {
   type: "object",

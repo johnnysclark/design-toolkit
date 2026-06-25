@@ -54,6 +54,11 @@ export interface ClimateSummary {
     tempMax: number | null;
     rhMean: number | null;
     windMean: number | null;
+    ghiAnnualKwh: number | null;
+    peakSunHours: number | null;
+    hdd18: number | null;
+    cdd18: number | null;
+    diurnalSwingC: number | null;
   };
   sunPaths: SunPath[];
 }

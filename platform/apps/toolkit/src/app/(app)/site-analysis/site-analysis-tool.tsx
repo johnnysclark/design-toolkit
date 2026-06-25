@@ -108,6 +108,13 @@ export default function SiteAnalysisTool({ signedIn }: { signedIn: boolean }) {
     setCandidates([]);
     setOpen(false);
     setSearchError(null);
+    // Drop the prior result so the cards never show one mode's data under the
+    // other mode's label.
+    setResult(null);
+    setAnalyzeError(null);
+    setContamination(null);
+    setSynthesis(null);
+    setScale("macro");
   }
 
   async function selectCandidate(c: Candidate) {
@@ -463,6 +470,22 @@ function MacroCards({
                 label="Mean wind"
                 value={`${fmt(c.annual.windMean)} m/s`}
                 hint="Mean wind speed at 10 m above ground over 2023."
+              />
+              <Stat
+                label="Solar (GHI)"
+                value={`${fmt(c.annual.ghiAnnualKwh)} kWh/m²·yr`}
+                sub={c.annual.peakSunHours != null ? `~${fmt(c.annual.peakSunHours)} peak sun hrs/day` : undefined}
+                hint="Annual global horizontal solar energy — sizes PV potential and passive-solar gain."
+              />
+              <Stat
+                label="Degree-days (18°C)"
+                value={`${fmt(c.annual.hdd18)} HDD · ${fmt(c.annual.cdd18)} CDD`}
+                hint="Heating vs cooling degree-days, base 18°C — how much the climate demands heating vs cooling over the year."
+              />
+              <Stat
+                label="Diurnal swing"
+                value={`${fmt(c.annual.diurnalSwingC)}°C`}
+                hint="Average day–night temperature range. A large swing rewards thermal mass + night flushing."
               />
             </div>
             {synthesis && (
