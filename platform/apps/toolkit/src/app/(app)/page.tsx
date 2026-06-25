@@ -159,7 +159,7 @@ const TOOLS: Tool[] = [
         The Radical Accessibility Project: making architectural production work without sight. It drives
         Rhino from the command line, generates tactile drawings (PIAF swell paper) and 3D-printed reliefs,
         reads plan and section aloud as spatial audio, and writes structured alt-text. Built local-first and
-        open-source so anyone can replicate it, and developed with Daniel, a blind co-researcher and its
+        open-source so anyone can replicate it, and developed with a blind co-researcher, its
         primary user. The constraints it surfaces sharpen spatial description for every student, not only
         blind ones.
       </p>
