@@ -1,0 +1,19 @@
+{
+  "name": "studio-platform",
+  "version": "0.1.0",
+  "private": true,
+  "description": "The two-property platform: the Design Toolkit app (Next.js) and the Research/Work/Teaching portfolio (Astro), sharing one Supabase backend.",
+  "workspaces": [
+    "apps/*"
+  ],
+  "scripts": {
+    "dev:toolkit": "npm run dev -w toolkit",
+    "dev:portfolio": "npm run dev -w portfolio",
+    "build": "npm run build -w toolkit && npm run build -w portfolio",
+    "build:toolkit": "npm run build -w toolkit",
+    "build:portfolio": "npm run build -w portfolio"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

@@ -76,4 +76,6 @@ the **contamination** read (web-search grounded, cited) and the **design read** 
 ## Roadmap (deferred)
 
 The "analyze new designs back in Rhino" loop — round-tripping a student's massing model against
-sun/wind/flood/contamination constraints — is the intended Phase 2.
+sun/wind/flood/contamination constraints — is the intended Phase 2. The architecture for that
+loop (a live web⇄Rhino link, and a vibe-coded-vs-Ladybug comparison on the shared metric origin)
+is explored in [`../LIVE-LINK.md`](../LIVE-LINK.md).

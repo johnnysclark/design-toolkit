@@ -4,11 +4,17 @@
 ~$*
 # Node
 node_modules/
+# crit-board runtime data — SQLite DB (+ WAL sidecars) and uploaded images.
+# Seed assets live in TOOLS/crit-board/seed/assets and ARE committed.
+TOOLS/crit-board/data/
 # Secrets / local env
 .env
 .env.local
 *.local
 # Claude local settings
 .claude/settings.local.json
+# Local MCP overrides (may contain tokens) — the committed .mcp.json uses env vars only
+.claude/.mcp.json
+.mcp.local.json
 # temp
 *.tmp

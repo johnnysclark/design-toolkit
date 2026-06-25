@@ -75,6 +75,7 @@ tools are spec stubs we'll flesh out.
 | [`site-analyzer`](TOOLS/site-analyzer) | Feed a site → structured read for design: climate, orientation, terrain, water, constraints, history, links — and the ground exported for Rhino | §1 | ✅ working |
 | [`precedent-librarian`](TOOLS/precedent-librarian) | Dossier builder for design **and** technical references; tags every claim, plays devil's advocate, hands you a verification worksheet | §2 | ✅ working |
 | [`gable-studio`](TOOLS/gable-studio) | Site-analyzer + constraint generator for the prototypical gable massing: shape it, watch live performance *proxies*, write testable rules, export the **same** rules as Rhino 8 / Grasshopper python, and re-import the `.3dm` to re-test (full design↔data loop) | §5/§7 | ✅ working |
+| [`crit-board`](TOOLS/crit-board) | Self-hosted studio pinup/crit board (Miro replacement): a students × weeks grid of cells, each holding many uploaded images + threaded public feedback. Multi-user + persistent; zero-setup `lite/` demo too | §16/§13 | ✅ working |
 | [`form-helper`](TOOLS/form-helper) | Form-finding governed by site forces (sun, wind, orientation…) acting on a chosen geometry | §5/§7 | 🟡 planned |
 | [`rhino-wizard`](TOOLS/rhino-wizard) | Tutor for Rhino / Grasshopper / GH-Python; mode toggles + Beginner/Moderate/Advanced levels | §6 | 🟡 planned |
 | [`code-zoning-agent`](TOOLS/code-zoning-agent) | Interpret code & zoning for a project, every claim clause-cited and checkable | §3 | 🟡 planned |
@@ -99,6 +100,9 @@ open "TOOLS/precedent-librarian/lite/index.html"
 # Site Analyzer — no install, no key, live data:
 open "TOOLS/site-analyzer/standalone/index.html"
 
+# Crit Board — no install, no server (single-browser demo of the studio board):
+open "TOOLS/crit-board/lite/index.html"
+
 # Site Analyzer CLI (Node 18+):
 node "TOOLS/site-analyzer/cli/analyze.js" "Gowanus Canal"
 ```
@@ -107,6 +111,20 @@ The full web apps need `npm install` and (for the model passes) an
 `ANTHROPIC_API_KEY`. See each tool's own `README.md`. **No real API key is committed
 to this repo** — only empty `.env.example` templates; `node_modules/` and `.env` are
 gitignored.
+
+**Putting these online?** Two guides:
+- [`HOSTING.md`](HOSTING.md) — quick recipe to host *today's* standalone demos and the
+  two Node apps (three UIUC + three private options, plus a per-user login gate).
+- [`WEBSITE-PLAN.md`](WEBSITE-PLAN.md) — the bigger build: the **Toolkit app** + the
+  **Research/Work/Teaching portfolio** as two database-backed sites (stack, database,
+  logins, LLM integration, UIUC vs. private hosting, and a phased build order).
+
+The build has started under [`platform/`](platform) — a Vercel + Supabase monorepo. The
+**Toolkit** app (Next.js) is up first with email login, the toolkit nav, a live Librarian
+tool, and the database-backed Pinup Wall. See [`platform/README.md`](platform/README.md).
+To deploy from scratch (incl. registering a domain) follow
+[`platform/DEPLOY.md`](platform/DEPLOY.md); to drive Supabase/Vercel/GitHub from Claude Code
+see [`platform/CLAUDE-CODE.md`](platform/CLAUDE-CODE.md) and [`CLAUDE.md`](CLAUDE.md).
 
 ---
 
