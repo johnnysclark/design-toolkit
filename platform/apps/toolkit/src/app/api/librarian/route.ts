@@ -3,69 +3,73 @@ import Anthropic from "@anthropic-ai/sdk";
 import { createClient } from "@/lib/supabase/server";
 import {
   MODEL,
-  DOSSIER_SCHEMA,
-  ADVERSARIAL_SCHEMA,
-  dossierSystem,
-  dossierUser,
-  ADVERSARIAL_SYSTEM,
-  adversarialUser
-} from "@/lib/anthropic/prompts";
+  IMAGE_ANALYSIS_SCHEMA,
+  IMAGE_ANALYSIS_SYSTEM,
+  analysisUser
+} from "@/lib/anthropic/library-prompts";
+import { enrich } from "@/lib/library/enrich";
 
 export const runtime = "nodejs";
-// Two model passes with adaptive thinking can run long. Hobby caps at 60s;
-// raise this on Vercel Pro (up to 300) if you use grounded mode + more precedents.
+// One vision pass + a fan-out of (timeout-guarded) archive calls. Hobby caps at
+// 60s; raise on Vercel Pro if needed.
 export const maxDuration = 60;
 
-// Run one structured-output call. Grounded mode uses the web_search tool and
-// asks for JSON in the prompt (forced json_schema format conflicts with tools).
-async function runStructured({
-  system,
-  user,
-  schema,
-  grounded
-}: {
-  system: string;
-  user: string;
-  schema: unknown;
-  grounded: boolean;
-}) {
-  const client = new Anthropic();
+const BUCKET = "library";
+const MAX_BYTES = 4_500_000; // keep base64 well under the vision API per-image limit
+const ALLOWED = new Set(["image/jpeg", "image/png", "image/gif", "image/webp"]);
 
-  const params: any = {
-    model: MODEL,
-    max_tokens: 20000,
-    thinking: { type: "adaptive" },
-    system,
-    messages: [{ role: "user", content: user }]
-  };
-
-  if (grounded) {
-    params.tools = [{ type: "web_search_20260209", name: "web_search" }];
-    params.messages[0].content +=
-      "\n\nReturn your answer as a single JSON object matching the agreed schema, " +
-      "inside a ```json code block. Do not include any other prose outside the block.";
-  } else {
-    params.output_config = { format: { type: "json_schema", schema } };
+// Only fetch public http(s) URLs — block internal hosts (basic SSRF guard).
+function isPublicHttpUrl(raw: string): boolean {
+  let u: URL;
+  try {
+    u = new URL(raw);
+  } catch {
+    return false;
   }
-
-  const message: any = await client.messages.stream(params).finalMessage();
-
-  if (message.stop_reason === "refusal") {
-    throw new Error("The model declined this request (safety refusal).");
+  if (u.protocol !== "http:" && u.protocol !== "https:") return false;
+  const h = u.hostname.toLowerCase();
+  if (
+    h === "localhost" ||
+    h.endsWith(".local") ||
+    h === "127.0.0.1" ||
+    h === "0.0.0.0" ||
+    h === "::1" ||
+    h.startsWith("10.") ||
+    h.startsWith("192.168.") ||
+    h.startsWith("169.254.") ||
+    /^172\.(1[6-9]|2\d|3[01])\./.test(h)
+  ) {
+    return false;
   }
-  if (message.stop_reason === "max_tokens") {
-    throw new Error("Output was truncated (hit max_tokens). Try fewer precedents.");
-  }
-
-  const text = message.content
-    .filter((b: any) => b.type === "text")
-    .map((b: any) => b.text)
-    .join("");
-
-  return parseJson(text);
+  return true;
 }
 
-function parseJson(text: string) {
+function mediaTypeFor(contentType: string | null, url: string): string | null {
+  const ct = (contentType || "").split(";")[0].trim().toLowerCase();
+  if (ALLOWED.has(ct)) return ct;
+  if (/\.jpe?g($|\?)/i.test(url)) return "image/jpeg";
+  if (/\.png($|\?)/i.test(url)) return "image/png";
+  if (/\.gif($|\?)/i.test(url)) return "image/gif";
+  if (/\.webp($|\?)/i.test(url)) return "image/webp";
+  return null;
+}
+
+// Fetch an image (from a signed Storage URL or a pasted web URL) → base64.
+async function fetchImage(url: string): Promise<{ data: string; mediaType: string }> {
+  const res = await fetch(url, { signal: AbortSignal.timeout(15000) });
+  if (!res.ok) throw new Error(`Could not fetch the image (HTTP ${res.status}).`);
+  const mediaType = mediaTypeFor(res.headers.get("content-type"), url);
+  if (!mediaType) {
+    throw new Error("Unsupported image type — use JPEG, PNG, GIF, or WebP.");
+  }
+  const buf = Buffer.from(await res.arrayBuffer());
+  if (buf.byteLength > MAX_BYTES) {
+    throw new Error("Image is too large — please use one under ~4 MB.");
+  }
+  return { data: buf.toString("base64"), mediaType };
+}
+
+function parseJson(text: string): any {
   const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/i);
   const candidate = fenced ? fenced[1] : text;
   try {
@@ -76,42 +80,8 @@ function parseJson(text: string) {
     if (start !== -1 && end > start) {
       return JSON.parse(candidate.slice(start, end + 1));
     }
-    throw new Error("Could not parse a JSON dossier from the model response.");
+    throw new Error("Could not parse the model's analysis.");
   }
-}
-
-async function research({
-  topic,
-  count,
-  grounded
-}: {
-  topic: string;
-  count: number;
-  grounded: boolean;
-}) {
-  const dossier = await runStructured({
-    system: dossierSystem(grounded),
-    user: dossierUser(topic, count),
-    schema: DOSSIER_SCHEMA,
-    grounded
-  });
-
-  if (!Array.isArray(dossier.precedents)) {
-    throw new Error("Model returned no precedents.");
-  }
-
-  const adversarial = await runStructured({
-    system: ADVERSARIAL_SYSTEM,
-    user: adversarialUser(topic, dossier),
-    schema: ADVERSARIAL_SCHEMA,
-    grounded: false
-  });
-
-  return {
-    meta: { topic, count, grounded, model: MODEL, generated_at: new Date().toISOString() },
-    dossier,
-    adversarial
-  };
 }
 
 export async function POST(req: Request) {
@@ -122,17 +92,14 @@ export async function POST(req: Request) {
     );
   }
 
-  // Cost protection: only signed-in studio members can spend the Anthropic key.
-  // The Toolkit shell is public, but this route must never run for an anon caller.
+  // Cost protection: the Toolkit shell is public, but this route spends the
+  // Anthropic key + hits external APIs, so it must never run for an anon caller.
   const supabase = await createClient();
   const {
     data: { user }
   } = await supabase.auth.getUser();
   if (!user) {
-    return NextResponse.json(
-      { error: "Sign in to use the Librarian." },
-      { status: 401 }
-    );
+    return NextResponse.json({ error: "Sign in to use the Librarian." }, { status: 401 });
   }
 
   let body: any;
@@ -142,34 +109,150 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Invalid JSON body." }, { status: 400 });
   }
 
-  const topic = String(body?.topic || "").trim();
-  if (!topic) {
-    return NextResponse.json({ error: "A research prompt is required." }, { status: 400 });
-  }
-  const count = Math.min(Math.max(parseInt(body?.count, 10) || 4, 1), 8);
-  const grounded = !!body?.grounded;
+  const projectId: string | null = body?.projectId || null;
+  const mode = body?.mode === "search" ? "search" : "analyze";
 
   try {
-    const result = await research({ topic, count, grounded });
+    // ── Mode: keyword archive search (no model cost) ──────────────────────
+    if (mode === "search") {
+      const query = String(body?.query || "").trim();
+      if (!query) {
+        return NextResponse.json({ error: "Enter something to search for." }, { status: 400 });
+      }
+      const enrichment = await enrich({ building: query, searchTerms: [query] });
 
-    // Log the run as "the trace" (the caller is guaranteed signed in above).
+      let searchId: string | null = null;
+      const { data: row } = await supabase
+        .from("library_searches")
+        .insert({
+          owner: user.id,
+          project_id: projectId,
+          analysis: { query },
+          enrichment
+        })
+        .select("id")
+        .single();
+      searchId = row?.id ?? null;
+
+      return NextResponse.json({
+        mode,
+        searchId,
+        query,
+        enrichment,
+        meta: { generated_at: new Date().toISOString() }
+      });
+    }
+
+    // ── Mode: analyze an image ────────────────────────────────────────────
+    const imagePath: string | null = body?.imagePath || null;
+    const imageUrl: string | null = body?.imageUrl ? String(body.imageUrl).trim() : null;
+    const note: string | null = body?.note ? String(body.note).trim() : null;
+
+    let fetchUrl: string;
+    if (imagePath) {
+      const { data: signed, error } = await supabase.storage
+        .from(BUCKET)
+        .createSignedUrl(imagePath, 120);
+      if (error || !signed?.signedUrl) {
+        return NextResponse.json(
+          { error: "Could not read the uploaded image. Try re-uploading." },
+          { status: 400 }
+        );
+      }
+      fetchUrl = signed.signedUrl;
+    } else if (imageUrl) {
+      if (!isPublicHttpUrl(imageUrl)) {
+        return NextResponse.json(
+          { error: "That doesn't look like a public image URL." },
+          { status: 400 }
+        );
+      }
+      fetchUrl = imageUrl;
+    } else {
+      return NextResponse.json(
+        { error: "Provide an uploaded image (imagePath) or an image URL." },
+        { status: 400 }
+      );
+    }
+
+    const { data: b64, mediaType } = await fetchImage(fetchUrl);
+
+    // Vision pass — structured output, no extended thinking (perception task).
+    const client = new Anthropic();
+    const message: any = await client.messages.create({
+      model: MODEL,
+      max_tokens: 4000,
+      system: IMAGE_ANALYSIS_SYSTEM,
+      output_config: { format: { type: "json_schema", schema: IMAGE_ANALYSIS_SCHEMA } },
+      messages: [
+        {
+          role: "user",
+          content: [
+            {
+              type: "image",
+              source: { type: "base64", media_type: mediaType, data: b64 }
+            },
+            { type: "text", text: analysisUser({ sourceUrl: imageUrl || undefined, note: note || undefined }) }
+          ]
+        }
+      ]
+    } as any);
+
+    if (message.stop_reason === "refusal") {
+      throw new Error("The model declined to analyze this image (safety refusal).");
+    }
+    const text = (message.content || [])
+      .filter((b: any) => b.type === "text")
+      .map((b: any) => b.text)
+      .join("");
+    const analysis = parseJson(text);
+
+    // Enrich from the best candidate (+ the model's search terms / vocabulary).
+    const top = (analysis.candidates || [])[0] || {};
+    const enrichment = await enrich({
+      building: top.building || "",
+      architect: top.architect || "",
+      searchTerms: analysis.suggested_search_terms || [],
+      vocabularyTerms: (analysis.vocabulary || []).map((v: any) => v.term)
+    });
+
+    // Catalogue the search (this is what grows the reference database).
+    let searchId: string | null = null;
+    const { data: row } = await supabase
+      .from("library_searches")
+      .insert({
+        owner: user.id,
+        project_id: projectId,
+        input_image_path: imagePath,
+        input_url: imageUrl,
+        analysis,
+        enrichment
+      })
+      .select("id")
+      .single();
+    searchId = row?.id ?? null;
+
+    // "The trace" — generic per-tool log (best-effort).
     try {
       await supabase.from("tool_runs").insert({
         owner: user.id,
         tool: "librarian",
-        input: { topic, count, grounded },
-        output: result
+        input: { mode, projectId, imagePath, imageUrl, note },
+        output: { analysis, enrichment }
       });
     } catch {
-      // never let trace logging break the response
+      /* never let trace logging break the response */
     }
 
-    return NextResponse.json(result);
+    return NextResponse.json({
+      mode,
+      searchId,
+      analysis,
+      enrichment,
+      meta: { model: MODEL, generated_at: new Date().toISOString() }
+    });
   } catch (err: any) {
     console.error(err);
-    return NextResponse.json(
-      { error: err?.message || "Internal error" },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: err?.message || "Internal error" }, { status: 500 });
   }
 }

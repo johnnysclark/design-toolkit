@@ -37,7 +37,7 @@ export const TOOLKIT_NAV: ToolItem[] = [
   {
     href: "/librarian",
     label: "Librarian",
-    blurb: "Precedent dossiers — every claim tagged, attacked, left for you to verify.",
+    blurb: "Context for any image you find — related plans, drawings, photos + background, catalogued into a growing project library.",
     status: "live",
     requiresAuth: true
   },
