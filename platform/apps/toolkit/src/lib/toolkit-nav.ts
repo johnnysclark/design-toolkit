@@ -35,6 +35,12 @@ export const TOOLKIT_NAV: ToolItem[] = [
     requiresAuth: true
   },
   {
+    href: "/skills-pathways",
+    label: "Skills Pathways",
+    blurb: "A beginner→advanced trail map of 2D & 3D skills — with a tutorial video behind every step.",
+    status: "live"
+  },
+  {
     href: "/librarian",
     label: "Librarian",
     blurb: "Precedent dossiers — every claim tagged, attacked, left for you to verify.",
