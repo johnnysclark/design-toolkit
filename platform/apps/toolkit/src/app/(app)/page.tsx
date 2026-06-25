@@ -14,7 +14,7 @@ type Tool = { no: string; href: string | null; title: string; runs: React.ReactN
 const TOOLS: Tool[] = [
   {
     no: "01",
-    title: "Skills / Design Production Tutor",
+    title: "Coach",
     href: "/skills-coach",
     runs: "Runs as — LLM chat behind a proxy, or campus Illinois Chat.",
     body: (
@@ -46,7 +46,7 @@ const TOOLS: Tool[] = [
   },
   {
     no: "02",
-    title: "Site Analysis / Form Generator",
+    title: "Surveyor",
     href: "/site-analysis",
     runs: "Runs as — Rhino / Grasshopper for the simulation, with a web front for inputs.",
     body: (
@@ -81,7 +81,7 @@ const TOOLS: Tool[] = [
   },
   {
     no: "03",
-    title: "Precedent / Research Machine — Librarian",
+    title: "Librarian",
     href: "/librarian",
     runs: "Runs as — a local app (Claude Code), filesystem-based.",
     body: (
@@ -144,7 +144,7 @@ const TOOLS: Tool[] = [
   },
   {
     no: "05",
-    title: "RAP Toolkit",
+    title: "RAP",
     href: "/rap",
     runs: (
       <>
@@ -186,7 +186,7 @@ const TOOLS: Tool[] = [
   },
   {
     no: "06",
-    title: "Drawing Cleanup & 2D Media",
+    title: "2D Tooling",
     href: "/media-2d",
     runs: "Runs as — vision models for cleanup, deterministic paths for fabrication.",
     body: (
@@ -214,7 +214,7 @@ const TOOLS: Tool[] = [
   },
   {
     no: "07",
-    title: "Miro Alternative — Digital Wall",
+    title: "Archivist",
     href: "/pinup",
     runs: "Runs as — a web app with a backend (Supabase) and accounts.",
     body: (
@@ -250,7 +250,7 @@ const TOOLS: Tool[] = [
   },
   {
     no: "08",
-    title: "Design Critic",
+    title: "Critic",
     href: "/design-critic",
     runs: "Runs as — LLM behind a proxy; each persona is a system prompt.",
     body: (

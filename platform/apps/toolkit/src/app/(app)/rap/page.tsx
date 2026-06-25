@@ -295,8 +295,9 @@ export default function RAP() {
 
       <div className="wrap">
         <header>
-          <div className="kicker">All Means Works · Radical Accessibility Project · Studio research</div>
-          <h1>Radical Accessibility Project</h1>
+          <div className="kicker">All Means Works · Studio research</div>
+          <h1>RAP</h1>
+          <p className="sub" style={{ color: "#111", fontWeight: 600 }}>Radical Accessibility Project</p>
           <p className="sub">Accessibility Harness &amp; Adaptive Pedagogy for Non-Visual Design Authorship · ACADIA 2026</p>
           <p className="lede">
             Architecture assumes you can see. RAP inverts the premise — wrapping an AI assistant

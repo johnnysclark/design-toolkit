@@ -78,7 +78,7 @@ export async function POST(req: Request) {
     data: { user }
   } = await supabase.auth.getUser();
   if (!user) {
-    return Response.json({ error: "Sign in to use the Skills Coach." }, { status: 401 });
+    return Response.json({ error: "Sign in to use Coach." }, { status: 401 });
   }
 
   let body: any;

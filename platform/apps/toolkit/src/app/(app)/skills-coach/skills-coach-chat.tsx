@@ -315,7 +315,7 @@ export default function SkillsCoachChat({
 
   return (
     <div>
-      <h1 className="text-3xl font-semibold tracking-tight">Skills Coach</h1>
+      <h1 className="text-3xl font-semibold tracking-tight">Coach</h1>
       <p className="mt-2 max-w-2xl text-neutral-600">
         A patient tutor for Rhino, Grasshopper, AutoCAD, Revit, and the Adobe
         suite. Pick a tool and a level, ask your question, upload a sketch or
