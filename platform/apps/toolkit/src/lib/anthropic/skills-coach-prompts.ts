@@ -17,10 +17,25 @@ export const MODEL = "claude-opus-4-8";
 
 export type Level = "beginner" | "intermediate" | "advanced";
 
-export const LEVELS: { id: Level; label: string; hint: string }[] = [
-  { id: "beginner", label: "Beginner", hint: "One step at a time, everything explained" },
-  { id: "intermediate", label: "Intermediate", hint: "The full recipe, brief why" },
-  { id: "advanced", label: "Advanced", hint: "Terse, plus trade-offs" }
+export const LEVELS: { id: Level; label: string; hint: string; desc: string }[] = [
+  {
+    id: "beginner",
+    label: "Beginner",
+    hint: "One step at a time, everything explained",
+    desc: "Walks you through one step at a time and asks you to try each before the next — best when the tool is new to you."
+  },
+  {
+    id: "intermediate",
+    label: "Intermediate",
+    hint: "The full recipe, brief why",
+    desc: "Gives the whole recipe at once with a short why on the tricky parts — for when you mostly know your way around."
+  },
+  {
+    id: "advanced",
+    label: "Advanced",
+    hint: "Terse, plus trade-offs",
+    desc: "Answer-first and terse, with alternatives, trade-offs, and where it breaks — for quick reference."
+  }
 ];
 
 // ---- per-turn structured tail ---------------------------------------------
@@ -132,6 +147,7 @@ const LEVEL_MODULES: Record<Level, string> = {
 const OUTPUT_CONTRACT = [
   "OUTPUT FORMAT — follow exactly:",
   "1. Write your answer as normal prose for the student. Use short paragraphs; a numbered list is fine for steps. Put [[concept:slug]] inline as described. Keep formatting light (no big headers).",
+  "1b. CODE EXPORT: when you provide runnable code — GhPython, rhinoscriptsyntax, or RhinoCommon Python for Grasshopper/Rhino (or a Grasshopper C# script) — put the COMPLETE script inside a fenced markdown code block whose opening fence names the language (```python on its own line, then the code, then a closing ```). The app shows a clear Export button on these blocks so the student can save the file and paste it into a GhPython/Script component. Do NOT fence single command or component names — only fence an actual script.",
   "2. Then, on a new line, output the literal marker " + META_SENTINEL + " and immediately after it a single raw JSON object (no code fence, nothing after it) shaped exactly:",
   '   {"concept": "<one slug from the index that best matches what this turn is about, or null>", "claims": [{"text": "<short load-bearing claim>", "tag": "stable" | "version" | "check"}], "report_back": "<your try-it-and-report question, or null on a non-task turn>"}',
   "Rules for the JSON: `concept` is at most one slug (the side panel shows it) and MUST be from the index or null — never invent one. `claims` is 0–3 items: tag 'stable' = reliable, 'version' = depends on the software version, 'check' = the student should verify this themselves. `report_back` mirrors the question you asked in the prose (null if you didn't ask one). Output valid JSON only after the marker."

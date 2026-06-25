@@ -323,7 +323,7 @@ export default function SkillsCoachChat({
               <button
                 key={l.id}
                 type="button"
-                title={l.hint}
+                title={l.desc}
                 onClick={() => setLevel(l.id)}
                 className={[
                   "px-3 py-1.5 text-sm transition-colors",
@@ -346,6 +346,13 @@ export default function SkillsCoachChat({
           New chat
         </button>
       </div>
+
+      <p className="mt-2 text-xs text-neutral-500">
+        <span className="font-medium text-neutral-700">
+          {LEVELS.find((l) => l.id === level)?.label}:
+        </span>{" "}
+        {LEVELS.find((l) => l.id === level)?.desc}
+      </p>
 
       {/* two-pane */}
       <div className="mt-5 grid grid-cols-1 gap-6 lg:grid-cols-[1fr_18rem]">
