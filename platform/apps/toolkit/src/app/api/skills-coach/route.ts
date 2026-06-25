@@ -247,7 +247,12 @@ export async function POST(req: Request) {
           // never let trace logging break the response
         }
 
-        send("meta", { concept: meta.concept, claims: meta.claims, report_back: meta.report_back });
+        send("meta", {
+          concept: meta.concept,
+          claims: meta.claims,
+          report_back: meta.report_back,
+          further_ideas: meta.further_ideas
+        });
         send("done", {
           conversationId,
           messageId: inserted?.id ?? null,
