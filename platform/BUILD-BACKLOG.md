@@ -92,6 +92,28 @@ apply in SQL editor). Slice: `(app)/skills-pathways/*`, `lib/skills-pathways/pat
 status `live`. Spec + maintainer guide: `(app)/skills-pathways/SPEC.md`. **v2 ideas:** node-graph
 view; teacher self-submission (`pathway_videos` table + RLS); `?discipline=` deep-link to Coach.*
 
+**Content pass — DONE (2026-06-25):** every step now carries a written `guide` (a few
+paragraphs of student-facing basics) so the page is useful before any video exists; expanded to
+≥3 steps per level per software (Rhino · Grasshopper · AutoCAD · Revit · Adobe + Foundations,
+~55 nodes), framed for undergrad/grad **studio** work (modeling, representation, portfolio) —
+**not** professional CD production. All content in `lib/skills-pathways/pathways.ts`.
+
+### T7-followup · Skills Pathways — deepen the content (good overnight-bot task)
+A self-contained, parallelizable content job — ideal for a workflow/overnight agents. **Do not
+touch the schema or UI; only edit `lib/skills-pathways/pathways.ts`.** Each unit of work = one
+`SkillNode`.
+- **Deepen guides:** expand thin `guide[]` entries; add a concrete "try this in studio" exercise
+  paragraph and common-mistake callouts. Keep the studio (not CD-production) framing; keep them
+  accurate (trust-but-verify — these teach students).
+- **Widen coverage:** add steps for gaps (e.g. Rhino `Make2D` cleanup, GH Kangaroo basics,
+  Photoshop sky/entourage, InDesign data-merge for plates), still ≥3 per level per software.
+  Consider new lanes only via the existing `Discipline` set in `lib/skills-coach/concepts.ts`.
+- **Link to concepts:** fill empty `conceptSlugs` where a matching KB concept exists; if a needed
+  concept is missing, note it (the KB lives in `concepts.ts`, shared with the Skills Coach).
+- **Curate videos:** as tutorials get recorded (John + teachers), paste `youtube`/`vimeo`/`file`
+  refs into the relevant nodes (format in `SPEC.md`).
+- **Verify:** `npm run build:toolkit` (types) must stay green; every `prereqs` id must exist.
+
 ---
 
 ## 📦 Reference specs in `TOOLS/` not yet wired into the nav

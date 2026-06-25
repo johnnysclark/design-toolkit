@@ -90,26 +90,33 @@ export default function NodeModal({
         </div>
 
         <div className="space-y-6 p-5">
-          {/* videos */}
-          <section>
-            <h3 className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-neutral-400">
-              Tutorials
-            </h3>
-            {node.videos.length > 0 ? (
+          {/* the basics — the written guide, the primary content for now */}
+          {node.guide.length > 0 && (
+            <section>
+              <h3 className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-neutral-400">
+                The basics
+              </h3>
+              <div className="space-y-3 text-[15px] leading-relaxed text-neutral-700">
+                {node.guide.map((para, i) => (
+                  <p key={i}>{para}</p>
+                ))}
+              </div>
+            </section>
+          )}
+
+          {/* videos — optional; the guide carries the node until one's recorded */}
+          {node.videos.length > 0 && (
+            <section>
+              <h3 className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-neutral-400">
+                Video walkthrough
+              </h3>
               <div className="space-y-3">
                 {node.videos.map((v, i) => (
                   <LazyVideo key={i} video={v} />
                 ))}
               </div>
-            ) : (
-              <p className="rounded-xl border border-dashed border-neutral-300 bg-neutral-50 px-4 py-5 text-sm text-neutral-500">
-                No tutorial here yet. This is the slot — add a YouTube/Vimeo link
-                (or upload a clip) for{" "}
-                <span className="font-medium text-neutral-700">{node.title}</span>{" "}
-                in <code className="rounded bg-neutral-100 px-1">pathways.ts</code>.
-              </p>
-            )}
-          </section>
+            </section>
+          )}
 
           {/* concepts — reused from the Skills Coach KB */}
           {node.conceptSlugs.length > 0 && (

@@ -225,11 +225,12 @@ function SkillCard({ node, onClick }: { node: SkillNode; onClick: () => void }) 
       <div className="text-base font-semibold leading-tight tracking-tight">{node.title}</div>
       <p className="mt-1 text-xs leading-snug text-neutral-500">{node.blurb}</p>
       <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px]">
-        <span className={hasVideo ? "font-medium text-[#ff3b21]" : "text-neutral-400"}>
-          {hasVideo
-            ? `▶ ${node.videos.length} tutorial${node.videos.length > 1 ? "s" : ""}`
-            : "tutorial slot"}
-        </span>
+        <span className="font-medium text-[#ff3b21]">Guide</span>
+        {hasVideo && (
+          <span className="text-neutral-500">
+            ▶ {node.videos.length} video{node.videos.length > 1 ? "s" : ""}
+          </span>
+        )}
         {node.conceptSlugs.length > 0 && (
           <span className="text-neutral-400">
             {node.conceptSlugs.length} concept{node.conceptSlugs.length > 1 ? "s" : ""}
