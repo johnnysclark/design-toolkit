@@ -29,7 +29,7 @@ studio) and the **public site / portfolio**.
   - `supabase/migrations/` — Postgres schema + RLS + storage. Apply in the Supabase SQL editor.
 - `TOOLS/` — original standalone tools being ported in.
 - Operating docs: `RUNNING-MULTIPLE-AGENTS.md` (concurrent-agent workflow) · `platform/STATUS.md`
-  (who's working on what). Reference: `WEBSITE-PLAN.md` · `platform/DEPLOY.md` (deploy from
+  (who's working on what) · `platform/BUILD-BACKLOG.md` (what to build next). Reference: `WEBSITE-PLAN.md` · `platform/DEPLOY.md` (deploy from
   scratch) · `platform/CLAUDE-CODE.md`.
 
 ## Commands (run from `platform/`)

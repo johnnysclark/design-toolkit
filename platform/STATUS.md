@@ -15,7 +15,7 @@
 >
 > **Multi-agent rule:** one agent = one folder = one git worktree = one branch (see
 > `../RUNNING-MULTIPLE-AGENTS.md`). The **GOAL-1 walkthrough below is now historical**; the
-> **GOAL-2 tool-porting roadmap is still current.**
+> **GOAL-2 tool-porting roadmap is still current.** Actionable build list: [`BUILD-BACKLOG.md`](BUILD-BACKLOG.md).
 <!-- ─────────────────────────── end current state ─────────────────────────── -->
 
 # STATUS — read this first (build handoff)
