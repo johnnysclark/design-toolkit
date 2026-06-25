@@ -9,11 +9,13 @@ import type { Claim, ClaimStatus, Coverage } from "./types";
 export function Card({
   title,
   accent,
+  source,
   children,
   className = ""
 }: {
   title?: string;
   accent?: boolean;
+  source?: ReactNode;
   children: ReactNode;
   className?: string;
 }) {
@@ -29,15 +31,40 @@ export function Card({
         </h3>
       )}
       {children}
+      {source && (
+        <p className="mt-3 border-t border-neutral-100 pt-2 text-[11px] text-neutral-400">
+          <span className="font-semibold uppercase tracking-wide">Source</span> · {source}
+        </p>
+      )}
     </section>
   );
 }
 
-export function Stat({ label, value, sub }: { label: string; value: ReactNode; sub?: ReactNode }) {
+// `hint` shows a hover tooltip explaining the metric (matches the Site Design tool's
+// title= + ⓘ pattern).
+export function Stat({
+  label,
+  value,
+  sub,
+  hint
+}: {
+  label: string;
+  value: ReactNode;
+  sub?: ReactNode;
+  hint?: string;
+}) {
   return (
     <div>
-      <div className="text-[10px] font-semibold uppercase tracking-wide text-neutral-400">
+      <div
+        className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide text-neutral-400"
+        title={hint}
+      >
         {label}
+        {hint && (
+          <span className="cursor-help text-neutral-300" aria-label={hint}>
+            ⓘ
+          </span>
+        )}
       </div>
       <div className="text-sm font-semibold text-neutral-900">{value ?? "—"}</div>
       {sub && <div className="text-xs text-neutral-500">{sub}</div>}

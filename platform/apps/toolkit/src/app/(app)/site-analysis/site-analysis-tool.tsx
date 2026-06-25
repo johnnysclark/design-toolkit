@@ -6,6 +6,7 @@ import SiteMap from "./SiteMap";
 import { WindRoseChart, SunPathChart, MonthlyClimate } from "./charts";
 import { Card, Stat, Pill, CoverageStrip, Read } from "./ui";
 import { SynthesisStrip, ContaminationPanel } from "./ai";
+import SiteChat from "./chat";
 import {
   buildExportList,
   download,
@@ -248,8 +249,8 @@ export default function SiteAnalysisTool({ signedIn }: { signedIn: boolean }) {
               value={scale}
               onChange={(v) => setScale(v as Scale)}
               options={[
-                { value: "macro", label: "◍ Macro" },
-                { value: "micro", label: "⌖ Micro" }
+                { value: "macro", label: "◍ Macro · Region" },
+                { value: "micro", label: "⌖ Micro · Site" }
               ]}
             />
           )}
@@ -384,6 +385,12 @@ function Results({
         />
         {contamination && <ContaminationPanel contamination={contamination} />}
         {synthesis && <SynthesisStrip synthesis={synthesis} />}
+        {signedIn && (
+          <SiteChat
+            key={site.epaId || site.name}
+            context={chatContext(result, contamination, synthesis)}
+          />
+        )}
       </div>
 
       {/* exports */}
@@ -405,7 +412,14 @@ function MacroCards({
   const c = climate?.summary;
   return (
     <>
-      <Card title="Climate — the regional read (~25 km cell)">
+      <Card
+        title="Climate — the regional read (~25 km cell)"
+        source={
+          c
+            ? `Open-Meteo ERA5 reanalysis (~25 km cell), ${c.year} · ${c.timezone} — a regional model, not a local weather station.`
+            : "Open-Meteo ERA5 reanalysis"
+        }
+      >
         {c ? (
           <>
             <div className="grid gap-6 sm:grid-cols-3">
@@ -429,15 +443,27 @@ function MacroCards({
               </div>
             </div>
             <div className="mt-4 flex flex-wrap gap-x-6 gap-y-2 border-t border-neutral-100 pt-3">
-              <Stat label="Prevailing wind" value={c.prevailingWind.dir} />
+              <Stat
+                label="Prevailing wind"
+                value={c.prevailingWind.dir}
+                hint="The compass direction the wind most often blows FROM, across the 2023 hourly record."
+              />
               <Stat
                 label="Annual temp"
                 value={`${fmt(c.annual.tempMean)}°`}
                 sub={`${fmt(c.annual.tempMin)}–${fmt(c.annual.tempMax)}°C`}
+                hint="Mean (and minimum–maximum) dry-bulb air temperature over 2023."
               />
-              <Stat label="Mean RH" value={`${fmt(c.annual.rhMean)}%`} />
-              <Stat label="Mean wind" value={`${fmt(c.annual.windMean)} m/s`} />
-              <Stat label="Source" value="Open-Meteo ERA5" sub={`${c.year} · ${c.timezone}`} />
+              <Stat
+                label="Mean RH"
+                value={`${fmt(c.annual.rhMean)}%`}
+                hint="Mean relative humidity over 2023 — drives comfort + condensation risk."
+              />
+              <Stat
+                label="Mean wind"
+                value={`${fmt(c.annual.windMean)} m/s`}
+                hint="Mean wind speed at 10 m above ground over 2023."
+              />
             </div>
             {synthesis && (
               <div className="mt-3 border-t border-neutral-100 pt-3">
@@ -450,13 +476,27 @@ function MacroCards({
         )}
       </Card>
 
-      <Card title="Regional position">
+      <Card
+        title="Regional position"
+        source={
+          site.mode === "superfund"
+            ? "US EPA National Priorities List (Superfund) site record."
+            : "Geocoded via OpenStreetMap / Nominatim."
+        }
+      >
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
           <Stat
             label="Coordinates"
             value={`${site.centroid.lat.toFixed(4)}, ${site.centroid.lon.toFixed(4)}`}
+            hint="Latitude, longitude (WGS84) of the site point."
           />
-          {climate && <Stat label="Elevation" value={`${Math.round(climate.summary.elevation)} m`} />}
+          {climate && (
+            <Stat
+              label="Elevation"
+              value={`${Math.round(climate.summary.elevation)} m`}
+              hint="Ground elevation at the point, from the Open-Meteo model."
+            />
+          )}
           {climate && <Stat label="Timezone" value={climate.summary.timezone} />}
           {site.mode === "superfund" ? (
             <>
@@ -500,7 +540,14 @@ function MicroCards({
   const docs = site.documents || {};
   return (
     <div className="grid gap-5 md:grid-cols-2">
-      <Card title="Site identity">
+      <Card
+        title="Site identity"
+        source={
+          site.mode === "superfund"
+            ? "US EPA Superfund — NPL record + published site-boundary layer."
+            : "Geocoded place via OpenStreetMap / Nominatim."
+        }
+      >
         <div className="grid grid-cols-2 gap-4">
           {site.mode === "superfund" ? (
             <>
@@ -542,14 +589,34 @@ function MicroCards({
         )}
       </Card>
 
-      <Card title="Terrain (USGS 3DEP)">
+      <Card
+        title="Terrain (USGS 3DEP)"
+        source="USGS 3DEP elevation, sampled as a coarse grid (getSamples). US only."
+      >
         {terrain ? (
           <>
             <div className="grid grid-cols-2 gap-4">
-              <Stat label="Elevation" value={`${fmt(terrain.min)}–${fmt(terrain.max)} m`} />
-              <Stat label="Relief" value={`${fmt(terrain.range)} m`} />
-              <Stat label="Mean slope" value={`~${fmt(terrain.slopePct)}%`} sub="coarse grid estimate" />
-              <Stat label="Grid" value={`${topo!.n}×${topo!.n} · ${fmt(terrain.resMeters)} m`} />
+              <Stat
+                label="Elevation"
+                value={`${fmt(terrain.min)}–${fmt(terrain.max)} m`}
+                hint="Lowest to highest sampled ground elevation across the study box."
+              />
+              <Stat
+                label="Relief"
+                value={`${fmt(terrain.range)} m`}
+                hint="Highest minus lowest elevation — the vertical range across the site."
+              />
+              <Stat
+                label="Mean slope"
+                value={`~${fmt(terrain.slopePct)}%`}
+                sub="coarse grid estimate"
+                hint="Average ground steepness from the elevation grid. Coarse — confirm with a survey before grading."
+              />
+              <Stat
+                label="Grid"
+                value={`${topo!.n}×${topo!.n} · ${fmt(terrain.resMeters)} m`}
+                hint="Sample resolution: number of points per side and the spacing between them."
+              />
             </div>
             {terrain.missing > 0 && (
               <p className="mt-2 text-xs text-amber-700">
@@ -568,7 +635,10 @@ function MicroCards({
         )}
       </Card>
 
-      <Card title="Water / flood (FEMA NFHL)">
+      <Card
+        title="Water / flood (FEMA NFHL)"
+        source="FEMA National Flood Hazard Layer — single-point lookup. US only."
+      >
         {flood && flood.mapped !== false ? (
           <>
             <div className="flex flex-wrap items-center gap-2">
@@ -813,6 +883,56 @@ function leanBundle(result: AnalyzeResult, contamination: Contamination | null) 
     flood,
     topo: topo ? { n: topo.n, bbox: topo.bbox, stats: topo.stats } : null,
     contamination
+  };
+}
+
+// Compact dossier handed to the follow-up chat as context (no hourly arrays / grid).
+function chatContext(
+  result: AnalyzeResult,
+  contamination: Contamination | null,
+  synthesis: Synthesis | null
+) {
+  const { site, climate, flood, topo, meta } = result;
+  return {
+    mode: meta.mode,
+    place: {
+      name: site.name,
+      address: site.address,
+      epaId: site.epaId,
+      status: site.status,
+      city: site.city,
+      county: site.county,
+      state: site.state,
+      region: site.region,
+      category: site.category,
+      coordinates: site.centroid,
+      areaAcres: site.areaAcres
+    },
+    climate: climate
+      ? {
+          source: climate.summary.source,
+          prevailingWind: climate.summary.prevailingWind,
+          annual: climate.summary.annual,
+          timezone: climate.summary.timezone,
+          elevation: climate.summary.elevation
+        }
+      : null,
+    terrain: topo ? { stats: topo.stats } : null,
+    flood,
+    aiReading: synthesis
+      ? {
+          site_in_a_sentence: synthesis.site_in_a_sentence,
+          key_tensions: synthesis.key_tensions,
+          cannot_tell_you: synthesis.what_this_analysis_cannot_tell_you
+        }
+      : null,
+    contamination: contamination
+      ? {
+          summary: contamination.summary,
+          contaminants: contamination.contaminants_of_concern?.map((c) => c.name),
+          remediation: contamination.remediation_status
+        }
+      : null
   };
 }
 

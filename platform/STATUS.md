@@ -26,6 +26,15 @@
 > modes + both analyze modes return live data (Love Canal boundary, Chicago climate/terrain/
 > flood). **Not browser-screenshot-tested** — open `/site-analysis` to eyeball the map/charts.
 >
+> **Site Analysis — follow-ups shipped (2026-06-25):** (1) terrain now a **single 3DEP
+> `getSamples`** call + size-capped study box (was a 144-call fan-out that timed out big sites
+> like Tar Creek). (2) AI passes moved to **Sonnet 4.6** (`MODEL` in `site-analysis-prompts.ts`)
+> for speed. (3) Added a **grounded follow-up chat** (`api/site-analysis/chat`, streamed, Sonnet
+> + `web_search_20260209`) with a **sources rail** that accumulates every web link it cites —
+> mirrors the Skills Coach streaming pattern; auth-gated. (4) **Hover tooltips (ⓘ) + a Source
+> line on every data card** (Open-Meteo / USGS 3DEP / FEMA / EPA / OSM). (5) Macro/Micro buttons
+> relabeled **Macro · Region / Micro · Site** (kept the orientation from John's original spec).
+>
 > **Multi-agent rule:** one agent = one folder = one git worktree = one branch (see
 > `../RUNNING-MULTIPLE-AGENTS.md`). The **GOAL-1 walkthrough below is now historical**; the
 > **GOAL-2 tool-porting roadmap is still current.** Actionable build list: [`BUILD-BACKLOG.md`](BUILD-BACKLOG.md).
