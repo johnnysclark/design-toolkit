@@ -62,7 +62,7 @@ export default function NodeModal({
         {/* header */}
         <div className="flex items-start justify-between gap-4 border-b border-neutral-200 p-5">
           <div>
-            <div className="flex flex-wrap items-center gap-2 text-[11px] uppercase tracking-wide text-neutral-500">
+            <div className="flex flex-wrap items-center gap-2 text-[11px] uppercase tracking-wide text-neutral-900">
               <span className="rounded-full bg-neutral-900 px-2 py-0.5 text-white">
                 {disciplineLabel(node.discipline)}
               </span>
@@ -74,14 +74,14 @@ export default function NodeModal({
               </span>
             </div>
             <h2 className="mt-2 text-2xl font-semibold tracking-tight">{node.title}</h2>
-            <p className="mt-1 max-w-lg text-sm text-neutral-600">{node.blurb}</p>
+            <p className="mt-1 max-w-lg text-sm text-neutral-900">{node.blurb}</p>
           </div>
           <button
             ref={closeRef}
             type="button"
             onClick={onClose}
             aria-label="Close"
-            className="shrink-0 rounded-full p-1.5 text-neutral-400 hover:bg-neutral-100 hover:text-neutral-900"
+            className="shrink-0 rounded-full p-1.5 text-neutral-900 hover:bg-neutral-100 hover:text-neutral-900"
           >
             <svg viewBox="0 0 24 24" className="h-5 w-5 stroke-current" fill="none" strokeWidth="2">
               <path d="M6 6l12 12M18 6L6 18" strokeLinecap="round" />
@@ -89,14 +89,20 @@ export default function NodeModal({
           </button>
         </div>
 
-        <div className="space-y-6 p-5">
+        <div
+          className="space-y-6 p-5"
+          style={{
+            fontFamily:
+              "ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif"
+          }}
+        >
           {/* the basics — the written guide, the primary content for now */}
           {node.guide.length > 0 && (
             <section>
-              <h3 className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-neutral-400">
+              <h3 className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-neutral-900">
                 The basics
               </h3>
-              <div className="space-y-3 text-[15px] leading-relaxed text-neutral-700">
+              <div className="space-y-3 text-[15px] leading-relaxed text-neutral-900">
                 {node.guide.map((para, i) => (
                   <p key={i}>{para}</p>
                 ))}
@@ -107,7 +113,7 @@ export default function NodeModal({
           {/* videos — optional; the guide carries the node until one's recorded */}
           {node.videos.length > 0 && (
             <section>
-              <h3 className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-neutral-400">
+              <h3 className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-neutral-900">
                 Video walkthrough
               </h3>
               <div className="space-y-3">
@@ -121,7 +127,7 @@ export default function NodeModal({
           {/* concepts — reused from the Skills Coach KB */}
           {node.conceptSlugs.length > 0 && (
             <section>
-              <h3 className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-neutral-400">
+              <h3 className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-neutral-900">
                 Key concepts
               </h3>
               <ul className="space-y-2">
@@ -144,7 +150,7 @@ export default function NodeModal({
                           Docs →
                         </a>
                       </div>
-                      <p className="mt-0.5 text-neutral-600">{c.oneLiner}</p>
+                      <p className="mt-0.5 text-neutral-900">{c.oneLiner}</p>
                     </li>
                   );
                 })}
@@ -204,7 +210,7 @@ function TrailLinks({
 
   return (
     <div>
-      <h3 className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-neutral-400">
+      <h3 className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-neutral-900">
         {label}
       </h3>
       {items.length > 0 ? (
@@ -214,14 +220,14 @@ function TrailLinks({
               key={n.id}
               type="button"
               onClick={() => onSelect(n.id)}
-              className="rounded-full border border-neutral-300 px-3 py-1 text-sm text-neutral-700 hover:border-neutral-900 hover:bg-neutral-50"
+              className="rounded-full border border-neutral-300 px-3 py-1 text-sm text-neutral-900 hover:border-neutral-900 hover:bg-neutral-50"
             >
               {n.title}
             </button>
           ))}
         </div>
       ) : (
-        <p className="text-sm text-neutral-400">{empty}</p>
+        <p className="text-sm text-neutral-900">{empty}</p>
       )}
     </div>
   );

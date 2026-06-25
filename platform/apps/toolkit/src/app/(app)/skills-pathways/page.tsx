@@ -15,7 +15,7 @@ export default function SkillsPathwaysPage() {
   return (
     <div>
       <h1 className="text-3xl font-semibold tracking-tight">Skills Pathways</h1>
-      <p className="mt-2 max-w-2xl text-neutral-600">
+      <p className="mt-2 max-w-2xl text-neutral-900">
         A trail map for digital skills — how to climb from beginner to advanced in
         both 2D and 3D software, aimed at studio work: modeling, representation,
         and portfolio, not construction documents. Click any step for a short,
