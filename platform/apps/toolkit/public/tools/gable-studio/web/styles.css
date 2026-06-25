@@ -98,3 +98,20 @@ input.num { width: 100%; border: 1px solid var(--line); border-radius: 5px; padd
 #map { height: 360px; width: 100%; margin-top: .6rem; }
 
 @media (max-width: 1100px) { main { grid-template-columns: 1fr; grid-auto-rows: minmax(260px, auto); } .panel.right, .panel.left { border: none; border-top: 1px solid var(--line); } }
+
+/* ============================================================
+   Bold-graphic restyle (matches the rest of the platform):
+   all text BLACK, sans-serif, medium/bold weight even for the
+   small labels — kept readable given this UI's density.
+   Pass/fail colors and the primary button's white text are
+   preserved (higher specificity).
+   ============================================================ */
+:root { --ink: #0a0a0a; --muted: #262626; }
+body { color: var(--ink); font-weight: 500; }
+button, select, input,
+.toolbar button, .toolbar select { color: var(--ink); font-weight: 600; }
+.tag, h1 .sub, .slk, .slider .slk, .mlbl, .mini, .scoresub, .rulesub, .hardlbl,
+.proxy, .status, .rule, .modal-sub, .modal-note, .modal-scroll p, .modal-scroll .src,
+.lblegend, .lblegend .lbmax, .lblegend .lbmin { color: var(--ink); font-weight: 600; }
+.panel h4 { color: var(--ink); font-weight: 700; }
+h1, h3, .panel h3, .scorepct, .mval, .lbtitle, .lblegend .lbtitle { font-weight: 800; }
