@@ -26,7 +26,9 @@ build under `apps/toolkit/public/tools/<tool>/`, embedded via iframe.
 
 ## 🔧 Infra / product — do these first (they make the site shareable + safe)
 
-### I1 · Make the Toolkit public + disable the Librarian — **small · HIGH PRIORITY**
+### I1 · Make the Toolkit public + disable the Librarian — ✅ **DONE (2026-06-24)**
+*Shipped: public shell (no blanket redirect), `AuthGate` on Librarian + Pinup, `api/librarian`
+returns 401 for anon, sidebar adapts. Verified live: `GET /`→200, anon `POST /api/librarian`→401.*
 Drop the sign-in wall so the cohort can browse, but keep the Anthropic key un-reachable.
 - Remove the blanket redirect in `(app)/layout.tsx`; sidebar shows "Sign in" (not email/sign-out) when anonymous.
 - **Librarian:** hide its nav item (or show a "sign-in required" state) **and** make `api/librarian/route.ts` return **401 for anon** — so even a direct POST can't spend credits.
