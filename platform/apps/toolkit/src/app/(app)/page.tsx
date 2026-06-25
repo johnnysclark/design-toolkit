@@ -277,10 +277,11 @@ const TOOLS: Tool[] = [
     runs: "Runs as — LLM behind a proxy; each persona is a system prompt.",
     body: (
       <p>
-        A sparring partner, explicitly not a verdict. It adopts a critical persona — a tectonic reading, a
-        social one, a formal one — and gives the lay of the land so a student can find blind spots before
-        review. The caution is built into the framing: one synthetic position among many, to be weighed
-        against a range of human critics, never substituted for them.
+        A review partner, explicitly not a verdict. It adopts a critical persona — tectonic, social, formal —
+        to give the lay of the land and surface blind spots, and it helps build the case for review: pulling a
+        project down to a defensible thesis, sequencing the drawings that prove it, and interviewing the
+        student for the questions a jury will ask. One synthetic position among many — weigh it against human
+        critics, never substitute it for them.
       </p>
     ),
     mock: `<svg viewBox="0 0 640 210" role="img" aria-label="Design critic mock: a lens selector, a critique block, and a caution tag">
