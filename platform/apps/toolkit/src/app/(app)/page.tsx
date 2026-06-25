@@ -6,7 +6,7 @@ import { TOOLKIT_NAV } from "@/lib/toolkit-nav";
 // uppercase, and a readable system sans for the long-form statement body.
 // Scoped to the `.di-doc` wrapper.
 
-// The nine tools, each with a tiny inline-SVG mock of how it works and a note on
+// The ten tools, each with a tiny inline-SVG mock of how it works and a note on
 // where it runs. SVGs are static, trusted markup ported verbatim from the
 // teaching statement; injected as-is to keep their (kebab-case) attributes.
 type Tool = { no: string; href: string | null; title: string; runs: React.ReactNode; body: React.ReactNode; mock: string };
@@ -445,15 +445,16 @@ export default function Overview() {
               instruments that supply the logics, language, and data behind a judgment while leaving the
               judgment to the student
             </span>
-            . I&rsquo;ve built nine such tools with Claude Code, covering site analysis, precedent research,
-            skills coaching, critique, portfolio narrative, studio culture, and accessibility. They&rsquo;re
+            . I&rsquo;ve built ten such tools with Claude Code, covering site analysis and design, precedent
+            research, skills coaching, drawing and 3D production, critique and portfolio, studio culture, and
+            accessibility. They&rsquo;re
             taught inside studio sequences and a short series of agentic-coding workshops, in a &ldquo;trust
             but verify&rdquo; stance that values iteration and edge-case hunting over fluent-sounding answers.
           </p>
           <div className="glance">
             <div className="gcell">
               <div className="gk">What</div>
-              <div className="gv">Nine AI tools for the design studio, built in Claude Code.</div>
+              <div className="gv">Ten AI tools for the design studio, built in Claude Code.</div>
             </div>
             <div className="gcell">
               <div className="gk">How it&rsquo;s taught</div>
@@ -469,7 +470,7 @@ export default function Overview() {
         <div className="khead">
           <h2>The toolkit, in examples</h2>
           <p>
-            Nine tools, each with a simple mock of how it works and a note on where it runs. Fuller context
+            Ten tools, each with a simple mock of how it works and a note on where it runs. Fuller context
             is in the statement below.
           </p>
         </div>
@@ -528,9 +529,10 @@ export default function Overview() {
             design and the process that produced it. Teaching students to work with AI follows the same
             tenets as teaching them to be resilient designers — which is why building these tools should
             reinforce the core of the studio rather than replace it. The toolkit is detailed in the examples
-            above — a production tutor, a site analyzer and form generator, a precedent librarian, a
-            portfolio coach, the RAP accessibility toolkit, drawing and fabrication widgets, a studio pin-up
-            wall, a design critic, and a set of 3D on-ramps — each at some stage of production, all built
+            above — Surveyor for site analysis and Eco-Architect for design with context, Coach the production
+            tutor and Cartographer the skills map, a precedent Librarian, a studio Archivist, a Critic for
+            critique and portfolio, 2D and 3D production tooling, and the RAP accessibility project — each at
+            some stage of production, all built
             with Claude Code.
           </p>
 
