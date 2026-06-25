@@ -1,32 +1,21 @@
 import Link from "next/link";
-import { Space_Grotesk, IBM_Plex_Sans } from "next/font/google";
 import { TOOLKIT_NAV } from "@/lib/toolkit-nav";
 
-// Editorial typography for the Overview, scoped to this page only (the rest of
-// the app keeps its Archivo Black display face). Loaded via next/font so the
-// CSS variables resolve under the `.di-doc` wrapper.
-const grotesk = Space_Grotesk({
-  subsets: ["latin"],
-  weight: ["500", "700"],
-  variable: "--font-grotesk",
-  display: "swap"
-});
-const plex = IBM_Plex_Sans({
-  subsets: ["latin"],
-  weight: ["400", "500"],
-  variable: "--font-plex",
-  display: "swap"
-});
+// Typography matches the rest of the platform: Archivo Black (the app's
+// --font-display, wired in the root layout) for the headings + pills, set
+// uppercase, and a readable system sans for the long-form statement body.
+// Scoped to the `.di-doc` wrapper.
 
 // The nine tools, each with a tiny inline-SVG mock of how it works and a note on
 // where it runs. SVGs are static, trusted markup ported verbatim from the
 // teaching statement; injected as-is to keep their (kebab-case) attributes.
-type Tool = { no: string; title: string; runs: React.ReactNode; body: React.ReactNode; mock: string };
+type Tool = { no: string; href: string | null; title: string; runs: React.ReactNode; body: React.ReactNode; mock: string };
 
 const TOOLS: Tool[] = [
   {
     no: "01",
     title: "Skills / Design Production Tutor",
+    href: "/skills-coach",
     runs: "Runs as — LLM chat behind a proxy, or campus Illinois Chat.",
     body: (
       <p>
@@ -58,6 +47,7 @@ const TOOLS: Tool[] = [
   {
     no: "02",
     title: "Site Analysis / Form Generator",
+    href: "/site-analysis",
     runs: "Runs as — Rhino / Grasshopper for the simulation, with a web front for inputs.",
     body: (
       <p>
@@ -92,6 +82,7 @@ const TOOLS: Tool[] = [
   {
     no: "03",
     title: "Precedent / Research Machine — Librarian",
+    href: "/librarian",
     runs: "Runs as — a local app (Claude Code), filesystem-based.",
     body: (
       <p>
@@ -119,6 +110,7 @@ const TOOLS: Tool[] = [
   {
     no: "04",
     title: "Portfolio / Storyteller Helper",
+    href: null,
     runs: "Runs as — LLM chat behind a proxy.",
     body: (
       <p>
@@ -153,6 +145,7 @@ const TOOLS: Tool[] = [
   {
     no: "05",
     title: "RAP Toolkit",
+    href: "/rap",
     runs: (
       <>
         Runs as — local + CLI, open-source ·{" "}
@@ -194,6 +187,7 @@ const TOOLS: Tool[] = [
   {
     no: "06",
     title: "Drawing Cleanup & 2D Media",
+    href: "/media-2d",
     runs: "Runs as — vision models for cleanup, deterministic paths for fabrication.",
     body: (
       <p>
@@ -221,6 +215,7 @@ const TOOLS: Tool[] = [
   {
     no: "07",
     title: "Miro Alternative — Digital Wall",
+    href: "/pinup",
     runs: "Runs as — a web app with a backend (Supabase) and accounts.",
     body: (
       <p>
@@ -256,6 +251,7 @@ const TOOLS: Tool[] = [
   {
     no: "08",
     title: "Design Critic",
+    href: "/design-critic",
     runs: "Runs as — LLM behind a proxy; each persona is a system prompt.",
     body: (
       <p>
@@ -283,6 +279,7 @@ const TOOLS: Tool[] = [
   {
     no: "09",
     title: "3D Tools",
+    href: "/tools-3d",
     runs: "Runs as — Rhino-coupled, plus a static web viewer.",
     body: (
       <p>
@@ -312,15 +309,15 @@ const TOOLS: Tool[] = [
 ];
 
 const STYLES = `
-.di-doc{ color:#141414; font-family:var(--font-plex),system-ui,sans-serif; font-size:17px; line-height:1.62; -webkit-font-smoothing:antialiased; }
-.di-doc h1,.di-doc h2,.di-doc h3{ font-family:var(--font-grotesk),system-ui,sans-serif; color:#111; margin:0; font-weight:500; text-transform:none; letter-spacing:normal; }
+.di-doc{ color:#141414; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif; font-size:17px; line-height:1.62; -webkit-font-smoothing:antialiased; }
+.di-doc h1,.di-doc h2,.di-doc h3{ font-family:var(--font-display),ui-sans-serif,system-ui,sans-serif; color:#111; margin:0; font-weight:400; text-transform:uppercase; letter-spacing:-.01em; }
 .di-doc a{ color:#1A45F0; }
 .di-doc em{ font-style:italic; }
 .di-doc .wrap{ max-width:760px; margin:0 auto; }
 
 .di-doc header{ border-bottom:2px solid #111; padding:2px 0 22px; }
 .di-doc .kicker{ font-size:13px; letter-spacing:.16em; text-transform:uppercase; color:#666; }
-.di-doc header h1{ font-size:clamp(28px,4.4vw,40px); line-height:1.05; letter-spacing:-.02em; margin-top:12px; font-weight:700; }
+.di-doc header h1{ font-size:clamp(26px,4.2vw,38px); line-height:1.04; letter-spacing:-.02em; margin-top:12px; font-weight:400; }
 .di-doc .byline{ font-size:15.5px; color:#444; margin-top:13px; }
 .di-doc .byline b{ font-weight:500; color:#111; }
 
@@ -336,7 +333,7 @@ const STYLES = `
 
 .di-doc .jump{ margin-top:26px; display:flex; flex-wrap:wrap; gap:8px; align-items:center; }
 .di-doc .jump .jlbl{ font-size:11px; letter-spacing:.12em; text-transform:uppercase; color:#999; margin-right:4px; }
-.di-doc .jump a{ font-family:var(--font-grotesk),sans-serif; font-size:13px; text-decoration:none; color:#111; background:#fff; border:1px solid #ddd; border-radius:999px; padding:5px 12px; }
+.di-doc .jump a{ font-family:var(--font-display),sans-serif; text-transform:uppercase; letter-spacing:-.01em; font-size:11.5px; text-decoration:none; color:#111; background:#fff; border:1px solid #111; border-radius:999px; padding:6px 12px; }
 .di-doc .jump a:hover{ border-color:#111; }
 
 .di-doc .khead{ border-top:2px solid #111; margin-top:44px; padding-top:15px; margin-bottom:10px; }
@@ -345,8 +342,11 @@ const STYLES = `
 
 .di-doc .tool-entry{ display:grid; grid-template-columns:minmax(0,1.08fr) minmax(0,1fr); gap:28px; align-items:center; padding:26px 0; border-top:1px solid #ededed; }
 .di-doc .tool-entry:first-of-type{ border-top:none; }
-.di-doc .te-no{ font-family:var(--font-grotesk),sans-serif; font-size:13px; color:#bbb; letter-spacing:.04em; margin-bottom:4px; }
+.di-doc .te-no{ font-family:var(--font-display),sans-serif; font-size:13px; color:#bbb; letter-spacing:.04em; margin-bottom:4px; }
 .di-doc .te-text h3{ font-size:20px; line-height:1.14; margin:0 0 9px; }
+.di-doc .te-link{ color:inherit; text-decoration:none; }
+.di-doc .te-link:hover{ text-decoration:underline; text-underline-offset:3px; text-decoration-thickness:2px; }
+.di-doc .te-link span{ color:#1A45F0; }
 .di-doc .te-text p{ font-size:15.5px; line-height:1.56; color:#2e2e2e; margin:0; }
 .di-doc .te-deliver{ font-size:12.5px; color:#8a8a8a; margin-top:11px; letter-spacing:.01em; }
 .di-doc .te-deliver a{ color:#1A45F0; }
@@ -358,9 +358,9 @@ const STYLES = `
 
 .di-doc .feature{ border-top:2px solid #111; border-bottom:2px solid #111; padding:28px 0; margin:28px 0 0; }
 .di-doc .feature .fl{ font-size:12px; letter-spacing:.14em; text-transform:uppercase; color:#888; margin-bottom:13px; }
-.di-doc .feature p{ font-family:var(--font-grotesk),sans-serif; font-weight:500; font-size:22px; line-height:1.34; letter-spacing:-.01em; color:#111; margin:0; }
+.di-doc .feature p{ font-weight:700; font-size:21px; line-height:1.36; letter-spacing:-.005em; color:#111; margin:0; }
 
-.di-doc .build h3{ font-family:var(--font-grotesk),sans-serif; font-weight:500; font-size:18px; margin:26px 0 6px; color:#111; }
+.di-doc .build h3{ font-family:var(--font-display),sans-serif; font-weight:400; font-size:16px; margin:26px 0 6px; color:#111; }
 .di-doc .build p{ font-size:16.5px; line-height:1.64; margin:0 0 12px; color:#1f1f1f; max-width:64ch; }
 .di-doc .stack-table{ width:100%; border-collapse:collapse; margin:16px 0 8px; font-size:14px; background:#fff; }
 .di-doc .stack-table th,.di-doc .stack-table td{ text-align:left; vertical-align:top; padding:10px 12px; border-bottom:1px solid #e8e8e8; }
@@ -390,9 +390,15 @@ const STYLES = `
 
 export default function Overview() {
   const liveTools = TOOLKIT_NAV.filter((t) => t.href !== "/" && t.status === "live");
+  // Show the tool cards in the SAME order as the left sidebar; any card with no
+  // matching tool page (href:null) sorts to the end.
+  const navIndex = Object.fromEntries(TOOLKIT_NAV.map((t, i) => [t.href, i]));
+  const orderedTools = [...TOOLS].sort(
+    (a, b) => (a.href ? navIndex[a.href] ?? 999 : 999) - (b.href ? navIndex[b.href] ?? 999 : 999)
+  );
 
   return (
-    <div className={`di-doc ${grotesk.variable} ${plex.variable}`}>
+    <div className="di-doc">
       <style>{STYLES}</style>
 
       <div className="wrap">
@@ -453,11 +459,19 @@ export default function Overview() {
           </p>
         </div>
 
-        {TOOLS.map((t) => (
-          <article className="tool-entry" key={t.no}>
+        {orderedTools.map((t, i) => (
+          <article className="tool-entry" key={t.title}>
             <div className="te-text">
-              <div className="te-no">{t.no}</div>
-              <h3>{t.title}</h3>
+              <div className="te-no">{String(i + 1).padStart(2, "0")}</div>
+              <h3>
+                {t.href ? (
+                  <Link href={t.href} className="te-link">
+                    {t.title} <span aria-hidden="true">→</span>
+                  </Link>
+                ) : (
+                  t.title
+                )}
+              </h3>
               {t.body}
               <p className="te-deliver">{t.runs}</p>
             </div>

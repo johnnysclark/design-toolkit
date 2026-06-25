@@ -4,6 +4,12 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Gable Studio · site analyzer + constraint generator</title>
+  <!-- Archivo Black = the toolkit's display face, so the embedded studio matches
+       the rest of the platform. Network-optional: if blocked (offline class
+       wifi) the headings fall back to the system sans via the CSS font stack. -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Archivo+Black&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="./styles.css" />
   <link rel="stylesheet" href="./vendor/leaflet/leaflet.css" />
   <!-- Zero-build. three.js is VENDORED in ./vendor (works offline — good for
