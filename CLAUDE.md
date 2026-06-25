@@ -2,6 +2,9 @@
 
 Guidance for Claude Code working in this repository (`design-toolkit`).
 
+> **Continuing the build? Read [`platform/STATUS.md`](platform/STATUS.md) first** — current
+> state, how to get the site live, and the tool-porting roadmap.
+
 ## What this is
 **All Means Works** (allmeans.works) — an umbrella design + research practice and platform by
 **John Clark** (architecture educator, UIUC School of Architecture). The **26 Summer AI
