@@ -1,7 +1,7 @@
 // app.js (v2) — owns state, wires panels to the core, keeps everything live.
 import { DEFAULTS, run } from "./core.js";
 import { createViewport } from "./viewport.js";
-import { renderControls, renderDashboard, renderRules, paintResults, el } from "./ui.js";
+import { renderEnvControls, renderMassingControls, renderDashboard, renderRules, paintResults, el } from "./ui.js";
 import { buildExportZip, download, downloadJSON } from "./exporter.js";
 import { importThreeDM } from "./rhinoImport.js";
 
@@ -15,7 +15,7 @@ const state = {
 };
 
 const $ = (s) => document.querySelector(s);
-const controlsEl = $("#controls"), dashEl = $("#dashboard"), rulesEl = $("#rules"), scoreEl = $("#score"), statusEl = $("#status");
+const envEl = $("#env-controls"), massingEl = $("#massing"), dashEl = $("#dashboard"), rulesEl = $("#rules"), scoreEl = $("#score"), statusEl = $("#status");
 let viewport = null;
 
 try { viewport = createViewport($("#view")); }
@@ -33,7 +33,8 @@ const onDisplay = () => { if (viewport) viewport.setDisplay(state.display); };
 function onRulesChange(structural) { if (structural) renderRules(rulesEl, state.ruleset, onRulesChange); recompute(); }
 
 function rebuildAll() {
-  renderControls(controlsEl, state, { param: onParam, display: onDisplay });
+  renderEnvControls(envEl, state, { param: onParam, display: onDisplay });
+  renderMassingControls(massingEl, state, { param: onParam, display: onDisplay });
   renderRules(rulesEl, state.ruleset, onRulesChange);
   recompute();
 }
@@ -97,8 +98,14 @@ const showModal = (id) => { $("#" + id).style.display = "flex"; };
 const hideModal = (id) => { $("#" + id).style.display = "none"; };
 document.querySelectorAll("[data-close]").forEach((b) => b.addEventListener("click", () => hideModal(b.getAttribute("data-close"))));
 document.querySelectorAll(".modal").forEach((m) => m.addEventListener("click", (e) => { if (e.target === m) hideModal(m.id); }));
-document.addEventListener("keydown", (e) => { if (e.key === "Escape") document.querySelectorAll(".modal").forEach((m) => (m.style.display = "none")); });
+document.addEventListener("keydown", (e) => { if (e.key === "Escape") { document.querySelectorAll(".modal").forEach((m) => (m.style.display = "none")); $("#studioWin").style.display = "none"; } });
 $("#btn-info").addEventListener("click", () => showModal("infoModal"));
+
+// Gable Studio example — floating building/terrain window (toggle, non-modal).
+const studioWin = $("#studioWin");
+const toggleStudio = () => { studioWin.style.display = studioWin.style.display === "flex" ? "none" : "flex"; };
+$("#btn-studio").addEventListener("click", toggleStudio);
+$("#btn-studio-2").addEventListener("click", toggleStudio);
 
 let map = null, marker = null;
 const updateMapReadout = () => { $("#map-readout").textContent = `lat ${state.site.latitude.toFixed(2)}°, lon ${state.site.longitude.toFixed(2)}°`; };

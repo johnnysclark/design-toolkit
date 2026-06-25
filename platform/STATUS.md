@@ -35,6 +35,19 @@
 > line on every data card** (Open-Meteo / USGS 3DEP / FEMA / EPA / OSM). (5) Macro/Micro buttons
 > relabeled **Macro · Region / Micro · Site** (kept the orientation from John's original spec).
 >
+> **Librarian — REBUILT + DEPLOYED (2026-06-25 · branch `tool/librarian`).**
+> Repurposed from the text-only precedent-dossier tool into a **visual reference library**:
+> upload / paste / URL a single found image → Claude vision reads it (identifications framed as
+> *leads to verify*, never facts) → free open-archive enrichment (Wikidata · Wikimedia Commons ·
+> Wikipedia · Getty AAT · LoC HABS) surfaces related plans / drawings / other views / photos +
+> textual context → catalogue finds (metadata-tagged) into **per-project libraries** that grow
+> over time, shared studio-wide (read-all / write-own RLS). New migration **`0003_library.sql`**
+> (`library_projects` / `library_searches` / `library_items` + a private `library` storage
+> bucket) — applied to the live Supabase. Still **auth-gated** — `/api/librarian` returns **401
+> for anon** (cost protection holds). Enrichment verified against live archives (Commons category
+> P373 + LoC HABS collections endpoint). **Free-data v1**; paid reverse-image + Google-Images
+> search is a planned upgrade (needs SerpAPI/Serper keys). **Merged to `main` → deployed live.**
+>
 > **Multi-agent rule:** one agent = one folder = one git worktree = one branch (see
 > `../RUNNING-MULTIPLE-AGENTS.md`). The **GOAL-1 walkthrough below is now historical**; the
 > **GOAL-2 tool-porting roadmap is still current.** Actionable build list: [`BUILD-BACKLOG.md`](BUILD-BACKLOG.md).

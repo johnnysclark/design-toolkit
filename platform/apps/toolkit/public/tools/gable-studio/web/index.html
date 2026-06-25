@@ -4,6 +4,12 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Gable Studio · site analyzer + constraint generator</title>
+  <!-- Archivo Black = the toolkit's display face, so the embedded studio matches
+       the rest of the platform. Network-optional: if blocked (offline class
+       wifi) the headings fall back to the system sans via the CSS font stack. -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Archivo+Black&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="./styles.css" />
   <link rel="stylesheet" href="./vendor/leaflet/leaflet.css" />
   <!-- Zero-build. three.js is VENDORED in ./vendor (works offline — good for
@@ -31,13 +37,13 @@
   </header>
 
   <nav class="toolbar">
+    <button id="btn-studio" class="tab">⊞ Gable Studio example</button>
+    <span class="sep"></span>
     <button id="btn-mode">◫ Pen mode</button>
     <button id="btn-map">📍 Location</button>
     <button id="btn-info">ⓘ Sources &amp; math</button>
     <span class="sep"></span>
     <button id="btn-export" class="primary">⤓ Export Rhino/GH scripts</button>
-    <button id="btn-import-3dm">⤒ Import .3dm</button>
-    <input type="file" id="file-3dm" accept=".3dm" style="display:none" />
     <span class="sep"></span>
     <button id="btn-save-design">Save design</button>
     <button id="btn-load-design">Load design</button>
@@ -54,8 +60,14 @@
 
   <main>
     <section class="panel left">
-      <h3>Parameters</h3>
-      <div id="controls"></div>
+      <h3>Environmental controls</h3>
+      <div class="importcard">
+        <button id="btn-import-3dm" class="bigimport">⤒ Import Rhino file (.3dm)</button>
+        <input type="file" id="file-3dm" accept=".3dm" style="display:none" />
+        <p class="importhint">Bring your own massing from Rhino&nbsp;8 — or open the built-in example. All dimensions shown in <b>feet</b>.</p>
+        <button id="btn-studio-2" class="tabopen">⊞ Open Gable Studio example</button>
+      </div>
+      <div id="env-controls"></div>
     </section>
 
     <section class="center">
@@ -72,6 +84,17 @@
     </section>
   </main>
 
+  <!-- Gable Studio example: building + terrain parameters in a floating window
+       (non-modal, so the 3D view keeps updating live as you drag). -->
+  <aside id="studioWin" class="studiowin" style="display:none">
+    <div class="studiowin-head">
+      <b>⊞ Gable Studio example</b>
+      <span class="studiowin-sub">building &amp; terrain · feet</span>
+      <button class="modal-x" data-close="studioWin" title="close">✕</button>
+    </div>
+    <div id="massing" class="studiowin-body"></div>
+  </aside>
+
   <!-- Location picker -->
   <div id="mapModal" class="modal" style="display:none">
     <div class="modal-box">
@@ -87,6 +110,7 @@
       <div class="modal-head"><b>Where the analysis comes from</b><button class="modal-x" data-close="infoModal">✕</button></div>
       <div class="modal-scroll">
         <p class="modal-note"><b>These are transparent teaching proxies, not validated simulation.</b> Each metric is a pure, deterministic function of the parameters — the same formula runs in the browser and in the exported Rhino/Grasshopper python (a parity test checks they agree). For certified analysis use Ladybug Tools / EnergyPlus (energy), Radiance (daylight), or CFD (wind).</p>
+        <p class="modal-note"><b>Units:</b> inputs and metrics are shown in <b>feet</b> (ft², ft³, mph) for convenience; the proxies and the exported Rhino/GH python compute in <b>metres (SI)</b>, so the formulas below are SI and values are converted only for display.</p>
 
         <h4>Frame &amp; sun position</h4>
         <p>+X East, +Y North, +Z Up; azimuth clockwise from North. Sun is sampled at 3 declinations (δ = +23.45° summer, 0° equinox, −23.45° winter) × 5 hours (08–16). Altitude: <code>sin α = sin φ·sin δ + cos φ·cos δ·cos H</code>; azimuth: <code>cos A = (sin δ − sin φ·sin α)/(cos φ·cos α)</code>, with hour angle <code>H = 15°·(hour−12)</code>. <em>Standard solar geometry — Duffie &amp; Beckman, “Solar Engineering of Thermal Processes”; NOAA solar-position equations.</em></p>

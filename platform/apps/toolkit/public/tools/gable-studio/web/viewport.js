@@ -157,8 +157,10 @@ export function createViewport(canvas) {
   }
 
   function gridCellsInto(f, out) {
-    const nu = Math.max(2, Math.min(14, Math.round(f.faceWidth / 0.5)));
-    const nv = Math.max(2, Math.min(14, Math.round(f.faceHeight / 0.5)));
+    // finer grain (~0.3 m ≈ 1 ft cells, capped) so the solar overlay reads smooth
+    // rather than chunky. Only runs in Analysis mode; Pen mode is unaffected.
+    const nu = Math.max(3, Math.min(24, Math.round(f.faceWidth / 0.3)));
+    const nv = Math.max(3, Math.min(24, Math.round(f.faceHeight / 0.3)));
     const at = (uu, vv) => [f.c[0] + f.uAxis[0] * uu * f.faceWidth + f.vAxis[0] * vv * f.faceHeight,
                             f.c[1] + f.uAxis[1] * uu * f.faceWidth + f.vAxis[1] * vv * f.faceHeight,
                             f.c[2] + f.uAxis[2] * uu * f.faceWidth + f.vAxis[2] * vv * f.faceHeight];

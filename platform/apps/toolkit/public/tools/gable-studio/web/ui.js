@@ -21,13 +21,42 @@ const fmt = (x, u) => {
   return u ? `${s} ${u}` : s;
 };
 
+// --- unit display (FEET for this tool) --------------------------------------
+// State + core.js compute in METRES (SI), so the Rhino/GH export and the
+// JS↔Python parity test stay valid. We convert ONLY at the display boundary so
+// the architect reads and types feet (and mph / ft² / ft³).
+const FT = 3.280839895, FT2 = FT * FT, FT3 = FT * FT * FT, MPH = 2.2369362921;
+const CONV = {
+  len: { f: FT, u: "ft" }, speed: { f: MPH, u: "mph" }, hour: { f: 1, u: "h" },
+  deg: { f: 1, u: "°" }, tempK: { f: 1, u: "K" }, ratio: { f: 1, u: "" },
+};
+// numeric slider key -> unit kind. Dimensional keys default to length (feet);
+// angles, ratios, speed and temperature are called out explicitly.
+const KIND = {
+  cx: "len", cy: "len", W: "len", L: "len", t: "len", h: "len", wt: "len", w: "len",
+  ridgeRise: "len", eyeHeight: "len", plateauZ: "len", ravineDepth: "len", ravineEdge: "len", ravineWidth: "len",
+  R: "deg", pitchL: "deg", pitchR: "deg", ravineAngle: "deg",
+  latitude: "deg", longitude: "deg", northAngle: "deg", windFromAz: "deg", viewTargetAz: "deg",
+  windSpeed: "speed", deltaT: "tempK", sunHour: "hour",
+  ridgePos: "ratio", undAmp: "ratio", shadowIntensity: "ratio", u: "ratio", v: "ratio",
+};
+const conv = (key) => CONV[KIND[key] || "len"];
+const r1 = (x) => Math.round(x * 10) / 10;
+const r2 = (x) => Math.round(x * 100) / 100;
+const niceStep = (s) => (s >= 1 ? Math.max(1, Math.round(s)) : s >= 0.3 ? 0.25 : s >= 0.08 ? 0.1 : 0.05);
+const lblOf = (label, c) => (c.u ? `${label} (${c.u})` : label);
+
 function slider(obj, key, label, min, max, step, onChange) {
-  const range = el("input", { type: "range", min, max, step, value: obj[key] });
-  const num = el("input", { type: "number", min, max, step, value: obj[key], class: "num" });
-  const sync = (v) => { v = Math.max(min, Math.min(max, +v)); obj[key] = v; range.value = v; num.value = v; onChange(); };
+  const c = conv(key), f = c.f;
+  const dmin = f === 1 ? min : r1(min * f), dmax = f === 1 ? max : r1(max * f);
+  const dstep = f === 1 ? step : niceStep(step * f);
+  const disp = () => r2(obj[key] * f);
+  const range = el("input", { type: "range", min: dmin, max: dmax, step: dstep, value: disp() });
+  const num = el("input", { type: "number", min: dmin, max: dmax, step: dstep, value: disp(), class: "num" });
+  const sync = (v) => { v = Math.max(dmin, Math.min(dmax, +v)); obj[key] = v / f; range.value = v; num.value = v; onChange(); };
   range.addEventListener("input", () => sync(range.value));
   num.addEventListener("input", () => sync(num.value));
-  return el("label", { class: "slider" }, [el("span", { class: "slk" }, label), range, num]);
+  return el("label", { class: "slider" }, [el("span", { class: "slk" }, lblOf(label, c)), range, num]);
 }
 
 function selectRow(obj, key, label, options, onChange) {
@@ -36,31 +65,39 @@ function selectRow(obj, key, label, options, onChange) {
   return el("label", { class: "slider" }, [el("span", { class: "slk" }, label), sel]);
 }
 
-// group -> [obj-path, [ [key,label,min,max,step], ... ] ]
+// group -> [obj-path, [ [key,label,min,max,step], ... ] ]  (labels carry no unit;
+// the converter appends ft / ° / mph etc.)
 const GROUPS = (state) => [
-  ["Plinth (floor slab)", state.params.plinth, [["cx", "centre X", -6, 6, 0.1], ["cy", "centre Y", -6, 6, 0.1], ["W", "width", 2, 20, 0.1], ["L", "length", 2, 24, 0.1], ["R", "rotation°", -45, 45, 1], ["t", "thickness", 0.1, 2, 0.05]]],
-  ["Walls (tube)", state.params.walls, [["cx", "centre X", -6, 6, 0.1], ["cy", "centre Y", -6, 6, 0.1], ["W", "width", 2, 16, 0.1], ["L", "length", 2, 18, 0.1], ["R", "rotation°", -45, 45, 1], ["h", "height", 2, 6, 0.05], ["wt", "wall thick", 0.1, 0.6, 0.02]]],
-  ["Roof (overhang)", state.params.roof, [["cx", "centre X", -6, 6, 0.1], ["cy", "centre Y", -6, 6, 0.1], ["W", "width", 2, 18, 0.1], ["L", "length", 2, 20, 0.1], ["R", "rotation°", -90, 90, 1], ["ridgeRise", "ridge rise", 0, 5, 0.05], ["pitchL", "pitch L°", -45, 60, 1], ["pitchR", "pitch R°", -45, 60, 1], ["ridgePos", "ridge shift", -1, 1, 0.05], ["t", "thickness", 0.1, 0.8, 0.02]]],
+  ["Plinth (floor slab)", state.params.plinth, [["cx", "centre X", -6, 6, 0.1], ["cy", "centre Y", -6, 6, 0.1], ["W", "width", 2, 20, 0.1], ["L", "length", 2, 24, 0.1], ["R", "rotation", -45, 45, 1], ["t", "thickness", 0.1, 2, 0.05]]],
+  ["Walls (tube)", state.params.walls, [["cx", "centre X", -6, 6, 0.1], ["cy", "centre Y", -6, 6, 0.1], ["W", "width", 2, 16, 0.1], ["L", "length", 2, 18, 0.1], ["R", "rotation", -45, 45, 1], ["h", "height", 2, 6, 0.05], ["wt", "wall thick", 0.1, 0.6, 0.02]]],
+  ["Roof (overhang)", state.params.roof, [["cx", "centre X", -6, 6, 0.1], ["cy", "centre Y", -6, 6, 0.1], ["W", "width", 2, 18, 0.1], ["L", "length", 2, 20, 0.1], ["R", "rotation", -90, 90, 1], ["ridgeRise", "ridge rise", 0, 5, 0.05], ["pitchL", "pitch L", -45, 60, 1], ["pitchR", "pitch R", -45, 60, 1], ["ridgePos", "ridge shift", -1, 1, 0.05], ["t", "thickness", 0.1, 0.8, 0.02]]],
 ];
-const SITE = (state) => [["latitude", "latitude°", -60, 70, 0.5], ["longitude", "longitude°", -180, 180, 0.5], ["northAngle", "north°", -180, 180, 1], ["windFromAz", "wind from°", 0, 360, 1], ["windSpeed", "wind m/s", 0, 25, 0.5], ["deltaT", "ΔT °K", 0, 20, 0.5], ["viewTargetAz", "view az°", 0, 360, 1], ["eyeHeight", "eye ht", 1, 2, 0.05]].map((r) => [state.site, ...r]);
-const TERR = (state) => [["plateauZ", "ground z", -3, 2, 0.1], ["ravineDepth", "ravine depth", 0, 15, 0.5], ["ravineEdge", "ravine edge", -4, 15, 0.5], ["ravineWidth", "ravine slope", 1, 12, 0.5], ["ravineAngle", "ravine dir°", -90, 90, 5], ["undAmp", "undulation", 0, 1, 0.05]].map((r) => [state.site.terrain, ...r]);
+const TERR = (state) => [["plateauZ", "ground level", -3, 2, 0.1], ["ravineDepth", "ravine depth", 0, 15, 0.5], ["ravineEdge", "ravine edge", -4, 15, 0.5], ["ravineWidth", "ravine slope", 1, 12, 0.5], ["ravineAngle", "ravine direction", -90, 90, 5], ["undAmp", "undulation", 0, 1, 0.05]].map((r) => [state.site.terrain, ...r]);
 
-export function renderControls(container, state, cb) {
+// LANDING — environmental controls only (climate forces + the display overlay).
+export function renderEnvControls(container, state, cb) {
   container.innerHTML = "";
-  // display
-  container.append(el("h4", {}, "Display"));
+  container.append(el("h4", {}, "Display overlay"));
   container.append(selectRow(state.display, "analysisField", "overlay", [["solarNow", "Solar — sun now"], ["solarYear", "Solar — yearly"], ["wind", "Wind — windward"]], cb.display));
-  container.append(slider(state.display, "shadowIntensity", "shadow", 0, 1, 0.05, cb.display));
   container.append(slider(state.display, "sunHour", "sun hour", 5, 19, 0.25, cb.display));
-  // form
+  container.append(slider(state.display, "shadowIntensity", "shadow", 0, 1, 0.05, cb.display));
+  const site = state.site;
+  const grp = (title, rows) => { container.append(el("h4", {}, title)); for (const [k, lbl, mn, mx, st] of rows) container.append(slider(site, k, lbl, mn, mx, st, cb.param)); };
+  grp("Location & sun", [["latitude", "latitude", -60, 70, 0.5], ["longitude", "longitude", -180, 180, 0.5], ["northAngle", "north", -180, 180, 1]]);
+  grp("Wind", [["windFromAz", "wind from", 0, 360, 1], ["windSpeed", "wind speed", 0, 25, 0.5]]);
+  grp("Air & comfort", [["deltaT", "ΔT", 0, 20, 0.5]]);
+  grp("View", [["viewTargetAz", "view azimuth", 0, 360, 1], ["eyeHeight", "eye height", 1, 2, 0.05]]);
+}
+
+// EXAMPLE WINDOW — building geometry + terrain (opens in the floating studio).
+export function renderMassingControls(container, state, cb) {
+  container.innerHTML = "";
   for (const [title, obj, rows] of GROUPS(state)) {
     container.append(el("h4", {}, title));
     for (const [k, lbl, mn, mx, st] of rows) container.append(slider(obj, k, lbl, mn, mx, st, cb.param));
   }
   container.append(el("h4", {}, "Apertures (3 walls + 1 roof)"));
   state.params.apertures.forEach((ap) => container.append(apertureRow(ap, cb.param)));
-  container.append(el("h4", {}, "Site"));
-  for (const [obj, k, lbl, mn, mx, st] of SITE(state)) container.append(slider(obj, k, lbl, mn, mx, st, cb.param));
   container.append(el("h4", {}, "Terrain (ravine edge)"));
   for (const [obj, k, lbl, mn, mx, st] of TERR(state)) container.append(slider(obj, k, lbl, mn, mx, st, cb.param));
 }
@@ -69,13 +106,15 @@ function apertureRow(ap, onChange) {
   const opts = [...WALL_HOSTS, ...ROOF_HOSTS].map((h) => el("option", { value: h, selected: h === ap.host ? "selected" : null }, HOST_LABELS[h]));
   const host = el("select", { class: "hostsel", onchange: (e) => { ap.host = e.target.value; onChange(); } }, opts);
   const mini = (key, lbl, mn, mx, st) => {
-    const n = el("input", { type: "number", min: mn, max: mx, step: st, value: ap[key], class: "num" });
-    n.addEventListener("input", () => { ap[key] = +n.value; onChange(); });
-    return el("label", { class: "mini" }, [el("span", {}, lbl), n]);
+    const c = conv(key), f = c.f;
+    const dmin = f === 1 ? mn : r1(mn * f), dmax = f === 1 ? mx : r1(mx * f), dstep = f === 1 ? st : niceStep(st * f);
+    const n = el("input", { type: "number", min: dmin, max: dmax, step: dstep, value: r2(ap[key] * f), class: "num" });
+    n.addEventListener("input", () => { ap[key] = Math.max(dmin, Math.min(dmax, +n.value)) / f; onChange(); });
+    return el("label", { class: "mini" }, [el("span", {}, lblOf(lbl, c)), n]);
   };
   return el("div", { class: "apblock" }, [
     el("div", { class: "aphead" }, [el("b", {}, ap.id), host]),
-    el("div", { class: "apgrid" }, [mini("u", "u", 0, 1, 0.01), mini("v", "v", 0, 1, 0.01), mini("w", "w m", 0.1, 8, 0.05), mini("h", "h m", 0.1, 5, 0.05)]),
+    el("div", { class: "apgrid" }, [mini("u", "u", 0, 1, 0.01), mini("v", "v", 0, 1, 0.01), mini("w", "width", 0.1, 8, 0.05), mini("h", "height", 0.1, 5, 0.05)]),
   ]);
 }
 
@@ -90,6 +129,59 @@ const DASH = [
 ];
 const DEF = Object.fromEntries(VARIABLE_DEFS.map((d) => [d.key, d]));
 
+// metric outputs convert to imperial for display (the proxies stay SI).
+function toImperial(unit, val) {
+  if (val === null || val === undefined || Number.isNaN(val)) return { v: val, u: unit };
+  switch (unit) {
+    case "m": return { v: val * FT, u: "ft" };
+    case "m²": return { v: val * FT2, u: "ft²" };
+    case "m³": return { v: val * FT3, u: "ft³" };
+    case "1/m": return { v: val / FT, u: "1/ft" };
+    default: return { v: val, u: unit };
+  }
+}
+
+// plain-English "what is this stat?" for the hover popups.
+const DESCRIPTIONS = {
+  solarWinterUseful: "Useful winter sun landing on the glazing (low-sun season, summed over the apertures). Higher = more free winter heating.",
+  solarSummerUseful: "Summer sun on the glazing. You usually want this LOW so the building doesn't overheat.",
+  overheatRatio: "Summer ÷ winter aperture gain. Above 1 means more sun in summer than winter — an overheating warning.",
+  solarSouth: "Aperture gain on south-facing glass (135–225° azimuth) — the passive-solar sweet spot.",
+  windExposure: "Windward area facing the wind (vertical faces only). Bigger = more wind pressure to resist.",
+  windPressure: "Wind load proxy ½·ρ·V²·exposure. It grows with the SQUARE of wind speed, so doubling wind ≈ 4× load.",
+  channelIndex: "How much the gap between the walls and the plinth pinches the across-wind flow (a venturi cue). Higher = more channelling.",
+  stackIndex: "Buoyancy-driven natural ventilation from low inlets up to high outlets. Higher = stronger stack effect.",
+  stackHeight: "Vertical distance between the average inlet and outlet aperture — the stack's driving height.",
+  viewQuality: "View openness weighted toward your target azimuth — how much the windows actually look where you want.",
+  viewAmount: "Total view openness from an interior eye point (solid angle through all the wall windows).",
+  skyView: "Upward view through the roof skylight — daylight and sky access.",
+  soilContactArea: "Plinth area sitting below the ground line — earth-coupling / thermal contact with the soil.",
+  thermalMassRatio: "Concrete slab heat capacity ÷ enclosed air volume — how much thermal mass per unit of interior.",
+  buriedFraction: "Fraction of the plinth thickness that is below grade (0 = on top of the ground, 1 = fully buried).",
+  enclosedVolume: "Interior air volume (walls plus the roof void).",
+  glazingRatio: "Glazed area ÷ total envelope area.",
+  pitchDeg: "Average roof pitch across the left and right slopes.",
+};
+
+// a single floating tooltip, positioned at the cursor — never clipped by panels.
+let _tip;
+function floatTip() {
+  if (!_tip) { _tip = el("div", { class: "floattip" }); document.body.append(_tip); }
+  return _tip;
+}
+function attachTip(node, text) {
+  node.classList.add("hastip");
+  node.addEventListener("mouseenter", () => { const t = floatTip(); t.textContent = text; t.style.display = "block"; });
+  node.addEventListener("mousemove", (e) => {
+    const t = floatTip(), pad = 14, w = t.offsetWidth, h = t.offsetHeight;
+    let x = e.clientX + pad, y = e.clientY + pad;
+    if (x + w > innerWidth - 8) x = e.clientX - w - pad;
+    if (y + h > innerHeight - 8) y = e.clientY - h - pad;
+    t.style.left = Math.max(8, x) + "px"; t.style.top = Math.max(8, y) + "px";
+  });
+  node.addEventListener("mouseleave", () => { if (_tip) _tip.style.display = "none"; });
+}
+
 export function renderDashboard(container, metrics) {
   container.innerHTML = "";
   for (const [group, rows] of DASH) {
@@ -98,10 +190,13 @@ export function renderDashboard(container, metrics) {
       const d = DEF[key] || { label: key, unit: "" };
       const val = metrics[key];
       const pct = Math.max(0, Math.min(1, (val || 0) / soft)) * 100;
-      wrap.append(el("div", { class: "metric" }, [
-        el("div", { class: "mtop" }, [el("span", { class: "mlbl" }, d.label), el("span", { class: "mval" }, fmt(val, d.unit))]),
+      const imp = toImperial(d.unit, val);
+      const metric = el("div", { class: "metric" }, [
+        el("div", { class: "mtop" }, [el("span", { class: "mlbl" }, d.label), el("span", { class: "mval" }, fmt(imp.v, imp.u))]),
         el("div", { class: "bar" }, [el("div", { class: "barfill", style: `width:${pct}%` })]),
-      ]));
+      ]);
+      if (DESCRIPTIONS[key]) attachTip(metric, DESCRIPTIONS[key]);
+      wrap.append(metric);
     }
     container.append(wrap);
   }
