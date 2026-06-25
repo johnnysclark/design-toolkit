@@ -1,4 +1,4 @@
--- 0003_skills_pathways.sql
+-- 0004_skills_pathways.sql
 -- Storage for the Skills Pathways video library. The trail STRUCTURE + the video
 -- catalog live in code (`lib/skills-pathways/pathways.ts`) — "content in files".
 -- This migration only creates a place to host UPLOADED tutorial clips (the

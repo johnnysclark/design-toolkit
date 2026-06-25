@@ -87,7 +87,7 @@ research showcase, ACADIA/JAE). Deepest; treat as its own track, screen-reader-f
 beginner→advanced, where each step holds tutorial videos + the shared Skills Coach concept
 links. Track/software filters, a 3-column per-discipline board, a click-to-open step modal with
 a lazy YouTube/Vimeo/upload player. Curated in code (`lib/skills-pathways/pathways.ts`); videos
-both as embeds and uploads to a public `skills-videos` bucket (`supabase/migrations/0003_…`,
+both as embeds and uploads to a public `skills-videos` bucket (`supabase/migrations/0004_…`,
 apply in SQL editor). Slice: `(app)/skills-pathways/*`, `lib/skills-pathways/pathways.ts`. Nav
 status `live`. Spec + maintainer guide: `(app)/skills-pathways/SPEC.md`. **v2 ideas:** node-graph
 view; teacher self-submission (`pathway_videos` table + RLS); `?discipline=` deep-link to Coach.*

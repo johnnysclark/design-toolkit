@@ -21,7 +21,7 @@ video library that complements the interactive **Skills Coach** (the tutor).
     "Builds on" / "Leads to" navigation, and a Skills Coach hand-off.
   - `LazyVideo.tsx` — click-to-play embed (YouTube/Vimeo `nocookie` iframe) or a
     native `<video>` for uploaded files; nothing loads until clicked.
-- **Storage:** `supabase/migrations/0003_skills_pathways.sql` — a **public**
+- **Storage:** `supabase/migrations/0004_skills_pathways.sql` — a **public**
   `skills-videos` bucket, only for the upload path. ⚠️ Apply it in the Supabase
   SQL editor (most videos are embeds and need nothing here).
 - **Nav:** added to `src/lib/toolkit-nav.ts` (status `live`, public).
