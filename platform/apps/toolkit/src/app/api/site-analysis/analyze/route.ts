@@ -36,6 +36,48 @@ function terrainBox(
   return [lon - maxHalfDeg, lat - maxHalfDeg, lon + maxHalfDeg, lat + maxHalfDeg];
 }
 
+// Architect-relevant climate derivations from the same hourly year: annual solar
+// (GHI), heating/cooling degree-days, and mean diurnal swing. All grouped by day.
+function climateExtras(climate: ClimateRaw) {
+  const days = new Map<string, { temps: number[]; ghi: number }>();
+  let ghiSum = 0;
+  for (let i = 0; i < climate.time.length; i++) {
+    const key = climate.time[i].slice(0, 10);
+    let d = days.get(key);
+    if (!d) {
+      d = { temps: [], ghi: 0 };
+      days.set(key, d);
+    }
+    const t = climate.tempC[i];
+    if (t != null && !Number.isNaN(t)) d.temps.push(t);
+    const g = climate.ghi[i];
+    if (g != null && !Number.isNaN(g) && g > 0) {
+      d.ghi += g; // W/m² over one hour = Wh/m²
+      ghiSum += g;
+    }
+  }
+  let hdd = 0;
+  let cdd = 0;
+  let swingSum = 0;
+  let swingDays = 0;
+  for (const d of days.values()) {
+    if (!d.temps.length) continue;
+    const m = d.temps.reduce((a, b) => a + b, 0) / d.temps.length;
+    hdd += Math.max(0, 18 - m);
+    cdd += Math.max(0, m - 18);
+    swingSum += Math.max(...d.temps) - Math.min(...d.temps);
+    swingDays++;
+  }
+  const ghiAnnualKwh = ghiSum / 1000; // Wh/m² → kWh/m²·yr
+  return {
+    ghiAnnualKwh: ghiSum ? ghiAnnualKwh : null,
+    peakSunHours: days.size && ghiSum ? ghiAnnualKwh / days.size : null,
+    hdd18: Math.round(hdd),
+    cdd18: Math.round(cdd),
+    diurnalSwingC: swingDays ? swingSum / swingDays : null
+  };
+}
+
 // Condense the hourly year into the display + export summary (ported from the
 // original server.js summarizeClimate).
 function summarizeClimate(climate: ClimateRaw) {
@@ -63,7 +105,8 @@ function summarizeClimate(climate: ClimateRaw) {
       tempMin: temps.length ? Math.min(...temps) : null,
       tempMax: temps.length ? Math.max(...temps) : null,
       rhMean: mean(climate.rh),
-      windMean: mean(climate.windSpeed)
+      windMean: mean(climate.windSpeed),
+      ...climateExtras(climate)
     },
     sunPaths: sunPaths(climate.lat, climate.lon, climate.tzOffsetHours)
   };

@@ -14,7 +14,7 @@ type Tool = { no: string; href: string | null; title: string; runs: React.ReactN
 const TOOLS: Tool[] = [
   {
     no: "01",
-    title: "Skills / Design Production Tutor",
+    title: "Coach",
     href: "/skills-coach",
     runs: "Runs as — LLM chat behind a proxy, or campus Illinois Chat.",
     body: (
@@ -46,7 +46,7 @@ const TOOLS: Tool[] = [
   },
   {
     no: "02",
-    title: "Site Analysis / Form Generator",
+    title: "Surveyor",
     href: "/site-analysis",
     runs: "Runs as — Rhino / Grasshopper for the simulation, with a web front for inputs.",
     body: (
@@ -81,7 +81,7 @@ const TOOLS: Tool[] = [
   },
   {
     no: "03",
-    title: "Precedent / Research Machine — Librarian",
+    title: "Librarian",
     href: "/librarian",
     runs: "Runs as — a local app (Claude Code), filesystem-based.",
     body: (
@@ -144,7 +144,7 @@ const TOOLS: Tool[] = [
   },
   {
     no: "05",
-    title: "RAP Toolkit",
+    title: "RAP",
     href: "/rap",
     runs: (
       <>
@@ -159,7 +159,7 @@ const TOOLS: Tool[] = [
         The Radical Accessibility Project: making architectural production work without sight. It drives
         Rhino from the command line, generates tactile drawings (PIAF swell paper) and 3D-printed reliefs,
         reads plan and section aloud as spatial audio, and writes structured alt-text. Built local-first and
-        open-source so anyone can replicate it, and developed with Daniel, a blind co-researcher and its
+        open-source so anyone can replicate it, and developed with a blind co-researcher, its
         primary user. The constraints it surfaces sharpen spatial description for every student, not only
         blind ones.
       </p>
@@ -186,7 +186,7 @@ const TOOLS: Tool[] = [
   },
   {
     no: "06",
-    title: "Drawing Cleanup & 2D Media",
+    title: "2D Tooling",
     href: "/media-2d",
     runs: "Runs as — vision models for cleanup, deterministic paths for fabrication.",
     body: (
@@ -214,7 +214,7 @@ const TOOLS: Tool[] = [
   },
   {
     no: "07",
-    title: "Miro Alternative — Digital Wall",
+    title: "Archivist",
     href: "/pinup",
     runs: "Runs as — a web app with a backend (Supabase) and accounts.",
     body: (
@@ -250,7 +250,7 @@ const TOOLS: Tool[] = [
   },
   {
     no: "08",
-    title: "Design Critic",
+    title: "Critic",
     href: "/design-critic",
     runs: "Runs as — LLM behind a proxy; each persona is a system prompt.",
     body: (
@@ -386,10 +386,15 @@ const STYLES = `
   .di-doc .stack-table td::before{ content:attr(data-label); display:block; font-size:10px; letter-spacing:.1em; text-transform:uppercase; color:#999; margin-bottom:3px; }
   .di-doc .stack-table td:first-child{ font-size:16px; }
 }
+
+/* Site rule — all text is black, never grey. (SVG mocks keep their own fills.) */
+.di-doc, .di-doc *:not(a){ color:#111 !important; }
+.di-doc a{ color:#1A45F0 !important; }
+.di-doc .te-link{ color:#111 !important; }
+.di-doc .te-link span{ color:#1A45F0 !important; }
 `;
 
 export default function Overview() {
-  const liveTools = TOOLKIT_NAV.filter((t) => t.href !== "/" && t.status === "live");
   // Show the tool cards in the SAME order as the left sidebar; any card with no
   // matching tool page (href:null) sorts to the end.
   const navIndex = Object.fromEntries(TOOLKIT_NAV.map((t, i) => [t.href, i]));
@@ -403,18 +408,16 @@ export default function Overview() {
 
       <div className="wrap">
         <header>
-          <div className="kicker">All Means Works · Teaching statement · School of Architecture</div>
-          <h1>Teaching design studio with agentic AI</h1>
+          <h1>Agentic Design Studio Instruments</h1>
           <p className="byline">
             <b>John Clark</b> — Teaching Assistant Professor · 1st–3rd year undergraduate design studios
           </p>
         </header>
 
         <section className="exec">
-          <div className="lbl">Executive summary</div>
           <p className="sum">
             Studio students often can&rsquo;t yet defend their designs with rigor. This is a plan to change
-            that by teaching them to work with agentically coded AI tools —{" "}
+            that by teaching them to work with agentic coding tools —{" "}
             <span className="hl">
               instruments that supply the logics, language, and data behind a judgment while leaving the
               judgment to the student
@@ -438,17 +441,6 @@ export default function Overview() {
               <div className="gv">When to offload thinking to a tool, and when to build the skill the slow way.</div>
             </div>
           </div>
-
-          {liveTools.length > 0 && (
-            <div className="jump">
-              <span className="jlbl">Live now</span>
-              {liveTools.map((t) => (
-                <Link key={t.href} href={t.href}>
-                  {t.label} →
-                </Link>
-              ))}
-            </div>
-          )}
         </section>
 
         <div className="khead">
@@ -485,40 +477,38 @@ export default function Overview() {
           </div>
           <p className="first">
             Studio students often can&rsquo;t yet justify their designs with rigor — whether they&rsquo;re
-            working from site-specific environmental forces, historical precedent, or creative form
-            generation. Our job as studio teachers is to level up their reasoning, synthesis, and analysis:
-            of a real-world site, and of the buildings they invent for it. Agentically coded AI tools can
-            help, giving students the <span className="hl">logics, language, and data</span> to make more
-            sophisticated judgments and putting computational analysis within reach for the first time.
-            Design thinking is already an iterative system — ask questions, gather information and expertise,
-            then form that material into built and unbuilt proposals — which is exactly the disposition this
-            new way of computing rewards. The two map cleanly onto each other.
+            reasoning from site-specific environmental forces, historical precedent, or creative form
+            generation. Our job as studio teachers is to sharpen their reasoning, synthesis, and analysis:
+            of a real-world site, and of the buildings they invent for it. Agentic coding tools — AI that
+            writes and runs its own code — can help, giving students the{" "}
+            <span className="hl">logics, language, and data</span> to make more sophisticated judgments and
+            putting computational analysis within reach for the first time. Design thinking is already an
+            iterative system — ask questions, gather information and expertise, then form that material into
+            built and unbuilt proposals — which is exactly the disposition these tools reward. That&rsquo;s
+            why the studio is the natural place to teach them.
           </p>
           <p>
             I&rsquo;ll work in two registers: demonstrating the more sophisticated tools I&rsquo;ve built and
             giving students access to them, and vibe-coding simpler tools together with the class. I expect
-            these to become as ubiquitous as the proprietary software students already use in school and in
+            both to become as ubiquitous as the proprietary software students already run in school and
             practice. What I want them to learn is a stance —{" "}
             <span className="hl">move quickly, but iterate in a &ldquo;trust but verify&rdquo; loop</span> that
             hunts for edge cases and failure modes, and brainstorm with these tools fluidly but skeptically.
             I&rsquo;ll introduce them inside studio sequences and run a short series of
-            agentic-coding-for-design workshops, since it takes a few sessions to bring students, and
-            colleagues, up to speed.
-          </p>
-          <p>
-            If you&rsquo;re moving from chatbots to Claude Code or Codex and want real control over your
-            models&rsquo; inputs, outputs, memory, and behavior, I&rsquo;m glad to help — and I&rsquo;d point
-            you toward the idea of <em>agent harnesses</em> for guiding a model with more clarity.
+            agentic-coding-for-design workshops, since it takes a few sessions to bring students — and
+            colleagues — up to speed. (For colleagues moving from chatbots to Claude Code or Codex who want
+            real control over a model&rsquo;s inputs, outputs, memory, and behavior, I&rsquo;m glad to help,
+            starting with the idea of an <em>agent harness</em> for guiding a model with more clarity.)
           </p>
           <p>
             The learning objective is the same as any studio&rsquo;s: students can explain both the final
             design and the process that produced it. Teaching students to work with AI follows the same
-            tenets as teaching them to be resilient designers, which is why building these tools should
-            reinforce the core of the studio rather than replace it. The toolkit itself is detailed in the
-            examples above — a production tutor, a site analyzer and form generator, a precedent librarian, a
+            tenets as teaching them to be resilient designers — which is why building these tools should
+            reinforce the core of the studio rather than replace it. The toolkit is detailed in the examples
+            above — a production tutor, a site analyzer and form generator, a precedent librarian, a
             portfolio coach, the RAP accessibility toolkit, drawing and fabrication widgets, a studio pin-up
-            wall, a design critic, and a set of 3D on-ramps — and all of it is in some stage of production,
-            fully built with Claude Code.
+            wall, a design critic, and a set of 3D on-ramps — each at some stage of production, all built
+            with Claude Code.
           </p>
 
           <section className="feature">

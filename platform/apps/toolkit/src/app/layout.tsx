@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Archivo_Black } from "next/font/google";
+import { Analytics } from "@vercel/analytics/next";
 import "./globals.css";
 
 // Bold, graphic display face for headings + wordmark — matches the public landing.
@@ -22,7 +23,11 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" className={display.variable}>
-      <body className="min-h-screen">{children}</body>
+      <body className="min-h-screen">
+        {children}
+        {/* Vercel Web Analytics — anonymous pageviews, top pages, referrers. */}
+        <Analytics />
+      </body>
     </html>
   );
 }

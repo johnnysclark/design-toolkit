@@ -176,7 +176,7 @@ export default function NodeModal({
               href="/skills-coach"
               className="inline-flex items-center gap-1 text-sm font-medium text-[#ff3b21] hover:underline"
             >
-              Stuck? Practice this with the Skills Coach →
+              Stuck? Practice this with Coach →
             </Link>
           </div>
         </div>

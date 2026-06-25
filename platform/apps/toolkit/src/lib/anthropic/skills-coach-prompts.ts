@@ -13,7 +13,9 @@ import {
   conceptIndexForPrompt
 } from "@/lib/skills-coach/concepts";
 
-export const MODEL = "claude-opus-4-8";
+// Toolkit-wide policy: AI tool calls run on Sonnet 4.6 (faster + cheaper; keeps
+// streamed/grounded passes under Vercel's 60s cap). Supports vision + structured output.
+export const MODEL = "claude-sonnet-4-6";
 
 export type Level = "beginner" | "intermediate" | "advanced";
 
@@ -54,9 +56,16 @@ export interface CoachMeta {
   claims: CoachClaim[];
   /** The "try it and tell me what happened" prompt, or null for non-task turns. */
   report_back: string | null;
+  /** 0–4 short alternative approaches / resources, shown in the sidebar. */
+  further_ideas: string[];
 }
 
-export const EMPTY_META: CoachMeta = { concept: null, claims: [], report_back: null };
+export const EMPTY_META: CoachMeta = {
+  concept: null,
+  claims: [],
+  report_back: null,
+  further_ideas: []
+};
 
 export const META_SENTINEL = "⟦META⟧"; // ⟦META⟧
 
@@ -65,7 +74,7 @@ export const META_SENTINEL = "⟦META⟧"; // ⟦META⟧
 // ---------------------------------------------------------------------------
 
 const BASE_ETHOS = [
-  "You are Skills Coach, an expert tutor for architecture students (UIUC School of Architecture) learning design software. You are warm, encouraging, specific, and never condescending.",
+  "You are Coach, an expert tutor for architecture students (UIUC School of Architecture) learning design software. You are warm, encouraging, specific, and never condescending.",
   "",
   "Your stance — read carefully:",
   "- ALWAYS give the real solution. Never refuse, and never say you won't tell them. Your goal is that the student can RE-DERIVE the move next week and debug it when it breaks — and you reach that goal by pacing and explaining, not by withholding the answer.",
@@ -149,8 +158,8 @@ const OUTPUT_CONTRACT = [
   "1. Write your answer as normal prose for the student. Use short paragraphs; a numbered list is fine for steps. Put [[concept:slug]] inline as described. Keep formatting light (no big headers).",
   "1b. CODE EXPORT: when you provide runnable code — GhPython, rhinoscriptsyntax, or RhinoCommon Python for Grasshopper/Rhino (or a Grasshopper C# script) — put the COMPLETE script inside a fenced markdown code block whose opening fence names the language (```python on its own line, then the code, then a closing ```). The app shows a clear Export button on these blocks so the student can save the file and paste it into a GhPython/Script component. Do NOT fence single command or component names — only fence an actual script.",
   "2. Then, on a new line, output the literal marker " + META_SENTINEL + " and immediately after it a single raw JSON object (no code fence, nothing after it) shaped exactly:",
-  '   {"concept": "<one slug from the index that best matches what this turn is about, or null>", "claims": [{"text": "<short load-bearing claim>", "tag": "stable" | "version" | "check"}], "report_back": "<your try-it-and-report question, or null on a non-task turn>"}',
-  "Rules for the JSON: `concept` is at most one slug (the side panel shows it) and MUST be from the index or null — never invent one. `claims` is 0–3 items: tag 'stable' = reliable, 'version' = depends on the software version, 'check' = the student should verify this themselves. `report_back` mirrors the question you asked in the prose (null if you didn't ask one). Output valid JSON only after the marker."
+  '   {"concept": "<one slug from the index that best matches what this turn is about, or null>", "claims": [{"text": "<short load-bearing claim>", "tag": "stable" | "version" | "check"}], "report_back": "<your try-it-and-report question, or null on a non-task turn>", "further_ideas": ["<a short alternative way to get the job done>"]}',
+  "Rules for the JSON: `concept` is at most one slug (the side panel shows it) and MUST be from the index or null — never invent one. `claims` is 0–3 items: tag 'stable' = reliable, 'version' = depends on the software version, 'check' = the student should verify this themselves. `report_back` mirrors the question you asked in the prose (null if you didn't ask one). `further_ideas` is 0–4 SHORT one-line items shown in a sidebar — alternative ways to get the job done: another command/component, a different workflow, or a resource worth a look (e.g. 'Try the Pufferfish plugin for tween surfaces'). Keep each under ~14 words; use [] if you have none. Output valid JSON only after the marker."
 ].join("\n");
 
 // ---------------------------------------------------------------------------
@@ -197,7 +206,13 @@ function coerceMeta(raw: any): CoachMeta {
     typeof raw?.report_back === "string" && raw.report_back.trim()
       ? raw.report_back.trim()
       : null;
-  return { concept, claims, report_back };
+  const further_ideas: string[] = Array.isArray(raw?.further_ideas)
+    ? raw.further_ideas
+        .filter((x: any) => typeof x === "string" && x.trim())
+        .slice(0, 4)
+        .map((x: string) => x.trim())
+    : [];
+  return { concept, claims, report_back, further_ideas };
 }
 
 function parseMetaJson(tail: string): CoachMeta | null {

@@ -4,7 +4,8 @@ import { useEffect, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { DISCIPLINES, type Discipline } from "@/lib/skills-coach/concepts";
 import { LEVELS, type Level, type CoachMeta } from "@/lib/anthropic/skills-coach-prompts";
-import ConceptPanel from "./ConceptPanel";
+import { latestScript, type CodeBlock } from "@/lib/skills-coach/code";
+import CoachSidebar from "./CoachSidebar";
 import MessageBubble, { type ChatMessage } from "./MessageBubble";
 
 type Upload = { path: string; kind: "image" | "pdf" };
@@ -75,6 +76,22 @@ export default function SkillsCoachChat({
       if (c) return c;
     }
     return null;
+  });
+  const [script, setScript] = useState<CodeBlock | null>(() => {
+    for (let i = initialMessages.length - 1; i >= 0; i--) {
+      if (initialMessages[i].role === "assistant") {
+        const s = latestScript(initialMessages[i].content);
+        if (s) return s;
+      }
+    }
+    return null;
+  });
+  const [ideas, setIdeas] = useState<string[]>(() => {
+    for (let i = initialMessages.length - 1; i >= 0; i--) {
+      const fi = initialMessages[i]?.meta?.further_ideas;
+      if (fi && fi.length) return fi;
+    }
+    return [];
   });
 
   const userIdRef = useRef<string | null>(null);
@@ -242,9 +259,11 @@ export default function SkillsCoachChat({
       metaRef.current = {
         concept: data.concept ?? null,
         claims: data.claims ?? [],
-        report_back: data.report_back ?? null
+        report_back: data.report_back ?? null,
+        further_ideas: data.further_ideas ?? []
       };
       setConcept(data.concept ?? null);
+      setIdeas(data.further_ideas ?? []);
     } else if (event === "done") {
       const assistant: ChatMessage = {
         id: data.messageId || crypto.randomUUID(),
@@ -253,6 +272,8 @@ export default function SkillsCoachChat({
         meta: metaRef.current ?? undefined
       };
       setMessages((m) => [...m, assistant]);
+      const s = latestScript(data.prose ?? "");
+      if (s) setScript(s);
       if (data.conversationId) setConversationId(data.conversationId);
       setStreamingText("");
       setStreaming(false);
@@ -274,6 +295,8 @@ export default function SkillsCoachChat({
     setMessages([]);
     setConversationId(null);
     setConcept(null);
+    setScript(null);
+    setIdeas([]);
     setStreamingText("");
     setStreaming(false);
     setError(null);
@@ -292,7 +315,7 @@ export default function SkillsCoachChat({
 
   return (
     <div>
-      <h1 className="text-3xl font-semibold tracking-tight">Skills Coach</h1>
+      <h1 className="text-3xl font-semibold tracking-tight">Coach</h1>
       <p className="mt-2 max-w-2xl text-neutral-600">
         A patient tutor for Rhino, Grasshopper, AutoCAD, Revit, and the Adobe
         suite. Pick a tool and a level, ask your question, upload a sketch or
@@ -467,7 +490,7 @@ export default function SkillsCoachChat({
 
         {/* concept panel */}
         <div className="lg:sticky lg:top-20 lg:self-start">
-          <ConceptPanel slug={concept} />
+          <CoachSidebar concept={concept} script={script} ideas={ideas} />
         </div>
       </div>
     </div>
