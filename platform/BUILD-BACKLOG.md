@@ -54,10 +54,15 @@ history, links — plus the ground **exported for Rhino**. Pulls live public dat
 Open-Meteo, USGS, flood) and builds `rhino3dm` exports. The heavy one: external APIs + WASM +
 a longer function timeout. **Interim:** embed the client-side standalone variant first.
 
-### T2 · Skills Coach — **medium** · ref: `TOOLS/rhino-wizard/`, `TOOLS/portfolio-storyteller/`
-A tutor across **Rhino · Revit · Adobe · Vibe-Coding · Portfolio/Storytelling**. Mode toggles +
-Beginner/Moderate/Advanced levels; tutorials as content; LLM does the coaching, logs the trace.
-*(The parked `claude/rhino-grasshopper-tutor-plan` branch is a hosted-Express prototype — reference only.)*
+### T2 · Skills Coach — ✅ **DONE (2026-06-25)**
+*Shipped: a streaming chat tutor across **Rhino · Grasshopper · AutoCAD · Revit · Adobe** —
+Beginner/Intermediate/Advanced levels, image/PDF upload (Claude vision), a curated concept KB
+driving trustworthy doc links + a contextual side panel, a "report-back" loop, and per-student
+persistence (`coach_conversations` / `coach_messages` + the `coach-uploads` bucket via
+`supabase/migrations/0002_skills_coach.sql`, applied in the SQL editor). Gated to signed-in members;
+`api/skills-coach` 401s for anon. Slice: `(app)/skills-coach/*`, `api/skills-coach/route.ts`,
+`lib/anthropic/skills-coach-prompts.ts`, `lib/skills-coach/concepts.ts`. **Phase 2:** `.ghx` (Grasshopper)
++ `.3dm` (Rhino) file parsing so students can upload real definitions/models, not just screenshots.*
 
 ### T3 · Design Critic — **medium** · spec: draft fresh
 Adoptable critique **personas** that give feedback on uploaded work, framed "use with caution —

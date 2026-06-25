@@ -5,6 +5,17 @@ Guidance for Claude Code working in this repository (`design-toolkit`).
 > **Continuing the build? Read [`platform/STATUS.md`](platform/STATUS.md) first** — current
 > state, how to get the site live, and the tool-porting roadmap.
 
+## ⛔ Read this first — rules for every agent (each session)
+
+1. **Read `platform/STATUS.md` (current state) and `platform/BUILD-BACKLOG.md` (what to build) before doing anything.**
+2. **One agent = one folder = one git worktree = one branch.** Never run two interactive Claude sessions in the same folder — they fight over the checked-out branch. For concurrent work, give each agent its own worktree (recipe: [`RUNNING-MULTIPLE-AGENTS.md`](RUNNING-MULTIPLE-AGENTS.md)).
+3. **Work on a feature branch. NEVER push to `main` without the user's explicit OK** — `main` auto-deploys to production (the live toolkit + public site).
+4. **Match the design language — bold + graphic.** Headings, titles, nav, and buttons use **Archivo Black** via the `.display-font` class / `--font-display` variable (wired in the toolkit's root `layout.tsx`; the static `landing/` + `works/` pages load it via a Google Fonts `<link>`). Body text stays a readable system sans.
+5. **Build tools with the Librarian pattern** (`platform/BUILD-BACKLOG.md`): an API route (keeps `ANTHROPIC_API_KEY` server-side and **returns 401 for anonymous callers** — cost protection) + prompts + a page replacing the `ComingSoon` stub + flip the tool's `status` in `toolkit-nav.ts` + log each run to `tool_runs`.
+6. **Keep RLS on. Secrets stay server-side. Use the LEGACY Supabase anon key** (see Gotchas below).
+
+Finishing a tool → flip its `status` in `toolkit-nav.ts`, note it in `STATUS.md`, and open a PR. Don't merge to `main` yourself.
+
 ## What this is
 **All Means Works** (allmeans.works) — an umbrella design + research practice and platform by
 **John Clark** (architecture educator, UIUC School of Architecture). The **26 Summer AI

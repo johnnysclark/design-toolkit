@@ -13,7 +13,9 @@ body {
 
 body {
   @apply bg-neutral-50 text-neutral-900 antialiased;
-  font-family: var(--font-sans), ui-sans-serif, system-ui, -apple-system,
+  /* Archivo Black everywhere — bold + graphic, matching the public Works page.
+     (var(--font-display) is defined in the root layout via next/font.) */
+  font-family: var(--font-display), ui-sans-serif, system-ui, -apple-system,
     "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
 }
 

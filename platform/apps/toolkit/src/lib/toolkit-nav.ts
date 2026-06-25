@@ -30,8 +30,9 @@ export const TOOLKIT_NAV: ToolItem[] = [
   {
     href: "/skills-coach",
     label: "Skills Coach",
-    blurb: "Rhino · Revit · Adobe · Vibe-Coding · Portfolio / Storytelling.",
-    status: "soon"
+    blurb: "A tutor for Rhino · Grasshopper · AutoCAD · Revit · Adobe — with levels, doc links, and a concept panel.",
+    status: "live",
+    requiresAuth: true
   },
   {
     href: "/librarian",
