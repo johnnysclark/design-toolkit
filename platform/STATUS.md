@@ -13,6 +13,19 @@
 > Librarian** so the Anthropic key is never reachable publicly — re-add auth before sharing
 > widely. Repo is being **trimmed to build-essential docs**.
 >
+> **Site Analysis — BUILT (2026-06-25, branch `site-analysis`, worktree
+> `design-toolkit-site-analysis`, not yet merged).** The ported engine
+> (`lib/site-analysis/*`) now has a full React UI at `(app)/site-analysis/`. Two new things vs.
+> the original spec: (1) it's **general-purpose** — a **Place mode** geocodes *any* address
+> (OSM Nominatim, keyless) plus a **Superfund mode** tuned for the class (EPA NPL search +
+> boundary + the web-cited contamination brief); (2) a **Macro ⇄ Micro** toggle at the top
+> reframes both the Leaflet map (street/zoomed-out vs. aerial/zoomed-in, `flyTo`) and the data
+> cards (climate + region vs. site + terrain + flood). The two AI passes stay auth-gated (401
+> for anon); hard data, map, charts and all exports are public. Added dep: `leaflet`. Nav
+> status flipped to **live**. Verified locally: build (types) green; page 200; both search
+> modes + both analyze modes return live data (Love Canal boundary, Chicago climate/terrain/
+> flood). **Not browser-screenshot-tested** — open `/site-analysis` to eyeball the map/charts.
+>
 > **Multi-agent rule:** one agent = one folder = one git worktree = one branch (see
 > `../RUNNING-MULTIPLE-AGENTS.md`). The **GOAL-1 walkthrough below is now historical**; the
 > **GOAL-2 tool-porting roadmap is still current.** Actionable build list: [`BUILD-BACKLOG.md`](BUILD-BACKLOG.md).

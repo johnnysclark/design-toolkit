@@ -18,8 +18,8 @@ export const TOOLKIT_NAV: ToolItem[] = [
   {
     href: "/site-analysis",
     label: "Site Analysis",
-    blurb: "All types of history + analysis for a site.",
-    status: "soon"
+    blurb: "The measured ground of any place — climate, terrain, water — macro ⇄ micro, Rhino-ready.",
+    status: "live"
   },
   {
     href: "/site-design",
