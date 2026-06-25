@@ -122,6 +122,19 @@ export async function POST(req: Request) {
     );
   }
 
+  // Cost protection: only signed-in studio members can spend the Anthropic key.
+  // The Toolkit shell is public, but this route must never run for an anon caller.
+  const supabase = await createClient();
+  const {
+    data: { user }
+  } = await supabase.auth.getUser();
+  if (!user) {
+    return NextResponse.json(
+      { error: "Sign in to use the Librarian." },
+      { status: 401 }
+    );
+  }
+
   let body: any;
   try {
     body = await req.json();
@@ -139,20 +152,14 @@ export async function POST(req: Request) {
   try {
     const result = await research({ topic, count, grounded });
 
-    // Best-effort: log the run as "the trace" if the caller is signed in.
+    // Log the run as "the trace" (the caller is guaranteed signed in above).
     try {
-      const supabase = await createClient();
-      const {
-        data: { user }
-      } = await supabase.auth.getUser();
-      if (user) {
-        await supabase.from("tool_runs").insert({
-          owner: user.id,
-          tool: "librarian",
-          input: { topic, count, grounded },
-          output: result
-        });
-      }
+      await supabase.from("tool_runs").insert({
+        owner: user.id,
+        tool: "librarian",
+        input: { topic, count, grounded },
+        output: result
+      });
     } catch {
       // never let trace logging break the response
     }

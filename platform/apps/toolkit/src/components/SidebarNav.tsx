@@ -4,7 +4,13 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { ToolItem } from "@/lib/toolkit-nav";
 
-export default function SidebarNav({ items }: { items: ToolItem[] }) {
+export default function SidebarNav({
+  items,
+  signedIn
+}: {
+  items: ToolItem[];
+  signedIn: boolean;
+}) {
   const pathname = usePathname();
 
   return (
@@ -12,6 +18,7 @@ export default function SidebarNav({ items }: { items: ToolItem[] }) {
       {items.map((it) => {
         const active =
           it.href === "/" ? pathname === "/" : pathname.startsWith(it.href);
+        const gated = it.requiresAuth && !signedIn;
         return (
           <Link
             key={it.href}
@@ -24,7 +31,7 @@ export default function SidebarNav({ items }: { items: ToolItem[] }) {
             ].join(" ")}
           >
             <span>{it.label}</span>
-            {it.status === "soon" && (
+            {it.status === "soon" ? (
               <span
                 className={[
                   "ml-2 rounded-full px-1.5 py-0.5 text-[10px] uppercase tracking-wide",
@@ -33,7 +40,16 @@ export default function SidebarNav({ items }: { items: ToolItem[] }) {
               >
                 soon
               </span>
-            )}
+            ) : gated ? (
+              <span
+                className={[
+                  "ml-2 rounded-full px-1.5 py-0.5 text-[10px] uppercase tracking-wide",
+                  active ? "bg-white/20 text-white" : "bg-neutral-200 text-neutral-600"
+                ].join(" ")}
+              >
+                sign in
+              </span>
+            ) : null}
           </Link>
         );
       })}

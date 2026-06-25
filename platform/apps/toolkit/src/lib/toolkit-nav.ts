@@ -1,5 +1,7 @@
 // The Design Toolkit sections, in the order they appear in the sidebar.
 // `status` drives the badge: "live" tools have a working page; "soon" are stubs.
+// `requiresAuth` tools need a signed-in user (they spend the API key or need a
+// user session for RLS) — the shell is public, but these gate to /login.
 
 export type ToolStatus = "live" | "soon";
 
@@ -8,6 +10,7 @@ export interface ToolItem {
   label: string;
   blurb: string;
   status: ToolStatus;
+  requiresAuth?: boolean;
 }
 
 export const TOOLKIT_NAV: ToolItem[] = [
@@ -34,13 +37,15 @@ export const TOOLKIT_NAV: ToolItem[] = [
     href: "/librarian",
     label: "Librarian",
     blurb: "Precedent dossiers — every claim tagged, attacked, left for you to verify.",
-    status: "live"
+    status: "live",
+    requiresAuth: true
   },
   {
     href: "/pinup",
     label: "Pinup Wall",
     blurb: "Studio memory + metadata. Upload work, tag it, keep the record.",
-    status: "live"
+    status: "live",
+    requiresAuth: true
   },
   {
     href: "/design-critic",

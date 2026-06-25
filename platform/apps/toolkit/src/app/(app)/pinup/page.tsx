@@ -1,10 +1,17 @@
 import { createClient } from "@/lib/supabase/server";
+import AuthGate from "@/components/AuthGate";
 import UploadForm from "./upload-form";
 
 export const dynamic = "force-dynamic";
 
 export default async function PinupPage() {
   const supabase = await createClient();
+  const {
+    data: { user }
+  } = await supabase.auth.getUser();
+
+  // The wall reads/writes per-user rows under RLS — it needs a signed-in user.
+  if (!user) return <AuthGate tool="Pinup Wall" />;
 
   const { data: pinups, error } = await supabase
     .from("pinups")
