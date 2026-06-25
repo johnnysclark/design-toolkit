@@ -16,6 +16,11 @@ const EPA_ORG = "https://services.arcgis.com/cJ9YHowT8TU7DUyn/ArcGIS/rest/servic
 const NPL_LAYER = `${EPA_ORG}/Superfund_National_Priorities_List_(NPL)_Sites_with_Status_Information/FeatureServer/0`;
 const BOUNDARY_LAYER = `${EPA_ORG}/FAC_Superfund_Site_Boundaries_EPA_Public/FeatureServer/0`;
 const EPQS = "https://epqs.nationalmap.gov/v1/json";
+// 3DEP ImageServer getSamples returns a whole grid of elevations in ONE request —
+// far faster + more reliable than EPQS one-point-per-call (which blew Vercel's 60s
+// cap on big sites). EPQS stays as the single-point fallback below.
+const DEP_GETSAMPLES =
+  "https://elevation.nationalmap.gov/arcgis/rest/services/3DEPElevation/ImageServer/getSamples";
 const FEMA_FLOOD = "https://hazards.fema.gov/arcgis/rest/services/public/NFHL/MapServer/28/query";
 const OPEN_METEO = "https://archive-api.open-meteo.com/v1/archive";
 const NOMINATIM = "https://nominatim.openstreetmap.org/search";
@@ -297,29 +302,66 @@ export async function elevationAt(lon: number, lat: number): Promise<number | nu
   }
 }
 
-// Sample an n×n elevation grid over a bbox. Rows go south→north, cols west→east.
-// EPQS is one-point-per-call, so we cap concurrency to stay polite and reliable.
+// Sample an n×n elevation grid over a bbox in a SINGLE 3DEP getSamples request.
+// Rows go south→north, cols west→east. One round-trip (~2-8s) instead of n²
+// point calls — this is what keeps `analyze` under Vercel's 60s function cap.
 export async function elevationGrid(
   bbox: [number, number, number, number],
-  n = 12,
-  concurrency = 10
+  n = 12
 ): Promise<Topo> {
   const [w, s, e, nth] = bbox;
-  const pts: { r: number; c: number; lon: number; lat: number }[] = [];
+  // Points in row-major order; locationId in the response == this index.
+  const points: [number, number][] = [];
   for (let r = 0; r < n; r++) {
     for (let c = 0; c < n; c++) {
       const lon = w + ((e - w) * c) / (n - 1);
       const lat = s + ((nth - s) * r) / (n - 1);
-      pts.push({ r, c, lon, lat });
+      points.push([lon, lat]);
     }
   }
-  const grid: number[][] = Array.from({ length: n }, () => new Array(n).fill(null));
-  await mapLimit(pts, concurrency, async (p) => {
-    grid[p.r][p.c] = (await elevationAt(p.lon, p.lat)) as number;
+
+  const grid: (number | null)[][] = Array.from({ length: n }, () => new Array(n).fill(null));
+  const body = new URLSearchParams({
+    geometry: JSON.stringify({ points, spatialReference: { wkid: 4326 } }),
+    geometryType: "esriGeometryMultipoint",
+    returnFirstValueOnly: "true",
+    f: "json"
   });
-  // Fill any nulls (out-of-coverage / failed) with the grid mean so the mesh is closed.
-  const flat = grid.flat().filter((v) => v != null) as number[];
-  const mean = flat.length ? flat.reduce((a, b) => a + b, 0) / flat.length : 0;
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 25000);
+  let data: any;
+  try {
+    const res = await fetch(DEP_GETSAMPLES, {
+      method: "POST",
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/x-www-form-urlencoded"
+      },
+      body,
+      signal: ctrl.signal
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status} from 3DEP getSamples`);
+    data = await res.json();
+  } finally {
+    clearTimeout(timer);
+  }
+
+  for (const sm of data?.samples || []) {
+    const id = Number(sm.locationId);
+    const v = Number(sm.value);
+    // 3DEP NoData comes back as a huge negative; keep only sane elevations.
+    if (Number.isInteger(id) && id >= 0 && id < n * n && Number.isFinite(v) && v > -500 && v < 9000) {
+      grid[Math.floor(id / n)][id % n] = v;
+    }
+  }
+
+  const flat = grid.flat().filter((v): v is number => v != null);
+  // Nothing came back in coverage → let the caller record terrain as absent (✕),
+  // rather than inventing a flat plane.
+  if (!flat.length) throw new Error("No 3DEP elevation coverage for this area.");
+
+  // Fill any gaps (out-of-coverage cells) with the grid mean so the mesh stays closed.
+  const mean = flat.reduce((a, b) => a + b, 0) / flat.length;
   let missing = 0;
   for (let r = 0; r < n; r++)
     for (let c = 0; c < n; c++)
@@ -327,13 +369,12 @@ export async function elevationGrid(
         grid[r][c] = mean;
         missing++;
       }
+
   return {
     n,
     bbox,
-    grid,
-    stats: flat.length
-      ? { min: Math.min(...flat), max: Math.max(...flat), mean, missing, total: n * n }
-      : { min: null, max: null, mean: null, missing: n * n, total: n * n }
+    grid: grid as number[][],
+    stats: { min: Math.min(...flat), max: Math.max(...flat), mean, missing, total: n * n }
   };
 }
 
@@ -431,16 +472,3 @@ export async function climateYear(lat: number, lon: number, year = 2023): Promis
   };
 }
 
-// --- util ------------------------------------------------------------------
-
-async function mapLimit<T>(items: T[], limit: number, fn: (item: T) => Promise<void>) {
-  const queue = [...items.entries()];
-  const workers = Array.from({ length: Math.min(limit, queue.length) }, async () => {
-    while (queue.length) {
-      const next = queue.shift();
-      if (!next) break;
-      await fn(next[1]);
-    }
-  });
-  await Promise.all(workers);
-}
