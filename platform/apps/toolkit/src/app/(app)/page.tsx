@@ -9,12 +9,13 @@ import { TOOLKIT_NAV } from "@/lib/toolkit-nav";
 // The nine tools, each with a tiny inline-SVG mock of how it works and a note on
 // where it runs. SVGs are static, trusted markup ported verbatim from the
 // teaching statement; injected as-is to keep their (kebab-case) attributes.
-type Tool = { no: string; title: string; runs: React.ReactNode; body: React.ReactNode; mock: string };
+type Tool = { no: string; href: string | null; title: string; runs: React.ReactNode; body: React.ReactNode; mock: string };
 
 const TOOLS: Tool[] = [
   {
     no: "01",
     title: "Skills / Design Production Tutor",
+    href: "/skills-coach",
     runs: "Runs as — LLM chat behind a proxy, or campus Illinois Chat.",
     body: (
       <p>
@@ -46,6 +47,7 @@ const TOOLS: Tool[] = [
   {
     no: "02",
     title: "Site Analysis / Form Generator",
+    href: "/site-analysis",
     runs: "Runs as — Rhino / Grasshopper for the simulation, with a web front for inputs.",
     body: (
       <p>
@@ -80,6 +82,7 @@ const TOOLS: Tool[] = [
   {
     no: "03",
     title: "Precedent / Research Machine — Librarian",
+    href: "/librarian",
     runs: "Runs as — a local app (Claude Code), filesystem-based.",
     body: (
       <p>
@@ -107,6 +110,7 @@ const TOOLS: Tool[] = [
   {
     no: "04",
     title: "Portfolio / Storyteller Helper",
+    href: null,
     runs: "Runs as — LLM chat behind a proxy.",
     body: (
       <p>
@@ -141,6 +145,7 @@ const TOOLS: Tool[] = [
   {
     no: "05",
     title: "RAP Toolkit",
+    href: "/rap",
     runs: (
       <>
         Runs as — local + CLI, open-source ·{" "}
@@ -182,6 +187,7 @@ const TOOLS: Tool[] = [
   {
     no: "06",
     title: "Drawing Cleanup & 2D Media",
+    href: "/media-2d",
     runs: "Runs as — vision models for cleanup, deterministic paths for fabrication.",
     body: (
       <p>
@@ -209,6 +215,7 @@ const TOOLS: Tool[] = [
   {
     no: "07",
     title: "Miro Alternative — Digital Wall",
+    href: "/pinup",
     runs: "Runs as — a web app with a backend (Supabase) and accounts.",
     body: (
       <p>
@@ -244,6 +251,7 @@ const TOOLS: Tool[] = [
   {
     no: "08",
     title: "Design Critic",
+    href: "/design-critic",
     runs: "Runs as — LLM behind a proxy; each persona is a system prompt.",
     body: (
       <p>
@@ -271,6 +279,7 @@ const TOOLS: Tool[] = [
   {
     no: "09",
     title: "3D Tools",
+    href: "/tools-3d",
     runs: "Runs as — Rhino-coupled, plus a static web viewer.",
     body: (
       <p>
@@ -335,6 +344,9 @@ const STYLES = `
 .di-doc .tool-entry:first-of-type{ border-top:none; }
 .di-doc .te-no{ font-family:var(--font-display),sans-serif; font-size:13px; color:#bbb; letter-spacing:.04em; margin-bottom:4px; }
 .di-doc .te-text h3{ font-size:20px; line-height:1.14; margin:0 0 9px; }
+.di-doc .te-link{ color:inherit; text-decoration:none; }
+.di-doc .te-link:hover{ text-decoration:underline; text-underline-offset:3px; text-decoration-thickness:2px; }
+.di-doc .te-link span{ color:#1A45F0; }
 .di-doc .te-text p{ font-size:15.5px; line-height:1.56; color:#2e2e2e; margin:0; }
 .di-doc .te-deliver{ font-size:12.5px; color:#8a8a8a; margin-top:11px; letter-spacing:.01em; }
 .di-doc .te-deliver a{ color:#1A45F0; }
@@ -378,6 +390,12 @@ const STYLES = `
 
 export default function Overview() {
   const liveTools = TOOLKIT_NAV.filter((t) => t.href !== "/" && t.status === "live");
+  // Show the tool cards in the SAME order as the left sidebar; any card with no
+  // matching tool page (href:null) sorts to the end.
+  const navIndex = Object.fromEntries(TOOLKIT_NAV.map((t, i) => [t.href, i]));
+  const orderedTools = [...TOOLS].sort(
+    (a, b) => (a.href ? navIndex[a.href] ?? 999 : 999) - (b.href ? navIndex[b.href] ?? 999 : 999)
+  );
 
   return (
     <div className="di-doc">
@@ -441,11 +459,19 @@ export default function Overview() {
           </p>
         </div>
 
-        {TOOLS.map((t) => (
-          <article className="tool-entry" key={t.no}>
+        {orderedTools.map((t, i) => (
+          <article className="tool-entry" key={t.title}>
             <div className="te-text">
-              <div className="te-no">{t.no}</div>
-              <h3>{t.title}</h3>
+              <div className="te-no">{String(i + 1).padStart(2, "0")}</div>
+              <h3>
+                {t.href ? (
+                  <Link href={t.href} className="te-link">
+                    {t.title} <span aria-hidden="true">→</span>
+                  </Link>
+                ) : (
+                  t.title
+                )}
+              </h3>
               {t.body}
               <p className="te-deliver">{t.runs}</p>
             </div>
