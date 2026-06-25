@@ -53,13 +53,20 @@ export default function AppShell({
 
       <div className="flex flex-1">
         {open && (
-          <aside className="w-64 shrink-0 border-r border-neutral-200 bg-white">
+          <aside className="flex w-64 shrink-0 flex-col border-r border-neutral-200 bg-white">
             <SidebarNav items={TOOLKIT_NAV} signedIn={signedIn} />
-            {signedIn && email && (
-              <p className="truncate px-4 py-3 text-xs text-neutral-400" title={email}>
-                {email}
+            <div className="mt-auto border-t border-neutral-200 px-4 py-4 text-xs leading-relaxed text-neutral-500">
+              <p className="text-neutral-700">Built by John Clark &amp; Claude, 2026</p>
+              <p className="mt-1.5">
+                Feedback?{" "}
+                <a
+                  href="mailto:jsclark2@illinois.edu"
+                  className="underline underline-offset-2 hover:text-neutral-900"
+                >
+                  jsclark2@illinois.edu
+                </a>
               </p>
-            )}
+            </div>
           </aside>
         )}
         <main className="flex-1 overflow-x-hidden px-6 py-8 sm:px-10 sm:py-12">
