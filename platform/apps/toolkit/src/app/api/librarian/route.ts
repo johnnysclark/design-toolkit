@@ -143,10 +143,14 @@ export async function POST(req: Request) {
       });
     }
 
-    // ── Mode: analyze an image ────────────────────────────────────────────
+    // ── Mode: analyze an image (first pass, or a conversational refinement) ─
     const imagePath: string | null = body?.imagePath || null;
     const imageUrl: string | null = body?.imageUrl ? String(body.imageUrl).trim() : null;
     const note: string | null = body?.note ? String(body.note).trim() : null;
+    // Accumulated authoritative facts the student has typed in the conversation.
+    const userContext: string | null = body?.userContext ? String(body.userContext).trim() : null;
+    // When refining an existing search, update that row instead of inserting.
+    const incomingSearchId: string | null = body?.searchId || null;
 
     let fetchUrl: string;
     if (imagePath) {
@@ -192,7 +196,14 @@ export async function POST(req: Request) {
               type: "image",
               source: { type: "base64", media_type: mediaType, data: b64 }
             },
-            { type: "text", text: analysisUser({ sourceUrl: imageUrl || undefined, note: note || undefined }) }
+            {
+              type: "text",
+              text: analysisUser({
+                sourceUrl: imageUrl || undefined,
+                note: note || undefined,
+                userContext: userContext || undefined
+              })
+            }
           ]
         }
       ]
@@ -216,28 +227,39 @@ export async function POST(req: Request) {
       vocabularyTerms: (analysis.vocabulary || []).map((v: any) => v.term)
     });
 
-    // Catalogue the search (this is what grows the reference database).
-    let searchId: string | null = null;
-    const { data: row } = await supabase
-      .from("library_searches")
-      .insert({
-        owner: user.id,
-        project_id: projectId,
-        input_image_path: imagePath,
-        input_url: imageUrl,
-        analysis,
-        enrichment
-      })
-      .select("id")
-      .single();
-    searchId = row?.id ?? null;
+    // Catalogue the search (this is what grows the reference database). On a
+    // conversational refinement we update the same row rather than spawn a new
+    // one, and stash the student's authoritative notes alongside the analysis.
+    const analysisToStore = userContext ? { ...analysis, user_context: userContext } : analysis;
+    let searchId: string | null = incomingSearchId;
+    if (incomingSearchId) {
+      await supabase
+        .from("library_searches")
+        .update({ analysis: analysisToStore, enrichment })
+        .eq("id", incomingSearchId)
+        .eq("owner", user.id);
+    } else {
+      const { data: row } = await supabase
+        .from("library_searches")
+        .insert({
+          owner: user.id,
+          project_id: projectId,
+          input_image_path: imagePath,
+          input_url: imageUrl,
+          analysis: analysisToStore,
+          enrichment
+        })
+        .select("id")
+        .single();
+      searchId = row?.id ?? null;
+    }
 
     // "The trace" — generic per-tool log (best-effort).
     try {
       await supabase.from("tool_runs").insert({
         owner: user.id,
         tool: "librarian",
-        input: { mode, projectId, imagePath, imageUrl, note },
+        input: { mode, projectId, imagePath, imageUrl, note, userContext, refine: !!incomingSearchId },
         output: { analysis, enrichment }
       });
     } catch {

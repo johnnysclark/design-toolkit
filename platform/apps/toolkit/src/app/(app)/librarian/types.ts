@@ -22,6 +22,9 @@ export interface Candidate {
 }
 
 export interface Analysis {
+  identification_confidence: "high" | "medium" | "low" | "none";
+  reply: string;
+  questions: string[];
   description: string;
   image_kind: string;
   candidates: Candidate[];
@@ -29,6 +32,11 @@ export interface Analysis {
   visible_text: string;
   suggested_search_terms: string[];
   suggested_tags: string[];
+}
+
+export interface ChatMessage {
+  role: "user" | "librarian";
+  text: string;
 }
 
 export interface AnalyzeResult {

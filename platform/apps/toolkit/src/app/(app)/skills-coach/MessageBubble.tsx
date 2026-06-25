@@ -1,6 +1,6 @@
 "use client";
 
-import { memo, type ReactNode } from "react";
+import { memo, useState, type ReactNode } from "react";
 import { getConcept } from "@/lib/skills-coach/concepts";
 import type { CoachMeta, ClaimTag } from "@/lib/anthropic/skills-coach-prompts";
 
@@ -53,6 +53,105 @@ function renderWithConcepts(text: string): ReactNode[] {
   return out;
 }
 
+// Fenced ```lang code blocks become an export card. The tutor is instructed to
+// wrap runnable Grasshopper/Rhino Python in a fence, and students get Copy + a
+// clear Export (download) button so they can drop the script into a component.
+const CODE_RE = /```([\w+-]*)[^\S\r\n]*\r?\n([\s\S]*?)```/g;
+
+function CodeCard({ lang, code }: { lang: string; code: string }) {
+  const [copied, setCopied] = useState(false);
+  const language = (lang || "code").toLowerCase();
+  const ext =
+    language === "python" || language === "py" || language === "ghpython"
+      ? "py"
+      : language === "cs" || language === "csharp"
+        ? "cs"
+        : "txt";
+
+  function copy() {
+    navigator.clipboard?.writeText(code).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    });
+  }
+  function download() {
+    const blob = new Blob([code + "\n"], { type: "text/plain;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `skills-coach-script.${ext}`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  return (
+    <div className="overflow-hidden rounded-xl border border-neutral-200">
+      <div className="flex items-center justify-between gap-2 border-b border-neutral-200 bg-neutral-50 px-3 py-1.5">
+        <span className="font-mono text-[11px] uppercase tracking-wide text-neutral-500">
+          {language}
+        </span>
+        <div className="flex items-center gap-1.5">
+          <button
+            type="button"
+            onClick={copy}
+            className="rounded-md px-2 py-1 text-xs text-neutral-600 hover:bg-neutral-200"
+          >
+            {copied ? "Copied ✓" : "Copy"}
+          </button>
+          <button
+            type="button"
+            onClick={download}
+            className="rounded-md bg-[#ff3b21] px-2.5 py-1 text-xs font-medium text-white hover:bg-[#e22d15]"
+          >
+            ↓ Export .{ext}
+          </button>
+        </div>
+      </div>
+      <pre className="overflow-x-auto px-3 py-3 text-[13px] leading-relaxed text-neutral-800">
+        <code className="font-mono">{code}</code>
+      </pre>
+    </div>
+  );
+}
+
+// Split assistant prose into text + fenced-code segments: each code block
+// renders as an export card, each text run keeps its concept links.
+function renderBody(content: string): ReactNode[] {
+  const out: ReactNode[] = [];
+  let last = 0;
+  let m: RegExpExecArray | null;
+  let key = 0;
+  CODE_RE.lastIndex = 0;
+  while ((m = CODE_RE.exec(content)) !== null) {
+    const before = content.slice(last, m.index).replace(/^\n+|\n+$/g, "");
+    if (before) {
+      out.push(
+        <div key={`t-${key++}`} className="whitespace-pre-wrap">
+          {renderWithConcepts(before)}
+        </div>
+      );
+    }
+    out.push(<CodeCard key={`code-${key++}`} lang={m[1]} code={m[2].replace(/\s+$/, "")} />);
+    last = m.index + m[0].length;
+  }
+  const rest = content.slice(last).replace(/^\n+/, "");
+  if (rest) {
+    out.push(
+      <div key={`t-${key++}`} className="whitespace-pre-wrap">
+        {renderWithConcepts(rest)}
+      </div>
+    );
+  }
+  if (out.length === 0) {
+    out.push(
+      <div key="t-0" className="whitespace-pre-wrap">
+        {renderWithConcepts(content)}
+      </div>
+    );
+  }
+  return out;
+}
+
 function MessageBubbleImpl({ message }: { message: ChatMessage }) {
   const isUser = message.role === "user";
 
@@ -79,7 +178,7 @@ function MessageBubbleImpl({ message }: { message: ChatMessage }) {
     <div className="flex justify-start">
       <div className="max-w-[92%] space-y-3">
         <div className="rounded-2xl rounded-bl-sm border border-neutral-200 bg-white px-4 py-3 text-sm leading-relaxed text-neutral-800">
-          <div className="whitespace-pre-wrap">{renderWithConcepts(message.content)}</div>
+          <div className="space-y-3">{renderBody(message.content)}</div>
         </div>
 
         {meta?.claims && meta.claims.length > 0 && (

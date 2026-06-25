@@ -6,7 +6,9 @@ import { prepareImage } from "./image";
 import ProjectGallery from "./project-gallery";
 import {
   type AnalyzeResult,
+  type Analysis,
   type Candidate,
+  type ChatMessage,
   type Project,
   type RelatedImage,
   kindLabel
@@ -61,7 +63,17 @@ export default function LibrarianTool() {
   const [result, setResult] = useState<AnalyzeResult | null>(null);
   const [saved, setSaved] = useState<Set<string>>(new Set());
   const [galleryKey, setGalleryKey] = useState(0);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [userFacts, setUserFacts] = useState("");
+  const [chatInput, setChatInput] = useState("");
+  const [chatting, setChatting] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+
+  function seedConversation(json: AnalyzeResult) {
+    setUserFacts("");
+    setChatInput("");
+    setMessages(json.analysis?.reply ? [{ role: "librarian", text: json.analysis.reply }] : []);
+  }
 
   // ── load projects + restore last selection ──────────────────────────────
   useEffect(() => {
@@ -134,6 +146,8 @@ export default function LibrarianTool() {
     setBusy("analyze");
     setResult(null);
     setSaved(new Set());
+    setMessages([]);
+    setUserFacts("");
     try {
       const supabase = createClient();
       const {
@@ -157,6 +171,7 @@ export default function LibrarianTool() {
         .from("library")
         .createSignedUrl(path, 3600);
       setResult({ ...json, _imagePath: path, _previewUrl: signed?.signedUrl || null });
+      seedConversation(json);
     } catch (e: any) {
       setError(e?.message || "Analysis failed.");
     } finally {
@@ -172,9 +187,12 @@ export default function LibrarianTool() {
     setBusy("analyze");
     setResult(null);
     setSaved(new Set());
+    setMessages([]);
+    setUserFacts("");
     try {
       const json = await postAnalyze({ imageUrl: u });
       setResult({ ...json, _sourceUrl: u, _previewUrl: u });
+      seedConversation(json);
     } catch (e: any) {
       setError(e?.message || "Analysis failed.");
     } finally {
@@ -190,6 +208,8 @@ export default function LibrarianTool() {
     setBusy("search");
     setResult(null);
     setSaved(new Set());
+    setMessages([]);
+    setUserFacts("");
     try {
       const res = await fetch("/api/librarian", {
         method: "POST",
@@ -203,6 +223,58 @@ export default function LibrarianTool() {
       setError(e?.message || "Search failed.");
     } finally {
       setBusy(null);
+    }
+  }
+
+  // Conversational refinement: the student tells the Librarian what it is /
+  // gives more data; we re-analyze the same image with those facts as ground
+  // truth and re-search the archives with the corrected identity.
+  async function sendChat() {
+    const msg = chatInput.trim();
+    if (!msg || !result) return;
+    const ref = result._imagePath
+      ? { imagePath: result._imagePath }
+      : result._sourceUrl
+        ? { imageUrl: result._sourceUrl }
+        : null;
+    if (!ref) {
+      setError("The conversation is available for image analyses.");
+      return;
+    }
+    setError(null);
+    const facts = (userFacts ? userFacts + "\n" : "") + msg;
+    setMessages((m) => [...m, { role: "user", text: msg }]);
+    setUserFacts(facts);
+    setChatInput("");
+    setChatting(true);
+    try {
+      const res = await fetch("/api/librarian", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          mode: "analyze",
+          projectId: projectId || null,
+          ...ref,
+          userContext: facts,
+          searchId: result.searchId
+        })
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || "Request failed");
+      setResult((prev) => ({
+        ...(json as AnalyzeResult),
+        _imagePath: prev?._imagePath,
+        _previewUrl: prev?._previewUrl,
+        _sourceUrl: prev?._sourceUrl
+      }));
+      if (json.analysis?.reply) {
+        setMessages((m) => [...m, { role: "librarian", text: json.analysis.reply }]);
+      }
+    } catch (e: any) {
+      setError(e?.message || "Message failed.");
+      setMessages((m) => [...m, { role: "librarian", text: "(couldn't respond — try again)" }]);
+    } finally {
+      setChatting(false);
     }
   }
 
@@ -469,6 +541,11 @@ export default function LibrarianTool() {
           onSaveSource={saveSource}
           onAddRelated={addRelated}
           canSave={!!projectId}
+          messages={messages}
+          chatInput={chatInput}
+          setChatInput={setChatInput}
+          onSend={sendChat}
+          chatting={chatting}
         />
       )}
 
@@ -489,6 +566,88 @@ export default function LibrarianTool() {
   );
 }
 
+// ───────────────────────────── conversation ──────────────────────────────
+
+function Conversation({
+  analysis,
+  messages,
+  chatInput,
+  setChatInput,
+  onSend,
+  chatting
+}: {
+  analysis: Analysis;
+  messages: ChatMessage[];
+  chatInput: string;
+  setChatInput: (v: string) => void;
+  onSend: () => void;
+  chatting: boolean;
+}) {
+  const lowConf =
+    analysis.identification_confidence === "low" ||
+    analysis.identification_confidence === "none";
+
+  return (
+    <section className={card}>
+      <h3 className="display-font text-lg uppercase tracking-tight">Talk to the Librarian</h3>
+
+      {lowConf && (
+        <div className="mt-2 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+          <p className="font-medium">
+            I couldn&rsquo;t confidently identify this, so I haven&rsquo;t written anything about
+            it or guessed.
+          </p>
+          <p className="mt-1">
+            Tell me what you know — author, project, location, year — and I&rsquo;ll catalog it
+            and pull related material.
+          </p>
+          {analysis.questions?.length > 0 && (
+            <ul className="mt-2 list-disc pl-5">
+              {analysis.questions.map((q, i) => (
+                <li key={i}>{q}</li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
+
+      {messages.length > 0 && (
+        <div className="mt-3 space-y-2">
+          {messages.map((m, i) => (
+            <div key={i} className={m.role === "user" ? "flex justify-end" : "flex justify-start"}>
+              <div
+                className={[
+                  "max-w-[85%] rounded-lg px-3 py-2 text-sm",
+                  m.role === "user"
+                    ? "bg-neutral-900 text-white"
+                    : "bg-neutral-100 text-neutral-800"
+                ].join(" ")}
+              >
+                {m.text}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div className="mt-3 flex flex-wrap gap-2">
+        <input
+          value={chatInput}
+          onChange={(e) => setChatInput(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && !chatting) onSend();
+          }}
+          placeholder="Tell the Librarian more — e.g. 'Architect: Tadao Ando · Church of the Light · Ibaraki, 1989'"
+          className="min-w-0 flex-1 rounded-lg border border-neutral-300 px-3 py-2 text-sm outline-none focus:border-neutral-900"
+        />
+        <button onClick={onSend} disabled={chatting || !chatInput.trim()} className={primaryBtn}>
+          {chatting ? "Thinking…" : "Send"}
+        </button>
+      </div>
+    </section>
+  );
+}
+
 // ───────────────────────────── result panel ──────────────────────────────
 
 function ResultPanel({
@@ -496,13 +655,23 @@ function ResultPanel({
   saved,
   onSaveSource,
   onAddRelated,
-  canSave
+  canSave,
+  messages,
+  chatInput,
+  setChatInput,
+  onSend,
+  chatting
 }: {
   result: AnalyzeResult;
   saved: Set<string>;
   onSaveSource: () => void;
   onAddRelated: (img: RelatedImage) => void;
   canSave: boolean;
+  messages: ChatMessage[];
+  chatInput: string;
+  setChatInput: (v: string) => void;
+  onSend: () => void;
+  chatting: boolean;
 }) {
   const a = result.analysis;
   const e = result.enrichment;
@@ -552,7 +721,9 @@ function ResultPanel({
                     </button>
                   )}
                 </div>
-                <p className="mt-2 text-sm text-neutral-800">{a.description}</p>
+                {a.description?.trim() && (
+                  <p className="mt-2 text-sm text-neutral-800">{a.description}</p>
+                )}
                 {a.visible_text?.trim() && (
                   <p className="mt-2 text-sm text-neutral-600">
                     <span className="font-medium">Text in image:</span> {a.visible_text}
@@ -569,52 +740,57 @@ function ResultPanel({
         </div>
       </div>
 
-      {/* candidate identifications */}
+      {/* conversation — tell the Librarian what it is */}
       {a && (
+        <Conversation
+          analysis={a}
+          messages={messages}
+          chatInput={chatInput}
+          setChatInput={setChatInput}
+          onSend={onSend}
+          chatting={chatting}
+        />
+      )}
+
+      {/* candidate identifications (only when there's something to show) */}
+      {a && a.candidates && a.candidates.length > 0 && (
         <section className={card}>
           <h3 className="display-font text-lg uppercase tracking-tight">Possible identifications</h3>
           <p className="mt-1 text-sm text-neutral-500">
             Leads to verify — not facts. A confident wrong name is the worst outcome, so the
             model abstains when unsure.
           </p>
-          {a.candidates?.length ? (
-            <div className="mt-3 space-y-3">
-              {a.candidates.map((c, i) => (
-                <div key={i} className="rounded-lg border border-neutral-200 p-3">
-                  <div className="flex items-start justify-between gap-3">
-                    <h4 className="font-medium">{c.building || "Unidentified"}</h4>
-                    <span
-                      className={[
-                        "shrink-0 rounded-full px-2 py-0.5 text-[10px] uppercase tracking-wide",
-                        CONF[c.confidence] || CONF.low
-                      ].join(" ")}
-                    >
-                      {c.confidence} confidence
-                    </span>
-                  </div>
-                  <p className="mt-0.5 text-sm text-neutral-500">
-                    {[c.architect, c.year, c.location, c.program].filter(Boolean).join(" · ")}
-                  </p>
-                  {c.visual_evidence && (
-                    <p className="mt-1 text-sm">
-                      <span className="text-neutral-500">Seen in image: </span>
-                      {c.visual_evidence}
-                    </p>
-                  )}
-                  {c.verify_hint && (
-                    <p className="mt-1 text-sm text-amber-800">
-                      <span className="font-medium">Verify:</span> {c.verify_hint}
-                    </p>
-                  )}
+          <div className="mt-3 space-y-3">
+            {a.candidates.map((c, i) => (
+              <div key={i} className="rounded-lg border border-neutral-200 p-3">
+                <div className="flex items-start justify-between gap-3">
+                  <h4 className="font-medium">{c.building || "Unidentified"}</h4>
+                  <span
+                    className={[
+                      "shrink-0 rounded-full px-2 py-0.5 text-[10px] uppercase tracking-wide",
+                      CONF[c.confidence] || CONF.low
+                    ].join(" ")}
+                  >
+                    {c.confidence} confidence
+                  </span>
                 </div>
-              ))}
-            </div>
-          ) : (
-            <p className="mt-3 text-sm text-neutral-600">
-              The model couldn&rsquo;t confidently identify this — use the description, vocabulary,
-              and a manual archive search to investigate.
-            </p>
-          )}
+                <p className="mt-0.5 text-sm text-neutral-500">
+                  {[c.architect, c.year, c.location, c.program].filter(Boolean).join(" · ")}
+                </p>
+                {c.visual_evidence && (
+                  <p className="mt-1 text-sm">
+                    <span className="text-neutral-500">Seen in image: </span>
+                    {c.visual_evidence}
+                  </p>
+                )}
+                {c.verify_hint && (
+                  <p className="mt-1 text-sm text-amber-800">
+                    <span className="font-medium">Verify:</span> {c.verify_hint}
+                  </p>
+                )}
+              </div>
+            ))}
+          </div>
         </section>
       )}
 
