@@ -417,7 +417,7 @@ export default function Overview() {
         <section className="exec">
           <p className="sum">
             Studio students often can&rsquo;t yet defend their designs with rigor. This is a plan to change
-            that by teaching them to work with agentically coded AI tools —{" "}
+            that by teaching them to work with agentic coding tools —{" "}
             <span className="hl">
               instruments that supply the logics, language, and data behind a judgment while leaving the
               judgment to the student
@@ -477,40 +477,38 @@ export default function Overview() {
           </div>
           <p className="first">
             Studio students often can&rsquo;t yet justify their designs with rigor — whether they&rsquo;re
-            working from site-specific environmental forces, historical precedent, or creative form
-            generation. Our job as studio teachers is to level up their reasoning, synthesis, and analysis:
-            of a real-world site, and of the buildings they invent for it. Agentically coded AI tools can
-            help, giving students the <span className="hl">logics, language, and data</span> to make more
-            sophisticated judgments and putting computational analysis within reach for the first time.
-            Design thinking is already an iterative system — ask questions, gather information and expertise,
-            then form that material into built and unbuilt proposals — which is exactly the disposition this
-            new way of computing rewards. The two map cleanly onto each other.
+            reasoning from site-specific environmental forces, historical precedent, or creative form
+            generation. Our job as studio teachers is to sharpen their reasoning, synthesis, and analysis:
+            of a real-world site, and of the buildings they invent for it. Agentic coding tools — AI that
+            writes and runs its own code — can help, giving students the{" "}
+            <span className="hl">logics, language, and data</span> to make more sophisticated judgments and
+            putting computational analysis within reach for the first time. Design thinking is already an
+            iterative system — ask questions, gather information and expertise, then form that material into
+            built and unbuilt proposals — which is exactly the disposition these tools reward. That&rsquo;s
+            why the studio is the natural place to teach them.
           </p>
           <p>
             I&rsquo;ll work in two registers: demonstrating the more sophisticated tools I&rsquo;ve built and
             giving students access to them, and vibe-coding simpler tools together with the class. I expect
-            these to become as ubiquitous as the proprietary software students already use in school and in
+            both to become as ubiquitous as the proprietary software students already run in school and
             practice. What I want them to learn is a stance —{" "}
             <span className="hl">move quickly, but iterate in a &ldquo;trust but verify&rdquo; loop</span> that
             hunts for edge cases and failure modes, and brainstorm with these tools fluidly but skeptically.
             I&rsquo;ll introduce them inside studio sequences and run a short series of
-            agentic-coding-for-design workshops, since it takes a few sessions to bring students, and
-            colleagues, up to speed.
-          </p>
-          <p>
-            If you&rsquo;re moving from chatbots to Claude Code or Codex and want real control over your
-            models&rsquo; inputs, outputs, memory, and behavior, I&rsquo;m glad to help — and I&rsquo;d point
-            you toward the idea of <em>agent harnesses</em> for guiding a model with more clarity.
+            agentic-coding-for-design workshops, since it takes a few sessions to bring students — and
+            colleagues — up to speed. (For colleagues moving from chatbots to Claude Code or Codex who want
+            real control over a model&rsquo;s inputs, outputs, memory, and behavior, I&rsquo;m glad to help,
+            starting with the idea of an <em>agent harness</em> for guiding a model with more clarity.)
           </p>
           <p>
             The learning objective is the same as any studio&rsquo;s: students can explain both the final
             design and the process that produced it. Teaching students to work with AI follows the same
-            tenets as teaching them to be resilient designers, which is why building these tools should
-            reinforce the core of the studio rather than replace it. The toolkit itself is detailed in the
-            examples above — a production tutor, a site analyzer and form generator, a precedent librarian, a
+            tenets as teaching them to be resilient designers — which is why building these tools should
+            reinforce the core of the studio rather than replace it. The toolkit is detailed in the examples
+            above — a production tutor, a site analyzer and form generator, a precedent librarian, a
             portfolio coach, the RAP accessibility toolkit, drawing and fabrication widgets, a studio pin-up
-            wall, a design critic, and a set of 3D on-ramps — and all of it is in some stage of production,
-            fully built with Claude Code.
+            wall, a design critic, and a set of 3D on-ramps — each at some stage of production, all built
+            with Claude Code.
           </p>
 
           <section className="feature">
