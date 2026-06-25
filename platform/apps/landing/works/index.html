@@ -4,6 +4,9 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>All Means Works</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Archivo+Black&display=swap" rel="stylesheet" />
 <style>
   /* ============================================================
      MOS-grammar index site.
@@ -19,6 +22,7 @@
     --rule:#000;
     --pad:1.25rem;
     --fs:15px;
+    --display:"Archivo Black", ui-sans-serif, system-ui, sans-serif;
   }
   *{box-sizing:border-box;margin:0;padding:0}
   html{font-size:var(--fs)}
@@ -266,6 +270,20 @@
     transition:top .1s;
   }
   .skip:focus{top:.5rem}
+
+  /* ===== Bold graphic font language — Archivo Black across the page ===== */
+  body{ font-family:var(--display); line-height:1.34; letter-spacing:-.01em; }
+  header{ gap:1rem; }
+  header .wordmark{ font-size:1.5rem; text-transform:uppercase; }
+  header nav{ gap:1.1rem; align-items:baseline; }
+  header nav button, header nav a{ font-size:1.25rem; text-transform:uppercase; letter-spacing:-.01em; }
+  button{ text-transform:uppercase; }
+  ol.index > li.year{ font-size:1.4rem; text-transform:uppercase; }
+  article.project h2, section.page h2{
+    font-size:clamp(1.8rem,5.5vw,3.4rem); line-height:1.0;
+    text-transform:uppercase; letter-spacing:-.02em; max-width:none;
+  }
+  article.project .sub{ text-transform:uppercase; font-size:1.05rem; letter-spacing:-.01em; }
 </style>
 </head>
 <body>

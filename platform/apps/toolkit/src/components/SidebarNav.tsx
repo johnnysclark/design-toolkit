@@ -14,7 +14,7 @@ export default function SidebarNav({
   const pathname = usePathname();
 
   return (
-    <nav className="flex-1 overflow-y-auto px-2 py-3">
+    <nav className="flex flex-col gap-0.5 overflow-y-auto px-2 py-3">
       {items.map((it) => {
         const active =
           it.href === "/" ? pathname === "/" : pathname.startsWith(it.href);
@@ -24,17 +24,17 @@ export default function SidebarNav({
             key={it.href}
             href={it.href}
             className={[
-              "flex items-center justify-between rounded-md px-3 py-2 text-sm",
+              "flex items-center justify-between gap-2 rounded-md px-3 py-2 display-font text-lg uppercase leading-tight tracking-tight",
               active
                 ? "bg-neutral-900 text-white"
-                : "text-neutral-700 hover:bg-neutral-100"
+                : "text-neutral-900 hover:bg-neutral-100"
             ].join(" ")}
           >
             <span>{it.label}</span>
             {it.status === "soon" ? (
               <span
                 className={[
-                  "ml-2 rounded-full px-1.5 py-0.5 text-[10px] uppercase tracking-wide",
+                  "shrink-0 rounded-full px-1.5 py-0.5 text-[10px] uppercase tracking-wide",
                   active ? "bg-white/20 text-white" : "bg-amber-100 text-amber-800"
                 ].join(" ")}
               >
@@ -43,7 +43,7 @@ export default function SidebarNav({
             ) : gated ? (
               <span
                 className={[
-                  "ml-2 rounded-full px-1.5 py-0.5 text-[10px] uppercase tracking-wide",
+                  "shrink-0 rounded-full px-1.5 py-0.5 text-[10px] uppercase tracking-wide",
                   active ? "bg-white/20 text-white" : "bg-neutral-200 text-neutral-600"
                 ].join(" ")}
               >

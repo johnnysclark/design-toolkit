@@ -6,7 +6,7 @@ export default function Dashboard() {
 
   return (
     <div>
-      <h1 className="text-4xl sm:text-5xl tracking-tight">Design Toolkit</h1>
+      <h1 className="text-4xl sm:text-5xl tracking-tight">Overview</h1>
       <p className="mt-2 max-w-2xl text-neutral-600">
         AI tools for the studio — built to be interrogated, not obeyed. Every
         model claim is tagged and left for you to verify, and every run is kept
