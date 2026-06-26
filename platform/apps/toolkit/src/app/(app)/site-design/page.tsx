@@ -17,7 +17,10 @@ export default function Page() {
       <header className="flex shrink-0 items-center justify-between gap-4 border-b border-neutral-200 px-6 py-3">
         <div>
           <div className="flex items-center gap-2">
-            <h1 className="text-lg font-semibold tracking-tight">Eco-Architect</h1>
+            <h1 className="text-lg font-semibold tracking-tight">
+              Eco-Architect{" "}
+              <span className="font-sans text-sm font-normal normal-case text-neutral-900">— Design to Site Forces</span>
+            </h1>
             <span className="rounded-full bg-green-100 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-green-800">
               live
             </span>

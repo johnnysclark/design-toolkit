@@ -425,7 +425,10 @@ export default function LibrarianTool() {
 
   return (
     <div>
-      <h1 className="text-3xl">Librarian</h1>
+      <h1 className="text-3xl font-semibold tracking-tight">
+        Librarian{" "}
+        <span className="font-sans text-lg font-normal normal-case text-neutral-900">— Precedent Analysis</span>
+      </h1>
       <p className="mt-2 max-w-2xl text-neutral-900">
         Drop one or more images you&rsquo;ve found. The Librarian reads them, proposes what they
         might be (as <span className="font-medium">leads to verify</span>, never facts), teaches
