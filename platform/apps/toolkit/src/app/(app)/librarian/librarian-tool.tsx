@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { prepareImage } from "./image";
 import ProjectGallery from "./project-gallery";
+import Thinking from "./Thinking";
 import {
   type Analysis,
   type AnalyzeResult,
@@ -93,9 +94,14 @@ export default function LibrarianTool() {
     }
   }
 
-  async function createProject() {
-    const name = newName.trim();
-    if (!name) return;
+  // Create a project by name (used by the top bar and the in-result destination
+  // picker). Adds it to the list, selects it, and returns its id.
+  async function createProjectNamed(
+    name: string,
+    brief?: string | null
+  ): Promise<string | null> {
+    const n = name.trim();
+    if (!n) return null;
     setError(null);
     const supabase = createClient();
     const {
@@ -103,22 +109,29 @@ export default function LibrarianTool() {
     } = await supabase.auth.getUser();
     if (!user) {
       setError("You appear to be signed out — reload the page.");
-      return;
+      return null;
     }
     const { data, error } = await supabase
       .from("library_projects")
-      .insert({ owner: user.id, name, brief: newBrief.trim() || null })
+      .insert({ owner: user.id, name: n, brief: (brief || "").trim() || null })
       .select("id, owner, name, brief, created_at")
       .single();
     if (error || !data) {
       setError(error?.message || "Could not create the project.");
-      return;
+      return null;
     }
     setProjects((p) => [data as Project, ...p]);
     selectProject((data as Project).id);
-    setNewName("");
-    setNewBrief("");
-    setShowNew(false);
+    return (data as Project).id;
+  }
+
+  async function createProject() {
+    const id = await createProjectNamed(newName, newBrief);
+    if (id) {
+      setNewName("");
+      setNewBrief("");
+      setShowNew(false);
+    }
   }
 
   async function saveProjectEdits() {
@@ -627,9 +640,9 @@ export default function LibrarianTool() {
       </div>
 
       {busy && (
-        <p className="mt-4 text-sm text-neutral-900">
-          {busy === "analyze" ? "Reading the image(s)…" : "Looking it up…"}
-        </p>
+        <div className="mt-4">
+          <Thinking label={busy === "analyze" ? "Reading the image(s)…" : "Looking it up…"} />
+        </div>
       )}
       {error && <p className="mt-4 rounded-lg bg-red-50 p-4 text-sm text-red-700">{error}</p>}
       {notice && (
@@ -640,6 +653,10 @@ export default function LibrarianTool() {
         <ResultPanel
           result={result}
           canSave={!!projectId}
+          projects={projects}
+          projectId={projectId}
+          onSelectProject={selectProject}
+          onCreateProject={createProjectNamed}
           onAddImages={addImages}
           imagesSaved={imagesSaved}
           onAddLink={addLink}
@@ -735,6 +752,14 @@ function Conversation({
         </div>
       )}
 
+      {chatting && (
+        <div className="mt-2 flex justify-start">
+          <div className="rounded-lg bg-neutral-100 px-3 py-2">
+            <Thinking />
+          </div>
+        </div>
+      )}
+
       <div className="mt-3 flex flex-wrap gap-2">
         <input
           value={chatInput}
@@ -753,11 +778,114 @@ function Conversation({
   );
 }
 
+// ─────────────────────────── destination picker ───────────────────────────
+// Choose where finds from this analysis go — an existing project or a brand new
+// one made right here. Setting it also makes that project the current one (the
+// library shown below), so there's a single, obvious destination.
+
+function DestinationBar({
+  projects,
+  projectId,
+  onSelect,
+  onCreate
+}: {
+  projects: Project[];
+  projectId: string;
+  onSelect: (id: string) => void;
+  onCreate: (name: string) => Promise<string | null>;
+}) {
+  const [open, setOpen] = useState(false);
+  const [sel, setSel] = useState(projectId || "");
+  const [newName, setNewName] = useState("");
+  const [working, setWorking] = useState(false);
+  const current = projects.find((p) => p.id === projectId) || null;
+
+  async function apply() {
+    if (sel === "__new__") {
+      setWorking(true);
+      const id = await onCreate(newName);
+      setWorking(false);
+      if (id) {
+        setNewName("");
+        setOpen(false);
+      }
+    } else if (sel) {
+      onSelect(sel);
+      setOpen(false);
+    }
+  }
+
+  return (
+    <div className={card}>
+      <div className="flex flex-wrap items-center gap-2 text-sm text-neutral-900">
+        <span className="display-font text-xs uppercase tracking-wide">Save finds to</span>
+        {!open ? (
+          <>
+            <span className="font-medium">
+              {current ? current.name : "— no project chosen —"}
+            </span>
+            <button
+              onClick={() => {
+                setSel(projectId || "");
+                setOpen(true);
+              }}
+              className={ghostBtn}
+            >
+              {current ? "Change / new" : "Choose / new"}
+            </button>
+          </>
+        ) : (
+          <>
+            <select
+              value={sel}
+              onChange={(ev) => setSel(ev.target.value)}
+              className="min-w-44 rounded-md border border-neutral-300 px-2 py-1 text-sm"
+            >
+              <option value="">— choose a project —</option>
+              {projects.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name}
+                </option>
+              ))}
+              <option value="__new__">➕ New project…</option>
+            </select>
+            {sel === "__new__" && (
+              <input
+                value={newName}
+                onChange={(ev) => setNewName(ev.target.value)}
+                onKeyDown={(ev) => {
+                  if (ev.key === "Enter") apply();
+                }}
+                placeholder="New project name"
+                className="rounded-md border border-neutral-300 px-2 py-1 text-sm"
+              />
+            )}
+            <button
+              onClick={apply}
+              disabled={working || !sel || (sel === "__new__" && !newName.trim())}
+              className={primaryBtn}
+            >
+              {working ? "…" : "Set"}
+            </button>
+            <button onClick={() => setOpen(false)} className={ghostBtn}>
+              Cancel
+            </button>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ───────────────────────────── result panel ──────────────────────────────
 
 function ResultPanel({
   result,
   canSave,
+  projects,
+  projectId,
+  onSelectProject,
+  onCreateProject,
   onAddImages,
   imagesSaved,
   onAddLink,
@@ -770,6 +898,10 @@ function ResultPanel({
 }: {
   result: AnalyzeResult;
   canSave: boolean;
+  projects: Project[];
+  projectId: string;
+  onSelectProject: (id: string) => void;
+  onCreateProject: (name: string) => Promise<string | null>;
   onAddImages: () => void;
   imagesSaved: boolean;
   onAddLink: (l: LinkRef) => void;
@@ -791,6 +923,13 @@ function ResultPanel({
 
   return (
     <div className="mt-8 space-y-6">
+      <DestinationBar
+        projects={projects}
+        projectId={projectId}
+        onSelect={onSelectProject}
+        onCreate={onCreateProject}
+      />
+
       {/* the student's image(s) + what they are */}
       <div className={card}>
         <div className="flex flex-wrap items-center justify-between gap-2">
@@ -806,8 +945,13 @@ function ResultPanel({
               </span>
             )}
           </div>
-          {canSave && images.length > 0 && (
-            <button onClick={onAddImages} disabled={imagesSaved} className={ghostBtn}>
+          {images.length > 0 && (
+            <button
+              onClick={onAddImages}
+              disabled={imagesSaved || !canSave}
+              title={!canSave ? "Choose a destination project above first" : undefined}
+              className={ghostBtn}
+            >
               {imagesSaved
                 ? "✓ Added to project"
                 : `★ Add image${images.length > 1 ? "s" : ""} to project`}
