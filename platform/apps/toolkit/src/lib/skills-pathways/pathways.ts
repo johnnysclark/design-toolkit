@@ -38,6 +38,56 @@ export const TRACK_LABEL: Record<Track, string> = {
   both: "2D · 3D"
 };
 
+// A "section" is a lane on the board. It's a superset of the Skills Coach
+// software `Discipline` (so nodes can still link to the shared concept KB) plus
+// the broader, non-software lanes this map also teaches — design thinking,
+// representation, agentic coding, and practice. Order here = order on the board.
+export type Section =
+  | Discipline // rhino | grasshopper | autocad | revit | adobe | general
+  | "design-theory"
+  | "architectural-media"
+  | "agentic-coding"
+  | "pro-practice";
+
+export interface SectionMeta {
+  id: Section;
+  label: string;
+  blurb: string;
+}
+
+export const SECTIONS: SectionMeta[] = [
+  {
+    id: "design-theory",
+    label: "Design Concepts & Theory",
+    blurb: "The ideas under the drawings — how designers order space and take a position."
+  },
+  {
+    id: "general",
+    label: "Digital Foundations",
+    blurb: "Cross-cutting basics: files, units, formats, colour, and working with AI."
+  },
+  { id: "rhino", label: "Rhino", blurb: "NURBS modeling, surfaces, drawings, fabrication." },
+  { id: "grasshopper", label: "Grasshopper", blurb: "Visual scripting and parametric design." },
+  { id: "autocad", label: "AutoCAD", blurb: "Precise 2D drafting, drawings, and layouts." },
+  { id: "revit", label: "Revit", blurb: "BIM for design: massing, data, and documentation." },
+  { id: "adobe", label: "Adobe", blurb: "Photoshop · Illustrator · InDesign for representation." },
+  {
+    id: "architectural-media",
+    label: "Architectural Media",
+    blurb: "Ways of making the image — drawing, collage, rendering, animation, real-time."
+  },
+  {
+    id: "agentic-coding",
+    label: "Agentic Coding",
+    blurb: "Vibe-coding for architects: directing AI tools to build your own software."
+  },
+  {
+    id: "pro-practice",
+    label: "Professional Practice",
+    blurb: "What makes you useful in an internship and an office."
+  }
+];
+
 /** A tutorial video. Either an embed (YouTube/Vimeo) or an uploaded file. */
 export type VideoRef =
   | { kind: "youtube"; id: string; title: string; author: string; minutes?: number }
@@ -47,7 +97,7 @@ export type VideoRef =
 export interface SkillNode {
   id: string;
   title: string;
-  discipline: Discipline;
+  discipline: Section;
   track: Track;
   level: Level;
   /** One line: what the student can do after this node. */
@@ -957,6 +1007,590 @@ export const PATHWAY_NODES: SkillNode[] = [
     prereqs: ["id-layout"],
     conceptSlugs: ["id-paragraph-styles", "id-master-pages"],
     videos: []
+  },
+
+  // ══ DESIGN CONCEPTS & THEORY (the ideas under the drawings) ════════════════
+  {
+    id: "dt-elements",
+    title: "Elements of architecture",
+    discipline: "design-theory",
+    track: "both",
+    level: "beginner",
+    blurb: "See space as built from point, line, plane, and volume — solid and void.",
+    guide: [
+      "Before any software, architecture is made from a small vocabulary of formal elements: the point (a focus, a column), the line (an edge, a beam, a path), the plane (a wall, a floor, a roof), and the volume (a room, a mass). Everything you model is an arrangement of these.",
+      "Crucially, architecture is as much about the void as the solid — the space between and within elements is the real material. A plan is a cut through solids that reveals the shape of the space they define; learning to see figure (solid) and ground (void) flip back and forth is a core skill.",
+      "Train your eye by naming these elements in buildings you admire: what holds space, what edges it, what sits as a figure in the void. This vocabulary (drawn from Ching's Architecture: Form, Space and Order) is the language you will use to describe your own and others' designs."
+    ],
+    prereqs: [],
+    conceptSlugs: [],
+    videos: []
+  },
+  {
+    id: "dt-ordering",
+    title: "Ordering principles",
+    discipline: "design-theory",
+    track: "both",
+    level: "beginner",
+    blurb: "Organize a composition with axis, hierarchy, rhythm, and datum.",
+    guide: [
+      "Designs feel coherent because they are ordered. The classic ordering principles — axis (a line organizing elements), symmetry, hierarchy (some things more important than others), rhythm (repetition and pattern), and datum (a line, plane, or volume tying parts together) — are the moves that turn a pile of rooms into a composition.",
+      "These are not rules to obey but tools to deploy and break deliberately. A strong scheme usually has one clear primary order — an axis, a grid, a hierarchy — that you can read instantly, with secondary moves playing against it.",
+      "Diagram the ordering of plans you admire: where is the axis, what is the hierarchy, where does rhythm appear? Then check your own scheme — if you cannot name its organizing principle, the design probably does not have one yet."
+    ],
+    prereqs: ["dt-elements"],
+    conceptSlugs: [],
+    videos: []
+  },
+  {
+    id: "dt-precedent",
+    title: "Reading precedent",
+    discipline: "design-theory",
+    track: "both",
+    level: "beginner",
+    blurb: "Analyze an existing building to learn moves you can borrow.",
+    guide: [
+      "Precedent study is how architects learn — you analyze how a successful building solves problems and borrow the moves, not the look. Pick a building related to your project's program, site, or idea, and take it apart through drawing: redraw its plan, section, and parti diagram yourself.",
+      "Ask structured questions: what is the big idea (parti)? How does it meet the ground and the sky? How does it organize circulation and program? How does structure shape space? Drawing the building yourself — rather than only looking at photos — is what reveals the decisions.",
+      "Build a habit of keeping a precedent library (the toolkit's Librarian tool is built for exactly this). The goal is a vocabulary of strategies you can recombine, with attribution — borrowing a sectional move from one building and a massing strategy from another is how design knowledge compounds."
+    ],
+    prereqs: ["dt-elements"],
+    conceptSlugs: [],
+    videos: []
+  },
+  {
+    id: "dt-parti",
+    title: "Parti & the big idea",
+    discipline: "design-theory",
+    track: "both",
+    level: "intermediate",
+    blurb: "Reduce a scheme to one clear, generating concept.",
+    guide: [
+      "A parti is the central organizing idea of a project, reducible to a simple diagram — a bar split by a slot, a wrapped courtyard, a stack of differentiated floors, a path that becomes the building. The parti is what you can explain in one sentence and one sketch, and it is what holds every other decision together.",
+      "A strong parti does work: it resolves the program, responds to the site, and gives you a rule for making decisions ('does this move reinforce the slot, or fight it?'). Schemes without a parti tend to feel arbitrary — every choice is up for grabs because nothing organizes them.",
+      "Test your scheme by trying to draw its parti in ten seconds. If you cannot, the idea is not clear yet. If you can, use it as a filter: keep moves that strengthen the parti, cut moves that blur it. The parti is also the spine of how you will present and defend the project."
+    ],
+    prereqs: ["dt-precedent", "dt-ordering"],
+    conceptSlugs: [],
+    videos: []
+  },
+  {
+    id: "dt-scale-body",
+    title: "Scale, proportion & the body",
+    discipline: "design-theory",
+    track: "both",
+    level: "intermediate",
+    blurb: "Design space that fits the human body and reads at the right scale.",
+    guide: [
+      "Architecture is measured against the human body. Knowing rough dimensions by heart — a comfortable stair (about 150–180 mm riser), a door (about 900 mm), a corridor, a ceiling that feels generous versus oppressive — lets you design spaces that actually work, and spot when a drawing is lying about scale.",
+      "Proportion is the relationship between dimensions, and it is a design tool: systems like the golden section, a module, or a structural grid give a composition internal consistency. Scale is how big something feels relative to us — the same room reads intimate or monumental depending on its proportions and how the body enters it.",
+      "Always populate drawings with human figures and furniture at true scale — it is both a check (does this fit a person?) and a communication tool (it tells the viewer how big the space is). When a space feels off in the model, measure it against a standing figure before anything else."
+    ],
+    prereqs: ["dt-elements"],
+    conceptSlugs: [],
+    videos: []
+  },
+  {
+    id: "dt-site-context",
+    title: "Site, context & place",
+    discipline: "design-theory",
+    track: "both",
+    level: "intermediate",
+    blurb: "Make the design respond to where it actually is.",
+    guide: [
+      "No building is an object alone — it sits in a place with a climate, a history, neighbours, topography, light, and views. Strong design reads the site as a set of forces and opportunities and lets them shape the scheme, so the building could only be here. (The toolkit's Site Analysis tool turns a real parcel into citable evidence for exactly this.)",
+      "Work at two scales: the figure-ground of the wider context (how your mass relates to neighbours and streets) and the immediate site (sun, wind, slope, access, the good view, the thing to hide). A response can be contextual (fitting in) or contrarian (a deliberate foil) — but it should be a position, not an accident.",
+      "Diagram the site's forces before you design, then test every massing move against them: does rotating the building improve light and views, does this edge engage the street or turn its back? Designing with the site is what separates a sited building from a generic object dropped onto a plot."
+    ],
+    prereqs: ["dt-ordering"],
+    conceptSlugs: [],
+    videos: []
+  },
+  {
+    id: "dt-tectonics",
+    title: "Tectonics & materiality",
+    discipline: "design-theory",
+    track: "both",
+    level: "advanced",
+    blurb: "Treat how a building is built — and how it shows it — as design.",
+    guide: [
+      "Tectonics is the art of construction — how a building is made, and how that making is expressed. Materials, joints, structure, and detail are not an afterthought added to a form; in strong architecture they are where the idea becomes physical and legible. A concrete building and a timber-framed one of the same shape are different buildings.",
+      "Think about how loads travel (what holds this up, and is that expressed or hidden?), how materials meet (the joint is where craft and meaning concentrate), and how the building weathers and ages. Even at concept stage, choosing a structural and material logic gives the design discipline and richness.",
+      "Develop a tectonic position alongside the form: draw a wall section that shows ground, structure, envelope, and roof meeting, and let it inform the bigger moves. A scheme that knows how it is built reads as resolved; one that is only a shape reads as unfinished."
+    ],
+    prereqs: ["dt-scale-body"],
+    conceptSlugs: [],
+    videos: []
+  },
+  {
+    id: "dt-program-type",
+    title: "Program & type",
+    discipline: "design-theory",
+    track: "both",
+    level: "advanced",
+    blurb: "Use program and building type as generators, not constraints.",
+    guide: [
+      "Program is what a building does — the activities, their sizes, and their relationships. Beginners treat program as a checklist of rooms to fit; designers treat it as a generator: the way you organize and connect programs (stacked, woven, separated, blended) is a primary design idea.",
+      "Building types — the courtyard house, the gallery enfilade, the loft, the tower — are accumulated knowledge about how a program can be organized, diagrams refined over centuries. Knowing the type gives you a starting position to adopt, adapt, or subvert, rather than reinventing organization from zero.",
+      "Make an adjacency diagram of your program early (what needs to be near what, public versus private, served versus servant), then test organizational types against it. The interesting design questions live in the relationships — where two programs touch, overlap, or are deliberately kept apart."
+    ],
+    prereqs: ["dt-parti"],
+    conceptSlugs: [],
+    videos: []
+  },
+  {
+    id: "dt-position",
+    title: "Developing a design position",
+    discipline: "design-theory",
+    track: "both",
+    level: "advanced",
+    blurb: "Move from solving a brief to arguing a point of view.",
+    guide: [
+      "Upper-level work asks for more than a building that works — it asks for a position: a point of view about architecture that the project argues. This is where theory enters, not as quotation but as a stance — about how people should live, how a building should meet its city, what beauty or sustainability or justice means here.",
+      "A position makes a project criticisable in a good way: it can be agreed with or argued against, which is what makes a review a real conversation. It also gives you a rule for the hard decisions and a thesis for your portfolio and your talk.",
+      "Find your position by asking what you are really arguing for, then pressure-test it: does every major move serve it? Read widely — theory, criticism, other disciplines — to sharpen the terms. The strongest designers can say, in a sentence, what their project believes, and then show it in the drawings."
+    ],
+    prereqs: ["dt-parti", "dt-site-context"],
+    conceptSlugs: [],
+    videos: []
+  },
+
+  // ══ ARCHITECTURAL MEDIA (ways of making the image) ════════════════════════
+  {
+    id: "am-orthographic",
+    title: "Orthographic drawing",
+    discipline: "architectural-media",
+    track: "2d",
+    level: "beginner",
+    blurb: "Communicate with the plan, section, and elevation.",
+    guide: [
+      "The plan, section, and elevation are architecture's primary language — flat, scaled, measurable projections that let anyone read and build a design. A plan is a horizontal cut (usually about 1.2 m up) looking down; a section is a vertical cut; an elevation is a straight-on face. Mastering these is non-negotiable, whatever software you use.",
+      "Conventions carry meaning: what is cut is drawn heaviest (poché), what is seen beyond is lighter, and line weight does most of the communicating. Include a scale, a north arrow on plans, and human figures so the drawing is legible and honest about size.",
+      "These drawings are generated from your model (Rhino Make2D, Revit views, or drawn in CAD/Illustrator), but the thinking is the same everywhere. A set that is coordinated — the section cut shown on the plan, consistent line weights — reads as professional; one that is not reads as student work."
+    ],
+    prereqs: [],
+    conceptSlugs: ["rh-make2d"],
+    videos: []
+  },
+  {
+    id: "am-hand",
+    title: "Hand drawing & sketching",
+    discipline: "architectural-media",
+    track: "2d",
+    level: "beginner",
+    blurb: "Think with a pen — the fastest design tool you own.",
+    guide: [
+      "Drawing by hand is still the fastest way to think. A loose sketch externalizes an idea in seconds, and the slight imprecision keeps a scheme open and exploratory in a way that crisp CAD lines shut down too early. The point is not pretty drawings; it is thinking made visible on paper.",
+      "Build a few core skills: quick freehand plans and sections to test ideas, one- and two-point perspective to imagine a space from inside, and fast diagrams. Trace, overlay, and iterate — sketch over a printout of your model, then bring the best moves back in.",
+      "Keep a sketchbook and draw constantly, including from observation (buildings, spaces you are in) — it trains your eye and stocks your memory with moves. Hybrid workflows are common: sketch to think, model to test, then sometimes hand-draw over a render for a warmer final image."
+    ],
+    prereqs: [],
+    conceptSlugs: [],
+    videos: []
+  },
+  {
+    id: "am-diagram",
+    title: "The diagram",
+    discipline: "architectural-media",
+    track: "2d",
+    level: "beginner",
+    blurb: "Explain an idea by stripping it to its essence.",
+    guide: [
+      "A diagram is a drawing that explains one idea by leaving everything else out — circulation, program, structure, massing logic, site forces. It is both a design tool (diagramming forces you to clarify the idea) and a communication tool (a good diagram makes a jury understand your project in a glance).",
+      "The discipline is reduction: decide the single thing the diagram says, then remove everything that is not saying it. Use a consistent graphic language — the same colour for 'public', the same arrow for 'movement' — across a series so they read as a family that builds an argument.",
+      "Diagrams are usually vector (Illustrator) built over a simplified plan or axon. Make the parti diagram first — if you cannot diagram your big idea simply, it is not clear yet — then a small set of supporting diagrams that each carry one point."
+    ],
+    prereqs: ["am-orthographic"],
+    conceptSlugs: [],
+    videos: []
+  },
+  {
+    id: "am-collage",
+    title: "Collage & the post-digital image",
+    discipline: "architectural-media",
+    track: "2d",
+    level: "intermediate",
+    blurb: "Make atmospheric, flat, texture-rich images by compositing.",
+    guide: [
+      "The architectural collage — flat, frontal, full of texture, cut-out figures, and atmosphere — is a dominant contemporary representation mode (the 'post-digital' look). It deliberately rejects photorealism for something closer to a painting or a graphic: a curated image that says how a space feels, not just how it looks.",
+      "It is built in Photoshop by compositing layers: a base (a flat model view or elevation), textures and materials, cut-out people and plants, sky, and a unifying atmosphere (haze, grain, a colour wash over everything). Blend modes, masks, and a consistent light direction tie it together.",
+      "Curate hard: a limited palette, a clear focal point, and restraint separate a strong collage from a busy mess. Collect a personal library of cut-out entourage and textures, keep everything layered and non-destructive, and decide the mood before you start placing elements."
+    ],
+    prereqs: ["am-diagram"],
+    conceptSlugs: ["ps-blend-modes", "ps-layer-mask"],
+    videos: []
+  },
+  {
+    id: "am-rendering",
+    title: "Rendering basics",
+    discipline: "architectural-media",
+    track: "3d",
+    level: "intermediate",
+    blurb: "Light, material, and frame a 3D model into a clean image.",
+    guide: [
+      "Rendering turns a 3D model into a lit image. The fundamentals are the same across engines (Enscape, V-Ray, Twinmotion, Blender, Rhino Render): set up a camera, assign materials, light the scene (usually a sun plus sky, sometimes interior lights), and render. Most of the quality is in lighting and composition, not the engine.",
+      "Frame the shot like a photographer: a considered camera height and angle (eye-level for inhabited space, not a random orbit), a clear subject, and good light (raking, late-day sun reads better than flat noon). Keep materials simple and believable — restraint beats a noisy material library.",
+      "A raw render is a starting point; a pass of post-production (exposure, contrast, sky, entourage, atmosphere in Photoshop) is what makes it sing. Set up a few consistent views across your scheme so the images read as a coherent series rather than one-offs."
+    ],
+    prereqs: ["am-orthographic"],
+    conceptSlugs: [],
+    videos: []
+  },
+  {
+    id: "am-axon",
+    title: "Axonometric & exploded views",
+    discipline: "architectural-media",
+    track: "both",
+    level: "intermediate",
+    blurb: "Show object, assembly, and system in one legible 3D drawing.",
+    guide: [
+      "The axonometric (and its cousins the isometric and the worm's-eye) is a 3D drawing with no perspective distortion — parallel lines stay parallel and it is measurable, which makes it perfect for explaining objects, assemblies, and systems clearly. The worm's-eye axon, looking up through the plan, is an architectural signature.",
+      "The exploded axon pulls a building apart along an axis to reveal its layers — structure, envelope, floors, program — and is one of the most powerful ways to explain how a project is put together. It is an analytical drawing as much as a beautiful one.",
+      "Generate axons from your model (a parallel-projection view in Rhino/Revit, then Make2D or render) and refine in Illustrator with line weights and colour, or render directly. Keep the projection consistent across a series, and use the explosion or cutaway to reveal exactly the idea you want to explain."
+    ],
+    prereqs: ["am-orthographic"],
+    conceptSlugs: ["rh-make2d"],
+    videos: []
+  },
+  {
+    id: "am-photoreal",
+    title: "Photorealistic visualization",
+    discipline: "architectural-media",
+    track: "3d",
+    level: "advanced",
+    blurb: "Push a render toward convincing realism — and know when to.",
+    guide: [
+      "Photorealism aims for an image hard to tell from a photograph, using path-traced engines (V-Ray, Corona, Lumion, Blender Cycles) and careful material, lighting, and post work. It is the language of competitions and client presentations — persuasive, but slow and seductive, so use it when convincing realism is the goal, not as a default.",
+      "Realism lives in the details that signal 'real': physically based materials with the right roughness and reflection, realistic lighting (HDRI skies, soft shadows, global illumination), imperfection (wear, dirt, slight asymmetry), and depth of field. Reference real photographs constantly — the eye knows when light is wrong.",
+      "Post-production is half the work: colour grading, bloom, lens effects, and compositing entourage in Photoshop. Be honest, too — a hyper-real render can oversell an unresolved design, and reviewers notice when the image is doing the work the architecture is not."
+    ],
+    prereqs: ["am-rendering"],
+    conceptSlugs: [],
+    videos: []
+  },
+  {
+    id: "am-animation",
+    title: "Animation & walkthroughs",
+    discipline: "architectural-media",
+    track: "3d",
+    level: "advanced",
+    blurb: "Move through and over a project in time-based media.",
+    guide: [
+      "Animation adds time — a walkthrough that moves through your spaces, a fly-over of the massing, an animated diagram that builds an idea step by step, or a sequence showing change over a day. Motion can explain spatial and temporal experience that a still never can.",
+      "The core skills are camera paths (a smooth, motivated move — enter, reveal, arrive — not a dizzy orbit), keyframing, and editing. Tools range from Rhino/Grasshopper and Twinmotion/Lumion for arch-viz to After Effects for animated diagrams and editors (Premiere, DaVinci, CapCut) for cutting it together with sound.",
+      "Keep it short and purposeful — 30 to 90 seconds, every shot earning its place — and storyboard before you render hours of frames. Sound and pacing matter as much as the imagery. An animated parti diagram is often more useful (and cheaper) than a long photoreal walkthrough."
+    ],
+    prereqs: ["am-rendering"],
+    conceptSlugs: [],
+    videos: []
+  },
+  {
+    id: "am-realtime",
+    title: "Real-time & interactive 3D",
+    discipline: "architectural-media",
+    track: "3d",
+    level: "advanced",
+    blurb: "Explore and present a model live — game engines, VR, and the web.",
+    guide: [
+      "Real-time engines render your model instantly as you move, instead of waiting minutes per frame. Tools like Twinmotion, Enscape, and Unreal Engine give immediate lit walkthroughs; web tools (Three.js, the toolkit's own viewer) put an explorable model in a browser; and VR/AR puts you at 1:1 scale inside the design.",
+      "The trade-off is setup versus immediacy: real-time engines need clean, optimized geometry and materials, but then let you explore, present interactively, and iterate lighting live — invaluable for testing spatial experience and for reviews where you walk a critic through the project.",
+      "Match the medium to the audience: a quick Enscape walkthrough for studio, a web 3D model for a portfolio site, VR for testing scale and immersion. Keep models light (real-time punishes heavy geometry), and remember interactivity is the point — let people look where they want, which a video cannot."
+    ],
+    prereqs: ["am-rendering"],
+    conceptSlugs: [],
+    videos: []
+  },
+
+  // ══ AGENTIC CODING (vibe-coding for architects) ═══════════════════════════
+  {
+    id: "ac-mindset",
+    title: "The vibe-coding mindset",
+    discipline: "agentic-coding",
+    track: "both",
+    level: "beginner",
+    blurb: "Direct an AI to build software — you are the author, not the typist.",
+    guide: [
+      "Agentic coding (or 'vibe-coding') means building software by directing an AI agent in plain language, rather than typing code yourself. The agent reads files, writes code, runs it, sees the errors, and fixes them in a loop — you stay the author and editor, describing what you want and judging the result. This whole toolkit was built this way, by an architect, not a programmer.",
+      "The mindset shift is from 'I must know how to code' to 'I must know how to direct, specify, and verify.' You bring the design judgement and the problem; the agent brings the syntax. That maps neatly onto how designers already work — ask, gather, propose, iterate.",
+      "The core stance is trust but verify: the agent is fast, confident, and often wrong, so treat its output as a first draft to test and break, hunting for edge cases. Get something running, then deliberately try the weird input. It is the same skeptical iteration you bring to a design, applied to software."
+    ],
+    prereqs: [],
+    conceptSlugs: [],
+    videos: []
+  },
+  {
+    id: "ac-setup",
+    title: "Your first agentic setup",
+    discipline: "agentic-coding",
+    track: "both",
+    level: "beginner",
+    blurb: "Get an agent running and make a tiny thing work.",
+    guide: [
+      "You need three things: an agentic coding tool (Claude Code in the terminal, or Cursor/Codex), a place to put files (a folder, ideally version-controlled with git), and a small first goal. Do not start with 'build my portfolio site' — start with 'make a single web page that says hello and changes colour on click.'",
+      "Get comfortable with the basics around the agent: a terminal (where you type commands and run the tool), a project folder, and saving and running what it makes. The agent handles the code; you handle steering it and looking at the result. A little terminal literacy goes a long way.",
+      "The goal of the first session is the loop, not the product: ask for something small, run it, see it work or break, ask for a fix, repeat. Once that loop feels natural on something trivial, you can point it at real tools. Keep your asks small and testable at first."
+    ],
+    prereqs: ["ac-mindset"],
+    conceptSlugs: [],
+    videos: []
+  },
+  {
+    id: "ac-prompting",
+    title: "Prompting & specifying",
+    discipline: "agentic-coding",
+    track: "both",
+    level: "beginner",
+    blurb: "Get better results by asking clearly and iterating.",
+    guide: [
+      "The quality of what an agent builds depends heavily on how you specify it. Be concrete about the goal, the inputs and outputs, and any constraints ('a single HTML file, no frameworks, works offline'). Vague asks get vague software; a clear spec gets something you can actually evaluate.",
+      "Work iteratively rather than expecting one perfect shot: get a rough version, then refine it in small, specific steps ('make the button bigger', 'now handle an empty input'). Show the agent the actual error or a screenshot — concrete feedback beats 'it is broken.'",
+      "Tell it your stance, too: ask it to flag assumptions, to keep things simple, and to point out edge cases. Save the prompts and specs that worked — over time you build a personal library of how to ask, which is its own skill."
+    ],
+    prereqs: ["ac-mindset"],
+    conceptSlugs: [],
+    videos: []
+  },
+  {
+    id: "ac-webapp",
+    title: "Build a simple web app",
+    discipline: "agentic-coding",
+    track: "both",
+    level: "intermediate",
+    blurb: "Make a small, useful, browser-based tool.",
+    guide: [
+      "A huge amount of useful software is just a web page with some logic — a calculator, a small interactive diagram, a converter, a drawing tool. These are static web apps (HTML, CSS, JavaScript): they run entirely in the browser, store no secrets, and can be hosted free. They are the perfect first real build.",
+      "Direct the agent to keep it self-contained and simple, then run it locally and test it hard — empty inputs, weird values, small screens. Because it is all client-side, you can read what it made, and there is nothing to break server-side. Iterate until it does one job well.",
+      "Scope tightly: one tool, one job. 'A tool that converts a Rhino dimension list into a cut sheet' is a great brief; 'build a design platform' is not. Ship the small thing, use it, then grow it — exactly how the tools in this toolkit started."
+    ],
+    prereqs: ["ac-setup", "ac-prompting"],
+    conceptSlugs: [],
+    videos: []
+  },
+  {
+    id: "ac-data",
+    title: "Data, APIs & the key trap",
+    discipline: "agentic-coding",
+    track: "both",
+    level: "intermediate",
+    blurb: "Connect to data and AI models without leaking your keys or money.",
+    guide: [
+      "Tools get powerful when they talk to data and AI models through APIs. But the moment a tool calls a paid model (like Claude), it has an API key — and that key is money. The cardinal rule: a key can never sit in code running in a browser, or someone will find it and run up your bill in a weekend.",
+      "The fix is a thin server function (a 'serverless function') that sits between the user and the model, holds the key, and proxies the calls — with rate limits and a hard spend cap. This is exactly how the AI tools in this toolkit protect the Anthropic key and refuse anonymous callers.",
+      "Have the agent set this up for you, but understand the shape: public browser code → your server function (holds the secret) → the model. The same layer is where privacy lives — be honest about where student or user data goes the moment it leaves the browser."
+    ],
+    prereqs: ["ac-webapp"],
+    conceptSlugs: [],
+    videos: []
+  },
+  {
+    id: "ac-harness",
+    title: "Agent harnesses & context",
+    discipline: "agentic-coding",
+    track: "both",
+    level: "intermediate",
+    blurb: "Make an agent reliable by giving it memory, tools, and rules.",
+    guide: [
+      "Once you outgrow the chat box, the key concept is the agent harness: the scaffolding you wrap around a model to make its behaviour predictable instead of improvised. It is the difference between a clever assistant and a dependable one — and it is mostly about context and constraints, not cleverness.",
+      "A harness includes persistent instructions and project knowledge (a rules file the agent reads every session), memory (facts it carries between sessions), the specific tools it is allowed to call, and guardrails (what it must never do — e.g. push to production without asking). This very repository runs on exactly such a harness.",
+      "Treat the harness as a design problem: when the agent keeps making the same mistake, do not just correct it again — encode the correction as a rule. Good harness design is what lets non-programmers run sophisticated agents reliably, which is the whole premise of this toolkit."
+    ],
+    prereqs: ["ac-prompting"],
+    conceptSlugs: [],
+    videos: []
+  },
+  {
+    id: "ac-deploy",
+    title: "Deploying & hosting",
+    discipline: "agentic-coding",
+    track: "both",
+    level: "advanced",
+    blurb: "Get your tool onto the internet — and know where things run.",
+    guide: [
+      "A tool is not useful until others can reach it. The most important thing to understand is that different tools run in different places: a static web page can live on any free host (Vercel, Netlify, GitHub Pages); an AI-backed tool needs a host that also runs server functions; a tool with accounts and saved data needs a backend (like Supabase); a tool that drives Rhino runs on your own machine.",
+      "For most web tools, the modern path is: push your code to GitHub, connect it to Vercel, and it auto-deploys on every change — which is exactly how this toolkit ships. Add a database, auth, and storage layer (Supabase) only when you actually need accounts or to save data.",
+      "Have the agent walk you through it click-by-click, and learn the few real gotchas: environment variables for secrets (never commit keys), custom domains and DNS, and free-tier limits. Deployment is where 'a thing I made' becomes 'a thing my studio uses.'"
+    ],
+    prereqs: ["ac-webapp"],
+    conceptSlugs: [],
+    videos: []
+  },
+  {
+    id: "ac-design-tools",
+    title: "Tools that touch design software",
+    discipline: "agentic-coding",
+    track: "both",
+    level: "advanced",
+    blurb: "Automate Rhino, Grasshopper, and your workflow with code.",
+    guide: [
+      "The highest-leverage agentic coding for architects connects to the design software you already use. Rhino and Grasshopper run Python; you can have an agent write scripts that automate tedious modeling, generate geometry from rules, batch-process files, or pull data out of a model — turning a one-hour chore into a button.",
+      "An MCP server (Model Context Protocol) can bridge an agent directly to an application like Rhino, so the agent can drive the software, see the result, and adjust — the pattern behind the toolkit's accessibility (RAP) work, which drives Rhino from the command line. This is where coding stops being 'making websites' and starts reshaping how you design.",
+      "Start with a real annoyance in your own workflow — 'rename these 200 layers', 'export every view as a numbered image', 'lay out these panels for the laser' — and have the agent script it. Verify the output carefully (trust but verify), and you have built a custom tool nobody else has."
+    ],
+    prereqs: ["ac-data"],
+    conceptSlugs: [],
+    videos: []
+  },
+  {
+    id: "ac-judgment",
+    title: "Judgment, ethics & authorship",
+    discipline: "agentic-coding",
+    track: "both",
+    level: "advanced",
+    blurb: "Decide when to use AI, and use it responsibly.",
+    guide: [
+      "The hardest skill in agentic coding is not technical — it is judgement about when to offload thinking to a tool and when to build the skill the slow way. AI can give you the logics, language, and data behind a decision while leaving the decision to you; the danger is letting a fluent answer replace the analog repetition that actually builds expertise.",
+      "Be deliberate about authorship and credit: you are the author and editor of what an agent builds, and AI-generated content should be acknowledged. Do not present work as more finished or more yours than it is, and keep the trace of how something was made — process is part of the work.",
+      "And take data and equity seriously: know what a tool does with anything you upload, owe people honesty about where their data goes (especially student work, under FERPA), and notice the equity edge of who can afford which tools. Using these tools well is itself a design and ethical judgement, not just a technical one."
+    ],
+    prereqs: ["ac-harness"],
+    conceptSlugs: [],
+    videos: []
+  },
+
+  // ══ PROFESSIONAL PRACTICE (being useful in an internship) ═════════════════
+  {
+    id: "pp-portfolio",
+    title: "The internship portfolio",
+    discipline: "pro-practice",
+    track: "both",
+    level: "beginner",
+    blurb: "Build a tight portfolio that gets you the interview.",
+    guide: [
+      "Your portfolio is the single most important thing for landing an internship — more than your résumé. A firm spends a couple of minutes on it, so it has to communicate fast: a tight selection of your best three to five projects, each shown with one strong hero image, a clear parti, and a few drawings that prove you can think and produce.",
+      "Curate ruthlessly and lead with strength — quality over quantity, your best work first and last. Show range (a hand drawing, a diagram, a model, a render) and basic software fluency, because firms want to know what you can produce on day one. Keep it consistent: one grid, one or two typefaces, a calm palette.",
+      "Make versions: a polished PDF (and/or a web portfolio), plus a one-page sample to attach to applications. Have it critiqued, proofread it (typos read as carelessness), and tailor the selection slightly to each firm's work. Build it as a maintainable system so updating it each year is easy, not a rebuild."
+    ],
+    prereqs: [],
+    conceptSlugs: [],
+    videos: []
+  },
+  {
+    id: "pp-readiness",
+    title: "Office software readiness",
+    discipline: "pro-practice",
+    track: "both",
+    level: "beginner",
+    blurb: "Know what firms actually expect you to operate.",
+    guide: [
+      "Internships expect you to be useful with the office's tools quickly. In most architecture offices that means real fluency in a BIM/CAD platform (commonly Revit, sometimes ArchiCAD or AutoCAD), Rhino and Grasshopper for design and complex geometry, and the Adobe suite for graphics and presentation. Knowing which a firm uses — check their work, or ask — tells you what to brush up.",
+      "You do not need to be an expert in everything — you need to be competent and fast to learn. Being solid in one BIM tool, one modeler, and the Adobe basics covers most internships; the trail lanes here map directly onto that. Honesty helps: claim what you can actually do.",
+      "Round it out with the unglamorous essentials firms assume: organized file management and naming, comfort with PDFs and plotting, basic spreadsheet skills, and email. These 'boring' skills are exactly what make an intern low-friction to work with."
+    ],
+    prereqs: [],
+    conceptSlugs: [],
+    videos: []
+  },
+  {
+    id: "pp-communication",
+    title: "Studio-to-office communication",
+    discipline: "pro-practice",
+    track: "both",
+    level: "beginner",
+    blurb: "Work the way an office expects, not the way studio does.",
+    guide: [
+      "Studio and office communicate differently, and adjusting fast makes you valuable. Offices run on clear, concise, written communication: professional email, short status updates, and — crucially — asking good questions. When given a task, confirm you understand the goal and the deadline before disappearing for a day.",
+      "Learn to take direction and feedback without defensiveness: markups and redlines are normal and not personal. Take notes in meetings, write down instructions, and follow up in writing so nothing is lost. 'I will have a first version by end of day for you to check' is music to a manager.",
+      "Know when to ask versus when to try: spend a reasonable amount of effort, then ask rather than burning a day stuck or guessing. Show your work-in-progress early for a quick gut-check instead of polishing the wrong thing. Reliability and clarity matter more than brilliance in your first job."
+    ],
+    prereqs: [],
+    conceptSlugs: [],
+    videos: []
+  },
+  {
+    id: "pp-drawing-sets",
+    title: "Reading a drawing set",
+    discipline: "pro-practice",
+    track: "both",
+    level: "intermediate",
+    blurb: "Understand the documents a project is actually built from.",
+    guide: [
+      "Offices produce coordinated drawing sets, and as an intern you will read and contribute to them. Learn how a set is organized: sheet numbering, the title block, the relationship between plans, sections, elevations, details, and schedules, and how a detail callout on one sheet points to a detail on another. You do not need to master construction documentation — you need to navigate it.",
+      "Understand scale and detail hierarchy — the same wall appears at 1:100 on a plan and 1:5 in a detail — and how notes, dimensions, and references coordinate across sheets. Knowing how the set fits together lets you find information and place your piece correctly.",
+      "Your studio skills transfer: clean drawings, clear line weights, and coordination are exactly what a set needs, just at a larger and more rigorous scale. Approach it as learning the conventions of a new, very organized kind of drawing, and ask which standards the office follows."
+    ],
+    prereqs: ["pp-readiness"],
+    conceptSlugs: [],
+    videos: []
+  },
+  {
+    id: "pp-teamwork",
+    title: "Teamwork & file standards",
+    discipline: "pro-practice",
+    track: "both",
+    level: "intermediate",
+    blurb: "Work cleanly inside a shared, multi-person project.",
+    guide: [
+      "In an office you are one of many people in the same files, so standards stop being optional. Follow the office's conventions for file naming, folder structure, layer and line standards, and (in Revit) worksets and shared models. The goal is that anyone can open your file and understand it — your tidy-studio-file habits, scaled up to a team.",
+      "Coordinate before you work: know who owns what, do not overwrite someone's work, and communicate changes. In BIM, learn to borrow and sync rather than clash; in CAD, respect the layer and xref structure. A small mistake in a shared model can cost the whole team time.",
+      "Treat the project file as shared infrastructure: leave it cleaner than you found it, document non-obvious decisions, and ask before doing something irreversible. Being the intern who is careful and communicative in shared files is how you earn bigger responsibilities."
+    ],
+    prereqs: ["pp-readiness"],
+    conceptSlugs: [],
+    videos: []
+  },
+  {
+    id: "pp-redlines",
+    title: "Redlines, markups & revisions",
+    discipline: "pro-practice",
+    track: "both",
+    level: "intermediate",
+    blurb: "Take markup and issue revisions the way an office does.",
+    guide: [
+      "A redline is a marked-up drawing telling you what to change — the everyday currency of office work. Your job is to read the markup accurately, make exactly those changes (not more, not less, unless you flag a question), and turn it around cleanly. Doing redlines well and quickly is how interns become trusted.",
+      "Track what you did: check off each markup as you address it, and keep the marked-up version. When something on the redline is unclear or seems wrong, ask rather than guess — a two-minute question beats a day of rework. Revisions get logged and dated, because a set evolves and people need to know what changed.",
+      "Treat it as a tight version of the studio iterate-and-verify loop: make the change, check it against the markup, and have it reviewed. Accuracy and speed on redlines, plus catching the occasional real error in them, makes you the person work gets handed to."
+    ],
+    prereqs: ["pp-drawing-sets"],
+    conceptSlugs: [],
+    videos: []
+  },
+  {
+    id: "pp-consultants",
+    title: "The project team & consultants",
+    discipline: "pro-practice",
+    track: "both",
+    level: "advanced",
+    blurb: "Know who does what on a real building.",
+    guide: [
+      "A building is designed by a team, not just architects. Structural engineers make it stand up, MEP engineers handle mechanical, electrical, and plumbing, civil engineers handle site and drainage, landscape architects the grounds, and others (lighting, façade, acoustics, code) as needed. Knowing who does what — and that you coordinate with them — is core professional literacy.",
+      "The architect typically leads and coordinates this team, which means your drawings have to align with everyone else's. As an intern you will see coordination in action: clashes between structure and ducts, a façade detail that needs the engineer's input. Understanding the cast of characters helps you know whose information you need and when.",
+      "You do not need to do the engineers' jobs, but you should grasp enough to talk to them and design buildable schemes — roughly how structure spans, where services run, how a wall is built. Designing with awareness of the whole team makes your work realistic and your coordination useful."
+    ],
+    prereqs: ["pp-drawing-sets"],
+    conceptSlugs: [],
+    videos: []
+  },
+  {
+    id: "pp-deliverables",
+    title: "Deliverables, deadlines & QA",
+    discipline: "pro-practice",
+    track: "both",
+    level: "advanced",
+    blurb: "Own a task end-to-end and deliver it clean and on time.",
+    guide: [
+      "Offices run on deliverables and deadlines — a set of drawings for a deadline, a presentation for a client, a study by Friday. The skill is managing a task from brief to finished product: understand exactly what is wanted, estimate the time, work back from the deadline, and flag early if it is slipping rather than at the last minute.",
+      "Quality-assure your own work before handing it over: check it against the brief, proof the drawings, make sure it is coordinated and the file is clean. The intern whose work does not need redoing is worth far more than the fast one whose work does. Build in time to check, not just to produce.",
+      "Communicate status proactively — a quick 'on track, first draft by 3pm' or an early 'this will take longer because X' — and deliver in the expected format. Owning a deliverable reliably, start to finish, is exactly the trait that turns an internship into a job offer."
+    ],
+    prereqs: ["pp-teamwork"],
+    conceptSlugs: [],
+    videos: []
+  },
+  {
+    id: "pp-career",
+    title: "Licensure & career path",
+    discipline: "pro-practice",
+    track: "both",
+    level: "advanced",
+    blurb: "Understand the road from intern to licensed architect.",
+    guide: [
+      "It helps to see where an internship leads. In the US, becoming a licensed architect generally means an accredited degree, a period of documented experience (the AXP — logging hours across areas of practice), and passing the licensing exams (the ARE) — a multi-year path that internships are the first step of. Other countries have parallel routes worth knowing if you will work abroad.",
+      "Early jobs are about building breadth: get exposure to different project types, phases (concept through construction), and roles, and find mentors who will invest in you. Keep learning software and skills, keep your portfolio current, and track your experience as you go, since it counts toward licensure.",
+      "Architecture is also a wide field — not everyone follows the same path, and skills transfer to adjacent careers (computational design, visualization, urbanism, real estate, tech, fabrication). Be intentional: notice what you are drawn to, seek that work, and treat each role as building toward the practice you actually want."
+    ],
+    prereqs: [],
+    conceptSlugs: [],
+    videos: []
   }
 ];
 
@@ -981,9 +1615,14 @@ export function trackMatches(track: Track, filter: TrackFilter): boolean {
   return track === filter || track === "both";
 }
 
-/** Disciplines that have at least one node, in the canonical KB order. */
-export function disciplinesWithNodes(): Discipline[] {
-  return DISCIPLINES.map((d) => d.id).filter((id) =>
+/** Metadata (label, blurb) for a section. */
+export function sectionMeta(id: Section): SectionMeta | undefined {
+  return SECTIONS.find((s) => s.id === id);
+}
+
+/** Sections that have at least one node, in board order. */
+export function sectionsWithNodes(): Section[] {
+  return SECTIONS.map((s) => s.id).filter((id) =>
     PATHWAY_NODES.some((n) => n.discipline === id)
   );
 }

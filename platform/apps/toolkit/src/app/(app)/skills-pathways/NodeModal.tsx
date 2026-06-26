@@ -6,16 +6,16 @@ import {
   getConcept,
   getNode,
   unlocks,
+  sectionMeta,
   LEVEL_LABEL,
   TRACK_LABEL,
   type SkillNode
 } from "@/lib/skills-pathways/pathways";
-import { DISCIPLINES } from "@/lib/skills-coach/concepts";
 import { getPractice } from "@/lib/skills-pathways/practice";
 import LazyVideo from "./LazyVideo";
 
 function disciplineLabel(id: SkillNode["discipline"]): string {
-  return DISCIPLINES.find((d) => d.id === id)?.label ?? id;
+  return sectionMeta(id)?.label ?? id;
 }
 
 // A lightweight, accessible lightbox for one skill node: its tutorial video(s),

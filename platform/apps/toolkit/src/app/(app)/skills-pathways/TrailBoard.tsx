@@ -6,15 +6,16 @@ import {
   LEVELS,
   LEVEL_LABEL,
   TRACK_LABEL,
-  disciplinesWithNodes,
+  SECTIONS,
+  sectionMeta,
+  sectionsWithNodes,
   getNode,
   trackMatches,
-  type Discipline,
+  type Section,
   type Level,
   type SkillNode,
   type TrackFilter
 } from "@/lib/skills-pathways/pathways";
-import { DISCIPLINES } from "@/lib/skills-coach/concepts";
 import NodeModal from "./NodeModal";
 
 const TRACK_FILTERS: { id: TrackFilter; label: string }[] = [
@@ -35,13 +36,9 @@ const LEVEL_DOT: Record<Level, string> = {
   advanced: "bg-neutral-900"
 };
 
-function disciplineMeta(id: Discipline) {
-  return DISCIPLINES.find((d) => d.id === id);
-}
-
 export default function TrailBoard() {
   const [track, setTrack] = useState<TrackFilter>("all");
-  const [discipline, setDiscipline] = useState<Discipline | "all">("all");
+  const [discipline, setDiscipline] = useState<Section | "all">("all");
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
   const visibleNodes = useMemo(
@@ -55,7 +52,7 @@ export default function TrailBoard() {
   );
 
   const sections = useMemo(() => {
-    return disciplinesWithNodes()
+    return sectionsWithNodes()
       .filter((d) => discipline === "all" || d === discipline)
       .map((d) => ({
         discipline: d,
@@ -96,7 +93,7 @@ export default function TrailBoard() {
           <Chip active={discipline === "all"} onClick={() => setDiscipline("all")}>
             All
           </Chip>
-          {DISCIPLINES.map((d) => (
+          {SECTIONS.map((d) => (
             <Chip
               key={d.id}
               active={discipline === d.id}
@@ -124,7 +121,7 @@ export default function TrailBoard() {
       {/* board */}
       <div className="mt-4 space-y-10">
         {sections.map(({ discipline: d, nodes }) => {
-          const meta = disciplineMeta(d);
+          const meta = sectionMeta(d);
           return (
             <section key={d}>
               <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 border-t-2 border-neutral-900 pb-3 pt-3">
