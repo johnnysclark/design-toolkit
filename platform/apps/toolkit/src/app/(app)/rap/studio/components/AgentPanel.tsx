@@ -81,7 +81,7 @@ export default function AgentPanel({ onSubmit }: { onSubmit: (instruction: strin
       </button>
 
       {result && (
-        <div className="rounded-md border border-neutral-300 p-3 text-sm" aria-live="polite">
+        <div className="rounded-md border border-neutral-300 p-3 text-sm">
           {result.needsAuth ? (
             <p className="text-neutral-900">
               Sign in to use the AI assistant — the deterministic console, forms, and exports work without it.{" "}

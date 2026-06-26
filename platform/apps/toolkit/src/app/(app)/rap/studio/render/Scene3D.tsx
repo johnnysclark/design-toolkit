@@ -7,6 +7,7 @@
 // Axes: world X (east) → three X, world Y (north) → three Z, height → three Y.
 // levelFilter shows one floor at a time for mixed-use work (null = whole building).
 
+import { memo, useMemo } from "react";
 import { Canvas } from "@react-three/fiber";
 import { OrbitControls, Grid, Bounds, Edges, Line } from "@react-three/drei";
 import { deriveGeometry } from "../engine/geometry";
@@ -27,7 +28,7 @@ const USE_COLOR: Record<string, string> = {
 };
 
 function Model({ state, levelFilter }: { state: State; levelFilter: number | null }) {
-  const scene = deriveGeometry(state, levelFilter);
+  const scene = useMemo(() => deriveGeometry(state, levelFilter), [state, levelFilter]);
   const wallH = state.tactile3d.wall_height;
   const colSize = state.style.column_size;
   const floorT = state.tactile3d.floor_thickness;
@@ -106,7 +107,7 @@ function Model({ state, levelFilter }: { state: State; levelFilter: number | nul
   );
 }
 
-export default function Scene3D({ state, levelFilter = null }: { state: State; levelFilter?: number | null }) {
+function Scene3D({ state, levelFilter = null }: { state: State; levelFilter?: number | null }) {
   return (
     <Canvas shadows camera={{ position: [80, 90, 120], fov: 40 }} style={{ background: "#fafafa" }}>
       <ambientLight intensity={0.7} />
@@ -119,3 +120,5 @@ export default function Scene3D({ state, levelFilter = null }: { state: State; l
     </Canvas>
   );
 }
+
+export default memo(Scene3D);

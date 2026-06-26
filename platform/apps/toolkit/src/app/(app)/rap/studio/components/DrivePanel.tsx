@@ -117,7 +117,7 @@ export default function DrivePanel({ stateText, onDownloadState }: { stateText: 
                 Auto-push on change
               </label>
             </div>
-            {folderMsg && <p className="text-xs text-neutral-900" aria-live="polite">{folderMsg}</p>}
+            <p className="min-h-[1rem] text-xs text-neutral-900" aria-live="polite">{folderMsg}</p>
           </>
         ) : (
           <p className="text-xs text-neutral-900">This browser can&rsquo;t write files directly. Use Chrome or Edge, or use the companion bridge below.</p>
@@ -146,7 +146,7 @@ export default function DrivePanel({ stateText, onDownloadState }: { stateText: 
             Auto-push on change
           </label>
         </div>
-        {bridgeMsg && <p className="text-xs text-neutral-900" aria-live="polite">{bridgeMsg}</p>}
+        <p className="min-h-[1rem] text-xs text-neutral-900" aria-live="polite">{bridgeMsg}</p>
         {info?.watcher && (
           <p className="text-xs text-neutral-900">
             Watcher (port {info.watcher.port}): <b>{info.watcher.reachable ? "reachable" : "not reachable"}</b>

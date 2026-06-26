@@ -75,7 +75,10 @@ export default function RapStudio({ signedIn }: { signedIn: boolean }) {
 
   const announce = useCallback(
     (msg: string) => {
-      setLive(msg);
+      // Force a real text-node change even for an identical message, so a
+      // screen reader re-announces it (a second "wall A off" must still speak).
+      // The trailing no-break space is not voiced but guarantees a diff.
+      setLive((prev) => (prev === msg ? msg + " " : msg));
       if (speak && typeof window !== "undefined" && "speechSynthesis" in window) {
         const clean = msg.replace(/^(OK:|ERROR:)\s*/, "");
         const u = new SpeechSynthesisUtterance(clean);
@@ -124,11 +127,15 @@ export default function RapStudio({ signedIn }: { signedIn: boolean }) {
 
       const commands: string[] = Array.isArray(data.commands) ? data.commands : [];
       setLog((l) => [...l, { id: idRef.current++, output: `ASSISTANT: ${data.reply ?? "(applied changes)"}`, ok: true }]);
+      const before = stateRef.current;
       const applied: string[] = [];
       for (const c of commands) {
         const r = runCommand(c);
         if (r.ok) applied.push(c);
       }
+      // Highlight the net before→after diff of the whole batch (not just the
+      // last command), so the JSON tree shows everything the assistant changed.
+      setChanged(diffPaths(before, stateRef.current));
       announce(data.reply ?? "Done.");
       return { ok: true, reply: data.reply, commands: applied };
     },
@@ -137,13 +144,29 @@ export default function RapStudio({ signedIn }: { signedIn: boolean }) {
 
   // ── exports ────────────────────────────────────────────────────────────────
   const fullState = useMemo(() => fullStateString(state), [state]);
-  const exportState = () => download("state.json", new Blob([fullState], { type: "application/json" }));
+  const scopeLabel = activeLevel === null ? "all levels" : `level ${activeLevel}${state.levels[activeLevel]?.label ? ` · ${state.levels[activeLevel].label}` : ""}`;
+  const exportState = () => {
+    download("state.json", new Blob([fullState], { type: "application/json" }));
+    announce("OK: Downloaded state.json.");
+  };
   const exportLog = () => {
     const text = log.filter((e) => e.input).map((e) => `>> ${e.input}\n${e.output}`).join("\n");
     download("rap-command-log.txt", new Blob([text], { type: "text/plain" }));
+    announce("OK: Saved the command log.");
   };
-  const exportPiaf = () => buildPiafCanvas(state, 1700, activeLevel).toBlob((b) => b && download("rap-tactile-piaf.png", b), "image/png");
-  const exportStl = () => download("rap-tactile.stl", new Blob([buildStl(state, activeLevel)], { type: "model/stl" }));
+  const exportPiaf = () =>
+    buildPiafCanvas(state, 1700, activeLevel).toBlob((b) => {
+      if (b) {
+        download("rap-tactile-piaf.png", b);
+        announce(`OK: Exported the PIAF tactile image (${scopeLabel}).`);
+      } else {
+        announce("ERROR: Could not export the PIAF image.");
+      }
+    }, "image/png");
+  const exportStl = () => {
+    download("rap-tactile.stl", new Blob([buildStl(state, activeLevel)], { type: "model/stl" }));
+    announce(`OK: Exported the STL (${scopeLabel}).`);
+  };
   const reset = () => runCommand("reset");
 
   const readback = describe(state);
@@ -154,8 +177,8 @@ export default function RapStudio({ signedIn }: { signedIn: boolean }) {
       {/* Toolbar */}
       <div className="flex flex-wrap items-center gap-2 rounded-lg border-2 border-neutral-900 p-2.5">
         <ToolbarBtn onClick={exportState}>Download state.json</ToolbarBtn>
-        <ToolbarBtn onClick={exportPiaf}>Export PIAF PNG</ToolbarBtn>
-        <ToolbarBtn onClick={exportStl}>Export STL</ToolbarBtn>
+        <ToolbarBtn onClick={exportPiaf}>Export PIAF PNG{activeLevel !== null ? ` · L${activeLevel}` : ""}</ToolbarBtn>
+        <ToolbarBtn onClick={exportStl}>Export STL{activeLevel !== null ? ` · L${activeLevel}` : ""}</ToolbarBtn>
         <ToolbarBtn onClick={exportLog}>Save command log</ToolbarBtn>
         <span className="flex-1" />
         <label className="flex items-center gap-1.5 text-xs font-semibold text-neutral-900">
@@ -165,6 +188,12 @@ export default function RapStudio({ signedIn }: { signedIn: boolean }) {
         <ToolbarBtn onClick={reset}>Reset</ToolbarBtn>
       </div>
 
+      <p className="text-sm text-neutral-900">
+        Loaded with a <b>sample building</b> (Bay A — ground-floor retail + lobby, two levels) so you can explore. Edit it in the{" "}
+        <b>Author</b> panel below — type <code className="font-mono">help</code> in the console for every command. <b>Reset</b> restores the
+        sample; <code className="font-mono">clear</code> empties the model.
+      </p>
+
       {/* Row 1 — visual model + canonical state */}
       <div className="grid gap-5 lg:grid-cols-2">
         <Panel
@@ -172,15 +201,18 @@ export default function RapStudio({ signedIn }: { signedIn: boolean }) {
           right={
             <div className="flex items-center gap-2">
               <LevelSelect levels={state.levels} value={activeLevel} onChange={setActiveLevel} />
-              <Tabs tabs={[["3d", "3D"], ["plan", "Tactile plan"]]} active={viewTab} onPick={(t) => setViewTab(t as ViewTab)} />
+              <Tabs label="Choose the model view" tabs={[["3d", "3D"], ["plan", "Tactile plan"]]} active={viewTab} onPick={(t) => setViewTab(t as ViewTab)} />
             </div>
           }
         >
-          <div className="h-80 w-full overflow-hidden rounded-md border border-neutral-300 bg-white">
+          <div
+            className="h-80 w-full overflow-hidden rounded-md border border-neutral-300 bg-white"
+            aria-hidden={viewTab === "3d" ? true : undefined}
+          >
             {viewTab === "3d" ? <Scene3D state={state} levelFilter={activeLevel} /> : <PlanSvg state={state} levelFilter={activeLevel} className="h-full w-full p-2" />}
           </div>
           <p className="mt-2 text-xs text-neutral-900">
-            The 3D view is an aid for sighted testing. The model is fully readable in the tactile plan, the read-back text, and the state tree — none is the source of truth.
+            The 3D view is an aid for sighted testing (hidden from screen readers). The model is fully readable in the tactile plan, the read-back text, and the state tree — none is the source of truth.
           </p>
         </Panel>
 
@@ -195,7 +227,7 @@ export default function RapStudio({ signedIn }: { signedIn: boolean }) {
       <div className="grid gap-5 lg:grid-cols-2">
         <Panel
           title="Author"
-          right={<Tabs tabs={[["console", "Console"], ["forms", "Forms"], ["assistant", "Assistant"]]} active={authorTab} onPick={(t) => setAuthorTab(t as AuthorTab)} />}
+          right={<Tabs label="Choose an authoring channel" tabs={[["console", "Console"], ["forms", "Forms"], ["assistant", "Assistant"]]} active={authorTab} onPick={(t) => setAuthorTab(t as AuthorTab)} />}
         >
           <div className="min-h-[20rem]">
             {authorTab === "console" && <Console log={log} history={history} onCommand={runCommand} />}
@@ -286,18 +318,21 @@ function LevelSelect({ levels, value, onChange }: { levels: { label: string }[];
   );
 }
 
-function Tabs({ tabs, active, onPick }: { tabs: string[][]; active: string; onPick: (t: string) => void }) {
+// Honest toggle-button group. (A full ARIA tab pattern needs all panels present
+// + roving tabindex + arrow keys; here only the selected panel is rendered, so
+// aria-pressed buttons in a labelled group are the correct, non-misleading model.)
+function Tabs({ tabs, active, onPick, label }: { tabs: string[][]; active: string; onPick: (t: string) => void; label?: string }) {
   return (
-    <div role="tablist" className="flex gap-1">
-      {tabs.map(([id, label]) => (
+    <div role="group" aria-label={label} className="flex gap-1">
+      {tabs.map(([id, lbl]) => (
         <button
           key={id}
-          role="tab"
-          aria-selected={active === id}
+          type="button"
+          aria-pressed={active === id}
           onClick={() => onPick(id)}
           className={`rounded px-2.5 py-1 text-xs font-semibold ${active === id ? "bg-neutral-900 text-white" : "border border-neutral-300 text-neutral-900 hover:border-neutral-900"}`}
         >
-          {label}
+          {lbl}
         </button>
       ))}
     </div>
