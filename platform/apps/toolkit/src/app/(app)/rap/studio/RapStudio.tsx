@@ -64,7 +64,10 @@ export default function RapStudio({ signedIn }: { signedIn: boolean }) {
   const [log, setLog] = useState<LogEntry[]>([]);
   const [history, setHistory] = useState<string[]>([]);
   const [changed, setChanged] = useState<Set<string>>(new Set());
-  const [live, setLive] = useState(""); // aria-live announcement
+  // aria-live announcement. The counter guarantees a DOM change even when the
+  // SAME message fires twice in a row (e.g. running a command again) — otherwise
+  // React skips the re-render and the screen reader announces nothing.
+  const [live, setLive] = useState<{ text: string; n: number }>({ text: "", n: 0 });
   const [speak, setSpeak] = useState(false);
   const [authorTab, setAuthorTab] = useState<AuthorTab>("console");
   const [viewTab, setViewTab] = useState<ViewTab>("3d");
@@ -72,7 +75,7 @@ export default function RapStudio({ signedIn }: { signedIn: boolean }) {
 
   const announce = useCallback(
     (msg: string) => {
-      setLive(msg);
+      setLive((p) => ({ text: msg, n: p.n + 1 }));
       if (speak && typeof window !== "undefined" && "speechSynthesis" in window) {
         const clean = msg.replace(/^(OK:|ERROR:)\s*/, "");
         const u = new SpeechSynthesisUtterance(clean);
@@ -126,7 +129,12 @@ export default function RapStudio({ signedIn }: { signedIn: boolean }) {
         const r = runCommand(c);
         if (r.ok) applied.push(c);
       }
-      announce(data.reply ?? "Done.");
+      // Announce the reply PLUS how many edits landed — the per-command OK lines
+      // above are overwritten before they can be announced, so summarize here.
+      const summary = applied.length
+        ? ` Applied ${applied.length} change${applied.length > 1 ? "s" : ""}.`
+        : "";
+      announce(`${data.reply ?? "Done."}${summary}`);
       return { ok: true, reply: data.reply, commands: applied };
     },
     [runCommand, announce]
@@ -219,9 +227,10 @@ export default function RapStudio({ signedIn }: { signedIn: boolean }) {
         </Panel>
       </div>
 
-      {/* Screen-reader announcements for every state change */}
-      <div aria-live="polite" className="sr-only">
-        {live}
+      {/* Screen-reader announcements for every state change. key={live.n} forces
+          a DOM commit even when the same message repeats, so it always announces. */}
+      <div aria-live="polite" aria-atomic="true" className="sr-only" key={live.n}>
+        {live.text}
       </div>
     </div>
   );

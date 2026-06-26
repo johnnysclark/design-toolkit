@@ -11,7 +11,7 @@ export default async function LibrarianPage() {
     data: { user }
   } = await supabase.auth.getUser();
 
-  if (!user) return <AuthGate tool="Librarian" />;
+  if (!user) return <AuthGate tool="Librarian" next="/librarian" />;
 
   return <LibrarianTool />;
 }

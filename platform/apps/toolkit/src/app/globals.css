@@ -31,6 +31,30 @@ h1 {
   letter-spacing: -0.01em;
 }
 
+/* Visible keyboard focus everywhere — brand-accent ring (was relying on the
+   inconsistent browser default, easy to lose against the white header / dark
+   active nav item). */
+:focus-visible {
+  outline: 2px solid #ff3b21;
+  outline-offset: 2px;
+}
+
+/* Skip-to-content link: hidden until focused, then pinned top-left. */
+.skip-link {
+  position: absolute;
+  left: 0.5rem;
+  top: -3rem;
+  z-index: 50;
+  background: #111;
+  color: #fff;
+  padding: 0.4rem 0.8rem;
+  border-radius: 0.375rem;
+  transition: top 0.12s ease;
+}
+.skip-link:focus {
+  top: 0.5rem;
+}
+
 /* Macro ⇄ Micro crossfade for the Site Analysis cards. */
 @keyframes fadeIn {
   from {

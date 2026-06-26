@@ -32,26 +32,50 @@ export default function NodeModal({
   onSelect: (id: string) => void;
 }) {
   const closeRef = useRef<HTMLButtonElement | null>(null);
+  const dialogRef = useRef<HTMLDivElement | null>(null);
   const next = unlocks(node.id);
   const practice = getPractice(node.id);
 
-  // Focus the close button on open, restore body scroll on close, Esc to close.
+  // Focus the close button on open; restore body scroll AND focus on close; Esc
+  // to close; Tab/Shift+Tab trapped inside the dialog (honors aria-modal).
   useEffect(() => {
+    const prevActive = document.activeElement as HTMLElement | null;
     closeRef.current?.focus();
     const prevOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
+      if (e.key === "Escape") {
+        onClose();
+        return;
+      }
+      if (e.key !== "Tab") return;
+      const root = dialogRef.current;
+      if (!root) return;
+      const focusable = root.querySelectorAll<HTMLElement>(
+        'button, a[href], video, iframe, [tabindex]:not([tabindex="-1"])'
+      );
+      if (focusable.length === 0) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
     };
     window.addEventListener("keydown", onKey);
     return () => {
       window.removeEventListener("keydown", onKey);
       document.body.style.overflow = prevOverflow;
+      prevActive?.focus?.(); // return focus to the card that opened the modal
     };
   }, [onClose]);
 
   return (
     <div
+      ref={dialogRef}
       role="dialog"
       aria-modal="true"
       aria-label={node.title}

@@ -31,7 +31,7 @@ export const PRACTICE: Record<string, Practice> = {
     tryThis:
       "Set up this semester's studio folder right now: make the five subfolders, move your current files in, and rename them in the project_thing_v01 pattern. Do it before your next work session so the habit sticks.",
     watchOut:
-      "‘final', ‘final2', ‘final-REAL' is how you lose the right version the night before review — use zero-padded versions (v01, v02…) so they sort in order."
+      "'final', 'final2', 'final-REAL' is how you lose the right version the night before review — use zero-padded versions (v01, v02…) so they sort in order."
   },
   "gen-units": {
     keyMoves: [
@@ -91,7 +91,7 @@ export const PRACTICE: Record<string, Practice> = {
     tryThis:
       "Make a Make2D (or any linework) in Rhino/CAD, export it as DWG, and open it in Illustrator. Check that it arrived at the right scale and kept its layers — fix the export settings until it does.",
     watchOut:
-      "Exports silently drop layers or rescale if you don't set them up — never just hit ‘Save As'; open the export options and check units + layers first."
+      "Exports silently drop layers or rescale if you don't set them up — never just hit 'Save As'; open the export options and check units + layers first."
   },
   "gen-pipeline": {
     keyMoves: [
@@ -101,7 +101,7 @@ export const PRACTICE: Record<string, Practice> = {
       "keep line-weight/poché as re-applicable styles"
     ],
     tryThis:
-      "Write a three-line ‘how this project is made' note in your project folder: where linework lives, the export preset, and the board template. Then test it by regenerating one board from the model.",
+      "Write a three-line 'how this project is made' note in your project folder: where linework lives, the export preset, and the board template. Then test it by regenerating one board from the model.",
     watchOut:
       "If a design change means redrawing boards by hand, your pipeline is broken — wire each stage so it re-runs, or you'll dread every revision."
   },
@@ -213,7 +213,7 @@ export const PRACTICE: Record<string, Practice> = {
     tryThis:
       "Turn a tree (or chair) into a Block, scatter a dozen instances across your site, then BlockEdit it into a better one and watch them all update at once.",
     watchOut:
-      "Exploding a block to ‘just tweak this one' breaks the link and bloats the file — BlockEdit the definition instead, or make a new block."
+      "Exploding a block to 'just tweak this one' breaks the link and bloats the file — BlockEdit the definition instead, or make a new block."
   },
   "rhino-make2d": {
     keyMoves: [
@@ -263,7 +263,7 @@ export const PRACTICE: Record<string, Practice> = {
     tryThis:
       "Wire a Number Slider into a Circle's radius and drag it; then add a Move with a second slider. Feel the loop — change an input, watch Rhino update — on something trivial before anything complex.",
     watchOut:
-      "‘Nothing happens when I drag' usually means the slider's range or rounding is wrong (or it's not wired) — double-click it to set min/max and check the wire."
+      "'Nothing happens when I drag' usually means the slider's range or rounding is wrong (or it's not wired) — double-click it to set min/max and check the wire."
   },
   "gh-lists": {
     keyMoves: [
@@ -299,7 +299,7 @@ export const PRACTICE: Record<string, Practice> = {
     tryThis:
       "Make a grid of points, then Graft and Flatten the same list into a downstream component and watch the result count change. Keep a Param Viewer on the output so you can see the branches.",
     watchOut:
-      "Most ‘wrong number of results' bugs are tree-shape mismatches, not broken logic — read the tree in a Param Viewer and graft/flatten deliberately rather than guessing."
+      "Most 'wrong number of results' bugs are tree-shape mismatches, not broken logic — read the tree in a Param Viewer and graft/flatten deliberately rather than guessing."
   },
   "gh-matching": {
     keyMoves: [
@@ -309,7 +309,7 @@ export const PRACTICE: Record<string, Practice> = {
       "Sort List (carry a second list along)"
     ],
     tryThis:
-      "Dispatch a row of façade panels into ‘solid' and ‘glazed' by an alternating pattern and give each group a different colour or depth; then Cull every third one to make an opening.",
+      "Dispatch a row of façade panels into 'solid' and 'glazed' by an alternating pattern and give each group a different colour or depth; then Cull every third one to make an opening.",
     watchOut:
       "Two lists of different lengths get padded by the default match rule, repeating the last item — set Shortest/Longest/Cross Reference on purpose to control the pairing."
   },
@@ -385,7 +385,7 @@ export const PRACTICE: Record<string, Practice> = {
     tryThis:
       "Build a reusable layer set (Walls, Doors, Furniture, Grid, Text, Hatch) with distinct colours, then re-sort an existing drawing onto it and toggle layers to see the drawing simplify.",
     watchOut:
-      "Drawing ‘just this one thing' on whatever layer is current creates a sorting nightmare — set the right current layer first, every time."
+      "Drawing 'just this one thing' on whatever layer is current creates a sorting nightmare — set the right current layer first, every time."
   },
   "acad-modify": {
     keyMoves: [
@@ -421,7 +421,7 @@ export const PRACTICE: Record<string, Practice> = {
     tryThis:
       "Dimension your room, label it with MText, and poché the walls with a solid hatch on its own light-coloured layer — set a Dimension Style first so it's consistent.",
     watchOut:
-      "‘No valid hatch boundary' means a gap in the outline — close the polyline; and set annotation annotative (or to the plot scale) or text prints the wrong size."
+      "'No valid hatch boundary' means a gap in the outline — close the polyline; and set annotation annotative (or to the plot scale) or text prints the wrong size."
   },
   "acad-linework": {
     keyMoves: [
@@ -445,7 +445,7 @@ export const PRACTICE: Record<string, Practice> = {
     tryThis:
       "Make a layout, drop in a viewport set to 1:100, lock it, add a title block and scale bar, then Plot to PDF using a page setup — and save that page setup for next time.",
     watchOut:
-      "‘All my lines print the same weight' is a plot-style (CTB) problem, not your drawing — fix the page setup's plot style; and lock viewports so panning doesn't change the scale."
+      "'All my lines print the same weight' is a plot-style (CTB) problem, not your drawing — fix the page setup's plot style; and lock viewports so panning doesn't change the scale."
   },
   "acad-rhino": {
     keyMoves: [
@@ -469,7 +469,7 @@ export const PRACTICE: Record<string, Practice> = {
     tryThis:
       "From an accurate site plan, make a figure-ground (buildings solid black) and one circulation diagram on separate layers, stripping everything that isn't making each argument.",
     watchOut:
-      "A diagram trying to say everything says nothing — isolate one idea per drawing and use a consistent graphic language (same fill for ‘building') across the set."
+      "A diagram trying to say everything says nothing — isolate one idea per drawing and use a consistent graphic language (same fill for 'building') across the set."
   },
 
   // ── Revit ────────────────────────────────────────────────────────────────
@@ -483,7 +483,7 @@ export const PRACTICE: Record<string, Practice> = {
     tryThis:
       "Place a few walls and doors, then change a Type parameter (a door width) and watch every door of that type change; change an Instance parameter (its mark) and watch only one change.",
     watchOut:
-      "Don't agonise over the ‘perfect' family at the massing stage — place generic types and swap them later; the whole point is that types update across the model."
+      "Don't agonise over the 'perfect' family at the massing stage — place generic types and swap them later; the whole point is that types update across the model."
   },
   "rvt-levels": {
     keyMoves: [
@@ -531,7 +531,7 @@ export const PRACTICE: Record<string, Practice> = {
     tryThis:
       "Place Rooms throughout a plan, make a room schedule that reports their areas, and add a Color Fill that shades rooms by program — then push a wall and watch the schedule update.",
     watchOut:
-      "Rooms need fully enclosed boundaries to compute area — a gap gives a ‘not enclosed' warning; close the room or add a room-bounding line."
+      "Rooms need fully enclosed boundaries to compute area — a gap gives a 'not enclosed' warning; close the room or add a room-bounding line."
   },
   "rvt-views": {
     keyMoves: [
@@ -577,7 +577,7 @@ export const PRACTICE: Record<string, Practice> = {
       "Constraints (lock/pin/align) hold intent"
     ],
     tryThis:
-      "Model an existing room, demolish one wall, and add a new insertion; then make two views — one ‘existing', one ‘new construction' — with the right phase filters so each tells its story.",
+      "Model an existing room, demolish one wall, and add a new insertion; then make two views — one 'existing', one 'new construction' — with the right phase filters so each tells its story.",
     watchOut:
       "If new and existing look identical (or new work vanishes), the view's Phase/Phase Filter is wrong — set those, not the geometry; and beware over-constraining ('constraints not satisfied')."
   },
@@ -605,7 +605,7 @@ export const PRACTICE: Record<string, Practice> = {
     tryThis:
       "Cut an entourage figure out of a photo using a selection turned into a layer mask, drop it onto a render on its own layer, and refine the mask edge with a soft brush — keep everything non-destructive.",
     watchOut:
-      "Erasing or flattening to ‘fix' something paints you into a corner — mask instead of delete, and keep elements on separate named layers so you can keep editing."
+      "Erasing or flattening to 'fix' something paints you into a corner — mask instead of delete, and keep elements on separate named layers so you can keep editing."
   },
   "ai-basics": {
     keyMoves: [

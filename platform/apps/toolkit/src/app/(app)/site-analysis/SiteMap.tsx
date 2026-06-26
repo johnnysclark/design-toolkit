@@ -111,18 +111,21 @@ export default function SiteMap({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Redraw overlays + reframe when the analyzed site changes.
+  // Redraw overlays + reframe when the analyzed site (or flood result) changes.
   useEffect(() => {
     if (!mapRef.current) return;
     drawOverlays();
     frame(scale, false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [centroid.lat, centroid.lon, boundary, topo]);
+  }, [centroid.lat, centroid.lon, boundary, topo, flood]);
 
-  // Animate scale changes (zoom + basemap).
+  // Animate scale changes (zoom + basemap). Also redraw overlays: the terrain
+  // elevation dots are gated on scale === "micro", and every new analysis starts
+  // at macro, so without this the dots never appear on the first Macro→Micro flip.
   useEffect(() => {
     if (!mapRef.current) return;
     applyBase(scale);
+    drawOverlays();
     frame(scale, true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scale]);

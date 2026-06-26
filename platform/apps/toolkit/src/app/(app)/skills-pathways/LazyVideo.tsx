@@ -55,10 +55,10 @@ export default function LazyVideo({ video }: { video: VideoRef }) {
         )}
       </div>
       <figcaption className="flex items-center justify-between gap-3 bg-white px-3 py-2 text-xs">
-        <span className="truncate font-medium text-neutral-800" title={video.title}>
+        <span className="truncate font-medium text-neutral-900" title={video.title}>
           {video.title}
         </span>
-        <span className="shrink-0 text-neutral-400">
+        <span className="shrink-0 text-neutral-900">
           {video.author}
           {video.minutes ? ` · ${video.minutes} min` : ""}
         </span>

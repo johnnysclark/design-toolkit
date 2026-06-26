@@ -392,13 +392,18 @@ export default function SkillsCoachChat({
         </label>
 
         <div className="flex items-center gap-2 text-sm">
-          <span className="text-neutral-900">Level</span>
-          <div className="inline-flex overflow-hidden rounded-lg border border-neutral-300">
+          <span className="text-neutral-900" id="coach-level-label">Level</span>
+          <div
+            role="group"
+            aria-labelledby="coach-level-label"
+            className="inline-flex overflow-hidden rounded-lg border border-neutral-300"
+          >
             {LEVELS.map((l) => (
               <button
                 key={l.id}
                 type="button"
                 title={l.desc}
+                aria-pressed={level === l.id}
                 onClick={() => setLevel(l.id)}
                 className={[
                   "px-3 py-1.5 text-sm transition-colors",
@@ -433,7 +438,13 @@ export default function SkillsCoachChat({
       <div className="mt-5 grid grid-cols-1 gap-6 lg:grid-cols-[1fr_18rem]">
         {/* chat column */}
         <div className="flex h-[68vh] min-h-[28rem] flex-col overflow-hidden rounded-2xl border border-neutral-200 bg-neutral-50">
-          <div className="flex-1 space-y-4 overflow-y-auto p-4">
+          <div
+            className="flex-1 space-y-4 overflow-y-auto p-4"
+            role="log"
+            aria-live="polite"
+            aria-atomic="false"
+            aria-busy={streaming}
+          >
             {empty && (
               <div className="mx-auto mt-6 max-w-md text-center">
                 <p className="text-sm text-neutral-900">
@@ -480,8 +491,11 @@ export default function SkillsCoachChat({
             )}
             {pending && (
               <div className="mb-2 inline-flex items-center gap-2 rounded-lg border border-neutral-200 bg-neutral-50 px-2 py-1 text-xs">
-                <span>{pending.kind === "pdf" ? "📄" : "🖼"}</span>
-                <span className="max-w-[16rem] truncate">{pending.name}</span>
+                <span aria-hidden="true">{pending.kind === "pdf" ? "📄" : "🖼"}</span>
+                <span className="max-w-[16rem] truncate">
+                  {pending.kind === "pdf" ? "PDF: " : "Image: "}
+                  {pending.name}
+                </span>
                 <button
                   type="button"
                   onClick={() => setPending(null)}
@@ -504,9 +518,10 @@ export default function SkillsCoachChat({
                 type="button"
                 onClick={() => fileRef.current?.click()}
                 title="Attach a sketch, screenshot, or PDF"
+                aria-label="Attach a sketch, screenshot, or PDF"
                 className="shrink-0 rounded-lg border border-neutral-300 px-3 py-2 text-sm text-neutral-900 hover:bg-neutral-100"
               >
-                📎
+                <span aria-hidden="true">📎</span>
               </button>
               <textarea
                 value={input}

@@ -13,11 +13,11 @@ const STUDIO_URL = "/tools/gable-studio/web/index.html";
 
 export default function Page() {
   return (
-    <div className="fixed inset-y-0 left-64 right-0 flex flex-col bg-white">
+    <div className="fixed bottom-0 left-64 right-0 top-14 flex flex-col bg-white">
       <header className="flex shrink-0 items-center justify-between gap-4 border-b border-neutral-200 px-6 py-3">
         <div>
           <div className="flex items-center gap-2">
-            <h1 className="text-lg font-semibold tracking-tight">
+            <h1 className="display-font text-lg uppercase tracking-tight">
               Eco-Architect{" "}
               <span className="font-sans text-sm font-normal normal-case text-neutral-900">— Design to Site Forces</span>
             </h1>
@@ -25,7 +25,7 @@ export default function Page() {
               live
             </span>
           </div>
-          <p className="text-xs text-neutral-500">
+          <p className="text-xs text-neutral-900">
             Eco-Architect — form-finding by site forces. Metrics are transparent
             teaching <em>proxies</em>, not validated simulation.
           </p>
@@ -34,7 +34,7 @@ export default function Page() {
           href={STUDIO_URL}
           target="_blank"
           rel="noopener noreferrer"
-          className="shrink-0 rounded-md border border-neutral-300 px-3 py-1.5 text-sm font-medium text-neutral-700 transition hover:border-neutral-400 hover:bg-neutral-50"
+          className="shrink-0 rounded-md border border-neutral-300 px-3 py-1.5 text-sm font-medium text-neutral-900 transition hover:border-neutral-400 hover:bg-neutral-50"
         >
           Open full screen ↗
         </a>

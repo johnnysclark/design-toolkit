@@ -3,6 +3,7 @@
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { safeNext } from "@/lib/auth/safe-next";
 
 export type LoginState = { error?: string; sent?: boolean };
 
@@ -23,7 +24,9 @@ export async function signInPassword(
   const { error } = await supabase.auth.signInWithPassword({ email, password });
   if (error) return { error: error.message };
 
-  redirect("/skills-coach");
+  // Return the student to wherever they were headed (a gated tool sends
+  // ?next=…), falling back to the dashboard rather than dumping everyone on Coach.
+  redirect(safeNext(String(formData.get("next") || "")));
 }
 
 // Email magic-link sign-in. Supabase emails a link back to /auth/callback.
@@ -40,9 +43,21 @@ export async function signIn(
     (await headers()).get("origin") ||
     "";
 
+  // Without an absolute origin Supabase silently falls back to the dashboard
+  // Site URL (the documented localhost trap). Fail loudly instead of emailing a
+  // broken relative redirect.
+  if (!origin) {
+    return {
+      error: "Magic-link sign-in isn't configured on this server — use email + password above."
+    };
+  }
+
+  const next = safeNext(String(formData.get("next") || ""));
+  const emailRedirectTo = `${origin}/auth/callback?next=${encodeURIComponent(next)}`;
+
   const { error } = await supabase.auth.signInWithOtp({
     email,
-    options: { emailRedirectTo: `${origin}/auth/callback` }
+    options: { emailRedirectTo }
   });
 
   if (error) return { error: error.message };

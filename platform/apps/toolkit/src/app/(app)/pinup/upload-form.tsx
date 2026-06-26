@@ -4,6 +4,8 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 
+const MAX_BYTES = 10 * 1024 * 1024; // 10 MB — studio images, not RAW/PSD dumps
+
 export default function UploadForm() {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
@@ -20,6 +22,15 @@ export default function UploadForm() {
 
     if (!file || file.size === 0) {
       setErr("Choose an image to pin.");
+      return;
+    }
+    // `accept="image/*"` is only a picker hint — validate for real before upload.
+    if (!file.type.startsWith("image/")) {
+      setErr("That file isn't an image — choose a PNG, JPG, WebP, or GIF.");
+      return;
+    }
+    if (file.size > MAX_BYTES) {
+      setErr("That image is over 10 MB — please use a smaller one.");
       return;
     }
     if (!title) {
@@ -59,7 +70,18 @@ export default function UploadForm() {
         notes: String(fd.get("notes") || "").trim() || null,
         image_path: path
       });
-      if (ins.error) throw ins.error;
+      if (ins.error) {
+        // The blob uploaded but the row didn't — clean it up so we don't orphan
+        // an un-deletable object in the bucket.
+        await supabase.storage.from("pinups").remove([path]);
+        throw ins.error;
+      }
+
+      // Log the run to the trace (best-effort; never block the upload).
+      supabase
+        .from("tool_runs")
+        .insert({ owner: user.id, tool: "archivist", input: { title, tags }, output: { image_path: path } })
+        .then(() => {}, () => {});
 
       formEl.reset();
       router.refresh();

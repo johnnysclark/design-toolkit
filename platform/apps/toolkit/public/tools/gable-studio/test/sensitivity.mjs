@@ -35,3 +35,6 @@ console.log(`metrics: ${Object.keys(base).length}  ·  tweaks: ${tweaks.length}`
 console.log("responds to ≥1 tweak:", Object.entries(moved).filter(([, n]) => n > 0).length);
 if (dead.length) console.log("DEAD (never moved):", dead.join(", ")); else console.log("DEAD: none ✓");
 if (bad.length) { console.log("NON-FINITE:"); bad.slice(0, 12).forEach((b) => console.log("  " + b)); } else console.log("NON-FINITE: none ✓");
+
+// Fail the build if a metric went dead or non-finite (match occlusion.mjs / parity_check.py).
+if (dead.length || bad.length) process.exit(1);

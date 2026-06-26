@@ -233,7 +233,7 @@ export default function SiteAnalysisTool({ signedIn }: { signedIn: boolean }) {
               className="w-full rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm outline-none focus:border-neutral-900"
             />
             {searching && (
-              <span className="absolute right-3 top-2.5 text-xs text-neutral-400">…</span>
+              <span className="absolute right-3 top-2.5 text-xs text-neutral-900">…</span>
             )}
             {open && candidates.length > 0 && (
               <ul className="absolute z-30 mt-1 max-h-80 w-full overflow-auto rounded-lg border border-neutral-200 bg-white shadow-lg">
@@ -246,7 +246,7 @@ export default function SiteAnalysisTool({ signedIn }: { signedIn: boolean }) {
                       <span className="text-sm font-medium text-neutral-900">
                         {"shortLabel" in c ? (c as GeoPlace).shortLabel : c.name}
                       </span>
-                      <span className="line-clamp-1 text-xs text-neutral-500">
+                      <span className="line-clamp-1 text-xs text-neutral-900">
                         {candidateSub(c, mode)}
                       </span>
                     </button>
@@ -269,7 +269,7 @@ export default function SiteAnalysisTool({ signedIn }: { signedIn: boolean }) {
         </div>
         {searchError && <p className="mt-2 text-xs text-red-600">{searchError}</p>}
         {!result && !analyzing && (
-          <p className="mt-2 text-xs text-neutral-400">
+          <p className="mt-2 text-xs text-neutral-900">
             Try {(mode === "superfund" ? SUPERFUND_EXAMPLES : PLACE_EXAMPLES).map((ex, i) => (
               <button
                 key={ex}
@@ -288,7 +288,7 @@ export default function SiteAnalysisTool({ signedIn }: { signedIn: boolean }) {
       </div>
 
       {analyzing && (
-        <div className="rounded-xl border border-neutral-200 bg-white p-8 text-center text-sm text-neutral-500">
+        <div className="rounded-xl border border-neutral-200 bg-white p-8 text-center text-sm text-neutral-900">
           Pulling the measured ground…
         </div>
       )}
@@ -353,7 +353,7 @@ function Results({
           <h2 className="display-font text-2xl uppercase leading-tight tracking-tight text-neutral-900">
             {site.name}
           </h2>
-          <p className="text-sm text-neutral-500">
+          <p className="text-sm text-neutral-900">
             {site.address || `${site.centroid.lat.toFixed(4)}, ${site.centroid.lon.toFixed(4)}`}
             {site.status ? ` · ${site.status}` : ""}
           </p>
@@ -372,7 +372,7 @@ function Results({
           scale={scale}
         />
       </div>
-      <p className="-mt-3 text-center text-xs text-neutral-400">
+      <p className="-mt-3 text-center text-xs text-neutral-900">
         {scale === "macro"
           ? "Macro — the region around the site (street map, zoomed out)."
           : "Micro — the immediate surroundings (aerial, with the terrain grid)."}
@@ -447,19 +447,19 @@ function MacroCards({
           <>
             <div className="grid gap-6 sm:grid-cols-3">
               <div>
-                <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-neutral-400">
+                <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-neutral-900">
                   Wind rose
                 </div>
                 <WindRoseChart rose={c.windRose} />
               </div>
               <div>
-                <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-neutral-400">
+                <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-neutral-900">
                   Sun path
                 </div>
                 <SunPathChart paths={c.sunPaths} />
               </div>
               <div>
-                <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-neutral-400">
+                <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-neutral-900">
                   Temp + humidity
                 </div>
                 <MonthlyClimate temp={c.temp} rh={c.rh} tempUnit={c.units?.temperature_2m || "°C"} />
@@ -555,7 +555,7 @@ function MacroCards({
           )}
         </div>
         {!coverage.terrain && site.mode === "place" && (
-          <p className="mt-3 text-xs text-neutral-400">
+          <p className="mt-3 text-xs text-neutral-900">
             Terrain + flood layers are US-only — outside the US they read ✕ (climate + map are global).
           </p>
         )}
@@ -615,7 +615,7 @@ function MicroCards({
                   href={v.url}
                   target="_blank"
                   rel="noreferrer"
-                  className="rounded-md bg-neutral-100 px-2 py-1 text-xs text-neutral-700 hover:bg-neutral-200"
+                  className="rounded-md bg-neutral-100 px-2 py-1 text-xs text-neutral-900 hover:bg-neutral-200"
                 >
                   {docLabel(k)} ↗
                 </a>
@@ -624,7 +624,7 @@ function MicroCards({
           </div>
         )}
         {site.mode === "superfund" && !site.boundary && (
-          <p className="mt-2 text-xs text-neutral-400">No EPA boundary polygon published for this site.</p>
+          <p className="mt-2 text-xs text-neutral-900">No EPA boundary polygon published for this site.</p>
         )}
       </Card>
 
@@ -691,7 +691,7 @@ function MicroCards({
                 <Pill tone="neutral">BFE {flood.baseFloodElevation} ft</Pill>
               )}
             </div>
-            {flood.note && <p className="mt-2 text-sm text-neutral-600">{flood.note}</p>}
+            {flood.note && <p className="mt-2 text-sm text-neutral-900">{flood.note}</p>}
             {synthesis && (
               <div className="mt-3 border-t border-neutral-100 pt-3">
                 <Read label="Water & flood read (AI)">{synthesis.water_and_flood_read}</Read>
@@ -704,7 +704,7 @@ function MicroCards({
       </Card>
 
       <Card title="Immediate surroundings">
-        <p className="text-sm leading-relaxed text-neutral-600">
+        <p className="text-sm leading-relaxed text-neutral-900">
           The aerial map above shows the {result.site.bbox ? "~1.8 km" : ""} study area. The colored
           dots are the {topo ? `${topo.n}×${topo.n}` : ""} USGS elevation samples (blue low → brown
           high). Switch to <span className="font-medium">Macro</span> for the regional climate read.
@@ -746,7 +746,7 @@ function AiControls({
     <Card accent title="AI reading (spends the studio's key)">
       {!signedIn ? (
         <div className="flex flex-col items-start gap-2">
-          <p className="text-sm text-neutral-700">
+          <p className="text-sm text-neutral-900">
             The map, data, charts and every export above are free and need no account. The two AI
             passes{mode === "superfund" ? " (contamination brief + design synthesis)" : " (design synthesis)"} are
             for signed-in studio members — they spend the Anthropic key.
@@ -767,7 +767,7 @@ function AiControls({
           >
             {aiLoading ? aiPhase || "Working…" : hasSynthesis ? "Re-run AI reading" : runLabel}
           </button>
-          <p className="text-xs text-neutral-500">
+          <p className="text-xs text-neutral-900">
             Reasons only over the hard data above
             {mode === "superfund" ? " + a web-cited EPA contamination brief" : ""}. Every claim is
             tagged for you to verify.
@@ -841,7 +841,7 @@ function Exports({
         </button>
       </div>
       {err && <p className="mt-2 text-xs text-red-600">{err}</p>}
-      <p className="mt-2 text-xs text-neutral-400">
+      <p className="mt-2 text-xs text-neutral-900">
         Terrain, contours and boundary share one local-metre origin, so they line up when imported
         together. The .3dm also carries sun path + wind rose + flood plane.
       </p>
@@ -873,7 +873,7 @@ function Segmented({
             big ? "px-4 py-1.5 text-sm" : "px-3 py-1.5 text-xs",
             value === o.value
               ? "bg-neutral-900 text-white"
-              : "text-neutral-500 hover:text-neutral-900"
+              : "text-neutral-900 hover:text-neutral-900"
           ].join(" ")}
         >
           {o.label}
@@ -885,7 +885,7 @@ function Segmented({
 
 function Missing({ label }: { label: string }) {
   return (
-    <p className="rounded-md bg-neutral-50 px-3 py-2 text-sm text-neutral-400">
+    <p className="rounded-md bg-neutral-50 px-3 py-2 text-sm text-neutral-900">
       No {label} data for this location.
     </p>
   );
