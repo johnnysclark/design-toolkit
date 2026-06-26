@@ -69,7 +69,7 @@ export default function AgentPanel({ onSubmit }: { onSubmit: (instruction: strin
         }}
         rows={2}
         placeholder="Describe a change in plain language…  (⌘/Ctrl + Enter to send)"
-        className="w-full rounded-md border-2 border-neutral-900 px-3 py-2 text-sm text-neutral-900 outline-none focus:border-[#ff3b21]"
+        className="w-full rounded-md border-2 border-neutral-900 px-3 py-2 text-sm text-neutral-900 outline-none focus:border-[#ff3b21] focus-visible:ring-2 focus-visible:ring-[#ff3b21] focus-visible:ring-offset-1"
       />
       <button
         type="button"

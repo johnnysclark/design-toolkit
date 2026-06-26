@@ -9,7 +9,7 @@
 import { useEffect, useReducer, useState } from "react";
 import type { State } from "../engine/types";
 
-const fieldCls = "rounded border-2 border-neutral-900 px-2 py-1 text-sm text-neutral-900 outline-none focus:border-[#ff3b21]";
+const fieldCls = "rounded border-2 border-neutral-900 px-2 py-1 text-sm text-neutral-900 outline-none focus:border-[#ff3b21] focus-visible:ring-2 focus-visible:ring-[#ff3b21] focus-visible:ring-offset-1";
 const labelCls = "flex flex-col gap-1 text-xs font-semibold text-neutral-900";
 
 // A numeric field that commits ONCE — on blur or Enter — not on every keystroke.
@@ -25,6 +25,12 @@ function NumField({ label, value, min, step, onCommit }: { label: string; value:
     const n = Number(raw);
     if (raw === "" || !Number.isFinite(n)) {
       el.value = String(value);
+      return;
+    }
+    // No change → no command, no announcement (Enter then blur would otherwise
+    // commit the same value twice and double-speak the confirmation).
+    if (n === value) {
+      bump();
       return;
     }
     onCommit(n);

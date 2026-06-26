@@ -10,7 +10,7 @@ import { fsSupported, pickDirectory, writeStateToDir, pingBridge, pushStateToBri
 
 const card = "rounded-lg border-2 border-neutral-900 p-3 space-y-2";
 const btn = "display-font rounded border-2 border-neutral-900 px-3 py-1.5 text-xs uppercase text-neutral-900 hover:bg-neutral-900 hover:text-white disabled:opacity-40";
-const field = "rounded border-2 border-neutral-900 px-2 py-1 text-sm text-neutral-900 outline-none focus:border-[#ff3b21]";
+const field = "rounded border-2 border-neutral-900 px-2 py-1 text-sm text-neutral-900 outline-none focus:border-[#ff3b21] focus-visible:ring-2 focus-visible:ring-[#ff3b21] focus-visible:ring-offset-1";
 
 export default function DrivePanel({ stateText, onDownloadState, webOnly }: { stateText: string; onDownloadState: () => void; webOnly?: { walls: number; columns: number; openings: number; rooms: number } }) {
   // ── Direct folder write ────────────────────────────────────────────────────
@@ -102,8 +102,11 @@ export default function DrivePanel({ stateText, onDownloadState, webOnly }: { st
         <code className="font-mono">state.json</code>; the existing Watcher rebuilds the <b>bay-based</b> geometry (grids, walls, corridors, apertures) and levels when that file changes.
       </p>
 
+      {/* Static visual note (NOT a live region): the embedded counts change on
+          every add/remove, so role="alert" would re-speak the whole paragraph
+          assertively each edit. The edit itself is already announced. */}
       {webOnly && webOnly.walls + webOnly.columns + webOnly.openings + webOnly.rooms > 0 && (
-        <p role="alert" className="rounded-md border-2 border-[#ff3b21] bg-[#fff2f0] px-3 py-2 text-sm text-neutral-900">
+        <p className="rounded-md border-2 border-[#ff3b21] bg-[#fff2f0] px-3 py-2 text-sm text-neutral-900">
           <b>Heads up:</b>{" "}
           {[
             webOnly.rooms ? `${webOnly.rooms} program room${webOnly.rooms === 1 ? "" : "s"}` : "",
@@ -130,7 +133,7 @@ export default function DrivePanel({ stateText, onDownloadState, webOnly }: { st
                 Push state.json
               </button>
               <label className="flex items-center gap-1.5 text-xs font-semibold">
-                <input type="checkbox" checked={autoFolder} onChange={(e) => setAutoFolder(e.target.checked)} disabled={!dir} />
+                <input type="checkbox" checked={autoFolder} onChange={(e) => setAutoFolder(e.target.checked)} disabled={!dir} aria-label="Auto-push to the connected folder on change" />
                 Auto-push on change
               </label>
             </div>
@@ -159,7 +162,7 @@ export default function DrivePanel({ stateText, onDownloadState, webOnly }: { st
           <button type="button" className={btn} onClick={() => pushBridge(stateText)}>Push to Rhino</button>
           <button type="button" className={btn} onClick={pingWatcher} title="Optional live query link (advanced; off by default)">Check live link</button>
           <label className="flex items-center gap-1.5 text-xs font-semibold">
-            <input type="checkbox" checked={autoBridge} onChange={(e) => setAutoBridge(e.target.checked)} />
+            <input type="checkbox" checked={autoBridge} onChange={(e) => setAutoBridge(e.target.checked)} aria-label="Auto-push to the bridge on change" />
             Auto-push on change
           </label>
         </div>

@@ -71,7 +71,7 @@ export default function Console({
         style={{ minHeight: 200 }}
         aria-label="Command log"
       >
-        {log.length === 0 && <div className="text-[#7a7a7a]">Type a command, or “help”. Try: wall A off</div>}
+        {log.length === 0 && <div className="text-[#a3a3a3]">Type a command, or “help”. Try: wall A off</div>}
         {log.map((e) => (
           <div key={e.id} className="mb-1.5 whitespace-pre-wrap break-words">
             {e.input !== undefined && (
@@ -99,7 +99,7 @@ export default function Console({
           spellCheck={false}
           autoComplete="off"
           placeholder="e.g. corridor A width 10"
-          className="flex-1 rounded-md border-2 border-neutral-900 px-3 py-2 font-mono text-sm text-neutral-900 outline-none focus:border-[#ff3b21]"
+          className="flex-1 rounded-md border-2 border-neutral-900 px-3 py-2 font-mono text-sm text-neutral-900 outline-none focus:border-[#ff3b21] focus-visible:ring-2 focus-visible:ring-[#ff3b21] focus-visible:ring-offset-1"
         />
         <button
           type="button"

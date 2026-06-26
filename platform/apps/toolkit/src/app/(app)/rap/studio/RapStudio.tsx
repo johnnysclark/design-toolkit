@@ -189,7 +189,11 @@ export default function RapStudio({ signedIn }: { signedIn: boolean }) {
       // Highlight the net before→after diff of the whole batch (not just the
       // last command), so the JSON tree shows everything the assistant changed.
       setChanged(diffPaths(before, stateRef.current));
-      announce(data.reply ?? "Done.");
+      // Failure-aware: if a command didn't apply, don't announce a cheerful
+      // reply — the per-command ERROR was batched away, so say it plainly.
+      const failed = commands.length - applied.length;
+      const base = data.reply ?? "Done.";
+      announce(failed > 0 ? `ERROR: Applied ${applied.length} of ${commands.length} changes; ${failed} could not be applied. ${base}` : base);
       return { ok: true, reply: data.reply, commands: applied };
     },
     [runCommand, announce]
