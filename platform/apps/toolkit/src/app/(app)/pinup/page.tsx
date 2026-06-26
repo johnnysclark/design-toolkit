@@ -60,7 +60,7 @@ export default async function PinupPage() {
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
                   src={p.url}
-                  alt={p.title}
+                  alt={p.title || "Pinned reference image"}
                   className="h-full w-full object-cover"
                 />
               ) : (

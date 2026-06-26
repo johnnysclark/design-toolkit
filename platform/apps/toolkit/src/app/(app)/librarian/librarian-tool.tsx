@@ -1062,7 +1062,7 @@ function ResultPanel({
               >
                 {im.url ? (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img src={im.url} alt={`dropped ${i + 1}`} className="h-full w-full object-cover" />
+                  <img src={im.url} alt={`Dropped reference image ${i + 1}`} className="h-full w-full object-cover" />
                 ) : null}
               </div>
             ))}
