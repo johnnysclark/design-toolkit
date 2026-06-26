@@ -24,15 +24,19 @@ const INK = "#111";
 const GROUND_Y = -0.05; // the one ground sits here, just below z=0
 const HIDDEN = { dashSize: 0.6, gapSize: 0.5 }; // feet — dotted hidden-edge cadence
 
-// Guaranteed-dashed hidden-edge pass: EdgesGeometry + explicit lineSegments so we
-// can call computeLineDistances() (LineDashedMaterial only dashes with per-vertex
-// line distances). depthTest off + renderOrder -1 → occluded edges peek through as
-// dotted, while the visible solid pass paints over genuinely-visible edges.
+// Hidden-edge pass: EdgesGeometry + explicit lineSegments so we can call
+// computeLineDistances() (LineDashedMaterial only dashes with per-vertex line
+// distances). The trick that makes ONLY hidden lines dotted: depthFunc =
+// GreaterDepth, so a dashed edge draws ONLY where its depth is *greater* than the
+// nearest face already in the depth buffer — i.e. only where it sits behind
+// geometry (genuinely occluded). depthWrite off so it never hides anything else.
+// Visible edges are left to the solid <Edges> pass; they fail GreaterDepth and so
+// never get dotted. Faces are drawn (white, opaque) and write depth first.
 function HiddenEdges({ args }: { args: [number, number, number] }) {
   const geo = useMemo(() => new THREE.EdgesGeometry(new THREE.BoxGeometry(args[0], args[1], args[2]), 15), [args]);
   return (
-    <lineSegments geometry={geo} renderOrder={-1} onUpdate={(self) => self.computeLineDistances()}>
-      <lineDashedMaterial color={INK} dashSize={HIDDEN.dashSize} gapSize={HIDDEN.gapSize} depthTest={false} transparent opacity={0.55} />
+    <lineSegments geometry={geo} renderOrder={2} onUpdate={(self) => self.computeLineDistances()}>
+      <lineDashedMaterial color={INK} dashSize={HIDDEN.dashSize} gapSize={HIDDEN.gapSize} depthFunc={THREE.GreaterDepth} depthWrite={false} />
     </lineSegments>
   );
 }
@@ -54,11 +58,10 @@ function BWBox({
       {/* Unlit white faces → pure B&W, no shading; occlude the solid visible edges.
           polygonOffset so those visible edges don't z-fight the face they sit on. */}
       <meshBasicMaterial color={WHITE} polygonOffset polygonOffsetFactor={1} polygonOffsetUnits={1} />
-      {/* (a) VISIBLE edges: solid black, normal depth test. */}
-      <Edges threshold={15}>
-        <lineBasicMaterial color={INK} />
-      </Edges>
-      {/* (b) HIDDEN edges: dotted black, depthTest off (rendered first). */}
+      {/* (a) VISIBLE edges: solid black, slightly bold for a graphic outline read
+          (drei fat lines). Normal depth test → only un-occluded edges draw. */}
+      <Edges threshold={15} color={INK} lineWidth={1.6} />
+      {/* (b) HIDDEN edges: dotted black, drawn only where occluded (GreaterDepth). */}
       <HiddenEdges args={args} />
     </mesh>
   );
