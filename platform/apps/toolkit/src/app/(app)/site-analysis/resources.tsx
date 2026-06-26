@@ -182,7 +182,7 @@ const GROUPS: Group[] = [
 export default function FurtherResources() {
   return (
     <Card title="Further resources — the wider site-research toolbox">
-      <p className="-mt-1 mb-4 max-w-3xl text-sm text-neutral-600">
+      <p className="-mt-1 mb-4 max-w-3xl text-sm text-neutral-900">
         This tool measures climate, terrain, and water. To go further, these are the resources
         architecture, landscape, and planning students most often use to gather information and data
         about a site. Most are free; many US datasets are nationwide.
@@ -193,7 +193,7 @@ export default function FurtherResources() {
             <h3 className="display-font text-sm uppercase tracking-tight text-neutral-900">
               {g.title}
             </h3>
-            <p className="mt-0.5 text-xs text-neutral-500">{g.blurb}</p>
+            <p className="mt-0.5 text-xs text-neutral-900">{g.blurb}</p>
             <ul className="mt-2 space-y-2">
               {g.items.map((r) => (
                 <li key={r.url}>
@@ -205,14 +205,14 @@ export default function FurtherResources() {
                   >
                     {r.name} ↗
                   </a>
-                  <p className="text-xs leading-snug text-neutral-600">{r.what}</p>
+                  <p className="text-xs leading-snug text-neutral-900">{r.what}</p>
                 </li>
               ))}
             </ul>
           </section>
         ))}
       </div>
-      <p className="mt-5 border-t border-neutral-100 pt-3 text-xs text-neutral-400">
+      <p className="mt-5 border-t border-neutral-100 pt-3 text-xs text-neutral-900">
         Links open external sites we don't control. For parcels, zoning, and codes, your local
         city/county GIS is almost always the authoritative source — start there.
       </p>

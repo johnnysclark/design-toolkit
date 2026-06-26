@@ -120,17 +120,17 @@ export default function SiteSources({ place, context }: { place: any; context: a
 
   return (
     <Card title="Sources & documents (AI · web search)">
-      <p className="-mt-1 mb-3 text-xs text-neutral-500">
+      <p className="-mt-1 mb-3 text-xs text-neutral-900">
         Found automatically when the place loaded — a first trail of authoritative links to verify
         and dig into. Ask follow-ups in the chat below.
       </p>
 
       {status === "loading" && !note && sources.length === 0 && (
-        <p className="text-sm text-neutral-400">Scanning the web for the best sources on this place…</p>
+        <p className="text-sm text-neutral-900">Scanning the web for the best sources on this place…</p>
       )}
 
       {note && (
-        <p className="whitespace-pre-wrap text-sm leading-relaxed text-neutral-800">{note}</p>
+        <p className="whitespace-pre-wrap text-sm leading-relaxed text-neutral-900">{note}</p>
       )}
 
       {sources.length > 0 && (
@@ -143,7 +143,7 @@ export default function SiteSources({ place, context }: { place: any; context: a
                 rel="noreferrer"
                 className="block rounded-md border border-neutral-200 bg-white p-2 hover:border-neutral-400"
               >
-                <div className="line-clamp-2 text-xs font-medium text-neutral-800">
+                <div className="line-clamp-2 text-xs font-medium text-neutral-900">
                   {i + 1}. {s.title}
                 </div>
                 <div className="mt-0.5 truncate text-[11px] text-sky-700">{domain(s.url)}</div>
@@ -154,7 +154,7 @@ export default function SiteSources({ place, context }: { place: any; context: a
       )}
 
       {status === "loading" && (note || sources.length > 0) && (
-        <p className="mt-2 text-[11px] text-neutral-400">Still searching…</p>
+        <p className="mt-2 text-[11px] text-neutral-900">Still searching…</p>
       )}
 
       {status === "error" && (
@@ -162,7 +162,7 @@ export default function SiteSources({ place, context }: { place: any; context: a
           <p className="text-sm text-red-600">{error}</p>
           <button
             onClick={() => setNonce((n) => n + 1)}
-            className="rounded-lg border border-neutral-300 px-3 py-1.5 text-xs font-medium text-neutral-700 hover:bg-neutral-100"
+            className="rounded-lg border border-neutral-300 px-3 py-1.5 text-xs font-medium text-neutral-900 hover:bg-neutral-100"
           >
             Retry
           </button>
@@ -171,17 +171,17 @@ export default function SiteSources({ place, context }: { place: any; context: a
 
       {status === "done" && sources.length === 0 && !note && (
         <div className="flex items-center gap-3">
-          <p className="text-sm text-neutral-500">No clear sources surfaced on the first pass.</p>
+          <p className="text-sm text-neutral-900">No clear sources surfaced on the first pass.</p>
           <button
             onClick={() => setNonce((n) => n + 1)}
-            className="rounded-lg border border-neutral-300 px-3 py-1.5 text-xs font-medium text-neutral-700 hover:bg-neutral-100"
+            className="rounded-lg border border-neutral-300 px-3 py-1.5 text-xs font-medium text-neutral-900 hover:bg-neutral-100"
           >
             Retry
           </button>
         </div>
       )}
 
-      <p className="mt-3 text-[11px] text-neutral-400">
+      <p className="mt-3 text-[11px] text-neutral-900">
         AI-gathered, web-searched — open the links and verify before you rely on them.
       </p>
     </Card>
