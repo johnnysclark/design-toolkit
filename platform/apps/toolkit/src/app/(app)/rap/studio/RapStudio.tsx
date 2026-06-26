@@ -1,0 +1,270 @@
+"use client";
+
+// ─────────────────────────────────────────────────────────────────────────────
+// RAP Studio — the orchestrator. One canonical state.json in the browser; every
+// authoring channel (console, forms, AI assistant) compiles to the same
+// Controller commands and runs through the same interpreter; every renderer
+// (3D, tactile plan, read-back text, Braille, JSON tree) reads that one state.
+// That's the project's thesis — sense-agnostic state + renderer parity — made
+// runnable. Exports (state.json, command log, PIAF PNG, STL) are the on-ramp to
+// driving real Rhino via the Watcher.
+// ─────────────────────────────────────────────────────────────────────────────
+
+import { useCallback, useMemo, useRef, useState } from "react";
+import dynamic from "next/dynamic";
+
+import type { State } from "./engine/types";
+import { makeSeedState } from "./engine/seed";
+import { applyCommand, describe } from "./engine/interpreter";
+import PlanSvg from "./render/PlanSvg";
+import JsonTree from "./components/JsonTree";
+import Console, { type LogEntry } from "./components/Console";
+import Forms from "./components/Forms";
+import AgentPanel, { type AgentResult } from "./components/AgentPanel";
+import { buildPiafCanvas } from "./render/piaf";
+import { buildStl } from "./render/stl";
+
+const Scene3D = dynamic(() => import("./render/Scene3D"), {
+  ssr: false,
+  loading: () => <div className="flex h-full items-center justify-center text-sm text-neutral-900">Loading 3D…</div>
+});
+
+// ── changed-path diff (so the JSON tree can highlight what an edit touched) ──
+function diffPaths(a: unknown, b: unknown, path = "state", out = new Set<string>()): Set<string> {
+  if (a === b) return out;
+  const ao = typeof a === "object" && a !== null;
+  const bo = typeof b === "object" && b !== null;
+  if (!ao || !bo) {
+    if (a !== b) out.add(path);
+    return out;
+  }
+  const keys = new Set([...Object.keys(a as object), ...Object.keys(b as object)]);
+  for (const k of keys) {
+    diffPaths((a as Record<string, unknown>)[k], (b as Record<string, unknown>)[k], `${path}.${k}`, out);
+  }
+  return out;
+}
+
+function download(filename: string, blob: Blob) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+type AuthorTab = "console" | "forms" | "assistant";
+type ViewTab = "3d" | "plan";
+
+export default function RapStudio({ signedIn }: { signedIn: boolean }) {
+  const seed = useMemo(() => makeSeedState(), []);
+  const [state, setState] = useState<State>(seed);
+  const stateRef = useRef<State>(seed); // synchronous mirror for sequential applies
+  const [log, setLog] = useState<LogEntry[]>([]);
+  const [history, setHistory] = useState<string[]>([]);
+  const [changed, setChanged] = useState<Set<string>>(new Set());
+  const [live, setLive] = useState(""); // aria-live announcement
+  const [speak, setSpeak] = useState(false);
+  const [authorTab, setAuthorTab] = useState<AuthorTab>("console");
+  const [viewTab, setViewTab] = useState<ViewTab>("3d");
+  const idRef = useRef(1);
+
+  const announce = useCallback(
+    (msg: string) => {
+      setLive(msg);
+      if (speak && typeof window !== "undefined" && "speechSynthesis" in window) {
+        const clean = msg.replace(/^(OK:|ERROR:)\s*/, "");
+        const u = new SpeechSynthesisUtterance(clean);
+        u.rate = 1.05;
+        window.speechSynthesis.cancel();
+        window.speechSynthesis.speak(u);
+      }
+    },
+    [speak]
+  );
+
+  // The single path every channel runs through.
+  const runCommand = useCallback(
+    (raw: string) => {
+      const prev = stateRef.current;
+      const res = applyCommand(prev, raw);
+      const entry: LogEntry = { id: idRef.current++, input: raw, output: res.message, ok: res.ok };
+      setLog((l) => [...l, entry]);
+      setHistory((h) => (h[h.length - 1] === raw ? h : [...h, raw]));
+      if (res.ok && !res.readOnly) {
+        stateRef.current = res.state;
+        setState(res.state);
+        setChanged(diffPaths(prev, res.state));
+      }
+      announce(res.message);
+      return res;
+    },
+    [announce]
+  );
+
+  const runAgent = useCallback(
+    async (instruction: string): Promise<AgentResult> => {
+      let res: Response;
+      try {
+        res = await fetch("/api/rap/agent", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ instruction, state: stateRef.current })
+        });
+      } catch {
+        return { ok: false, error: "Couldn't reach the assistant. Check your connection." };
+      }
+      if (res.status === 401) return { ok: false, needsAuth: true };
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) return { ok: false, error: data?.error || "The assistant is unavailable right now." };
+
+      const commands: string[] = Array.isArray(data.commands) ? data.commands : [];
+      setLog((l) => [...l, { id: idRef.current++, output: `ASSISTANT: ${data.reply ?? "(applied changes)"}`, ok: true }]);
+      const applied: string[] = [];
+      for (const c of commands) {
+        const r = runCommand(c);
+        if (r.ok) applied.push(c);
+      }
+      announce(data.reply ?? "Done.");
+      return { ok: true, reply: data.reply, commands: applied };
+    },
+    [runCommand, announce]
+  );
+
+  // ── exports ────────────────────────────────────────────────────────────────
+  const exportState = () => download("state.json", new Blob([JSON.stringify(state, null, 2)], { type: "application/json" }));
+  const exportLog = () => {
+    const text = log.filter((e) => e.input).map((e) => `>> ${e.input}\n${e.output}`).join("\n");
+    download("rap-command-log.txt", new Blob([text], { type: "text/plain" }));
+  };
+  const exportPiaf = () => buildPiafCanvas(state).toBlob((b) => b && download("rap-tactile-piaf.png", b), "image/png");
+  const exportStl = () => download("rap-tactile.stl", new Blob([buildStl(state)], { type: "model/stl" }));
+  const reset = () => runCommand("reset");
+
+  const readback = describe(state);
+  const bayList = Object.values(state.bays);
+
+  return (
+    <div className="space-y-5">
+      {/* Toolbar */}
+      <div className="flex flex-wrap items-center gap-2 rounded-lg border-2 border-neutral-900 p-2.5">
+        <ToolbarBtn onClick={exportState}>Download state.json</ToolbarBtn>
+        <ToolbarBtn onClick={exportPiaf}>Export PIAF PNG</ToolbarBtn>
+        <ToolbarBtn onClick={exportStl}>Export STL</ToolbarBtn>
+        <ToolbarBtn onClick={exportLog}>Save command log</ToolbarBtn>
+        <span className="flex-1" />
+        <label className="flex items-center gap-1.5 text-xs font-semibold text-neutral-900">
+          <input type="checkbox" checked={speak} onChange={(e) => setSpeak(e.target.checked)} />
+          Speak confirmations
+        </label>
+        <ToolbarBtn onClick={reset}>Reset</ToolbarBtn>
+      </div>
+
+      {/* Row 1 — visual model + canonical state */}
+      <div className="grid gap-5 lg:grid-cols-2">
+        <Panel title="Model — visual test" right={<Tabs tabs={[["3d", "3D"], ["plan", "Tactile plan"]]} active={viewTab} onPick={(t) => setViewTab(t as ViewTab)} />}>
+          <div className="h-80 w-full overflow-hidden rounded-md border border-neutral-300 bg-white">
+            {viewTab === "3d" ? <Scene3D state={state} /> : <PlanSvg state={state} className="h-full w-full p-2" />}
+          </div>
+          <p className="mt-2 text-xs text-neutral-900">
+            The 3D view is an aid for sighted testing. The model is fully readable in the tactile plan, the read-back text, and the state tree — none is the source of truth.
+          </p>
+        </Panel>
+
+        <Panel title="Canonical state.json">
+          <div className="h-80 overflow-auto rounded-md border border-neutral-300 bg-white p-2">
+            <JsonTree data={state} changed={changed} />
+          </div>
+        </Panel>
+      </div>
+
+      {/* Row 2 — authoring + read-back */}
+      <div className="grid gap-5 lg:grid-cols-2">
+        <Panel
+          title="Author"
+          right={<Tabs tabs={[["console", "Console"], ["forms", "Forms"], ["assistant", "Assistant"]]} active={authorTab} onPick={(t) => setAuthorTab(t as AuthorTab)} />}
+        >
+          <div className="min-h-[20rem]">
+            {authorTab === "console" && <Console log={log} history={history} onCommand={runCommand} />}
+            {authorTab === "forms" && <Forms state={state} onCommand={runCommand} />}
+            {authorTab === "assistant" && (
+              <div className="space-y-2">
+                {!signedIn && (
+                  <p className="rounded-md bg-[#fff2f0] px-3 py-2 text-xs text-neutral-900">
+                    The AI assistant needs sign-in (it spends the studio's API budget). The console, forms, and exports all work signed-out.
+                  </p>
+                )}
+                <AgentPanel onSubmit={runAgent} />
+              </div>
+            )}
+          </div>
+        </Panel>
+
+        <Panel title="Read-back — the non-visual model">
+          <div className="h-80 overflow-auto rounded-md border border-neutral-300 bg-white p-3">
+            <pre className="whitespace-pre-wrap font-mono text-xs leading-relaxed text-neutral-900">{readback}</pre>
+            <div className="mt-3 border-t border-neutral-200 pt-3">
+              <div className="text-xs font-bold uppercase text-neutral-900">Braille key</div>
+              {bayList.map((b) => (
+                <div key={b.label} className="mt-1 text-neutral-900">
+                  <span className="text-sm" style={{ fontFamily: "'Apple Braille','Segoe UI Symbol',monospace" }}>
+                    {b.braille}
+                  </span>{" "}
+                  <span className="text-xs">— {b.label}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </Panel>
+      </div>
+
+      {/* Screen-reader announcements for every state change */}
+      <div aria-live="polite" className="sr-only">
+        {live}
+      </div>
+    </div>
+  );
+}
+
+function ToolbarBtn({ onClick, children }: { onClick: () => void; children: React.ReactNode }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="rounded border-2 border-neutral-900 px-2.5 py-1.5 text-xs font-semibold text-neutral-900 hover:bg-neutral-900 hover:text-white"
+    >
+      {children}
+    </button>
+  );
+}
+
+function Panel({ title, right, children }: { title: string; right?: React.ReactNode; children: React.ReactNode }) {
+  return (
+    <section className="rounded-lg border-2 border-neutral-900 p-3">
+      <div className="mb-2 flex items-center justify-between gap-2">
+        <h2 className="display-font text-sm uppercase tracking-tight text-neutral-900">{title}</h2>
+        {right}
+      </div>
+      {children}
+    </section>
+  );
+}
+
+function Tabs({ tabs, active, onPick }: { tabs: string[][]; active: string; onPick: (t: string) => void }) {
+  return (
+    <div role="tablist" className="flex gap-1">
+      {tabs.map(([id, label]) => (
+        <button
+          key={id}
+          role="tab"
+          aria-selected={active === id}
+          onClick={() => onPick(id)}
+          className={`rounded px-2.5 py-1 text-xs font-semibold ${active === id ? "bg-neutral-900 text-white" : "border border-neutral-300 text-neutral-900 hover:border-neutral-900"}`}
+        >
+          {label}
+        </button>
+      ))}
+    </div>
+  );
+}
