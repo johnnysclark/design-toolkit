@@ -1,4 +1,34 @@
 <!-- ───────────────────────────── CURRENT STATE (top) ───────────────────────────── -->
+> **2D & 3D Tooling — BUILT (2026-06-26, branch `claude/port-tools-2d-3d-mhkag2`, not yet
+> merged).** The two stub pages are now **hubs of title cards**, one card per sub-tool, nav
+> status flipped `soon → live`. Pattern = client-only static apps under
+> `apps/toolkit/public/tools/<tool>/` embedded via iframe (the Gable Studio / Eco-Architect
+> pattern; no API key, no sign-in → public). New shared components: `components/ToolHub.tsx`
+> (header + card grid; card status `live`/`rebuilt`/`proposed`) and `components/EmbeddedTool.tsx`
+> (the iframe sub-route wrapper, with an "Open full screen" link).
+> - **2D Tooling (`/media-2d`)** — **Drawing Cleaner** (`public/tools/drawing-cleaner/`, ported
+>   verbatim from John's **Drawing-Image-Cleaner** repo: levels/gamma/unsharp/adaptive + split
+>   preview) and **Scan Cleaner** (`public/tools/scan-cleaner/`, ported from **scan-cleaner** repo;
+>   the superset — adds rotate/crop/curves/denoise/resize). Sub-routes `(app)/media-2d/{drawing-
+>   cleaner,scan-cleaner}/page.tsx`. **Proposed** cards (marked, not built): Halftone/Riso,
+>   Vectorize, Live Video Tracer, Laser/Fab export.
+> - **3D Tooling (`/tools-3d`)** — **Obliquify** (`public/tools/obliquify/`): a **fresh rebuild**
+>   (dependency-free canvas oblique/paraline projection — angle/depth/direction, cabinet/cavalier
+>   presets, solid|texture sides, shading, outline, transparent-PNG export). ⚠️ The original
+>   "obliquify" source was **NOT found** in the public repos (code-search + tree-walk of all 18 of
+>   John's repos came up empty — likely a private repo / non-default branch). Built from the
+>   "3D/geometry tool" description; card + page flag it as a rebuild. **Point us at the real source
+>   to match it.** **Proposed** cards: 3D-Print/PIAF Settings, Three.js Viewer, Rhino/GH Python.
+> - **How tools were sourced:** the source repos are **outside this session's GitHub scope**
+>   (`get_file_contents` denied; `list_repos`/`add_repo` not wired). With John's OK ("fetch public
+>   source, rebuild native") the two cleanup tools were pulled from **raw.githubusercontent.com**
+>   (both single self-contained HTML files, zero external deps) and dropped in as-is.
+> - **Verified:** `npm run build:toolkit` green (28 routes, incl. the 5 new ones); headless
+>   Chromium smoke test PASS for all three tools (each loads a synthetic image, renders its canvas,
+>   no console errors; Obliquify exports a valid PNG and its direction/depth/texture controls work).
+>   ⚠️ **Not tested:** the hub/sub-route pages inside the running Next app (needs Supabase env for
+>   the `(app)` layout's `getUser`) — they're simple static server components, build-clean.
+>
 > **RAP Studio — BUILT (2026-06-25, branch `feat/rap-studio`, worktree `design-toolkit-rap`,
 > not yet merged).** A runnable, interactive slice of the Radical Accessibility Project at
 > **`/rap/studio`** (linked from the `/rap` page; no new nav entry). One canonical in-browser
