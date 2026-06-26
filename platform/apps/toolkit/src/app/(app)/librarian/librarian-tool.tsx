@@ -1,40 +1,27 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { prepareImage } from "./image";
 import ProjectGallery from "./project-gallery";
 import {
-  type AnalyzeResult,
   type Analysis,
+  type AnalyzeResult,
   type Candidate,
   type ChatMessage,
+  type DroppedImage,
+  type LinkRef,
   type Project,
-  type RelatedImage,
   kindLabel
 } from "./types";
+
+const MAX_IMAGES = 6;
 
 const CONF: Record<string, string> = {
   high: "bg-green-100 text-green-800",
   medium: "bg-amber-100 text-amber-800",
-  low: "bg-neutral-200 text-neutral-600"
+  low: "bg-neutral-200 text-neutral-900"
 };
-
-const GROUP_ORDER = [
-  "plan",
-  "section",
-  "elevation",
-  "axon",
-  "perspective",
-  "photo-exterior",
-  "photo-interior",
-  "model-photo",
-  "sketch",
-  "diagram",
-  "detail",
-  "archive",
-  "other"
-];
 
 const card = "rounded-xl border border-neutral-200 bg-white p-5";
 const primaryBtn =
@@ -52,8 +39,13 @@ export default function LibrarianTool() {
   const [showNew, setShowNew] = useState(false);
   const [newName, setNewName] = useState("");
   const [newBrief, setNewBrief] = useState("");
+  const [editingProject, setEditingProject] = useState(false);
+  const [editName, setEditName] = useState("");
+  const [editBrief, setEditBrief] = useState("");
 
   const [tab, setTab] = useState<Tab>("upload");
+  const [ctxNote, setCtxNote] = useState("");
+  const [srcLink, setSrcLink] = useState("");
   const [urlInput, setUrlInput] = useState("");
   const [queryInput, setQueryInput] = useState("");
 
@@ -61,39 +53,44 @@ export default function LibrarianTool() {
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [result, setResult] = useState<AnalyzeResult | null>(null);
-  const [saved, setSaved] = useState<Set<string>>(new Set());
-  const [galleryKey, setGalleryKey] = useState(0);
+
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [userFacts, setUserFacts] = useState("");
   const [chatInput, setChatInput] = useState("");
   const [chatting, setChatting] = useState(false);
+
+  const [savedLinks, setSavedLinks] = useState<Set<string>>(new Set());
+  const [imagesSaved, setImagesSaved] = useState(false);
+  const [galleryKey, setGalleryKey] = useState(0);
   const fileRef = useRef<HTMLInputElement>(null);
 
-  function seedConversation(json: AnalyzeResult) {
-    setUserFacts("");
-    setChatInput("");
-    setMessages(json.analysis?.reply ? [{ role: "librarian", text: json.analysis.reply }] : []);
-  }
+  const currentProject = projects.find((p) => p.id === projectId) || null;
 
-  // ── load projects + restore last selection ──────────────────────────────
+  const loadProjects = useCallback(async () => {
+    const supabase = createClient();
+    const { data } = await supabase
+      .from("library_projects")
+      .select("id, owner, name, brief, created_at")
+      .order("created_at", { ascending: false });
+    setProjects((data || []) as Project[]);
+  }, []);
+
   useEffect(() => {
     (async () => {
-      const supabase = createClient();
-      const { data } = await supabase
-        .from("library_projects")
-        .select("id, owner, name, brief, created_at")
-        .order("created_at", { ascending: false });
-      const list = (data || []) as Project[];
-      setProjects(list);
+      await loadProjects();
       const last =
         typeof window !== "undefined" ? localStorage.getItem("librarian.project") : null;
-      if (last && list.some((p) => p.id === last)) setProjectId(last);
+      if (last) setProjectId(last);
     })();
-  }, []);
+  }, [loadProjects]);
 
   function selectProject(id: string) {
     setProjectId(id);
-    if (typeof window !== "undefined") localStorage.setItem("librarian.project", id);
+    setEditingProject(false);
+    if (typeof window !== "undefined") {
+      if (id) localStorage.setItem("librarian.project", id);
+      else localStorage.removeItem("librarian.project");
+    }
   }
 
   async function createProject() {
@@ -124,7 +121,54 @@ export default function LibrarianTool() {
     setShowNew(false);
   }
 
-  // ── analysis + search ───────────────────────────────────────────────────
+  async function saveProjectEdits() {
+    if (!projectId) return;
+    const supabase = createClient();
+    await supabase
+      .from("library_projects")
+      .update({ name: editName.trim() || currentProject?.name, brief: editBrief.trim() || null })
+      .eq("id", projectId);
+    await loadProjects();
+    setEditingProject(false);
+  }
+
+  async function deleteProject() {
+    if (!projectId) return;
+    if (
+      typeof window !== "undefined" &&
+      !window.confirm("Delete this project and everything catalogued in it?")
+    )
+      return;
+    const supabase = createClient();
+    await supabase.from("library_projects").delete().eq("id", projectId);
+    selectProject("");
+    await loadProjects();
+  }
+
+  // ── analysis helpers ────────────────────────────────────────────────────
+  function resetForAnalyze() {
+    setError(null);
+    setNotice(null);
+    setResult(null);
+    setMessages([]);
+    setUserFacts("");
+    setSavedLinks(new Set());
+    setImagesSaved(false);
+  }
+
+  function buildNote(): string | undefined {
+    const parts: string[] = [];
+    if (ctxNote.trim()) parts.push(ctxNote.trim());
+    if (srcLink.trim()) parts.push(`Source link: ${srcLink.trim()}`);
+    return parts.length ? parts.join("\n") : undefined;
+  }
+
+  function seedConversation(json: AnalyzeResult) {
+    setUserFacts("");
+    setChatInput("");
+    setMessages(json.analysis?.reply ? [{ role: "librarian", text: json.analysis.reply }] : []);
+  }
+
   async function postAnalyze(extra: Record<string, unknown>): Promise<AnalyzeResult> {
     const res = await fetch("/api/librarian", {
       method: "POST",
@@ -136,18 +180,16 @@ export default function LibrarianTool() {
     return json as AnalyzeResult;
   }
 
-  async function onFile(file: File) {
-    setError(null);
-    setNotice(null);
-    if (!/^image\//.test(file.type)) {
-      setError("That's not an image file.");
+  async function onFiles(list: FileList | File[]) {
+    const files = Array.from(list)
+      .filter((f) => /^image\//.test(f.type))
+      .slice(0, MAX_IMAGES);
+    if (!files.length) {
+      setError("Drop image files (JPEG, PNG, GIF, or WebP).");
       return;
     }
+    resetForAnalyze();
     setBusy("analyze");
-    setResult(null);
-    setSaved(new Set());
-    setMessages([]);
-    setUserFacts("");
     try {
       const supabase = createClient();
       const {
@@ -155,22 +197,28 @@ export default function LibrarianTool() {
       } = await supabase.auth.getUser();
       if (!user) throw new Error("You appear to be signed out — reload the page.");
 
-      const { blob, ext } = await prepareImage(file);
-      const path = `${user.id}/${projectId || "inbox"}/${Date.now()}.${ext}`;
-      const up = await supabase.storage
-        .from("library")
-        .upload(path, blob, {
-          cacheControl: "3600",
-          upsert: false,
-          contentType: blob.type || file.type
-        });
-      if (up.error) throw up.error;
+      const images: DroppedImage[] = [];
+      for (const file of files) {
+        const { blob, ext } = await prepareImage(file);
+        const path = `${user.id}/${projectId || "inbox"}/${Date.now()}-${Math.random()
+          .toString(36)
+          .slice(2, 7)}.${ext}`;
+        const up = await supabase.storage
+          .from("library")
+          .upload(path, blob, {
+            cacheControl: "3600",
+            upsert: false,
+            contentType: blob.type || file.type
+          });
+        if (up.error) throw up.error;
+        const { data: signed } = await supabase.storage
+          .from("library")
+          .createSignedUrl(path, 3600);
+        images.push({ path, url: signed?.signedUrl || "" });
+      }
 
-      const json = await postAnalyze({ imagePath: path });
-      const { data: signed } = await supabase.storage
-        .from("library")
-        .createSignedUrl(path, 3600);
-      setResult({ ...json, _imagePath: path, _previewUrl: signed?.signedUrl || null });
+      const json = await postAnalyze({ imagePaths: images.map((i) => i.path), note: buildNote() });
+      setResult({ ...json, _images: images, _sourceLink: srcLink.trim() || null });
       seedConversation(json);
     } catch (e: any) {
       setError(e?.message || "Analysis failed.");
@@ -182,16 +230,11 @@ export default function LibrarianTool() {
   async function analyzeUrl() {
     const u = urlInput.trim();
     if (!u) return;
-    setError(null);
-    setNotice(null);
+    resetForAnalyze();
     setBusy("analyze");
-    setResult(null);
-    setSaved(new Set());
-    setMessages([]);
-    setUserFacts("");
     try {
-      const json = await postAnalyze({ imageUrl: u });
-      setResult({ ...json, _sourceUrl: u, _previewUrl: u });
+      const json = await postAnalyze({ imageUrls: [u], note: buildNote() });
+      setResult({ ...json, _images: [{ url: u }], _sourceLink: srcLink.trim() || u });
       seedConversation(json);
     } catch (e: any) {
       setError(e?.message || "Analysis failed.");
@@ -203,13 +246,8 @@ export default function LibrarianTool() {
   async function keywordSearch() {
     const q = queryInput.trim();
     if (!q) return;
-    setError(null);
-    setNotice(null);
+    resetForAnalyze();
     setBusy("search");
-    setResult(null);
-    setSaved(new Set());
-    setMessages([]);
-    setUserFacts("");
     try {
       const res = await fetch("/api/librarian", {
         method: "POST",
@@ -226,17 +264,14 @@ export default function LibrarianTool() {
     }
   }
 
-  // Conversational refinement: the student tells the Librarian what it is /
-  // gives more data; we re-analyze the same image with those facts as ground
-  // truth and re-search the archives with the corrected identity.
+  // Conversational refinement — the student tells the Librarian what it is.
   async function sendChat() {
     const msg = chatInput.trim();
     if (!msg || !result) return;
-    const ref = result._imagePath
-      ? { imagePath: result._imagePath }
-      : result._sourceUrl
-        ? { imageUrl: result._sourceUrl }
-        : null;
+    const imgs = result._images || [];
+    const paths = imgs.filter((i) => i.path).map((i) => i.path!) as string[];
+    const urls = imgs.filter((i) => !i.path).map((i) => i.url);
+    const ref = paths.length ? { imagePaths: paths } : urls.length ? { imageUrls: urls } : null;
     if (!ref) {
       setError("The conversation is available for image analyses.");
       return;
@@ -261,12 +296,7 @@ export default function LibrarianTool() {
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || "Request failed");
-      setResult((prev) => ({
-        ...(json as AnalyzeResult),
-        _imagePath: prev?._imagePath,
-        _previewUrl: prev?._previewUrl,
-        _sourceUrl: prev?._sourceUrl
-      }));
+      setResult((prev) => ({ ...(json as AnalyzeResult), _images: prev?._images, _sourceLink: prev?._sourceLink }));
       if (json.analysis?.reply) {
         setMessages((m) => [...m, { role: "librarian", text: json.analysis.reply }]);
       }
@@ -281,16 +311,18 @@ export default function LibrarianTool() {
   function onPaste(e: React.ClipboardEvent) {
     const items = e.clipboardData?.items;
     if (items) {
+      const files: File[] = [];
       for (const it of Array.from(items)) {
         if (it.type.startsWith("image/")) {
           const f = it.getAsFile();
-          if (f) {
-            e.preventDefault();
-            setTab("upload");
-            onFile(f);
-            return;
-          }
+          if (f) files.push(f);
         }
+      }
+      if (files.length) {
+        e.preventDefault();
+        setTab("upload");
+        onFiles(files);
+        return;
       }
     }
     const text = e.clipboardData?.getData("text") || "";
@@ -303,7 +335,7 @@ export default function LibrarianTool() {
   // ── catalogue into the project ──────────────────────────────────────────
   function requireProject(): boolean {
     if (!projectId) {
-      setError("Pick or create a project first — that's where saved images go.");
+      setError("Pick or create a project first — that's where saved items go.");
       return false;
     }
     return true;
@@ -325,76 +357,74 @@ export default function LibrarianTool() {
     setGalleryKey((k) => k + 1);
   }
 
-  async function saveSource() {
-    if (!requireProject() || !result?.analysis) return;
+  async function addImages() {
+    if (!requireProject() || !result) return;
     setError(null);
     const a = result.analysis;
-    const top: Candidate | undefined = a.candidates?.[0];
+    const top: Candidate | undefined = a?.candidates?.[0];
     const id = result.enrichment?.identified;
+    const imgs = result._images || [];
     try {
-      await insertItem({
-        source: result._imagePath ? "upload" : "paste-url",
-        kind: a.image_kind || null,
-        image_path: result._imagePath || null,
-        source_url: result._sourceUrl || null,
-        title: id?.label || top?.building || "Found image",
-        caption: a.description?.slice(0, 280) || null,
-        building: id?.label || top?.building || null,
-        architect: id?.architect || top?.architect || null,
-        year: id?.year || top?.year || null,
-        location: top?.location || null,
-        program: top?.program || null,
-        tags: (a.suggested_tags || []).slice(0, 12),
-        confidence: top?.confidence || null
-      });
-      setNotice("Saved the source image to the project.");
+      for (const im of imgs) {
+        await insertItem({
+          source: im.path ? "upload" : "paste-url",
+          kind: a?.image_kind || null,
+          image_path: im.path || null,
+          source_url: im.path ? result._sourceLink || null : im.url,
+          title: id?.label || top?.building || "Found image",
+          caption: a?.description?.slice(0, 280) || null,
+          building: id?.label || top?.building || null,
+          architect: id?.architect || top?.architect || null,
+          year: id?.year || top?.year || null,
+          location: top?.location || null,
+          program: top?.program || null,
+          tags: (a?.suggested_tags || []).slice(0, 12),
+          confidence: top?.confidence || null
+        });
+      }
+      setImagesSaved(true);
+      setNotice(`Saved ${imgs.length} image${imgs.length > 1 ? "s" : ""} to the project.`);
     } catch (e: any) {
       setError(e?.message || "Could not save.");
     }
   }
 
-  async function addRelated(img: RelatedImage) {
+  async function addLink(link: LinkRef) {
     if (!requireProject()) return;
     setError(null);
     const id = result?.enrichment?.identified;
     try {
       await insertItem({
-        source: img.source === "loc" ? "archive" : "llm-found",
-        kind: img.kind || null,
-        source_url: img.sourceUrl || img.url,
-        thumb_url: img.thumbUrl || img.url,
-        title: img.title || id?.label || "Related image",
+        source: "reference",
+        kind: "reference",
+        source_url: link.url,
+        title: link.label,
+        notes: link.note || null,
         building: id?.label || null,
         architect: id?.architect || null,
-        year: id?.year || null,
-        tags: img.kind ? [img.kind] : [],
-        license: img.license || null,
-        attribution: img.attribution || null,
-        confidence: id ? "medium" : "low"
+        tags: ["reference"]
       });
-      setSaved((s) => new Set(s).add(img.url));
+      setSavedLinks((s) => new Set(s).add(link.url));
     } catch (e: any) {
       setError(e?.message || "Could not save.");
     }
   }
 
-  const currentProject = projects.find((p) => p.id === projectId) || null;
-
   return (
     <div>
       <h1 className="text-3xl">Librarian</h1>
-      <p className="mt-2 max-w-2xl text-neutral-600">
-        Found a single image and don&rsquo;t know what it is? Drop it here. The Librarian
-        reads it, proposes what it might be (as <span className="font-medium">leads to verify</span>,
-        not facts), pulls related plans, drawings, and photos from open archives, and teaches
-        you the words to describe it — then catalogues anything worth keeping into a project
-        library you build over time.
+      <p className="mt-2 max-w-2xl text-neutral-900">
+        Drop one or more images you&rsquo;ve found. The Librarian reads them, proposes what they
+        might be (as <span className="font-medium">leads to verify</span>, never facts), teaches
+        you the words to describe them, and points you to where related plans, drawings, and
+        photos actually live — then catalogues anything worth keeping into a project library you
+        build over time.
       </p>
 
       {/* ── project bar ─────────────────────────────────────────────── */}
       <div className={`mt-6 ${card}`}>
         <div className="flex flex-wrap items-center gap-3">
-          <span className="display-font text-sm uppercase tracking-wide text-neutral-500">
+          <span className="display-font text-sm uppercase tracking-wide text-neutral-900">
             Project
           </span>
           <select
@@ -409,35 +439,82 @@ export default function LibrarianTool() {
               </option>
             ))}
           </select>
-          <button onClick={() => setShowNew((v) => !v)} className={ghostBtn}>
+          <button
+            onClick={() => {
+              setShowNew((v) => !v);
+              setEditingProject(false);
+            }}
+            className={ghostBtn}
+          >
             {showNew ? "Cancel" : "+ New project"}
           </button>
-          {currentProject?.brief && (
-            <span className="text-sm text-neutral-500">— {currentProject.brief}</span>
+          {projectId && (
+            <button
+              onClick={() => {
+                setEditingProject((v) => !v);
+                setShowNew(false);
+                setEditName(currentProject?.name || "");
+                setEditBrief(currentProject?.brief || "");
+              }}
+              className={ghostBtn}
+            >
+              {editingProject ? "Close" : "Edit project"}
+            </button>
           )}
           {!projectId && (
-            <span className="text-xs text-neutral-400">
-              Pick a project to save finds into; you can still analyze without one.
+            <span className="text-xs text-neutral-900">
+              Pick a project to save into; you can still analyze without one.
             </span>
           )}
         </div>
+
         {showNew && (
-          <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-[1fr_1fr_auto]">
+          <div className="mt-3 space-y-2">
             <input
               value={newName}
               onChange={(e) => setNewName(e.target.value)}
               placeholder="Project name *"
               className={field}
             />
-            <input
+            <textarea
               value={newBrief}
               onChange={(e) => setNewBrief(e.target.value)}
-              placeholder="One-line brief (optional)"
-              className={field}
+              rows={2}
+              placeholder="A few sentences about this project — what it's for, what you're collecting (optional)"
+              className={`${field} resize-y`}
             />
             <button onClick={createProject} className={primaryBtn}>
-              Create
+              Create project
             </button>
+          </div>
+        )}
+
+        {editingProject && projectId && (
+          <div className="mt-3 space-y-2">
+            <input
+              value={editName}
+              onChange={(e) => setEditName(e.target.value)}
+              placeholder="Project name"
+              className={field}
+            />
+            <textarea
+              value={editBrief}
+              onChange={(e) => setEditBrief(e.target.value)}
+              rows={3}
+              placeholder="A few sentences about this project"
+              className={`${field} resize-y`}
+            />
+            <div className="flex gap-2">
+              <button onClick={saveProjectEdits} className={primaryBtn}>
+                Save
+              </button>
+              <button
+                onClick={deleteProject}
+                className="rounded-lg border border-red-300 px-4 py-2 text-sm font-medium text-red-700 hover:bg-red-50"
+              >
+                Delete project
+              </button>
+            </div>
           </div>
         )}
       </div>
@@ -456,53 +533,80 @@ export default function LibrarianTool() {
                   : "border border-neutral-300 hover:bg-neutral-100"
               ].join(" ")}
             >
-              {t === "upload" ? "Upload / paste image" : t === "url" ? "Image URL" : "Search archives"}
+              {t === "upload"
+                ? "Upload / paste images"
+                : t === "url"
+                  ? "Image URL"
+                  : "Search archives"}
             </button>
           ))}
         </div>
 
         {tab === "upload" && (
-          <div className="mt-4">
+          <div className="mt-4 space-y-3">
             <div
               onDragOver={(e) => e.preventDefault()}
               onDrop={(e) => {
                 e.preventDefault();
-                const f = e.dataTransfer.files?.[0];
-                if (f) onFile(f);
+                if (e.dataTransfer.files?.length) onFiles(e.dataTransfer.files);
               }}
               onClick={() => fileRef.current?.click()}
               className="flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-neutral-300 px-6 py-10 text-center hover:border-neutral-900"
             >
-              <p className="font-medium">Drop an image, click to choose, or paste (⌘/Ctrl-V)</p>
-              <p className="mt-1 text-sm text-neutral-500">
-                JPEG · PNG · GIF · WebP — large images are downscaled automatically.
+              <p className="font-medium">
+                Drop image(s), click to choose, or paste (⌘/Ctrl-V)
+              </p>
+              <p className="mt-1 text-sm text-neutral-900">
+                Up to {MAX_IMAGES} at once — several views of the same thing are welcome.
               </p>
               <input
                 ref={fileRef}
                 type="file"
                 accept="image/*"
+                multiple
                 className="hidden"
                 onChange={(e) => {
-                  const f = e.target.files?.[0];
-                  if (f) onFile(f);
+                  if (e.target.files?.length) onFiles(e.target.files);
                   e.target.value = "";
                 }}
               />
             </div>
+            <textarea
+              value={ctxNote}
+              onChange={(e) => setCtxNote(e.target.value)}
+              rows={2}
+              placeholder="Context (optional) — anything you already know: architect, project, where you found it…"
+              className={`${field} resize-y`}
+            />
+            <input
+              value={srcLink}
+              onChange={(e) => setSrcLink(e.target.value)}
+              placeholder="Source link (optional) — the page you found it on"
+              className={field}
+            />
           </div>
         )}
 
         {tab === "url" && (
-          <div className="mt-4 flex flex-wrap gap-2">
-            <input
-              value={urlInput}
-              onChange={(e) => setUrlInput(e.target.value)}
-              placeholder="https://…/image.jpg — paste an image link from the web"
-              className={`${field} flex-1`}
+          <div className="mt-4 space-y-3">
+            <div className="flex flex-wrap gap-2">
+              <input
+                value={urlInput}
+                onChange={(e) => setUrlInput(e.target.value)}
+                placeholder="https://…/image.jpg — paste an image link from the web"
+                className={`${field} flex-1`}
+              />
+              <button onClick={analyzeUrl} disabled={busy !== null} className={primaryBtn}>
+                Analyze
+              </button>
+            </div>
+            <textarea
+              value={ctxNote}
+              onChange={(e) => setCtxNote(e.target.value)}
+              rows={2}
+              placeholder="Context (optional) — architect, project, where you found it…"
+              className={`${field} resize-y`}
             />
-            <button onClick={analyzeUrl} disabled={busy !== null} className={primaryBtn}>
-              Analyze
-            </button>
           </div>
         )}
 
@@ -512,7 +616,7 @@ export default function LibrarianTool() {
               value={queryInput}
               onChange={(e) => setQueryInput(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && keywordSearch()}
-              placeholder="Search open archives by name — e.g. 'Villa Savoye' or 'Lina Bo Bardi SESC'"
+              placeholder="Search by name — e.g. 'Villa Savoye' or 'Lina Bo Bardi SESC'"
               className={`${field} flex-1`}
             />
             <button onClick={keywordSearch} disabled={busy !== null} className={primaryBtn}>
@@ -523,10 +627,8 @@ export default function LibrarianTool() {
       </div>
 
       {busy && (
-        <p className="mt-4 text-sm text-neutral-500">
-          {busy === "analyze"
-            ? "Reading the image and searching the archives…"
-            : "Searching the archives…"}
+        <p className="mt-4 text-sm text-neutral-900">
+          {busy === "analyze" ? "Reading the image(s)…" : "Looking it up…"}
         </p>
       )}
       {error && <p className="mt-4 rounded-lg bg-red-50 p-4 text-sm text-red-700">{error}</p>}
@@ -537,10 +639,11 @@ export default function LibrarianTool() {
       {result && (
         <ResultPanel
           result={result}
-          saved={saved}
-          onSaveSource={saveSource}
-          onAddRelated={addRelated}
           canSave={!!projectId}
+          onAddImages={addImages}
+          imagesSaved={imagesSaved}
+          onAddLink={addLink}
+          savedLinks={savedLinks}
           messages={messages}
           chatInput={chatInput}
           setChatInput={setChatInput}
@@ -555,9 +658,11 @@ export default function LibrarianTool() {
           <h2 className="display-font text-xl uppercase tracking-tight">
             {currentProject?.name} — library
           </h2>
-          <p className="mt-1 text-sm text-neutral-500">
-            Everything catalogued in this project. Shared with the studio; you can edit and
-            remove your own.
+          {currentProject?.brief && (
+            <p className="mt-1 max-w-2xl text-sm text-neutral-900">{currentProject.brief}</p>
+          )}
+          <p className="mt-1 text-xs text-neutral-900">
+            Shared with the studio; you can edit and remove your own items.
           </p>
           <ProjectGallery projectId={projectId} refreshKey={galleryKey} />
         </section>
@@ -598,8 +703,8 @@ function Conversation({
             it or guessed.
           </p>
           <p className="mt-1">
-            Tell me what you know — author, project, location, year — and I&rsquo;ll catalog it
-            and pull related material.
+            Tell me what you know — author, project, location, year — and I&rsquo;ll catalog it and
+            point you to related material.
           </p>
           {analysis.questions?.length > 0 && (
             <ul className="mt-2 list-disc pl-5">
@@ -620,7 +725,7 @@ function Conversation({
                   "max-w-[85%] rounded-lg px-3 py-2 text-sm",
                   m.role === "user"
                     ? "bg-neutral-900 text-white"
-                    : "bg-neutral-100 text-neutral-800"
+                    : "bg-neutral-100 text-neutral-900"
                 ].join(" ")}
               >
                 {m.text}
@@ -652,10 +757,11 @@ function Conversation({
 
 function ResultPanel({
   result,
-  saved,
-  onSaveSource,
-  onAddRelated,
   canSave,
+  onAddImages,
+  imagesSaved,
+  onAddLink,
+  savedLinks,
   messages,
   chatInput,
   setChatInput,
@@ -663,10 +769,11 @@ function ResultPanel({
   chatting
 }: {
   result: AnalyzeResult;
-  saved: Set<string>;
-  onSaveSource: () => void;
-  onAddRelated: (img: RelatedImage) => void;
   canSave: boolean;
+  onAddImages: () => void;
+  imagesSaved: boolean;
+  onAddLink: (l: LinkRef) => void;
+  savedLinks: Set<string>;
   messages: ChatMessage[];
   chatInput: string;
   setChatInput: (v: string) => void;
@@ -675,72 +782,71 @@ function ResultPanel({
 }) {
   const a = result.analysis;
   const e = result.enrichment;
-  const top = a?.candidates?.[0];
+  const images = result._images || [];
 
-  // merge model + Getty vocabulary
   const vocab = [
     ...(a?.vocabulary || []).map((v) => ({ ...v, source: "model" })),
     ...(e?.vocabulary || [])
   ];
 
-  // group related images by kind
-  const groups: Record<string, RelatedImage[]> = {};
-  for (const im of e?.relatedImages || []) {
-    const k = im.kind || "other";
-    (groups[k] ||= []).push(im);
-  }
-  const groupKeys = Object.keys(groups).sort(
-    (x, y) => (GROUP_ORDER.indexOf(x) + 1 || 99) - (GROUP_ORDER.indexOf(y) + 1 || 99)
-  );
-
   return (
     <div className="mt-8 space-y-6">
-      {/* the image + what it is */}
+      {/* the student's image(s) + what they are */}
       <div className={card}>
-        <div className="grid grid-cols-1 gap-5 sm:grid-cols-[200px_1fr]">
-          <div className="overflow-hidden rounded-lg border border-neutral-200 bg-neutral-100">
-            {result._previewUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={result._previewUrl} alt="analyzed" className="h-full w-full object-cover" />
-            ) : (
-              <div className="flex aspect-square items-center justify-center text-xs text-neutral-400">
-                {result.mode === "search" ? "keyword search" : "no preview"}
-              </div>
-            )}
-          </div>
-          <div>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
             {a && (
-              <>
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="rounded-full bg-neutral-900 px-2 py-0.5 text-[10px] uppercase tracking-wide text-white">
-                    {kindLabel(a.image_kind)}
-                  </span>
-                  {canSave && (
-                    <button onClick={onSaveSource} className={ghostBtn}>
-                      ★ Save this image to project
-                    </button>
-                  )}
-                </div>
-                {a.description?.trim() && (
-                  <p className="mt-2 text-sm text-neutral-800">{a.description}</p>
-                )}
-                {a.visible_text?.trim() && (
-                  <p className="mt-2 text-sm text-neutral-600">
-                    <span className="font-medium">Text in image:</span> {a.visible_text}
-                  </p>
-                )}
-              </>
+              <span className="rounded-full bg-neutral-900 px-2 py-0.5 text-[10px] uppercase tracking-wide text-white">
+                {kindLabel(a.image_kind)}
+              </span>
             )}
-            {result.mode === "search" && (
-              <p className="text-sm text-neutral-700">
-                Archive results for <span className="font-medium">{result.query}</span>.
-              </p>
+            {images.length > 0 && (
+              <span className="text-xs text-neutral-900">
+                {images.length} image{images.length > 1 ? "s" : ""}
+              </span>
             )}
           </div>
+          {canSave && images.length > 0 && (
+            <button onClick={onAddImages} disabled={imagesSaved} className={ghostBtn}>
+              {imagesSaved
+                ? "✓ Added to project"
+                : `★ Add image${images.length > 1 ? "s" : ""} to project`}
+            </button>
+          )}
         </div>
+
+        {images.length > 0 && (
+          <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+            {images.map((im, i) => (
+              <div
+                key={i}
+                className="aspect-square overflow-hidden rounded-lg border border-neutral-200 bg-neutral-100"
+              >
+                {im.url ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={im.url} alt={`dropped ${i + 1}`} className="h-full w-full object-cover" />
+                ) : null}
+              </div>
+            ))}
+          </div>
+        )}
+
+        {a?.description?.trim() && (
+          <p className="mt-3 text-sm text-neutral-900">{a.description}</p>
+        )}
+        {a?.visible_text?.trim() && (
+          <p className="mt-2 text-sm text-neutral-900">
+            <span className="font-medium">Text in image:</span> {a.visible_text}
+          </p>
+        )}
+        {result.mode === "search" && (
+          <p className="mt-1 text-sm text-neutral-900">
+            Results for <span className="font-medium">{result.query}</span>.
+          </p>
+        )}
       </div>
 
-      {/* conversation — tell the Librarian what it is */}
+      {/* conversation */}
       {a && (
         <Conversation
           analysis={a}
@@ -752,13 +858,13 @@ function ResultPanel({
         />
       )}
 
-      {/* candidate identifications (only when there's something to show) */}
+      {/* candidate identifications (only when there's something confident) */}
       {a && a.candidates && a.candidates.length > 0 && (
         <section className={card}>
           <h3 className="display-font text-lg uppercase tracking-tight">Possible identifications</h3>
-          <p className="mt-1 text-sm text-neutral-500">
-            Leads to verify — not facts. A confident wrong name is the worst outcome, so the
-            model abstains when unsure.
+          <p className="mt-1 text-sm text-neutral-900">
+            Leads to verify — not facts. A confident wrong name is the worst outcome, so the model
+            abstains when unsure.
           </p>
           <div className="mt-3 space-y-3">
             {a.candidates.map((c, i) => (
@@ -774,12 +880,12 @@ function ResultPanel({
                     {c.confidence} confidence
                   </span>
                 </div>
-                <p className="mt-0.5 text-sm text-neutral-500">
+                <p className="mt-0.5 text-sm text-neutral-900">
                   {[c.architect, c.year, c.location, c.program].filter(Boolean).join(" · ")}
                 </p>
                 {c.visual_evidence && (
                   <p className="mt-1 text-sm">
-                    <span className="text-neutral-500">Seen in image: </span>
+                    <span className="text-neutral-900">Seen in image: </span>
                     {c.visual_evidence}
                   </p>
                 )}
@@ -794,26 +900,26 @@ function ResultPanel({
         </section>
       )}
 
-      {/* identified context (Wikidata) + Wikipedia */}
+      {/* text context */}
       {(e?.identified || e?.context) && (
         <section className={card}>
           <h3 className="display-font text-lg uppercase tracking-tight">Context</h3>
           {e.identified && (
             <div className="mt-2 text-sm">
               <p className="font-medium">{e.identified.label}</p>
-              <p className="text-neutral-500">
+              <p className="text-neutral-900">
                 {[e.identified.architect, e.identified.year, e.identified.style]
                   .filter(Boolean)
                   .join(" · ")}
               </p>
               {e.identified.description && (
-                <p className="mt-1 text-neutral-700">{e.identified.description}</p>
+                <p className="mt-1 text-neutral-900">{e.identified.description}</p>
               )}
             </div>
           )}
           {e.context && (
             <div className="mt-3 text-sm">
-              <p className="text-neutral-700">{e.context.summary}</p>
+              <p className="text-neutral-900">{e.context.summary}</p>
               <a
                 href={e.context.url}
                 target="_blank"
@@ -824,21 +930,6 @@ function ResultPanel({
               </a>
             </div>
           )}
-          {e.sources?.length ? (
-            <div className="mt-3 flex flex-wrap gap-3 text-xs">
-              {e.sources.map((s, i) => (
-                <a
-                  key={i}
-                  href={s.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-neutral-500 underline hover:text-neutral-800"
-                >
-                  {s.label} ↗
-                </a>
-              ))}
-            </div>
-          ) : null}
         </section>
       )}
 
@@ -846,7 +937,7 @@ function ResultPanel({
       {vocab.length > 0 && (
         <section className={card}>
           <h3 className="display-font text-lg uppercase tracking-tight">Vocabulary</h3>
-          <p className="mt-1 text-sm text-neutral-500">
+          <p className="mt-1 text-sm text-neutral-900">
             Words to describe and search for this kind of work.
           </p>
           <dl className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
@@ -855,89 +946,72 @@ function ResultPanel({
                 <dt className="text-sm font-medium">
                   {v.term}
                   {v.source === "getty-aat" && (
-                    <span className="ml-2 rounded bg-neutral-100 px-1 py-0.5 text-[10px] uppercase text-neutral-500">
+                    <span className="ml-2 rounded bg-neutral-100 px-1 py-0.5 text-[10px] uppercase text-neutral-900">
                       Getty AAT
                     </span>
                   )}
                 </dt>
-                <dd className="text-sm text-neutral-600">{v.meaning}</dd>
+                <dd className="text-sm text-neutral-900">{v.meaning}</dd>
               </div>
             ))}
           </dl>
         </section>
       )}
 
-      {/* related images */}
+      {/* where to find related material — links, never speculative images */}
       <section className={card}>
-        <h3 className="display-font text-lg uppercase tracking-tight">Related material</h3>
-        <p className="mt-1 text-sm text-neutral-500">
-          Plans, drawings, other views, and photos from open archives. Check the license before
-          reuse; click any image to open its source.
+        <h3 className="display-font text-lg uppercase tracking-tight">
+          Where to find related material
+        </h3>
+        <p className="mt-1 text-sm text-neutral-900">
+          Curated links — plans, drawings, other views, photos. We don&rsquo;t auto-show archive
+          images because automatic matches are unreliable; click through, judge for yourself, and
+          drop anything good back in above.
         </p>
-        {groupKeys.length === 0 ? (
-          <p className="mt-3 text-sm text-neutral-600">
-            No archive matches — likely a lesser-known or recent building. Try a manual search,
-            or a different view of it.
-          </p>
-        ) : (
-          <div className="mt-3 space-y-5">
-            {groupKeys.map((k) => (
-              <div key={k}>
-                <p className="mb-2 text-xs font-medium uppercase tracking-wide text-neutral-500">
-                  {kindLabel(k)} · {groups[k].length}
-                </p>
-                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-                  {groups[k].map((img, i) => (
-                    <figure
-                      key={`${k}-${i}`}
-                      className="overflow-hidden rounded-lg border border-neutral-200 bg-white"
-                    >
-                      <a href={img.sourceUrl || img.url} target="_blank" rel="noopener noreferrer">
-                        <div className="aspect-[4/3] bg-neutral-100">
-                          {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img
-                            src={img.thumbUrl || img.url}
-                            alt={img.title || "related"}
-                            loading="lazy"
-                            className="h-full w-full object-cover"
-                          />
-                        </div>
-                      </a>
-                      <figcaption className="p-2">
-                        {img.title && (
-                          <p className="truncate text-xs text-neutral-700" title={img.title}>
-                            {img.title}
-                          </p>
-                        )}
-                        <p className="mt-0.5 text-[10px] text-neutral-400">
-                          {img.source} {img.license ? `· ${img.license}` : ""}
-                        </p>
-                        <button
-                          onClick={() => onAddRelated(img)}
-                          disabled={!canSave || saved.has(img.url)}
-                          className={`mt-1 w-full ${ghostBtn}`}
-                        >
-                          {saved.has(img.url) ? "✓ Added" : "+ Add to project"}
-                        </button>
-                      </figcaption>
-                    </figure>
-                  ))}
-                </div>
-              </div>
+        {e?.links?.length ? (
+          <ul className="mt-3 space-y-2">
+            {e.links.map((l, i) => (
+              <li
+                key={i}
+                className="flex items-center justify-between gap-3 rounded-lg border border-neutral-200 p-2"
+              >
+                <a
+                  href={l.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="min-w-0 flex-1 truncate text-sm text-blue-700 underline"
+                  title={l.label}
+                >
+                  {l.label}
+                  {l.note ? <span className="text-neutral-900"> — {l.note}</span> : null}
+                </a>
+                {canSave && (
+                  <button
+                    onClick={() => onAddLink(l)}
+                    disabled={savedLinks.has(l.url)}
+                    className={ghostBtn}
+                  >
+                    {savedLinks.has(l.url) ? "✓ Saved" : "+ Save link"}
+                  </button>
+                )}
+              </li>
             ))}
-          </div>
-        )}
-        {!canSave && (
-          <p className="mt-3 text-xs text-neutral-400">
-            Select a project above to save any of these.
+          </ul>
+        ) : (
+          <p className="mt-3 text-sm text-neutral-900">
+            Nothing to point to yet — tell the Librarian what this is and I&rsquo;ll add search
+            links.
           </p>
         )}
+        {!canSave && e?.links?.length ? (
+          <p className="mt-3 text-xs text-neutral-900">
+            Select a project above to save any of these as references.
+          </p>
+        ) : null}
       </section>
 
       {/* diagnostics */}
-      {e?.notes?.length ? (
-        <p className="text-xs text-neutral-400">{e.notes.join(" ")}</p>
-      ) : null}
+      {e?.notes?.length ? <p className="text-xs text-neutral-900">{e.notes.join(" ")}</p> : null}
     </div>
   );
 }

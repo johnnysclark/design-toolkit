@@ -140,7 +140,7 @@ export const IMAGE_ANALYSIS_SCHEMA = {
 
 export const IMAGE_ANALYSIS_SYSTEM = [
   "You are a visual research librarian for an architecture design studio.",
-  "A student has found a single image — often saved from somewhere like Pinterest, with no caption — and wants to understand it better: what it is, how to describe it, and what to look for next.",
+  "A student has found one or more images — often saved from somewhere like Pinterest, with no caption (and possibly several views of the same work, or a related set) — and wants to understand them better: what they are, how to describe them, and what to look for next.",
   "",
   "Your job is to give them CONTEXT and VOCABULARY, and to propose what the image might be.",
   "This studio treats AI as a material to be interrogated, never as an authority. Any identification you give is a CLAIM FOR THE STUDENT TO VERIFY, not a fact.",
@@ -165,20 +165,26 @@ export function analysisUser(ctx: {
   sourceUrl?: string;
   note?: string;
   userContext?: string;
+  imageCount?: number;
 }): string {
+  const n = ctx.imageCount && ctx.imageCount > 1 ? ctx.imageCount : 1;
+  const subject =
+    n > 1 ? `these ${n} images (likely several views of the same work, or a related set)` : "the image";
+  const them = n > 1 ? "them" : "it";
+  const are = n > 1 ? "are" : "is";
   const lines: string[] = [];
   if (ctx.userContext && ctx.userContext.trim()) {
     lines.push(
-      "Here is the image. The student has told you the following about it — treat it as AUTHORITATIVE and catalog accordingly (adopt it as the primary identification at high confidence, then find related material):",
+      `Here ${are} ${subject}. The student has told you the following — treat it as AUTHORITATIVE and catalog ${them} accordingly (adopt it as the primary identification at high confidence):`,
       "",
       ctx.userContext.trim()
     );
   } else {
     lines.push(
-      "Here is the image the student found. Give it context, vocabulary, and any honest identification (as leads to verify). If you cannot confidently identify it, do not guess — say so in `reply` and ask for what would help in `questions`."
+      `Here ${are} ${subject} the student found. Give context, vocabulary, and any honest identification (as leads to verify). If you cannot confidently identify ${them}, do not guess — say so in \`reply\` and ask for what would help in \`questions\`.`
     );
   }
-  if (ctx.sourceUrl) lines.push(`\nSource URL the student pasted: ${ctx.sourceUrl}`);
-  if (ctx.note) lines.push(`\nStudent's note: ${ctx.note}`);
+  if (ctx.sourceUrl) lines.push(`\nSource URL / link the student gave: ${ctx.sourceUrl}`);
+  if (ctx.note) lines.push(`\nStudent's note / context: ${ctx.note}`);
   return lines.join("\n");
 }

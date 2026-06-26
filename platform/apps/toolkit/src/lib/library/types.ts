@@ -1,16 +1,17 @@
 // Shared types for the free-archive enrichment layer (no API keys required).
-// Everything here is "best-effort context" — leads for a student to follow and
-// verify, never authoritative fact.
+//
+// IMPORTANT: we do NOT auto-embed archive images. Free image search/category
+// matching is unreliable (tangential shots, wrong building), and a wrong image
+// is worse than none. Instead we return reliable TEXT context for a *confirmed*
+// identity plus a curated set of LINKS to where related material actually lives
+// (the student clicks through and judges relevance). The only images ever shown
+// are the student's own — dropped in or added to a project.
 
-export interface RelatedImage {
-  url: string; // direct image URL
-  thumbUrl?: string; // smaller preview
-  title?: string;
-  kind?: string; // best-guess category (plan, section, photo-interior, model-photo…)
-  source: string; // where it came from: 'wikimedia-commons' | 'loc' | 'wikidata'
-  sourceUrl?: string; // human-readable page / description URL
-  license?: string; // per-item rights, when known
-  attribution?: string;
+export interface LinkRef {
+  label: string;
+  url: string;
+  note?: string; // short hint: "article", "drawings", "image search"…
+  kind?: string; // 'article' | 'reference' | 'images' | 'archive'
 }
 
 export interface VocabTerm {
@@ -37,19 +38,12 @@ export interface TextContext {
   title: string;
   summary: string;
   url: string;
-  thumbUrl?: string;
-}
-
-export interface SourceLink {
-  label: string;
-  url: string;
 }
 
 export interface Enrichment {
   identified: IdentifiedContext | null;
   context: TextContext | null;
-  relatedImages: RelatedImage[];
   vocabulary: VocabTerm[];
-  sources: SourceLink[];
+  links: LinkRef[];
   notes: string[]; // soft diagnostics (which lookups failed / were skipped)
 }

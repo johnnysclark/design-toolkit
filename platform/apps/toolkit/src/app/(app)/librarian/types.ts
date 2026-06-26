@@ -1,12 +1,12 @@
 // Client-side types for the Librarian (visual reference library).
-import type { Enrichment, RelatedImage } from "@/lib/library/types";
-export type { Enrichment, RelatedImage };
+import type { Enrichment, LinkRef } from "@/lib/library/types";
+export type { Enrichment, LinkRef };
 
 export interface Project {
   id: string;
   owner: string;
   name: string;
-  brief: string | null;
+  brief: string | null; // a few sentences about the project, shown on its page
   created_at: string;
 }
 
@@ -39,6 +39,12 @@ export interface ChatMessage {
   text: string;
 }
 
+// A dropped/analyzed image, client-side (the student's own — safe to display).
+export interface DroppedImage {
+  path?: string; // storage path in the 'library' bucket (uploads)
+  url: string; // signed URL (uploads) or the pasted image URL
+}
+
 export interface AnalyzeResult {
   mode: "analyze" | "search";
   searchId: string | null;
@@ -47,9 +53,8 @@ export interface AnalyzeResult {
   query?: string;
   meta?: { model?: string; generated_at?: string };
   // client-only extras attached after the request
-  _imagePath?: string | null;
-  _sourceUrl?: string | null;
-  _previewUrl?: string | null;
+  _images?: DroppedImage[];
+  _sourceLink?: string | null;
 }
 
 export interface LibraryItem {
@@ -89,6 +94,7 @@ export const KIND_OPTIONS = [
   "sketch",
   "diagram",
   "detail",
+  "reference", // a saved link / webpage (no image)
   "other"
 ];
 

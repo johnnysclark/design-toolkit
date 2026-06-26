@@ -5,9 +5,11 @@ import { createClient } from "@/lib/supabase/client";
 import { KIND_OPTIONS, kindLabel, type LibraryItem } from "./types";
 
 interface Row extends LibraryItem {
-  _display: string | null; // resolved image URL (signed for uploads, source for refs)
+  _display: string | null; // resolved image URL, when this item is an image
+  _isImage: boolean; // false → render as a link/reference card
 }
 
+const IMG_EXT = /\.(jpe?g|png|gif|webp|svg|avif)(\?|$)/i;
 const ghostBtn =
   "rounded-md border border-neutral-300 px-2.5 py-1 text-xs hover:bg-neutral-100 disabled:opacity-50";
 const field =
@@ -49,14 +51,22 @@ export default function ProjectGallery({
       const items = (data || []) as LibraryItem[];
       const withUrls: Row[] = await Promise.all(
         items.map(async (it) => {
-          let display: string | null = it.thumb_url || it.source_url || null;
+          let display: string | null = null;
+          let isImage = false;
           if (it.image_path) {
             const { data: s } = await supabase.storage
               .from("library")
               .createSignedUrl(it.image_path, 3600);
-            display = s?.signedUrl || display;
+            display = s?.signedUrl || null;
+            isImage = !!display;
+          } else if (it.thumb_url) {
+            display = it.thumb_url;
+            isImage = true;
+          } else if (it.source_url && it.kind !== "reference" && IMG_EXT.test(it.source_url)) {
+            display = it.source_url;
+            isImage = true;
           }
-          return { ...it, _display: display };
+          return { ...it, _display: display, _isImage: isImage };
         })
       );
       setRows(withUrls);
@@ -99,10 +109,10 @@ export default function ProjectGallery({
 
   if (!loading && rows.length === 0) {
     return (
-      <p className="mt-6 rounded-lg border border-dashed border-neutral-300 bg-white p-4 text-sm text-neutral-500">
-        Nothing catalogued yet. Analyze an image above and use{" "}
-        <span className="font-medium">Save this image</span> or{" "}
-        <span className="font-medium">Add to project</span> to start the library.
+      <p className="mt-6 rounded-lg border border-dashed border-neutral-300 bg-white p-4 text-sm text-neutral-900">
+        Nothing catalogued yet. Analyze image(s) above, then use{" "}
+        <span className="font-medium">Add to project</span> or{" "}
+        <span className="font-medium">Save link</span> to start the library.
       </p>
     );
   }
@@ -129,7 +139,7 @@ export default function ProjectGallery({
               onClick={() => setTagFilter("")}
               className={[
                 "rounded-full px-2 py-0.5 text-xs",
-                !tagFilter ? "bg-neutral-900 text-white" : "bg-neutral-100 text-neutral-600"
+                !tagFilter ? "bg-neutral-900 text-white" : "bg-neutral-100 text-neutral-900"
               ].join(" ")}
             >
               all tags
@@ -140,7 +150,7 @@ export default function ProjectGallery({
                 onClick={() => setTagFilter(t === tagFilter ? "" : t)}
                 className={[
                   "rounded-full px-2 py-0.5 text-xs",
-                  t === tagFilter ? "bg-neutral-900 text-white" : "bg-neutral-100 text-neutral-600"
+                  t === tagFilter ? "bg-neutral-900 text-white" : "bg-neutral-100 text-neutral-900"
                 ].join(" ")}
               >
                 {t}
@@ -148,7 +158,7 @@ export default function ProjectGallery({
             ))}
           </div>
         )}
-        <span className="ml-auto text-xs text-neutral-400">
+        <span className="ml-auto text-xs text-neutral-900">
           {filtered.length} of {rows.length}
         </span>
       </div>
@@ -157,62 +167,67 @@ export default function ProjectGallery({
       <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {filtered.map((it) => {
           const mine = me && it.owner === me;
+          const meta = [it.building, it.architect, it.year].filter(Boolean).join(" · ");
           return (
             <figure
               key={it.id}
               className="overflow-hidden rounded-xl border border-neutral-200 bg-white"
             >
-              <a
-                href={it.source_url || it._display || "#"}
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                <div className="aspect-[4/3] bg-neutral-100">
-                  {it._display ? (
-                    // eslint-disable-next-line @next/next/no-img-element
+              {it._isImage && it._display ? (
+                <a
+                  href={it.source_url || it._display}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  <div className="aspect-[4/3] bg-neutral-100">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
                       src={it._display}
                       alt={it.title || "item"}
                       loading="lazy"
                       className="h-full w-full object-cover"
                     />
-                  ) : (
-                    <div className="flex h-full items-center justify-center text-xs text-neutral-400">
-                      image unavailable
-                    </div>
-                  )}
-                </div>
-              </a>
+                  </div>
+                </a>
+              ) : (
+                <a
+                  href={it.source_url || "#"}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex aspect-[4/3] flex-col items-center justify-center gap-1 bg-neutral-50 px-3 text-center"
+                >
+                  <span className="text-2xl">🔗</span>
+                  <span className="line-clamp-2 break-all text-xs text-blue-700 underline">
+                    {it.source_url}
+                  </span>
+                </a>
+              )}
 
               <figcaption className="p-3">
                 <div className="flex items-start justify-between gap-2">
                   <p className="font-medium leading-tight">{it.title || "Untitled"}</p>
                   {it.kind && (
-                    <span className="shrink-0 rounded-full bg-neutral-100 px-2 py-0.5 text-[10px] uppercase tracking-wide text-neutral-600">
+                    <span className="shrink-0 rounded-full bg-neutral-100 px-2 py-0.5 text-[10px] uppercase tracking-wide text-neutral-900">
                       {kindLabel(it.kind)}
                     </span>
                   )}
                 </div>
-                {(it.architect || it.year || it.building) && (
-                  <p className="mt-0.5 text-xs text-neutral-500">
-                    {[it.building, it.architect, it.year].filter(Boolean).join(" · ")}
-                  </p>
-                )}
+                {meta && <p className="mt-0.5 text-xs text-neutral-900">{meta}</p>}
                 {it.tags?.length ? (
                   <div className="mt-1 flex flex-wrap gap-1">
                     {it.tags.map((t) => (
                       <span
                         key={t}
-                        className="rounded-full bg-neutral-100 px-2 py-0.5 text-[10px] text-neutral-600"
+                        className="rounded-full bg-neutral-100 px-2 py-0.5 text-[10px] text-neutral-900"
                       >
                         {t}
                       </span>
                     ))}
                   </div>
                 ) : null}
-                {it.notes && <p className="mt-1 text-xs text-neutral-600">{it.notes}</p>}
+                {it.notes && <p className="mt-1 text-xs text-neutral-900">{it.notes}</p>}
                 {it.attribution && (
-                  <p className="mt-1 text-[10px] text-neutral-400">
+                  <p className="mt-1 text-[10px] text-neutral-900">
                     {it.attribution}
                     {it.license ? ` · ${it.license}` : ""}
                   </p>
