@@ -667,6 +667,7 @@ export const HELP_TEXT = `RAP Studio commands — build a full building, inside 
 READ
   describe                              read the model back (Macro / Meso / Micro)
   list bays · room list · wall list · column list · opening list
+  undo · redo                           step backward / forward through your edits
 
 SITE & LEVELS
   set site width|height <ft>            site extents

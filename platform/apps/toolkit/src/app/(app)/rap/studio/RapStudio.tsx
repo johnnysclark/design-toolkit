@@ -13,7 +13,7 @@
 import { useCallback, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 
-import type { State } from "./engine/types";
+import type { CommandResult, State } from "./engine/types";
 import { makeSeedState } from "./engine/seed";
 import { applyCommand, describe } from "./engine/interpreter";
 import { fullStateString } from "./engine/exportState";
@@ -72,6 +72,10 @@ export default function RapStudio({ signedIn }: { signedIn: boolean }) {
   const [viewTab, setViewTab] = useState<ViewTab>("3d");
   const [activeLevel, setActiveLevel] = useState<number | null>(null); // null = all levels
   const idRef = useRef(1);
+  // Undo/redo history (applyCommand is pure, so history lives in the caller).
+  const undoRef = useRef<State[]>([]);
+  const redoRef = useRef<State[]>([]);
+  const [histLen, setHistLen] = useState({ undo: 0, redo: 0 });
 
   const announce = useCallback(
     (msg: string) => {
@@ -92,13 +96,42 @@ export default function RapStudio({ signedIn }: { signedIn: boolean }) {
 
   // The single path every channel runs through.
   const runCommand = useCallback(
-    (raw: string) => {
+    (raw: string): CommandResult => {
+      const cmd = raw.trim().toLowerCase();
+
+      // Undo / redo are handled here, stepping the whole-state history stacks.
+      if (cmd === "undo" || cmd === "redo") {
+        const from = cmd === "undo" ? undoRef.current : redoRef.current;
+        const to = cmd === "undo" ? redoRef.current : undoRef.current;
+        if (from.length === 0) {
+          const msg = `ERROR: Nothing to ${cmd}.`;
+          setLog((l) => [...l, { id: idRef.current++, input: raw, output: msg, ok: false }]);
+          announce(msg);
+          return { state: stateRef.current, message: msg, ok: false, readOnly: true };
+        }
+        const prev = stateRef.current;
+        const target = from.pop() as State;
+        to.push(prev);
+        stateRef.current = target;
+        setState(target);
+        setChanged(diffPaths(prev, target));
+        setHistLen({ undo: undoRef.current.length, redo: redoRef.current.length });
+        const msg = `OK: ${cmd === "undo" ? "Undid" : "Redid"} the last change.`;
+        setLog((l) => [...l, { id: idRef.current++, input: raw, output: msg, ok: true }]);
+        setHistory((h) => [...h, raw]);
+        announce(msg);
+        return { state: target, message: msg, ok: true };
+      }
+
       const prev = stateRef.current;
       const res = applyCommand(prev, raw);
-      const entry: LogEntry = { id: idRef.current++, input: raw, output: res.message, ok: res.ok };
-      setLog((l) => [...l, entry]);
+      setLog((l) => [...l, { id: idRef.current++, input: raw, output: res.message, ok: res.ok }]);
       setHistory((h) => (h[h.length - 1] === raw ? h : [...h, raw]));
       if (res.ok && !res.readOnly) {
+        undoRef.current.push(prev);
+        if (undoRef.current.length > 50) undoRef.current.shift();
+        redoRef.current = [];
+        setHistLen({ undo: undoRef.current.length, redo: 0 });
         stateRef.current = res.state;
         setState(res.state);
         setChanged(diffPaths(prev, res.state));
@@ -167,7 +200,9 @@ export default function RapStudio({ signedIn }: { signedIn: boolean }) {
     download("rap-tactile.stl", new Blob([buildStl(state, activeLevel)], { type: "model/stl" }));
     announce(`OK: Exported the STL (${scopeLabel}).`);
   };
-  const reset = () => runCommand("reset");
+  const reset = () => {
+    if (typeof window === "undefined" || window.confirm("Reset to the sample model? Your current model will be discarded — you can Undo this.")) runCommand("reset");
+  };
 
   const readback = describe(state, activeLevel);
   const bayList = Object.values(state.bays);
@@ -181,6 +216,12 @@ export default function RapStudio({ signedIn }: { signedIn: boolean }) {
         <ToolbarBtn onClick={exportStl}>Export STL{activeLevel !== null ? ` · L${activeLevel}` : ""}</ToolbarBtn>
         <ToolbarBtn onClick={exportLog}>Save command log</ToolbarBtn>
         <span className="flex-1" />
+        <ToolbarBtn onClick={() => runCommand("undo")} disabled={histLen.undo === 0}>
+          Undo
+        </ToolbarBtn>
+        <ToolbarBtn onClick={() => runCommand("redo")} disabled={histLen.redo === 0}>
+          Redo
+        </ToolbarBtn>
         <label className="flex items-center gap-1.5 text-xs font-semibold text-neutral-900">
           <input type="checkbox" checked={speak} onChange={(e) => setSpeak(e.target.checked)} />
           Speak confirmations
@@ -280,12 +321,13 @@ export default function RapStudio({ signedIn }: { signedIn: boolean }) {
   );
 }
 
-function ToolbarBtn({ onClick, children }: { onClick: () => void; children: React.ReactNode }) {
+function ToolbarBtn({ onClick, children, disabled }: { onClick: () => void; children: React.ReactNode; disabled?: boolean }) {
   return (
     <button
       type="button"
       onClick={onClick}
-      className="rounded border-2 border-neutral-900 px-2.5 py-1.5 text-xs font-semibold text-neutral-900 hover:bg-neutral-900 hover:text-white"
+      disabled={disabled}
+      className="rounded border-2 border-neutral-900 px-2.5 py-1.5 text-xs font-semibold text-neutral-900 hover:bg-neutral-900 hover:text-white disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-neutral-900"
     >
       {children}
     </button>
