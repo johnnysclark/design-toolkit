@@ -1,4 +1,15 @@
 <!-- ───────────────────────────── CURRENT STATE (top) ───────────────────────────── -->
+> **RAP — REVIEW & ROADMAP written (2026-06-26, branch `claude/rap-tool-review-analysis-h3olxb`).**
+> A multi-agent review of the RAP tool produced
+> **[`apps/toolkit/src/app/(app)/rap/REVIEW-AND-ROADMAP.md`](apps/toolkit/src/app/(app)/rap/REVIEW-AND-ROADMAP.md)** —
+> an honest, `file:line`-cited assessment of the current state plus a staged plan to turn RAP from a
+> bay-only **layout jig** into a **swiss-army knife for 3rd-year design**, and a decision on talking to
+> Rhino (**lead all-in-house**: grow the canonical state under a build-failing parity gate; make a real
+> in-browser `.3dm` the "talks to Rhino" proof; treat live desktop drive as off-site research). **No tool
+> code changed yet** — this is the handoff doc for the next agent. Headline first move: a **honest-reply
+> hotfix** in `api/rap/agent/route.ts` (the assistant currently announces edits to a blind user that
+> `validateCommands` silently dropped). Read that doc before touching `(app)/rap/**`.
+>
 > **RAP Studio — BUILT (2026-06-25, branch `feat/rap-studio`, worktree `design-toolkit-rap`,
 > not yet merged).** A runnable, interactive slice of the Radical Accessibility Project at
 > **`/rap/studio`** (linked from the `/rap` page; no new nav entry). One canonical in-browser
