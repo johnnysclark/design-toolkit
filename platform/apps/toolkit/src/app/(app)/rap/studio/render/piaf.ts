@@ -11,8 +11,8 @@ import type { State } from "../engine/types";
 const WEIGHT_FT = { light: 0.18, heavy: 0.55, corridor: 0.3 } as const;
 
 /** Draw the plan to a canvas, then threshold to a crisp 1-bit black/white. */
-export function buildPiafCanvas(state: State, pxWidth = 1700): HTMLCanvasElement {
-  const { prims, bounds } = buildPlanModel(state);
+export function buildPiafCanvas(state: State, pxWidth = 1700, levelFilter: number | null = null): HTMLCanvasElement {
+  const { prims, bounds } = buildPlanModel(state, levelFilter);
   const { minX, minY, maxX, maxY } = bounds;
   const worldW = Math.max(1, maxX - minX);
   const worldH = Math.max(1, maxY - minY);
@@ -61,6 +61,7 @@ export function buildPiafCanvas(state: State, pxWidth = 1700): HTMLCanvasElement
       const px = Math.max(11, p.size * scale);
       ctx.font = `${px}px ${p.braille ? "'Apple Braille','Segoe UI Symbol',monospace" : "'IBM Plex Mono',monospace"}`;
       ctx.textBaseline = "middle";
+      ctx.textAlign = p.anchor === "middle" ? "center" : "left";
       ctx.fillText(p.text, X(p.at.x), Y(p.at.y));
     }
   }

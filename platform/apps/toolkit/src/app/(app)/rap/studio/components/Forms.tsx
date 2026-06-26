@@ -137,6 +137,80 @@ export default function Forms({ state, onCommand }: { state: State; onCommand: (
           <ApertureAdd sel={sel} onCommand={onCommand} count={bay.apertures.length} />
         </>
       )}
+
+      {/* Building elements — rooms, interior walls, columns (not tied to a bay) */}
+      <BuildingAdd onCommand={onCommand} />
+    </div>
+  );
+}
+
+const USES = ["residential", "retail", "office", "lobby", "circulation", "parking", "amenity", "core", "mechanical", "open", "other"];
+
+function BuildingAdd({ onCommand }: { onCommand: (raw: string) => void }) {
+  // Room
+  const [rx, setRx] = useState(18);
+  const [ry, setRy] = useState(12);
+  const [rw, setRw] = useState(24);
+  const [rh, setRh] = useState(18);
+  const [use, setUse] = useState("retail");
+  const [rname, setRname] = useState("");
+  // Wall
+  const [x1, setX1] = useState(18);
+  const [y1, setY1] = useState(32);
+  const [x2, setX2] = useState(78);
+  const [y2, setY2] = useState(32);
+  const [wt, setWt] = useState(0.5);
+  // Column
+  const [cx, setCx] = useState(40);
+  const [cy, setCy] = useState(40);
+
+  return (
+    <div className="space-y-3 rounded-lg border-2 border-neutral-900 p-3">
+      <h3 className="display-font text-xs uppercase tracking-tight text-neutral-900">Building — rooms, walls, columns</h3>
+
+      <fieldset className="rounded border border-neutral-300 p-3">
+        <legend className="px-1 text-xs font-bold uppercase text-neutral-900">Add room (program)</legend>
+        <div className="grid grid-cols-3 gap-2 sm:grid-cols-6">
+          <label className={labelCls}>X<input type="number" className={fieldCls} value={rx} onChange={(e) => setRx(+e.target.value)} /></label>
+          <label className={labelCls}>Y<input type="number" className={fieldCls} value={ry} onChange={(e) => setRy(+e.target.value)} /></label>
+          <label className={labelCls}>W<input type="number" className={fieldCls} value={rw} onChange={(e) => setRw(+e.target.value)} /></label>
+          <label className={labelCls}>H<input type="number" className={fieldCls} value={rh} onChange={(e) => setRh(+e.target.value)} /></label>
+          <label className={labelCls}>Use
+            <select className={fieldCls} value={use} onChange={(e) => setUse(e.target.value)}>
+              {USES.map((u) => <option key={u}>{u}</option>)}
+            </select>
+          </label>
+          <label className={labelCls}>Name<input className={fieldCls} value={rname} onChange={(e) => setRname(e.target.value)} placeholder="(optional)" /></label>
+        </div>
+        <button type="button" onClick={() => onCommand(`room add ${rx} ${ry} ${rw} ${rh} ${use}${rname.trim() ? ` "${rname.trim()}"` : ""}`)} className="display-font mt-2 rounded border-2 border-neutral-900 px-3 py-1.5 text-xs uppercase hover:bg-neutral-900 hover:text-white">
+          + Place room
+        </button>
+      </fieldset>
+
+      <fieldset className="rounded border border-neutral-300 p-3">
+        <legend className="px-1 text-xs font-bold uppercase text-neutral-900">Add wall (interior / exterior)</legend>
+        <div className="grid grid-cols-3 gap-2 sm:grid-cols-5">
+          <label className={labelCls}>X1<input type="number" className={fieldCls} value={x1} onChange={(e) => setX1(+e.target.value)} /></label>
+          <label className={labelCls}>Y1<input type="number" className={fieldCls} value={y1} onChange={(e) => setY1(+e.target.value)} /></label>
+          <label className={labelCls}>X2<input type="number" className={fieldCls} value={x2} onChange={(e) => setX2(+e.target.value)} /></label>
+          <label className={labelCls}>Y2<input type="number" className={fieldCls} value={y2} onChange={(e) => setY2(+e.target.value)} /></label>
+          <label className={labelCls}>Thick<input type="number" step={0.1} className={fieldCls} value={wt} onChange={(e) => setWt(+e.target.value)} /></label>
+        </div>
+        <button type="button" onClick={() => onCommand(`wall add ${x1} ${y1} ${x2} ${y2} ${wt}`)} className="display-font mt-2 rounded border-2 border-neutral-900 px-3 py-1.5 text-xs uppercase hover:bg-neutral-900 hover:text-white">
+          + Draw wall
+        </button>
+      </fieldset>
+
+      <fieldset className="rounded border border-neutral-300 p-3">
+        <legend className="px-1 text-xs font-bold uppercase text-neutral-900">Add column</legend>
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+          <label className={labelCls}>X<input type="number" className={fieldCls} value={cx} onChange={(e) => setCx(+e.target.value)} /></label>
+          <label className={labelCls}>Y<input type="number" className={fieldCls} value={cy} onChange={(e) => setCy(+e.target.value)} /></label>
+        </div>
+        <button type="button" onClick={() => onCommand(`column add ${cx} ${cy}`)} className="display-font mt-2 rounded border-2 border-neutral-900 px-3 py-1.5 text-xs uppercase hover:bg-neutral-900 hover:text-white">
+          + Place column
+        </button>
+      </fieldset>
     </div>
   );
 }

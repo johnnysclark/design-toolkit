@@ -6,8 +6,8 @@ import type { State } from "../engine/types";
 
 const WEIGHTS = { light: 0.18, heavy: 0.55, corridor: 0.3 } as const;
 
-export default function PlanSvg({ state, className }: { state: State; className?: string }) {
-  const { prims, bounds } = buildPlanModel(state);
+export default function PlanSvg({ state, className, levelFilter = null }: { state: State; className?: string; levelFilter?: number | null }) {
+  const { prims, bounds } = buildPlanModel(state, levelFilter);
   const { minX, minY, maxX, maxY } = bounds;
   const w = Math.max(1, maxX - minX);
   const h = Math.max(1, maxY - minY);
@@ -59,6 +59,7 @@ function Prim({ p, fy }: { p: DrawPrim; fy: (y: number) => number }) {
       y={fy(p.at.y)}
       fontSize={p.size}
       fill="#111"
+      textAnchor={p.anchor === "middle" ? "middle" : "start"}
       fontFamily={p.braille ? "'Apple Braille','Segoe UI Symbol',monospace" : "'IBM Plex Mono', monospace"}
       style={{ userSelect: "none" }}
     >

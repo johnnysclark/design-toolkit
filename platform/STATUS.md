@@ -1,4 +1,26 @@
 <!-- ───────────────────────────── CURRENT STATE (top) ───────────────────────────── -->
+> **RAP Studio v2 — building model + Drive Rhino (2026-06-25, branch `feat/rap-rhino-bridge`,
+> worktree `design-toolkit-rap`, not yet merged).** Two big additions on top of the live
+> `/rap/studio`:
+> 1. **Full building model** (was a "bay jig"). New top-level state arrays: free `walls`
+>    (interior + exterior, any angle, with `openings`), `rooms` (program use: residential / retail
+>    / office / lobby / circulation / parking / amenity / core / mechanical / open / other),
+>    free `columns`; plus an editable irregular `site.boundary` (urban infill) and multi-`levels`
+>    for mixed-use vertical program. New command verbs (`wall add/move/remove`, `room add … <use>`,
+>    `column add`, `opening add <wallId> …`, `set site boundary …`); the assistant prompt now tells
+>    the model to compose full architecture. A **level selector** filters every renderer + export.
+>    `deriveGeometry` emits the new elements (gapped free walls, room labels, columns, boundary);
+>    2D plan / PIAF render them generically; Scene3D + STL extended; `describe()` reads back program
+>    mix by level. This was Daniel's ask for 3rd-year urban-infill mixed-use studio.
+> 2. **Drive Rhino** — talk to `state.json` + the Watcher from the site. (a) **Direct folder write**
+>    via the File System Access API (Chromium) writes `state.json` into the RAP folder; (b)
+>    **companion bridge** `public/rap-bridge/rap_bridge.py` (stdlib-only localhost server, token +
+>    CORS + Private-Network-Access headers) writes the file AND proxies the Watcher's TCP-1998
+>    queries; (c) **Download** fallback. New `engine/exportState.ts` emits a COMPLETE
+>    `rhino_controller_v4.0` file (all keys + `web_*` for the studio-native elements). Client:
+>    `studio/lib/rhino-bridge.ts`; panel: `components/DrivePanel.tsx`. Build (types) green.
+>    **Not browser-tested** — the bridge/FS-Access need a real desktop + Rhino to verify.
+>
 > **RAP Studio — BUILT (2026-06-25, branch `feat/rap-studio`, worktree `design-toolkit-rap`,
 > not yet merged).** A runnable, interactive slice of the Radical Accessibility Project at
 > **`/rap/studio`** (linked from the `/rap` page; no new nav entry). One canonical in-browser

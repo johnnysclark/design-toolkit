@@ -16,7 +16,7 @@ export type DrawPrim =
   | { kind: "line"; pts: Pt[]; weight: "light" | "heavy" | "corridor"; dashed?: boolean }
   | { kind: "fill"; pts: Pt[] } // filled black polygon (walls)
   | { kind: "circle"; c: Pt; r: number; fill: boolean }
-  | { kind: "text"; at: Pt; text: string; size: number; braille?: boolean };
+  | { kind: "text"; at: Pt; text: string; size: number; braille?: boolean; anchor?: "start" | "middle" };
 
 export interface PlanModel {
   prims: DrawPrim[];
@@ -46,13 +46,18 @@ function arcPolyline(hinge: Pt, radius: number, a0: number, a1: number, t: Trans
   return pts;
 }
 
-export function buildPlanModel(state: State): PlanModel {
-  const scene = deriveGeometry(state);
+export function buildPlanModel(state: State, levelFilter: number | null = null): PlanModel {
+  const scene = deriveGeometry(state, levelFilter);
   const prims: DrawPrim[] = [];
 
-  // Site boundary (heavy).
+  // Site boundary — irregular infill lot polygon if present, else the rectangle.
   const { ox, oy, w, h } = scene.site;
-  prims.push({ kind: "line", pts: [{ x: ox, y: oy }, { x: ox + w, y: oy }, { x: ox + w, y: oy + h }, { x: ox, y: oy + h }, { x: ox, y: oy }], weight: "light" });
+  if (scene.site.boundary && scene.site.boundary.length >= 3) {
+    const b = scene.site.boundary;
+    prims.push({ kind: "line", pts: [...b, b[0]], weight: "heavy", dashed: true });
+  } else {
+    prims.push({ kind: "line", pts: [{ x: ox, y: oy }, { x: ox + w, y: oy }, { x: ox + w, y: oy + h }, { x: ox, y: oy + h }, { x: ox, y: oy }], weight: "light" });
+  }
 
   for (const bay of scene.bays) {
     const t = bay.transform;
@@ -105,6 +110,35 @@ export function buildPlanModel(state: State): PlanModel {
     const lp = applyTransform({ x: bay.label.x, y: bay.label.y }, t);
     prims.push({ kind: "text", at: lp, text: bay.label.text, size: 2.4 });
     prims.push({ kind: "text", at: { x: lp.x, y: lp.y - 3 }, text: bay.label.braille, size: 3.2, braille: true });
+  }
+
+  // Rooms — outline (program spaces).
+  for (const rm of scene.rooms) {
+    prims.push({ kind: "line", pts: [{ x: rm.x, y: rm.y }, { x: rm.x + rm.w, y: rm.y }, { x: rm.x + rm.w, y: rm.y + rm.h }, { x: rm.x, y: rm.y + rm.h }, { x: rm.x, y: rm.y }], weight: "light" });
+  }
+
+  // Free walls — solid black chunks + door/window symbols.
+  for (const fw of scene.freeWalls) {
+    for (const s of fw.solids) prims.push({ kind: "fill", pts: s.quad });
+    for (const d of fw.doors) {
+      prims.push({ kind: "line", pts: [d.hinge, d.leafEnd], weight: "heavy" });
+      prims.push({ kind: "line", pts: arcPolyline(d.hinge, d.radius, d.a0, d.a1, { ox: 0, oy: 0, rot: 0 }), weight: "light" });
+    }
+    for (const win of fw.windows) {
+      prims.push({ kind: "line", pts: [win.a, win.b], weight: "heavy" });
+      prims.push({ kind: "circle", c: { x: (win.a.x + win.b.x) / 2, y: (win.a.y + win.b.y) / 2 }, r: 0.6, fill: false });
+    }
+  }
+
+  // Free columns.
+  for (const c of scene.freeColumns) {
+    prims.push({ kind: "circle", c: { x: c.x, y: c.y }, r: c.size / 2, fill: true });
+  }
+
+  // Room labels (drawn last so walls don't cover them).
+  for (const rm of scene.rooms) {
+    prims.push({ kind: "text", at: { x: rm.cx, y: rm.cy + 1.4 }, text: rm.name, size: 2.6, anchor: "middle" });
+    prims.push({ kind: "text", at: { x: rm.cx, y: rm.cy - 2.4 }, text: rm.braille, size: 3, braille: true, anchor: "middle" });
   }
 
   // Voids (world-space outline).

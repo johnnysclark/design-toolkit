@@ -49,8 +49,8 @@ function addBox(tris: Tri[], x: number, y: number, w: number, h: number, zBot: n
   pushBox(tris, corners);
 }
 
-export function buildStl(state: State): ArrayBuffer {
-  const scene = deriveGeometry(state);
+export function buildStl(state: State, levelFilter: number | null = null): ArrayBuffer {
+  const scene = deriveGeometry(state, levelFilter);
   const cut = state.tactile3d.cut_height;
   const floorT = state.tactile3d.floor_thickness;
   const colSize = state.style.column_size;
@@ -71,6 +71,22 @@ export function buildStl(state: State): ArrayBuffer {
     for (const c of bay.columns) {
       addBox(tris, c.x - colSize / 2, c.y - colSize / 2, colSize, colSize, levelZ, levelZ + cut, bay.transform);
     }
+  }
+
+  const idTransform = { ox: 0, oy: 0, rot: 0 };
+
+  // Free walls (interior + exterior) — each solid chunk as a rotated box.
+  for (const fw of scene.freeWalls) {
+    const levelZ = scene.levels[fw.level]?.z ?? 0;
+    for (const s of fw.solids) {
+      addBox(tris, 0, 0, s.len, fw.thickness, levelZ, levelZ + cut, { ox: s.start.x, oy: s.start.y, rot: s.angleDeg });
+    }
+  }
+
+  // Free columns.
+  for (const c of scene.freeColumns) {
+    const levelZ = scene.levels[c.level]?.z ?? 0;
+    addBox(tris, c.x - c.size / 2, c.y - c.size / 2, c.size, c.size, levelZ, levelZ + cut, idTransform);
   }
 
   // ── Serialise to binary STL (feet → mm × scale_factor) ──────────────────────

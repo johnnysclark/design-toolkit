@@ -16,11 +16,13 @@ import dynamic from "next/dynamic";
 import type { State } from "./engine/types";
 import { makeSeedState } from "./engine/seed";
 import { applyCommand, describe } from "./engine/interpreter";
+import { fullStateString } from "./engine/exportState";
 import PlanSvg from "./render/PlanSvg";
 import JsonTree from "./components/JsonTree";
 import Console, { type LogEntry } from "./components/Console";
 import Forms from "./components/Forms";
 import AgentPanel, { type AgentResult } from "./components/AgentPanel";
+import DrivePanel from "./components/DrivePanel";
 import { buildPiafCanvas } from "./render/piaf";
 import { buildStl } from "./render/stl";
 
@@ -68,6 +70,7 @@ export default function RapStudio({ signedIn }: { signedIn: boolean }) {
   const [speak, setSpeak] = useState(false);
   const [authorTab, setAuthorTab] = useState<AuthorTab>("console");
   const [viewTab, setViewTab] = useState<ViewTab>("3d");
+  const [activeLevel, setActiveLevel] = useState<number | null>(null); // null = all levels
   const idRef = useRef(1);
 
   const announce = useCallback(
@@ -133,13 +136,14 @@ export default function RapStudio({ signedIn }: { signedIn: boolean }) {
   );
 
   // ── exports ────────────────────────────────────────────────────────────────
-  const exportState = () => download("state.json", new Blob([JSON.stringify(state, null, 2)], { type: "application/json" }));
+  const fullState = useMemo(() => fullStateString(state), [state]);
+  const exportState = () => download("state.json", new Blob([fullState], { type: "application/json" }));
   const exportLog = () => {
     const text = log.filter((e) => e.input).map((e) => `>> ${e.input}\n${e.output}`).join("\n");
     download("rap-command-log.txt", new Blob([text], { type: "text/plain" }));
   };
-  const exportPiaf = () => buildPiafCanvas(state).toBlob((b) => b && download("rap-tactile-piaf.png", b), "image/png");
-  const exportStl = () => download("rap-tactile.stl", new Blob([buildStl(state)], { type: "model/stl" }));
+  const exportPiaf = () => buildPiafCanvas(state, 1700, activeLevel).toBlob((b) => b && download("rap-tactile-piaf.png", b), "image/png");
+  const exportStl = () => download("rap-tactile.stl", new Blob([buildStl(state, activeLevel)], { type: "model/stl" }));
   const reset = () => runCommand("reset");
 
   const readback = describe(state);
@@ -163,9 +167,17 @@ export default function RapStudio({ signedIn }: { signedIn: boolean }) {
 
       {/* Row 1 — visual model + canonical state */}
       <div className="grid gap-5 lg:grid-cols-2">
-        <Panel title="Model — visual test" right={<Tabs tabs={[["3d", "3D"], ["plan", "Tactile plan"]]} active={viewTab} onPick={(t) => setViewTab(t as ViewTab)} />}>
+        <Panel
+          title="Model — visual test"
+          right={
+            <div className="flex items-center gap-2">
+              <LevelSelect levels={state.levels} value={activeLevel} onChange={setActiveLevel} />
+              <Tabs tabs={[["3d", "3D"], ["plan", "Tactile plan"]]} active={viewTab} onPick={(t) => setViewTab(t as ViewTab)} />
+            </div>
+          }
+        >
           <div className="h-80 w-full overflow-hidden rounded-md border border-neutral-300 bg-white">
-            {viewTab === "3d" ? <Scene3D state={state} /> : <PlanSvg state={state} className="h-full w-full p-2" />}
+            {viewTab === "3d" ? <Scene3D state={state} levelFilter={activeLevel} /> : <PlanSvg state={state} levelFilter={activeLevel} className="h-full w-full p-2" />}
           </div>
           <p className="mt-2 text-xs text-neutral-900">
             The 3D view is an aid for sighted testing. The model is fully readable in the tactile plan, the read-back text, and the state tree — none is the source of truth.
@@ -219,6 +231,11 @@ export default function RapStudio({ signedIn }: { signedIn: boolean }) {
         </Panel>
       </div>
 
+      {/* Row 3 — drive real Rhino */}
+      <Panel title="Drive Rhino — talk to state.json + the Watcher">
+        <DrivePanel stateText={fullState} onDownloadState={exportState} />
+      </Panel>
+
       {/* Screen-reader announcements for every state change */}
       <div aria-live="polite" className="sr-only">
         {live}
@@ -248,6 +265,24 @@ function Panel({ title, right, children }: { title: string; right?: React.ReactN
       </div>
       {children}
     </section>
+  );
+}
+
+function LevelSelect({ levels, value, onChange }: { levels: { label: string }[]; value: number | null; onChange: (v: number | null) => void }) {
+  return (
+    <select
+      value={value === null ? "all" : String(value)}
+      onChange={(e) => onChange(e.target.value === "all" ? null : Number(e.target.value))}
+      className="rounded border border-neutral-300 px-1.5 py-1 text-xs font-semibold text-neutral-900"
+      aria-label="Active level to view and export"
+    >
+      <option value="all">All levels</option>
+      {levels.map((l, i) => (
+        <option key={i} value={i}>
+          L{i} · {l.label}
+        </option>
+      ))}
+    </select>
   );
 }
 

@@ -16,7 +16,12 @@ export interface AgentResult {
   needsAuth?: boolean;
 }
 
-const EXAMPLES = ["make the corridor wider", "add a 3×2 bay to the east called Studio", "put a door and two windows on bay A", "rotate bay A by 30 degrees"];
+const EXAMPLES = [
+  "lay out a ground-floor lobby and two retail units",
+  "add an interior wall splitting the retail, with a door",
+  "stack residential on level 2",
+  "trace the exterior envelope along the site boundary"
+];
 
 export default function AgentPanel({ onSubmit }: { onSubmit: (instruction: string) => Promise<AgentResult> }) {
   const [value, setValue] = useState("");
