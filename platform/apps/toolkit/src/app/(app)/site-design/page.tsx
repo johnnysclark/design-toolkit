@@ -17,13 +17,13 @@ export default function Page() {
       <header className="flex shrink-0 items-center justify-between gap-4 border-b border-neutral-200 px-6 py-3">
         <div>
           <div className="flex items-center gap-2">
-            <h1 className="text-lg font-semibold tracking-tight">Site Design</h1>
+            <h1 className="text-lg font-semibold tracking-tight">Eco-Architect</h1>
             <span className="rounded-full bg-green-100 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-green-800">
               live
             </span>
           </div>
           <p className="text-xs text-neutral-500">
-            Gable Studio — form-finding by site forces. Metrics are transparent
+            Eco-Architect — form-finding by site forces. Metrics are transparent
             teaching <em>proxies</em>, not validated simulation.
           </p>
         </div>
@@ -39,7 +39,7 @@ export default function Page() {
 
       <iframe
         src={STUDIO_URL}
-        title="Gable Studio — Site Design"
+        title="Eco-Architect"
         className="min-h-0 flex-1 border-0"
         allow="fullscreen"
       />

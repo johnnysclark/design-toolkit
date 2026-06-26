@@ -18,8 +18,7 @@ export async function summary(title: string): Promise<TextContext | null> {
       summary: data.extract,
       url:
         data.content_urls?.desktop?.page ||
-        `https://en.wikipedia.org/wiki/${encodeURIComponent(title)}`,
-      thumbUrl: data.thumbnail?.source
+        `https://en.wikipedia.org/wiki/${encodeURIComponent(title)}`
     };
   } catch {
     return null;

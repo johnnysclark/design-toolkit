@@ -16,7 +16,7 @@ export default async function SkillsCoachPage() {
     data: { user }
   } = await supabase.auth.getUser();
 
-  if (!user) return <AuthGate tool="Skills Coach" />;
+  if (!user) return <AuthGate tool="Coach" />;
 
   // Restore the most recent conversation so a reload keeps the thread.
   const { data: convo } = await supabase

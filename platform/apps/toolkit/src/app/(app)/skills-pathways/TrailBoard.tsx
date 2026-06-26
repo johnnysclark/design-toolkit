@@ -71,7 +71,7 @@ export default function TrailBoard() {
       {/* controls */}
       <div className="mt-6 flex flex-wrap items-center gap-x-6 gap-y-3">
         <div className="flex items-center gap-2 text-sm">
-          <span className="text-neutral-500">Track</span>
+          <span className="text-neutral-900">Track</span>
           <div className="inline-flex overflow-hidden rounded-lg border border-neutral-300">
             {TRACK_FILTERS.map((t) => (
               <button
@@ -82,7 +82,7 @@ export default function TrailBoard() {
                   "px-3 py-1.5 text-sm transition-colors",
                   track === t.id
                     ? "bg-neutral-900 text-white"
-                    : "bg-white text-neutral-600 hover:bg-neutral-100"
+                    : "bg-white text-neutral-900 hover:bg-neutral-100"
                 ].join(" ")}
               >
                 {t.label}
@@ -92,7 +92,7 @@ export default function TrailBoard() {
         </div>
 
         <div className="flex flex-wrap items-center gap-2 text-sm">
-          <span className="text-neutral-500">Software</span>
+          <span className="text-neutral-900">Software</span>
           <Chip active={discipline === "all"} onClick={() => setDiscipline("all")}>
             All
           </Chip>
@@ -109,7 +109,7 @@ export default function TrailBoard() {
       </div>
 
       {/* legend */}
-      <div className="mt-5 flex items-center gap-3 text-[11px] uppercase tracking-wide text-neutral-400">
+      <div className="mt-5 flex items-center gap-3 text-[11px] uppercase tracking-wide text-neutral-900">
         {LEVELS.map((lvl, i) => (
           <span key={lvl} className="flex items-center gap-3">
             <span className="flex items-center gap-1.5">
@@ -132,7 +132,7 @@ export default function TrailBoard() {
                   {meta?.label ?? d}
                 </h2>
                 {meta?.blurb && (
-                  <span className="text-sm normal-case text-neutral-500">{meta.blurb}</span>
+                  <span className="text-sm normal-case text-neutral-900">{meta.blurb}</span>
                 )}
               </div>
 
@@ -141,7 +141,7 @@ export default function TrailBoard() {
                   const cards = nodes.filter((n) => n.level === lvl);
                   return (
                     <div key={lvl}>
-                      <div className="mb-2 flex items-center gap-1.5 text-[11px] uppercase tracking-wide text-neutral-400">
+                      <div className="mb-2 flex items-center gap-1.5 text-[11px] uppercase tracking-wide text-neutral-900">
                         <span className={`h-2 w-2 rounded-full ${LEVEL_DOT[lvl]}`} />
                         {LEVEL_LABEL[lvl]}
                       </div>
@@ -169,7 +169,7 @@ export default function TrailBoard() {
         })}
 
         {sections.length === 0 && (
-          <p className="rounded-xl border border-dashed border-neutral-300 bg-white px-4 py-8 text-center text-sm text-neutral-500">
+          <p className="rounded-xl border border-dashed border-neutral-300 bg-white px-4 py-8 text-center text-sm text-neutral-900">
             No skills match this filter yet.
           </p>
         )}
@@ -203,7 +203,7 @@ function Chip({
         "rounded-full border px-3 py-1 text-sm transition-colors",
         active
           ? "border-neutral-900 bg-neutral-900 text-white"
-          : "border-neutral-300 bg-white text-neutral-600 hover:border-neutral-500"
+          : "border-neutral-300 bg-white text-neutral-900 hover:border-neutral-500"
       ].join(" ")}
     >
       {children}
@@ -223,15 +223,16 @@ function SkillCard({ node, onClick }: { node: SkillNode; onClick: () => void }) 
       ].join(" ")}
     >
       <div className="text-base font-semibold leading-tight tracking-tight">{node.title}</div>
-      <p className="mt-1 text-xs leading-snug text-neutral-500">{node.blurb}</p>
+      <p className="mt-1 text-xs leading-snug text-neutral-900">{node.blurb}</p>
       <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px]">
-        <span className={hasVideo ? "font-medium text-[#ff3b21]" : "text-neutral-400"}>
-          {hasVideo
-            ? `▶ ${node.videos.length} tutorial${node.videos.length > 1 ? "s" : ""}`
-            : "tutorial slot"}
-        </span>
+        <span className="font-medium text-[#ff3b21]">Guide</span>
+        {hasVideo && (
+          <span className="text-neutral-900">
+            ▶ {node.videos.length} video{node.videos.length > 1 ? "s" : ""}
+          </span>
+        )}
         {node.conceptSlugs.length > 0 && (
-          <span className="text-neutral-400">
+          <span className="text-neutral-900">
             {node.conceptSlugs.length} concept{node.conceptSlugs.length > 1 ? "s" : ""}
           </span>
         )}

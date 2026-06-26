@@ -78,7 +78,7 @@ export async function POST(req: Request) {
     data: { user }
   } = await supabase.auth.getUser();
   if (!user) {
-    return Response.json({ error: "Sign in to use the Skills Coach." }, { status: 401 });
+    return Response.json({ error: "Sign in to use Coach." }, { status: 401 });
   }
 
   let body: any;
@@ -247,7 +247,12 @@ export async function POST(req: Request) {
           // never let trace logging break the response
         }
 
-        send("meta", { concept: meta.concept, claims: meta.claims, report_back: meta.report_back });
+        send("meta", {
+          concept: meta.concept,
+          claims: meta.claims,
+          report_back: meta.report_back,
+          further_ideas: meta.further_ideas
+        });
         send("done", {
           conversationId,
           messageId: inserted?.id ?? null,

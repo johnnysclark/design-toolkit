@@ -11,6 +11,7 @@ import {
   type SkillNode
 } from "@/lib/skills-pathways/pathways";
 import { DISCIPLINES } from "@/lib/skills-coach/concepts";
+import { getPractice } from "@/lib/skills-pathways/practice";
 import LazyVideo from "./LazyVideo";
 
 function disciplineLabel(id: SkillNode["discipline"]): string {
@@ -32,6 +33,7 @@ export default function NodeModal({
 }) {
   const closeRef = useRef<HTMLButtonElement | null>(null);
   const next = unlocks(node.id);
+  const practice = getPractice(node.id);
 
   // Focus the close button on open, restore body scroll on close, Esc to close.
   useEffect(() => {
@@ -62,7 +64,7 @@ export default function NodeModal({
         {/* header */}
         <div className="flex items-start justify-between gap-4 border-b border-neutral-200 p-5">
           <div>
-            <div className="flex flex-wrap items-center gap-2 text-[11px] uppercase tracking-wide text-neutral-500">
+            <div className="flex flex-wrap items-center gap-2 text-[11px] uppercase tracking-wide text-neutral-900">
               <span className="rounded-full bg-neutral-900 px-2 py-0.5 text-white">
                 {disciplineLabel(node.discipline)}
               </span>
@@ -74,14 +76,14 @@ export default function NodeModal({
               </span>
             </div>
             <h2 className="mt-2 text-2xl font-semibold tracking-tight">{node.title}</h2>
-            <p className="mt-1 max-w-lg text-sm text-neutral-600">{node.blurb}</p>
+            <p className="mt-1 max-w-lg text-sm text-neutral-900">{node.blurb}</p>
           </div>
           <button
             ref={closeRef}
             type="button"
             onClick={onClose}
             aria-label="Close"
-            className="shrink-0 rounded-full p-1.5 text-neutral-400 hover:bg-neutral-100 hover:text-neutral-900"
+            className="shrink-0 rounded-full p-1.5 text-neutral-900 hover:bg-neutral-100 hover:text-neutral-900"
           >
             <svg viewBox="0 0 24 24" className="h-5 w-5 stroke-current" fill="none" strokeWidth="2">
               <path d="M6 6l12 12M18 6L6 18" strokeLinecap="round" />
@@ -89,32 +91,88 @@ export default function NodeModal({
           </button>
         </div>
 
-        <div className="space-y-6 p-5">
-          {/* videos */}
-          <section>
-            <h3 className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-neutral-400">
-              Tutorials
-            </h3>
-            {node.videos.length > 0 ? (
+        <div
+          className="space-y-6 p-5"
+          style={{
+            fontFamily:
+              "ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif"
+          }}
+        >
+          {/* the basics — the written guide, the primary content for now */}
+          {node.guide.length > 0 && (
+            <section>
+              <h3 className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-neutral-900">
+                The basics
+              </h3>
+              <div className="space-y-3 text-[15px] leading-relaxed text-neutral-900">
+                {node.guide.map((para, i) => (
+                  <p key={i}>{para}</p>
+                ))}
+              </div>
+            </section>
+          )}
+
+          {/* key moves — quick command / tool cheat-sheet */}
+          {practice?.keyMoves && practice.keyMoves.length > 0 && (
+            <section>
+              <h3 className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-neutral-900">
+                Key moves
+              </h3>
+              <div className="flex flex-wrap gap-1.5">
+                {practice.keyMoves.map((m, i) => (
+                  <code
+                    key={i}
+                    className="rounded-md bg-neutral-100 px-2 py-1 font-mono text-[12.5px] text-neutral-900"
+                  >
+                    {m}
+                  </code>
+                ))}
+              </div>
+            </section>
+          )}
+
+          {/* try this — a concrete studio exercise */}
+          {practice?.tryThis && (
+            <section>
+              <h3 className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-neutral-900">
+                Try this in studio
+              </h3>
+              <p className="rounded-xl border border-l-4 border-neutral-200 border-l-[#ff3b21] bg-neutral-50 p-3 text-[15px] leading-relaxed text-neutral-900">
+                {practice.tryThis}
+              </p>
+            </section>
+          )}
+
+          {/* watch out — the common pitfall + fix */}
+          {practice?.watchOut && (
+            <section>
+              <h3 className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-neutral-900">
+                Watch out for
+              </h3>
+              <p className="rounded-xl border border-l-4 border-amber-200 border-l-amber-400 bg-amber-50 p-3 text-[15px] leading-relaxed text-neutral-900">
+                {practice.watchOut}
+              </p>
+            </section>
+          )}
+
+          {/* videos — optional; the guide carries the node until one's recorded */}
+          {node.videos.length > 0 && (
+            <section>
+              <h3 className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-neutral-900">
+                Video walkthrough
+              </h3>
               <div className="space-y-3">
                 {node.videos.map((v, i) => (
                   <LazyVideo key={i} video={v} />
                 ))}
               </div>
-            ) : (
-              <p className="rounded-xl border border-dashed border-neutral-300 bg-neutral-50 px-4 py-5 text-sm text-neutral-500">
-                No tutorial here yet. This is the slot — add a YouTube/Vimeo link
-                (or upload a clip) for{" "}
-                <span className="font-medium text-neutral-700">{node.title}</span>{" "}
-                in <code className="rounded bg-neutral-100 px-1">pathways.ts</code>.
-              </p>
-            )}
-          </section>
+            </section>
+          )}
 
           {/* concepts — reused from the Skills Coach KB */}
           {node.conceptSlugs.length > 0 && (
             <section>
-              <h3 className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-neutral-400">
+              <h3 className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-neutral-900">
                 Key concepts
               </h3>
               <ul className="space-y-2">
@@ -137,7 +195,7 @@ export default function NodeModal({
                           Docs →
                         </a>
                       </div>
-                      <p className="mt-0.5 text-neutral-600">{c.oneLiner}</p>
+                      <p className="mt-0.5 text-neutral-900">{c.oneLiner}</p>
                     </li>
                   );
                 })}
@@ -169,7 +227,7 @@ export default function NodeModal({
               href="/skills-coach"
               className="inline-flex items-center gap-1 text-sm font-medium text-[#ff3b21] hover:underline"
             >
-              Stuck? Practice this with the Skills Coach →
+              Stuck? Practice this with Coach →
             </Link>
           </div>
         </div>
@@ -197,7 +255,7 @@ function TrailLinks({
 
   return (
     <div>
-      <h3 className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-neutral-400">
+      <h3 className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-neutral-900">
         {label}
       </h3>
       {items.length > 0 ? (
@@ -207,14 +265,14 @@ function TrailLinks({
               key={n.id}
               type="button"
               onClick={() => onSelect(n.id)}
-              className="rounded-full border border-neutral-300 px-3 py-1 text-sm text-neutral-700 hover:border-neutral-900 hover:bg-neutral-50"
+              className="rounded-full border border-neutral-300 px-3 py-1 text-sm text-neutral-900 hover:border-neutral-900 hover:bg-neutral-50"
             >
               {n.title}
             </button>
           ))}
         </div>
       ) : (
-        <p className="text-sm text-neutral-400">{empty}</p>
+        <p className="text-sm text-neutral-900">{empty}</p>
       )}
     </div>
   );

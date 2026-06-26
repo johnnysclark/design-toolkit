@@ -17,26 +17,26 @@ export const TOOLKIT_NAV: ToolItem[] = [
   { href: "/", label: "Overview", blurb: "The toolkit at a glance.", status: "live" },
   {
     href: "/site-analysis",
-    label: "Site Analysis",
+    label: "Surveyor",
     blurb: "The measured ground of any place — climate, terrain, water — macro ⇄ micro, Rhino-ready.",
     status: "live"
   },
   {
     href: "/site-design",
-    label: "Site Design",
-    blurb: "Gable Studio — form-finding by site forces (sun, wind, terrain), with testable rules + a Rhino 8 round-trip.",
+    label: "Eco-Architect",
+    blurb: "Eco-Architect — form-finding by site forces (sun, wind, terrain), with testable rules + a Rhino 8 round-trip.",
     status: "live"
   },
   {
     href: "/skills-coach",
-    label: "Skills Coach",
+    label: "Coach",
     blurb: "A tutor for Rhino · Grasshopper · AutoCAD · Revit · Adobe — with levels, doc links, and a concept panel.",
     status: "live",
     requiresAuth: true
   },
   {
     href: "/skills-pathways",
-    label: "Skills Pathways",
+    label: "Cartographer",
     blurb: "A beginner→advanced trail map of 2D & 3D skills — with a tutorial video behind every step.",
     status: "live"
   },
@@ -49,26 +49,26 @@ export const TOOLKIT_NAV: ToolItem[] = [
   },
   {
     href: "/pinup",
-    label: "Pinup Wall",
+    label: "Archivist",
     blurb: "Studio memory + metadata. Upload work, tag it, keep the record.",
     status: "live",
     requiresAuth: true
   },
   {
     href: "/design-critic",
-    label: "Design Critic",
-    blurb: "Lay of the land + adoptable personas. Use with caution — consult humans too.",
+    label: "Critic",
+    blurb: "Critique + portfolio narrative — adoptable personas, a defensible thesis, and review prep. Use with caution; consult humans too.",
     status: "soon"
   },
   {
     href: "/media-2d",
-    label: "2D Media Tools",
+    label: "2D Tooling",
     blurb: "Drawing cleanup · live video · fabrication.",
     status: "soon"
   },
   {
     href: "/tools-3d",
-    label: "3D Tools",
+    label: "3D Tooling",
     blurb: "Python · tutorials · Three.js · 3D-print settings.",
     status: "soon"
   },

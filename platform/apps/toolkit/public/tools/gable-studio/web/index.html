@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Gable Studio · site analyzer + constraint generator</title>
+  <title>Eco-Architect · site analyzer + constraint generator</title>
   <!-- Archivo Black = the toolkit's display face, so the embedded studio matches
        the rest of the platform. Network-optional: if blocked (offline class
        wifi) the headings fall back to the system sans via the CSS font stack. -->
@@ -29,7 +29,7 @@
 <body>
   <header>
     <div class="hwrap">
-      <h1>Gable Studio <span class="sub">· analyze → constrain → export → Rhino → re-test</span></h1>
+      <h1>Eco-Architect <span class="sub">· analyze → constrain → export → Rhino → re-test</span></h1>
       <p class="tag">Shape the prototypical massing, watch the performance <em>data</em> move, encode your design
         intent as testable <em>rules</em>, then export the same constraints as Rhino 8 + Grasshopper python — and
         re-import the Rhino file to close the loop.</p>
@@ -37,7 +37,7 @@
   </header>
 
   <nav class="toolbar">
-    <button id="btn-studio" class="tab">⊞ Gable Studio example</button>
+    <button id="btn-studio" class="tab">⊞ Eco-Architect example</button>
     <span class="sep"></span>
     <button id="btn-mode">◫ Pen mode</button>
     <button id="btn-map">📍 Location</button>
@@ -65,7 +65,7 @@
         <button id="btn-import-3dm" class="bigimport">⤒ Import Rhino file (.3dm)</button>
         <input type="file" id="file-3dm" accept=".3dm" style="display:none" />
         <p class="importhint">Bring your own massing from Rhino&nbsp;8 — or open the built-in example. All dimensions shown in <b>feet</b>.</p>
-        <button id="btn-studio-2" class="tabopen">⊞ Open Gable Studio example</button>
+        <button id="btn-studio-2" class="tabopen">⊞ Open Eco-Architect example</button>
       </div>
       <div id="env-controls"></div>
     </section>
@@ -84,11 +84,11 @@
     </section>
   </main>
 
-  <!-- Gable Studio example: building + terrain parameters in a floating window
+  <!-- Eco-Architect example: building + terrain parameters in a floating window
        (non-modal, so the 3D view keeps updating live as you drag). -->
   <aside id="studioWin" class="studiowin" style="display:none">
     <div class="studiowin-head">
-      <b>⊞ Gable Studio example</b>
+      <b>⊞ Eco-Architect example</b>
       <span class="studiowin-sub">building &amp; terrain · feet</span>
       <button class="modal-x" data-close="studioWin" title="close">✕</button>
     </div>

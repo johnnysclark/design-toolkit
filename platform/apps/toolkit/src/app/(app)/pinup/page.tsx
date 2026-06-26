@@ -11,7 +11,7 @@ export default async function PinupPage() {
   } = await supabase.auth.getUser();
 
   // The wall reads/writes per-user rows under RLS — it needs a signed-in user.
-  if (!user) return <AuthGate tool="Pinup Wall" />;
+  if (!user) return <AuthGate tool="Archivist" />;
 
   const { data: pinups, error } = await supabase
     .from("pinups")
@@ -31,7 +31,7 @@ export default async function PinupPage() {
 
   return (
     <div>
-      <h1 className="text-3xl font-semibold tracking-tight">Pinup Wall</h1>
+      <h1 className="text-3xl font-semibold tracking-tight">Archivist</h1>
       <p className="mt-2 max-w-2xl text-neutral-600">
         Studio memory + metadata. Everyone signed in sees the wall; you can add,
         edit, and remove your own pins.

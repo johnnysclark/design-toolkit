@@ -16,6 +16,7 @@ export const maxDuration = 60;
 
 const BUCKET = "library";
 const MAX_BYTES = 4_500_000; // keep base64 well under the vision API per-image limit
+const MAX_IMAGES = 6; // cap images per analysis to bound tokens/latency
 const ALLOWED = new Set(["image/jpeg", "image/png", "image/gif", "image/webp"]);
 
 // Only fetch public http(s) URLs — block internal hosts (basic SSRF guard).
@@ -143,43 +144,78 @@ export async function POST(req: Request) {
       });
     }
 
-    // ── Mode: analyze an image (first pass, or a conversational refinement) ─
-    const imagePath: string | null = body?.imagePath || null;
-    const imageUrl: string | null = body?.imageUrl ? String(body.imageUrl).trim() : null;
+    // ── Mode: analyze image(s) (first pass, or a conversational refinement) ─
     const note: string | null = body?.note ? String(body.note).trim() : null;
     // Accumulated authoritative facts the student has typed in the conversation.
     const userContext: string | null = body?.userContext ? String(body.userContext).trim() : null;
     // When refining an existing search, update that row instead of inserting.
     const incomingSearchId: string | null = body?.searchId || null;
+    // One or more images: uploaded storage paths and/or public image URLs.
+    const paths: string[] = Array.isArray(body?.imagePaths)
+      ? body.imagePaths.filter((p: unknown): p is string => typeof p === "string" && !!p)
+      : body?.imagePath
+        ? [String(body.imagePath)]
+        : [];
+    const urls: string[] = (
+      Array.isArray(body?.imageUrls) ? body.imageUrls : body?.imageUrl ? [body.imageUrl] : []
+    )
+      .filter((u: unknown): u is string => typeof u === "string" && !!u)
+      .map((u: string) => u.trim());
+    const primaryPath = paths[0] || null;
+    const primaryUrl = urls[0] || null;
 
-    let fetchUrl: string;
-    if (imagePath) {
+    // Resolve each image to a fetchable URL (signed for uploads; validated for URLs).
+    const refUrls: string[] = [];
+    for (const p of paths.slice(0, MAX_IMAGES)) {
       const { data: signed, error } = await supabase.storage
         .from(BUCKET)
-        .createSignedUrl(imagePath, 120);
+        .createSignedUrl(p, 120);
       if (error || !signed?.signedUrl) {
         return NextResponse.json(
-          { error: "Could not read the uploaded image. Try re-uploading." },
+          { error: "Could not read an uploaded image. Try re-uploading." },
           { status: 400 }
         );
       }
-      fetchUrl = signed.signedUrl;
-    } else if (imageUrl) {
-      if (!isPublicHttpUrl(imageUrl)) {
+      refUrls.push(signed.signedUrl);
+    }
+    for (const u of urls.slice(0, MAX_IMAGES)) {
+      if (!isPublicHttpUrl(u)) {
         return NextResponse.json(
           { error: "That doesn't look like a public image URL." },
           { status: 400 }
         );
       }
-      fetchUrl = imageUrl;
-    } else {
+      refUrls.push(u);
+    }
+    if (!refUrls.length) {
       return NextResponse.json(
-        { error: "Provide an uploaded image (imagePath) or an image URL." },
+        { error: "Provide at least one image (upload or URL)." },
         { status: 400 }
       );
     }
 
-    const { data: b64, mediaType } = await fetchImage(fetchUrl);
+    const fetched = await Promise.all(
+      refUrls.slice(0, MAX_IMAGES).map(async (u) => {
+        try {
+          return await fetchImage(u);
+        } catch (e: any) {
+          return { error: e?.message || "fetch failed" } as { error: string };
+        }
+      })
+    );
+    const imageBlocks = fetched
+      .filter((f): f is { data: string; mediaType: string } => !("error" in f))
+      .map((f) => ({
+        type: "image" as const,
+        source: { type: "base64" as const, media_type: f.mediaType, data: f.data }
+      }));
+    if (!imageBlocks.length) {
+      const firstErr = fetched.find((f) => "error" in f) as { error: string } | undefined;
+      return NextResponse.json(
+        { error: firstErr?.error || "Could not read the image(s)." },
+        { status: 400 }
+      );
+    }
 
     // Vision pass — structured output, no extended thinking (perception task).
     const client = new Anthropic();
@@ -192,16 +228,14 @@ export async function POST(req: Request) {
         {
           role: "user",
           content: [
-            {
-              type: "image",
-              source: { type: "base64", media_type: mediaType, data: b64 }
-            },
+            ...imageBlocks,
             {
               type: "text",
               text: analysisUser({
-                sourceUrl: imageUrl || undefined,
+                sourceUrl: primaryUrl || undefined,
                 note: note || undefined,
-                userContext: userContext || undefined
+                userContext: userContext || undefined,
+                imageCount: imageBlocks.length
               })
             }
           ]
@@ -244,8 +278,8 @@ export async function POST(req: Request) {
         .insert({
           owner: user.id,
           project_id: projectId,
-          input_image_path: imagePath,
-          input_url: imageUrl,
+          input_image_path: primaryPath,
+          input_url: primaryUrl,
           analysis: analysisToStore,
           enrichment
         })
@@ -259,7 +293,16 @@ export async function POST(req: Request) {
       await supabase.from("tool_runs").insert({
         owner: user.id,
         tool: "librarian",
-        input: { mode, projectId, imagePath, imageUrl, note, userContext, refine: !!incomingSearchId },
+        input: {
+          mode,
+          projectId,
+          imageCount: imageBlocks.length,
+          paths,
+          urls,
+          note,
+          userContext,
+          refine: !!incomingSearchId
+        },
         output: { analysis, enrichment }
       });
     } catch {
