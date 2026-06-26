@@ -16,12 +16,17 @@ export type DrawPrim =
   | { kind: "line"; pts: Pt[]; weight: "light" | "heavy" | "corridor"; dashed?: boolean }
   | { kind: "fill"; pts: Pt[] } // filled black polygon (walls)
   | { kind: "circle"; c: Pt; r: number; fill: boolean }
-  | { kind: "text"; at: Pt; text: string; size: number; braille?: boolean };
+  | { kind: "text"; at: Pt; text: string; size: number; braille?: boolean; anchor?: "start" | "middle" };
 
 export interface PlanModel {
   prims: DrawPrim[];
   bounds: { minX: number; minY: number; maxX: number; maxY: number };
 }
+
+/** Stroke weights in FEET, shared by the on-screen SVG and the PIAF raster so
+ *  screen == print. (Deliberately not derived from state.style.*_lineweight_mm,
+ *  which is the desktop Rhino renderer's mm scale — a different ratio.) */
+export const PLAN_WEIGHTS = { light: 0.18, heavy: 0.55, corridor: 0.3 } as const;
 
 function rectCorners(x: number, y: number, w: number, h: number, t: Transform): Pt[] {
   return [
@@ -46,13 +51,18 @@ function arcPolyline(hinge: Pt, radius: number, a0: number, a1: number, t: Trans
   return pts;
 }
 
-export function buildPlanModel(state: State): PlanModel {
-  const scene = deriveGeometry(state);
+export function buildPlanModel(state: State, levelFilter: number | null = null): PlanModel {
+  const scene = deriveGeometry(state, levelFilter);
   const prims: DrawPrim[] = [];
 
-  // Site boundary (heavy).
+  // Site boundary — irregular infill lot polygon if present, else the rectangle.
   const { ox, oy, w, h } = scene.site;
-  prims.push({ kind: "line", pts: [{ x: ox, y: oy }, { x: ox + w, y: oy }, { x: ox + w, y: oy + h }, { x: ox, y: oy + h }, { x: ox, y: oy }], weight: "light" });
+  if (scene.site.boundary && scene.site.boundary.length >= 3) {
+    const b = scene.site.boundary;
+    prims.push({ kind: "line", pts: [...b, b[0]], weight: "heavy", dashed: true });
+  } else {
+    prims.push({ kind: "line", pts: [{ x: ox, y: oy }, { x: ox + w, y: oy }, { x: ox + w, y: oy + h }, { x: ox, y: oy + h }, { x: ox, y: oy }], weight: "light" });
+  }
 
   for (const bay of scene.bays) {
     const t = bay.transform;
@@ -79,9 +89,10 @@ export function buildPlanModel(state: State): PlanModel {
       prims.push({ kind: "fill", pts: rectCorners(wRect.x, wRect.y, wRect.w, wRect.h, t) });
     }
 
-    // Columns (filled circles).
+    // Columns (filled squares — matches the 3D + STL box footprint, so a reader
+    // feels the same shape on swell paper and in the print).
     for (const col of bay.columns) {
-      prims.push({ kind: "circle", c: applyTransform({ x: col.x, y: col.y }, t), r: col.r, fill: true });
+      prims.push({ kind: "fill", pts: rectCorners(col.x - col.r, col.y - col.r, col.r * 2, col.r * 2, t) });
     }
 
     // Door swings (leaf + arc).
@@ -107,6 +118,36 @@ export function buildPlanModel(state: State): PlanModel {
     prims.push({ kind: "text", at: { x: lp.x, y: lp.y - 3 }, text: bay.label.braille, size: 3.2, braille: true });
   }
 
+  // Rooms — outline (program spaces).
+  for (const rm of scene.rooms) {
+    prims.push({ kind: "line", pts: [{ x: rm.x, y: rm.y }, { x: rm.x + rm.w, y: rm.y }, { x: rm.x + rm.w, y: rm.y + rm.h }, { x: rm.x, y: rm.y + rm.h }, { x: rm.x, y: rm.y }], weight: "light" });
+  }
+
+  // Free walls — solid black chunks + door/window symbols.
+  for (const fw of scene.freeWalls) {
+    for (const s of fw.solids) prims.push({ kind: "fill", pts: s.quad });
+    for (const d of fw.doors) {
+      prims.push({ kind: "line", pts: [d.hinge, d.leafEnd], weight: "heavy" });
+      prims.push({ kind: "line", pts: arcPolyline(d.hinge, d.radius, d.a0, d.a1, { ox: 0, oy: 0, rot: 0 }), weight: "light" });
+    }
+    for (const win of fw.windows) {
+      prims.push({ kind: "line", pts: [win.a, win.b], weight: "heavy" });
+      prims.push({ kind: "circle", c: { x: (win.a.x + win.b.x) / 2, y: (win.a.y + win.b.y) / 2 }, r: 0.6, fill: false });
+    }
+  }
+
+  // Free columns (square footprint to match 3D + STL).
+  const idT = { ox: 0, oy: 0, rot: 0 };
+  for (const c of scene.freeColumns) {
+    prims.push({ kind: "fill", pts: rectCorners(c.x - c.size / 2, c.y - c.size / 2, c.size, c.size, idT) });
+  }
+
+  // Room labels (drawn last so walls don't cover them).
+  for (const rm of scene.rooms) {
+    prims.push({ kind: "text", at: { x: rm.cx, y: rm.cy + 1.4 }, text: rm.name, size: 2.6, anchor: "middle" });
+    prims.push({ kind: "text", at: { x: rm.cx, y: rm.cy - 2.4 }, text: rm.braille, size: 3, braille: true, anchor: "middle" });
+  }
+
   // Voids (world-space outline).
   for (const v of scene.voids) {
     if (v.shape === "circle") {
@@ -118,15 +159,20 @@ export function buildPlanModel(state: State): PlanModel {
     }
   }
 
-  // Pad bounds a little for labels/margins.
+  // Grow bounds to include label/braille glyph boxes — geometry-only bounds
+  // would clip text on south/east-edge or rotated bays, and the braille key is
+  // the primary non-visual deliverable. (Monospace ≈ 0.62 em advance.)
+  let { minX, minY, maxX, maxY } = scene.bounds;
+  for (const p of prims) {
+    if (p.kind !== "text") continue;
+    const w = p.text.length * p.size * 0.62;
+    const x0 = p.anchor === "middle" ? p.at.x - w / 2 : p.at.x;
+    const x1 = p.anchor === "middle" ? p.at.x + w / 2 : p.at.x + w;
+    minX = Math.min(minX, x0);
+    maxX = Math.max(maxX, x1);
+    minY = Math.min(minY, p.at.y - p.size);
+    maxY = Math.max(maxY, p.at.y + p.size);
+  }
   const pad = 6;
-  return {
-    prims,
-    bounds: {
-      minX: scene.bounds.minX - pad,
-      minY: scene.bounds.minY - pad,
-      maxX: scene.bounds.maxX + pad,
-      maxY: scene.bounds.maxY + pad
-    }
-  };
+  return { prims, bounds: { minX: minX - pad, minY: minY - pad, maxX: maxX + pad, maxY: maxY + pad } };
 }

@@ -1,4 +1,70 @@
 <!-- ───────────────────────────── CURRENT STATE (top) ───────────────────────────── -->
+> **RAP Studio — overnight code-quality pass (2026-06-26, branch `feat/rap-rhino-bridge`,
+> PR #30, NOT merged — holding for the Vercel 24h build-rate-limit reset).** Ran two multi-agent
+> review workflows over the studio code. Round 1 (8 lenses → adversarial verify → synth): 54
+> findings, 45 confirmed; worked through them in build-green commits. Round 2 (regression check of
+> the changes): caught 5 real bugs, all fixed. Commits `70dd9d5`..`e3455e5`. Highlights:
+> - **Non-visual feedback (the thesis):** aria-live re-announces repeated messages; exports +
+>   assistant failures now announce; 3D canvas hidden from AT; single-owner announcements; honest
+>   `aria-pressed` toggle buttons (the role=tab pattern was broken); JsonTree disclosure user-owned.
+> - **Renderer parity:** square columns in 2D to match 3D/STL; shared `PLAN_WEIGHTS`; braille
+>   letter-sign after digits; plan bounds include text (braille no longer clipped); perimeter-only
+>   aperture symbols; STL floor under free-element-only levels; columns size from `deriveGeometry`.
+> - **Input flooding:** Forms commit-once (`NumField` on blur/Enter; rotation slider commits on
+>   release + only on real change) — was a command per keystroke/drag.
+> - **Validation + agent reliability:** zero/negative/dup-id guards; room-level bounds; agent
+>   `max_tokens` 6000 + truncation handling; dropped-command parity note; input-size guards.
+> - **Recovery:** **undo/redo** (toolbar + console verbs) + confirm-before-reset; no-op commands
+>   don't pollute history.
+> - **Honest disclosure:** Drive panel warns which `web_*` free elements the Watcher won't rebuild;
+>   bridge relays only read-only `ping`/`status`. Clearer first-time intro on `/rap/studio`.
+> - **Deliberately skipped (need a live browser+Rhino to do safely):** STL void-cutting (manifold
+>   CSG), and swapping the agent route to the beta structured-output SDK. Minor open: bare-verb
+>   "No bay named undefined" guards (low). Build (types) green throughout; not browser-tested.
+>
+> **RAP Studio v2 — building model + Drive Rhino (2026-06-25, branch `feat/rap-rhino-bridge`,
+> worktree `design-toolkit-rap`, not yet merged).** Two big additions on top of the live
+> `/rap/studio`:
+> 1. **Full building model** (was a "bay jig"). New top-level state arrays: free `walls`
+>    (interior + exterior, any angle, with `openings`), `rooms` (program use: residential / retail
+>    / office / lobby / circulation / parking / amenity / core / mechanical / open / other),
+>    free `columns`; plus an editable irregular `site.boundary` (urban infill) and multi-`levels`
+>    for mixed-use vertical program. New command verbs (`wall add/move/remove`, `room add … <use>`,
+>    `column add`, `opening add <wallId> …`, `set site boundary …`); the assistant prompt now tells
+>    the model to compose full architecture. A **level selector** filters every renderer + export.
+>    `deriveGeometry` emits the new elements (gapped free walls, room labels, columns, boundary);
+>    2D plan / PIAF render them generically; Scene3D + STL extended; `describe()` reads back program
+>    mix by level. This was Daniel's ask for 3rd-year urban-infill mixed-use studio.
+> 2. **Drive Rhino** — talk to `state.json` + the Watcher from the site. (a) **Direct folder write**
+>    via the File System Access API (Chromium) writes `state.json` into the RAP folder; (b)
+>    **companion bridge** `public/rap-bridge/rap_bridge.py` (stdlib-only localhost server, token +
+>    CORS + Private-Network-Access headers) writes the file AND proxies the Watcher's TCP-1998
+>    queries; (c) **Download** fallback. New `engine/exportState.ts` emits a COMPLETE
+>    `rhino_controller_v4.0` file (all keys + `web_*` for the studio-native elements). Client:
+>    `studio/lib/rhino-bridge.ts`; panel: `components/DrivePanel.tsx`. Build (types) green.
+>    **Not browser-tested** — the bridge/FS-Access need a real desktop + Rhino to verify.
+>
+> **Design Critic / "Critic" — BUILT (2026-06-26, branch `claude/design-critic-agent-plan-07tb1o`,
+> not yet merged).** Backlog **T3** shipped as the full three-mode critic at **`/design-critic`**,
+> built on the Librarian pattern. One multi-mode route `api/design-critic/route.ts` (Sonnet 4.6,
+> **401 for anon**, logs every run to `tool_runs`) dispatching on `mode`:
+> **Jury** (adoptable critic personas — technical · theory · client-pragmatist · accessibility ·
+> context-urbanist · materials-maker — each makes "the strongest case it fails" over uploaded work
+> + a thesis), **Review Prep** (crit weather report forecasting 5–8 jury questions tagged
+> fair/loaded/out-of-scope + rebuttal rehearsal), and **Portfolio** (a voice-preserving two-pane
+> editor — read-only AI scaffold, the student rewrites, a "% in your words" meter + export-lock,
+> then the critic attacks the **student's own words**; plus a defensible-thesis builder). Every
+> factual claim is a tagged CLAIM (✓ supported / ? verify / ⚠ likely-wrong). New tables +
+> owner-only RLS + a private `critic` bucket in `supabase/migrations/0005_design_critic.sql`
+> (`critic_sessions` / `critic_critiques` / `critic_portfolio` / `critic_rebuttals`) — **apply in
+> the Supabase SQL editor** before the tool works in prod. Slice: `(app)/design-critic/*`,
+> `api/design-critic/route.ts`, `lib/anthropic/critic-prompts.ts`. Nav status flipped to **live**
+> (`requiresAuth: true`). Image upload + `prepareImage` reuse the Librarian flow. Export-lock is a
+> UX nudge (commented as such); the real server guard refuses self-attack on empty student text.
+> Build (types) green; **not browser-screenshot-tested and not run live** (no Supabase/Anthropic
+> creds in the build env) — open `/design-critic` signed-in to eyeball it. Next: trace/Markdown
+> export, desk-crit transcript ingestion, screen-reader-first portfolio export.
+>
 > **RAP Studio — BUILT (2026-06-25, branch `feat/rap-studio`, worktree `design-toolkit-rap`,
 > not yet merged).** A runnable, interactive slice of the Radical Accessibility Project at
 > **`/rap/studio`** (linked from the `/rap` page; no new nav entry). One canonical in-browser

@@ -1,13 +1,13 @@
 // 2D tactile plan — renders the shared plan model to SVG (north-up, 1-bit look).
 // The same model rasterises to the PIAF swell-paper PNG, so screen == print.
 
-import { buildPlanModel, type DrawPrim } from "./planModel";
+import { buildPlanModel, PLAN_WEIGHTS, type DrawPrim } from "./planModel";
 import type { State } from "../engine/types";
 
-const WEIGHTS = { light: 0.18, heavy: 0.55, corridor: 0.3 } as const;
+const WEIGHTS = PLAN_WEIGHTS;
 
-export default function PlanSvg({ state, className }: { state: State; className?: string }) {
-  const { prims, bounds } = buildPlanModel(state);
+export default function PlanSvg({ state, className, levelFilter = null }: { state: State; className?: string; levelFilter?: number | null }) {
+  const { prims, bounds } = buildPlanModel(state, levelFilter);
   const { minX, minY, maxX, maxY } = bounds;
   const w = Math.max(1, maxX - minX);
   const h = Math.max(1, maxY - minY);
@@ -59,6 +59,7 @@ function Prim({ p, fy }: { p: DrawPrim; fy: (y: number) => number }) {
       y={fy(p.at.y)}
       fontSize={p.size}
       fill="#111"
+      textAnchor={p.anchor === "middle" ? "middle" : "start"}
       fontFamily={p.braille ? "'Apple Braille','Segoe UI Symbol',monospace" : "'IBM Plex Mono', monospace"}
       style={{ userSelect: "none" }}
     >

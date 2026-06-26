@@ -21,23 +21,28 @@ function parseJson(text: string): { reply?: string; commands?: string[] } {
   }
 }
 
-/** Keep only commands that actually apply cleanly against the supplied state. */
-function validateCommands(state: State, commands: string[]): string[] {
+/** Keep commands that apply cleanly against the supplied state; capture the
+ *  rest with their error so the spoken reply can't silently over-claim. */
+function validateCommands(state: State, commands: string[]): { kept: string[]; dropped: { command: string; error: string }[] } {
   const kept: string[] = [];
+  const dropped: { command: string; error: string }[] = [];
   let cur = state;
   for (const raw of commands) {
     if (typeof raw !== "string" || !raw.trim()) continue;
+    const cmd = raw.trim();
     try {
-      const res = applyCommand(cur, raw.trim());
+      const res = applyCommand(cur, cmd);
       if (res.ok) {
-        kept.push(raw.trim());
+        kept.push(cmd);
         cur = res.state;
+      } else {
+        dropped.push({ command: cmd, error: res.message });
       }
-    } catch {
-      /* drop a command that throws */
+    } catch (e) {
+      dropped.push({ command: cmd, error: e instanceof Error ? e.message : "failed" });
     }
   }
-  return kept;
+  return { kept, dropped };
 }
 
 export async function POST(req: Request) {
@@ -66,18 +71,26 @@ export async function POST(req: Request) {
   if (!instruction) return NextResponse.json({ error: "Type a request first." }, { status: 400 });
   if (!state || typeof state !== "object") return NextResponse.json({ error: "Missing model state." }, { status: 400 });
 
+  // Cheap abuse guards — both are billed per call.
+  if (instruction.length > 4000) return NextResponse.json({ error: "That request is too long — please shorten it." }, { status: 413 });
+  const stateJson = JSON.stringify(state);
+  if (stateJson.length > 200_000) return NextResponse.json({ error: "The model is too large to send to the assistant." }, { status: 413 });
+
   try {
     const client = new Anthropic();
     const message: any = await client.messages.create({
       model: MODEL,
-      max_tokens: 1500,
+      max_tokens: 6000,
       system: AGENT_SYSTEM,
       output_config: { format: { type: "json_schema", schema: AGENT_SCHEMA } },
-      messages: [{ role: "user", content: agentUser(instruction, JSON.stringify(state)) }]
+      messages: [{ role: "user", content: agentUser(instruction, stateJson) }]
     } as any);
 
     if (message.stop_reason === "refusal") {
       return NextResponse.json({ error: "The assistant declined this request." }, { status: 200 });
+    }
+    if (message.stop_reason === "max_tokens") {
+      return NextResponse.json({ reply: "That request was too large to plan in one go — try splitting it into smaller steps.", commands: [] }, { status: 200 });
     }
 
     const text = (message.content || [])
@@ -85,8 +98,10 @@ export async function POST(req: Request) {
       .map((b: any) => b.text)
       .join("");
     const parsed = parseJson(text);
-    const reply = typeof parsed.reply === "string" ? parsed.reply : "Done.";
-    const commands = validateCommands(state, Array.isArray(parsed.commands) ? parsed.commands : []);
+    const { kept: commands, dropped } = validateCommands(state, Array.isArray(parsed.commands) ? parsed.commands : []);
+    // Append a parity note so a spoken reply never claims edits that didn't apply.
+    const baseReply = typeof parsed.reply === "string" ? parsed.reply : "Done.";
+    const reply = dropped.length ? `${baseReply} (Note: ${dropped.length} command${dropped.length === 1 ? "" : "s"} could not be applied.)` : baseReply;
 
     // "The trace" — best-effort per-run log.
     try {
@@ -94,13 +109,13 @@ export async function POST(req: Request) {
         owner: user.id,
         tool: "rap-agent",
         input: { instruction },
-        output: { reply, commands }
+        output: { reply, commands, dropped }
       });
     } catch {
       /* never let logging break the response */
     }
 
-    return NextResponse.json({ reply, commands, meta: { model: MODEL, generated_at: new Date().toISOString() } });
+    return NextResponse.json({ reply, commands, dropped, meta: { model: MODEL, generated_at: new Date().toISOString() } });
   } catch (err: unknown) {
     console.error(err);
     return NextResponse.json({ error: err instanceof Error ? err.message : "Internal error" }, { status: 500 });
