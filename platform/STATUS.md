@@ -1,4 +1,21 @@
 <!-- ───────────────────────────── CURRENT STATE (top) ───────────────────────────── -->
+> **RAP Studio — BUILT (2026-06-25, branch `feat/rap-studio`, worktree `design-toolkit-rap`,
+> not yet merged).** A runnable, interactive slice of the Radical Accessibility Project at
+> **`/rap/studio`** (linked from the `/rap` page; no new nav entry). One canonical in-browser
+> `state.json` (real `rhino_controller_v4.0` subset) + many renderers — the project's
+> "sense-agnostic state + renderer parity" made literal. Engine: typed state + a Controller-grammar
+> command interpreter + Grade-1 Braille + `deriveGeometry()` (the single geometry source all
+> renderers read), under `(app)/rap/studio/engine/`. Channels (all compile to the same commands):
+> a **command console**, **accessible forms**, and a **natural-language assistant**
+> (`/api/rap/agent`, Sonnet 4.6, **401 for anon**, logs to `tool_runs`). Renderers: **3D**
+> (react-three-fiber, dynamic-imported), **2D tactile plan SVG**, **Whole-to-Part read-back text**,
+> **Braille key**, and a **navigable state.json tree** with changed-path highlighting. Exports:
+> `state.json`, **PIAF 1-bit PNG**, **STL** (port of `tactile_print.py` extrude+clip), command log.
+> Accessibility: `aria-live` announcements + optional Web Speech TTS; the 3D view is an aid, not the
+> source of truth. Public page; only the assistant gates to sign-in. New deps: `three`,
+> `@react-three/fiber`, `@react-three/drei`. Next step = drive real Rhino (B1 `state.json` → Watcher;
+> then a local companion bridge for live). Build (types) green; **not browser-screenshot-tested.**
+>
 > **CURRENT STATE — 2026-06-24 (primary-agent sync).** GOAL 1 is **DONE**: the Toolkit is
 > **LIVE** at https://toolkit.allmeans.works — Supabase migration applied, Vercel project
 > `toolkit` deploying `main`, Porkbun DNS + HTTPS green, magic-link login verified. The repo +

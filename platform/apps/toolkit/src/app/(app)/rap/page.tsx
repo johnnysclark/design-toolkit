@@ -312,6 +312,24 @@ export default function RAP() {
           </p>
         </header>
 
+        <a
+          href="/rap/studio"
+          style={{
+            display: "inline-block",
+            marginTop: 2,
+            padding: "12px 20px",
+            background: "#111",
+            color: "#fff",
+            textDecoration: "none",
+            fontFamily: "var(--font-grotesk),sans-serif",
+            fontWeight: 500,
+            fontSize: 15,
+            borderRadius: 6
+          }}
+        >
+          ▶&nbsp;&nbsp;Try RAP Studio — author a plan in your browser
+        </a>
+
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <figure className="fig">
           <img src="/rap-figures/fig-tactile-axon.jpg" alt="Hands reading a swell-paper tactile axonometric drawing; raised black lines form a three-dimensional massing on textured paper amid other tactile sheets." />
@@ -577,16 +595,33 @@ export default function RAP() {
         </div>
 
         <div className="demo">
-          <div className="dl">Planned for this site</div>
-          <div className="dt">A browser demo — drive the pattern from the web</div>
+          <div className="dl">Now live on this site</div>
+          <div className="dt">RAP Studio — drive the pattern from the web</div>
           <p>
-            A self-contained &ldquo;RAP Studio&rdquo; is planned for the toolkit: a
-            screen-reader-first web tool where you author a design in structured language, watch the
-            canonical <code>state.json</code> update as the source of truth, see it rebuilt live in a
-            3D (Three.js) viewer and as a tactile-style plan, and export the very same{" "}
-            <code>state.json</code> and <code>.3dm</code> that drive Rhino. A companion document
-            maps the full range of options for demoing the idea here and for wiring the website
-            through to a live Rhino model.
+            A self-contained <a href="/rap/studio" style={{ color: "#111", fontWeight: 600 }}>RAP Studio</a> now runs in the
+            toolkit: a screen-reader-first web tool where you author a design in structured language —
+            by typed command, by form, or in plain language to the assistant — watch the canonical{" "}
+            <code>state.json</code> update as the source of truth, see it rebuilt live in a 3D viewer and
+            as a tactile-style plan, read it back as text and Braille, and export the same{" "}
+            <code>state.json</code>, a PIAF swell-paper image, and a 3D-print STL. The state matches the
+            real schema, so it round-trips to Rhino through the desktop Watcher.
+          </p>
+          <p style={{ marginTop: 12 }}>
+            <a
+              href="/rap/studio"
+              style={{
+                display: "inline-block",
+                padding: "10px 18px",
+                background: "#111",
+                color: "#fff",
+                textDecoration: "none",
+                fontFamily: "var(--font-grotesk),sans-serif",
+                fontWeight: 500,
+                borderRadius: 6
+              }}
+            >
+              ▶&nbsp;&nbsp;Open RAP Studio
+            </a>
           </p>
         </div>
 

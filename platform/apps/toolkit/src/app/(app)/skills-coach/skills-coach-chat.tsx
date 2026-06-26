@@ -11,12 +11,53 @@ import MessageBubble, { type ChatMessage } from "./MessageBubble";
 type Upload = { path: string; kind: "image" | "pdf" };
 type Pending = { file: File; name: string; kind: "image" | "pdf"; previewUrl: string | null };
 
-const EXAMPLES = [
+// A deep pool of starter questions across every discipline; a fresh handful is
+// drawn on each visit (see the shuffle in the component) so the empty state
+// never looks the same twice.
+const EXAMPLE_POOL = [
+  // Rhino
   "How do I loft between two curves in Rhino?",
+  "What's the difference between a polysurface and a SubD in Rhino?",
+  "How do I fillet the edges of a closed solid in Rhino?",
+  "My Make2D output is missing lines — how do I fix it?",
+  "How do I split a surface with a curve in Rhino?",
+  "How do I array objects along a curve in Rhino?",
+  // Grasshopper
   "My Grasshopper definition makes too many results — what's wrong with my data tree?",
+  "When do I graft vs flatten a list in Grasshopper?",
+  "How do I scatter points evenly across a surface in Grasshopper?",
+  "What does the Dispatch component do, and when would I use it?",
+  "How do I bake Grasshopper geometry onto a specific layer?",
+  // AutoCAD
   "How do I set up a viewport at 1:100 in an AutoCAD layout?",
-  "How do I drop a white-background diagram onto a colored board in Photoshop?"
+  "What's the difference between model space and paper space?",
+  "How do I make and edit a block in AutoCAD?",
+  "My dimensions look tiny in the layout — how does annotation scale work?",
+  "How do I attach an xref, and why won't it show up?",
+  // Revit
+  "What's the difference between a type and an instance in Revit?",
+  "How do I create a section view and drop it on a sheet in Revit?",
+  "How do I schedule all the doors in my Revit model?",
+  "What are phases in Revit, and how do I show existing vs new?",
+  // Adobe
+  "How do I drop a white-background diagram onto a colored board in Photoshop?",
+  "What's the difference between a clipping mask and a layer mask?",
+  "Should I use Illustrator or Photoshop for a line diagram?",
+  "How do I set bleed and margins for a printed booklet in InDesign?",
+  "How do I use paragraph styles to format a long document in InDesign?"
 ];
+const EXAMPLE_COUNT = 4;
+
+// Fisher–Yates pick of N distinct prompts. Runs only on the client (after mount)
+// so server and first-paint markup stay identical — no hydration mismatch.
+function sampleExamples(pool: string[], n: number): string[] {
+  const copy = [...pool];
+  for (let i = copy.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [copy[i], copy[j]] = [copy[j], copy[i]];
+  }
+  return copy.slice(0, n);
+}
 
 // Downscale a raster image to a bounded JPEG client-side (normalizes format,
 // strips EXIF, keeps the upload small). HEIC can't be decoded here — guarded
@@ -93,6 +134,9 @@ export default function SkillsCoachChat({
     }
     return [];
   });
+  // Deterministic on the server (first N of the pool), reshuffled on the client
+  // each mount — so every page refresh surfaces a different set of examples.
+  const [examples, setExamples] = useState<string[]>(() => EXAMPLE_POOL.slice(0, EXAMPLE_COUNT));
 
   const userIdRef = useRef<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
@@ -106,6 +150,10 @@ export default function SkillsCoachChat({
       .then(({ data }) => {
         userIdRef.current = data.user?.id ?? null;
       });
+  }, []);
+
+  useEffect(() => {
+    setExamples(sampleExamples(EXAMPLE_POOL, EXAMPLE_COUNT));
   }, []);
 
   useEffect(() => {
@@ -302,6 +350,7 @@ export default function SkillsCoachChat({
     setError(null);
     setPending(null);
     setInput("");
+    setExamples(sampleExamples(EXAMPLE_POOL, EXAMPLE_COUNT));
   }
 
   function onComposerKey(e: React.KeyboardEvent<HTMLTextAreaElement>) {
@@ -316,7 +365,7 @@ export default function SkillsCoachChat({
   return (
     <div>
       <h1 className="text-3xl font-semibold tracking-tight">Coach</h1>
-      <p className="mt-2 max-w-2xl text-neutral-600">
+      <p className="mt-2 max-w-2xl text-neutral-900">
         A patient tutor for Rhino, Grasshopper, AutoCAD, Revit, and the Adobe
         suite. Pick a tool and a level, ask your question, upload a sketch or
         screenshot — and report back what happened so we can debug it together.
@@ -325,7 +374,7 @@ export default function SkillsCoachChat({
       {/* controls */}
       <div className="mt-5 flex flex-wrap items-center gap-3">
         <label className="flex items-center gap-2 text-sm">
-          <span className="text-neutral-500">Tool</span>
+          <span className="text-neutral-900">Tool</span>
           <select
             value={discipline}
             onChange={(e) => setDiscipline(e.target.value as Discipline)}
@@ -340,7 +389,7 @@ export default function SkillsCoachChat({
         </label>
 
         <div className="flex items-center gap-2 text-sm">
-          <span className="text-neutral-500">Level</span>
+          <span className="text-neutral-900">Level</span>
           <div className="inline-flex overflow-hidden rounded-lg border border-neutral-300">
             {LEVELS.map((l) => (
               <button
@@ -352,7 +401,7 @@ export default function SkillsCoachChat({
                   "px-3 py-1.5 text-sm transition-colors",
                   level === l.id
                     ? "bg-neutral-900 text-white"
-                    : "bg-white text-neutral-600 hover:bg-neutral-100"
+                    : "bg-white text-neutral-900 hover:bg-neutral-100"
                 ].join(" ")}
               >
                 {l.label}
@@ -364,14 +413,14 @@ export default function SkillsCoachChat({
         <button
           type="button"
           onClick={newChat}
-          className="ml-auto rounded-lg border border-neutral-300 px-3 py-1.5 text-sm text-neutral-600 hover:bg-neutral-100"
+          className="ml-auto rounded-lg border border-neutral-300 px-3 py-1.5 text-sm text-neutral-900 hover:bg-neutral-100"
         >
           New chat
         </button>
       </div>
 
-      <p className="mt-2 text-xs text-neutral-500">
-        <span className="font-medium text-neutral-700">
+      <p className="mt-2 text-xs text-neutral-900">
+        <span className="font-medium text-neutral-900">
           {LEVELS.find((l) => l.id === level)?.label}:
         </span>{" "}
         {LEVELS.find((l) => l.id === level)?.desc}
@@ -384,16 +433,16 @@ export default function SkillsCoachChat({
           <div className="flex-1 space-y-4 overflow-y-auto p-4">
             {empty && (
               <div className="mx-auto mt-6 max-w-md text-center">
-                <p className="text-sm text-neutral-500">
+                <p className="text-sm text-neutral-900">
                   Ask anything about your current tool. Try one of these:
                 </p>
                 <div className="mt-3 space-y-2">
-                  {EXAMPLES.map((ex) => (
+                  {examples.map((ex) => (
                     <button
                       key={ex}
                       type="button"
                       onClick={() => setInput(ex)}
-                      className="block w-full rounded-lg border border-neutral-200 bg-white px-3 py-2 text-left text-sm text-neutral-700 hover:border-neutral-400"
+                      className="block w-full rounded-lg border border-neutral-200 bg-white px-3 py-2 text-left text-sm text-neutral-900 hover:border-neutral-400"
                     >
                       {ex}
                     </button>
@@ -408,11 +457,11 @@ export default function SkillsCoachChat({
 
             {streaming && (
               <div className="flex justify-start">
-                <div className="max-w-[92%] rounded-2xl rounded-bl-sm border border-neutral-200 bg-white px-4 py-3 text-sm leading-relaxed text-neutral-800">
+                <div className="max-w-[92%] rounded-2xl rounded-bl-sm border border-neutral-200 bg-white px-4 py-3 text-sm leading-relaxed text-neutral-900">
                   {streamingText ? (
                     <span className="whitespace-pre-wrap">{streamingText}</span>
                   ) : (
-                    <span className="text-neutral-400">Thinking…</span>
+                    <span className="text-neutral-900">Thinking…</span>
                   )}
                 </div>
               </div>
@@ -433,7 +482,7 @@ export default function SkillsCoachChat({
                 <button
                   type="button"
                   onClick={() => setPending(null)}
-                  className="text-neutral-400 hover:text-neutral-900"
+                  className="text-neutral-900 hover:opacity-60"
                   aria-label="Remove attachment"
                 >
                   ✕
@@ -452,7 +501,7 @@ export default function SkillsCoachChat({
                 type="button"
                 onClick={() => fileRef.current?.click()}
                 title="Attach a sketch, screenshot, or PDF"
-                className="shrink-0 rounded-lg border border-neutral-300 px-3 py-2 text-sm text-neutral-600 hover:bg-neutral-100"
+                className="shrink-0 rounded-lg border border-neutral-300 px-3 py-2 text-sm text-neutral-900 hover:bg-neutral-100"
               >
                 📎
               </button>
@@ -470,7 +519,7 @@ export default function SkillsCoachChat({
                 <button
                   type="button"
                   onClick={stop}
-                  className="shrink-0 rounded-lg border border-neutral-300 px-4 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-100"
+                  className="shrink-0 rounded-lg border border-neutral-300 px-4 py-2 text-sm font-medium text-neutral-900 hover:bg-neutral-100"
                 >
                   Stop
                 </button>
