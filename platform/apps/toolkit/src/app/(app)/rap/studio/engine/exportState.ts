@@ -35,7 +35,9 @@ export function toFullStateJson(state: State): Record<string, unknown> {
       origin: r.origin,
       size: r.size,
       level: r.level,
-      hatch_image: "",
+      // "none" (not "") — the watcher's legend filter keys off the literal
+      // "none"; "" makes every room emit a phantom hatched legend swatch.
+      hatch_image: "none",
       hatch_scale: 1.0,
       hatch_rotation: 0.0
     };
@@ -109,7 +111,9 @@ export function toFullStateJson(state: State): Record<string, unknown> {
       show_hatches: true,
       show_apertures: true
     },
-    tactile3d: state.tactile3d,
+    // The watcher reads `floor_enabled` (defaults true if absent), so map our
+    // `floor` onto it — otherwise `tactile3d floor off` is silently ignored.
+    tactile3d: { ...state.tactile3d, floor_enabled: state.tactile3d.floor },
     hatch_library_path: "./hatches/",
     print: { dpi: 300, paper_size: "letter", margin_in: 0.5 },
     bambu: { ip: "", access_code: "", serial: "", printer_model: "p1s", print_scale: 1.0, stl_path: "", slicer_path: "" },
@@ -118,9 +122,12 @@ export function toFullStateJson(state: State): Record<string, unknown> {
     tts: { enabled: false, rate: 2 },
     section: { axis: "x", offset: 0 },
 
-    // ── Studio-native free elements (interior/exterior walls, columns, wall
-    // openings) the desktop Watcher does not yet read back. Rooms are already
-    // projected into the native `rooms` dict above, so they're not repeated here.
+    // ── Studio-native elements the current desktop Watcher does NOT rebuild.
+    // Free walls/columns/openings live under web_* keys. Program rooms ARE
+    // projected into the native `rooms` dict above so they survive a round-trip,
+    // but note the current watcher draws no room boundary/label either — it only
+    // handles bay/void/landscape — so rooms are effectively web-only too (the
+    // Drive panel warns the student). Mirrored here as a reminder.
     web_walls: state.walls,
     web_columns: state.columns,
     web_openings: state.openings

@@ -171,6 +171,12 @@ export default function RapStudio({ signedIn }: { signedIn: boolean }) {
         announce("ERROR: " + msg);
         return { ok: false, error: msg };
       }
+      // Defense-in-depth: a 200 that still carries an {error} (e.g. a refusal)
+      // must be announced as a failure, never fall through to "Done.".
+      if (typeof data?.error === "string") {
+        announce("ERROR: " + data.error);
+        return { ok: false, error: data.error };
+      }
 
       const commands: string[] = Array.isArray(data.commands) ? data.commands : [];
       setLog((l) => [...l, { id: idRef.current++, output: `ASSISTANT: ${data.reply ?? "(applied changes)"}`, ok: true }]);
@@ -323,7 +329,7 @@ export default function RapStudio({ signedIn }: { signedIn: boolean }) {
         <DrivePanel
           stateText={fullState}
           onDownloadState={exportState}
-          webOnly={{ walls: state.walls.length, columns: state.columns.length, openings: state.openings.length }}
+          webOnly={{ walls: state.walls.length, columns: state.columns.length, openings: state.openings.length, rooms: state.rooms.length }}
         />
       </Panel>
 

@@ -92,11 +92,15 @@ export function buildStl(state: State, levelFilter: number | null = null): Array
   // level with only free walls/rooms/columns would otherwise print as floating
   // geometry with no base. One slab over the union bounding box per level.
   if (state.tactile3d.floor) {
+    // Levels that already have a bay are floored by the per-bay slab above —
+    // skip them here, or we emit a second coincident coplanar slab (non-manifold).
+    const bayLevels = new Set(scene.bays.map((b) => b.level));
     const freeLevels = new Set<number>();
     for (const fw of scene.freeWalls) freeLevels.add(fw.level);
     for (const c of scene.freeColumns) freeLevels.add(c.level);
     for (const r of scene.rooms) freeLevels.add(r.level);
     for (const lvl of freeLevels) {
+      if (bayLevels.has(lvl)) continue;
       let minX = Infinity;
       let minY = Infinity;
       let maxX = -Infinity;
@@ -118,7 +122,7 @@ export function buildStl(state: State, levelFilter: number | null = null): Array
           grow(r.x, r.y);
           grow(r.x + r.w, r.y + r.h);
         }
-      if (minX <= maxX && minY <= maxY) {
+      if (minX < maxX && minY < maxY) {
         const levelZ = scene.levels[lvl]?.z ?? 0;
         addBox(tris, minX, minY, maxX - minX, maxY - minY, levelZ - floorT, levelZ, idTransform);
       }
