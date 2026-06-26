@@ -60,6 +60,7 @@ function Prim({ p, fy }: { p: DrawPrim; fy: (y: number) => number }) {
       fontSize={p.size}
       fill="#111"
       textAnchor={p.anchor === "middle" ? "middle" : "start"}
+      dominantBaseline="middle"
       fontFamily={p.braille ? "'Apple Braille','Segoe UI Symbol',monospace" : "'IBM Plex Mono', monospace"}
       style={{ userSelect: "none" }}
     >
