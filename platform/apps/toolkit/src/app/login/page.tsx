@@ -2,6 +2,7 @@
 
 import { useActionState } from "react";
 import { signIn, signInPassword, type LoginState } from "./actions";
+import RequestAccessButton from "@/components/RequestAccessButton";
 
 const initialState: LoginState = {};
 
@@ -16,7 +17,7 @@ export default function LoginPage() {
     <main className="flex min-h-screen items-center justify-center p-6">
       <div className="w-full max-w-sm rounded-2xl border border-neutral-200 bg-white p-8 shadow-sm">
         <h1 className="text-2xl font-semibold tracking-tight">Design Toolkit</h1>
-        <p className="mt-1 text-sm text-neutral-600">Sign in to use the studio tools.</p>
+        <p className="mt-1 text-sm text-neutral-900">Sign in to use the studio tools.</p>
 
         {/* Email + password — works on any domain (incl. Vercel previews), no email needed. */}
         <form action={pwAction} className="mt-6 space-y-3">
@@ -77,9 +78,12 @@ export default function LoginPage() {
           )}
         </details>
 
-        <p className="mt-6 text-xs text-neutral-400">
-          Access is by invitation — your email must exist in Supabase Auth.
-        </p>
+        <div className="mt-6 border-t border-neutral-200 pt-4 text-center">
+          <p className="text-xs text-neutral-900">
+            Access is by invitation — your email must exist in Supabase Auth.
+          </p>
+          <RequestAccessButton className="mt-3" />
+        </div>
       </div>
     </main>
   );

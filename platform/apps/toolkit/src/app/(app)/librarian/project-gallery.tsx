@@ -183,7 +183,7 @@ export default function ProjectGallery({
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
                       src={it._display}
-                      alt={it.title || "item"}
+                      alt={it.title || "Reference image from the project library"}
                       loading="lazy"
                       className="h-full w-full object-cover"
                     />

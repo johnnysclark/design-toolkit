@@ -44,6 +44,27 @@
 >    `studio/lib/rhino-bridge.ts`; panel: `components/DrivePanel.tsx`. Build (types) green.
 >    **Not browser-tested** — the bridge/FS-Access need a real desktop + Rhino to verify.
 >
+> **Design Critic / "Critic" — BUILT (2026-06-26, branch `claude/design-critic-agent-plan-07tb1o`,
+> not yet merged).** Backlog **T3** shipped as the full three-mode critic at **`/design-critic`**,
+> built on the Librarian pattern. One multi-mode route `api/design-critic/route.ts` (Sonnet 4.6,
+> **401 for anon**, logs every run to `tool_runs`) dispatching on `mode`:
+> **Jury** (adoptable critic personas — technical · theory · client-pragmatist · accessibility ·
+> context-urbanist · materials-maker — each makes "the strongest case it fails" over uploaded work
+> + a thesis), **Review Prep** (crit weather report forecasting 5–8 jury questions tagged
+> fair/loaded/out-of-scope + rebuttal rehearsal), and **Portfolio** (a voice-preserving two-pane
+> editor — read-only AI scaffold, the student rewrites, a "% in your words" meter + export-lock,
+> then the critic attacks the **student's own words**; plus a defensible-thesis builder). Every
+> factual claim is a tagged CLAIM (✓ supported / ? verify / ⚠ likely-wrong). New tables +
+> owner-only RLS + a private `critic` bucket in `supabase/migrations/0005_design_critic.sql`
+> (`critic_sessions` / `critic_critiques` / `critic_portfolio` / `critic_rebuttals`) — **apply in
+> the Supabase SQL editor** before the tool works in prod. Slice: `(app)/design-critic/*`,
+> `api/design-critic/route.ts`, `lib/anthropic/critic-prompts.ts`. Nav status flipped to **live**
+> (`requiresAuth: true`). Image upload + `prepareImage` reuse the Librarian flow. Export-lock is a
+> UX nudge (commented as such); the real server guard refuses self-attack on empty student text.
+> Build (types) green; **not browser-screenshot-tested and not run live** (no Supabase/Anthropic
+> creds in the build env) — open `/design-critic` signed-in to eyeball it. Next: trace/Markdown
+> export, desk-crit transcript ingestion, screen-reader-first portfolio export.
+>
 > **RAP Studio — BUILT (2026-06-25, branch `feat/rap-studio`, worktree `design-toolkit-rap`,
 > not yet merged).** A runnable, interactive slice of the Radical Accessibility Project at
 > **`/rap/studio`** (linked from the `/rap` page; no new nav entry). One canonical in-browser
@@ -145,18 +166,51 @@
 >   accessible chart data-tables (ARIA) · global terrain (USGS 3DEP is **US-only** — non-US
 >   sites get terrain:null) · the black-text sweep above.
 >
-> **Librarian — REBUILT + DEPLOYED (2026-06-25 · branch `tool/librarian`).**
-> Repurposed from the text-only precedent-dossier tool into a **visual reference library**:
-> upload / paste / URL a single found image → Claude vision reads it (identifications framed as
-> *leads to verify*, never facts) → free open-archive enrichment (Wikidata · Wikimedia Commons ·
-> Wikipedia · Getty AAT · LoC HABS) surfaces related plans / drawings / other views / photos +
-> textual context → catalogue finds (metadata-tagged) into **per-project libraries** that grow
-> over time, shared studio-wide (read-all / write-own RLS). New migration **`0003_library.sql`**
-> (`library_projects` / `library_searches` / `library_items` + a private `library` storage
-> bucket) — applied to the live Supabase. Still **auth-gated** — `/api/librarian` returns **401
-> for anon** (cost protection holds). Enrichment verified against live archives (Commons category
-> P373 + LoC HABS collections endpoint). **Free-data v1**; paid reverse-image + Google-Images
-> search is a planned upgrade (needs SerpAPI/Serper keys). **Merged to `main` → deployed live.**
+> **Librarian — REBUILT into a VISUAL REFERENCE LIBRARY · LIVE (2026-06-25 · branch
+> `tool/librarian`, worktree `design-toolkit-librarian` · deployed to `main`).**
+> Was the text-only precedent-dossier tool; now: a student drops one *or more* found images
+> (upload / clipboard-paste / web-URL), optionally with a context note + source link → Claude
+> **vision** reads them (IDs framed as *leads to verify*, never facts; **abstains** rather than
+> guessing) → the student can **converse** ("the architect is Ando…") and it re-catalogs from
+> those authoritative facts → finds get catalogued, metadata-tagged, into **per-project
+> libraries** (create / edit / delete, with descriptions), shared studio-wide (read-all /
+> write-own RLS). Auth-gated (`/api/librarian` 401s anon — cost protection).
+>
+> **Key design decision (after the first cut):** we do **NOT** auto-show archive images —
+> free image-matching was unreliable ("all wrong"). The **"Where to find related material"**
+> panel is **curated LINKS** (confirmed Wikipedia / Wikimedia Commons category / Wikidata pages
+> + pre-built Google-Images and ArchDaily / Dezeen / LoC-HABS queries). The only images ever
+> shown are the student's own (dropped, or saved into a project). Save a link as a `reference`
+> item; save dropped images as image items; a destination picker lets you add to any project or
+> make a new one on the spot.
+>
+> **Model = `claude-sonnet-4-6`** (toolkit-wide policy). Verified against the Claude API ref:
+> structured output `output_config: {format: {type:"json_schema", schema}}`, the **effort**
+> control `output_config.effort` (low/medium/high — the "Effort" slider: Quick/Balanced/Deep),
+> and multiple image blocks per message are all correct/supported. The analyze route is **two
+> phase** for a quick answer first: phase 1 `mode:"analyze"` (vision read, returns immediately)
+> → phase 2 `mode:"enrich"` (the slower free archive lookups; a "gathering context" animation
+> shows until links fill in). `mode:"search"` = keyword archive lookup (no model cost).
+>
+> **Files:** migration `supabase/0003_library.sql` (`library_projects`/`library_searches`/
+> `library_items` + private `library` bucket — APPLIED to live Supabase); `src/lib/library/*`
+> (keyless enrichment: wikidata/wikipedia/getty + `enrich.ts` link-builder); `src/lib/anthropic/
+> library-prompts.ts` (vision prompt + JSON schema); `src/app/api/librarian/route.ts`;
+> `src/app/(app)/librarian/{page,librarian-tool,project-gallery,Thinking,types,image}.tsx`.
+>
+> **⏭ NEXT / PENDING (for whoever picks this up):**
+> 1. **Run `supabase/seed-sample-projects.sql`** in the Supabase SQL editor — seeds 3 starter
+>    projects (Modern Houses / Light & Concrete / Civic Monuments, 10 openly-licensed Commons
+>    images). **NOT run yet.** (Idempotent; owner = `jsclark2@gmail.com` — edit the email if
+>    seeding for someone else.)
+> 2. **Signed-in end-to-end test** of the vision flow (couldn't run from the build env — gated):
+>    drop an image, confirm it reads + the links + save all work in prod.
+> 3. **Resend SMTP / OTP (backlog I3)** is the precondition before a student cohort can log in.
+> 4. **v2 upgrade** = true reverse-image ("other angles of *this* building") via **SerpAPI Lens**
+>    + Google Images via **Serper** — slots in behind 2 paid env vars (`SERPAPI_KEY`,
+>    `SERPER_API_KEY`) without reworking the pipeline. Currently free-data only.
+> Caveats: vision is weak on obscure/interior/model/sketch IDs (hence the verify framing +
+> conversation); images downscaled client-side to ≤~4 MB; Vercel Hobby 60s function cap.
 >
 > **Coach (was "Skills Coach") — BUILT + LIVE + polished (through 2026-06-25 · merged to
 > `main`, deployed).** A Claude tutor for **Rhino / Grasshopper / AutoCAD / Revit / Adobe**

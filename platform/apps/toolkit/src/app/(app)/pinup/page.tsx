@@ -31,8 +31,11 @@ export default async function PinupPage() {
 
   return (
     <div>
-      <h1 className="text-3xl font-semibold tracking-tight">Archivist</h1>
-      <p className="mt-2 max-w-2xl text-neutral-600">
+      <h1 className="text-3xl font-semibold tracking-tight">
+        Archivist{" "}
+        <span className="font-sans text-lg font-normal normal-case text-neutral-900">— Studio Digital Pinup Wall</span>
+      </h1>
+      <p className="mt-2 max-w-2xl text-neutral-900">
         Studio memory + metadata. Everyone signed in sees the wall; you can add,
         edit, and remove your own pins.
       </p>
@@ -57,7 +60,7 @@ export default async function PinupPage() {
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
                   src={p.url}
-                  alt={p.title}
+                  alt={p.title || "Pinned reference image"}
                   className="h-full w-full object-cover"
                 />
               ) : (

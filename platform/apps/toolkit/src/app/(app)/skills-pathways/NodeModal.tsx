@@ -6,16 +6,17 @@ import {
   getConcept,
   getNode,
   unlocks,
+  sectionMeta,
   LEVEL_LABEL,
   TRACK_LABEL,
   type SkillNode
 } from "@/lib/skills-pathways/pathways";
-import { DISCIPLINES } from "@/lib/skills-coach/concepts";
 import { getPractice } from "@/lib/skills-pathways/practice";
+import { getDiagram } from "@/lib/skills-pathways/diagrams";
 import LazyVideo from "./LazyVideo";
 
 function disciplineLabel(id: SkillNode["discipline"]): string {
-  return DISCIPLINES.find((d) => d.id === id)?.label ?? id;
+  return sectionMeta(id)?.label ?? id;
 }
 
 // A lightweight, accessible lightbox for one skill node: its tutorial video(s),
@@ -34,6 +35,7 @@ export default function NodeModal({
   const closeRef = useRef<HTMLButtonElement | null>(null);
   const next = unlocks(node.id);
   const practice = getPractice(node.id);
+  const diagram = getDiagram(node.id);
 
   // Focus the close button on open, restore body scroll on close, Esc to close.
   useEffect(() => {
@@ -98,6 +100,14 @@ export default function NodeModal({
               "ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif"
           }}
         >
+          {/* concept diagram — trusted, hand-authored inline SVG */}
+          {diagram && (
+            <figure
+              className="overflow-hidden rounded-xl border border-neutral-200 bg-white"
+              dangerouslySetInnerHTML={{ __html: diagram }}
+            />
+          )}
+
           {/* the basics — the written guide, the primary content for now */}
           {node.guide.length > 0 && (
             <section>

@@ -64,11 +64,18 @@ persistence (`coach_conversations` / `coach_messages` + the `coach-uploads` buck
 `lib/anthropic/skills-coach-prompts.ts`, `lib/skills-coach/concepts.ts`. **Phase 2:** `.ghx` (Grasshopper)
 + `.3dm` (Rhino) file parsing so students can upload real definitions/models, not just screenshots.*
 
-### T3 · Design Critic — **medium** · spec: draft fresh
-Adoptable critique **personas** that give feedback on uploaded work, framed "use with caution —
-consult humans too." Build: a persona picker → upload/paste the work → LLM critique in that
-persona's voice, every claim tagged and logged. Pair with the design-loop ethos in
-`TOOLS/design-thinking-showcase/`. **Write a short spec before building.**
+### T3 · Design Critic — ✅ **DONE (2026-06-26, branch `claude/design-critic-agent-plan-07tb1o`)**
+*Shipped the full three-mode critic at `/design-critic` (Librarian pattern). One multi-mode route
+`api/design-critic/route.ts` (Sonnet 4.6, **401 for anon**, logs to `tool_runs`): **Jury** (6
+adoptable critic personas making "the strongest case it fails" over uploaded work + a thesis),
+**Review Prep** (crit weather report tagging questions fair/loaded/out-of-scope + rebuttal
+rehearsal), and **Portfolio** (voice-preserving two-pane editor with a "% in your words" meter +
+export-lock, then the critic attacks the **student's own words**; + a defensible-thesis builder).
+Every claim is tagged ✓/?/⚠. Dedicated tables + owner-only RLS + a private `critic` bucket in
+`supabase/migrations/0005_design_critic.sql` (apply in the SQL editor). Slice:
+`(app)/design-critic/*`, `lib/anthropic/critic-prompts.ts`. Nav status `live` (`requiresAuth`).
+**v2:** trace/Markdown export, desk-crit transcript ingestion, screen-reader-first portfolio
+export, the design-loop "Crit Engine" from `TOOLS/design-thinking-showcase/`.*
 
 ### T4 · 2D Media Tools — **large** (several sub-tools) · spec: draft fresh
 **Drawing cleanup · live video · fabrication.** Mixed: image/vision passes, WebRTC, export.

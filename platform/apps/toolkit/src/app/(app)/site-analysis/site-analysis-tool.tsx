@@ -196,15 +196,18 @@ export default function SiteAnalysisTool({ signedIn }: { signedIn: boolean }) {
   return (
     <div className="space-y-6">
       <header>
-        <h1 className="text-4xl">Surveyor</h1>
-        <p className="mt-1 max-w-2xl text-neutral-600">
+        <h1 className="text-3xl font-semibold tracking-tight">
+          Surveyor{" "}
+          <span className="font-sans text-lg font-normal normal-case text-neutral-900">— Site Analysis</span>
+        </h1>
+        <p className="mt-2 max-w-2xl text-neutral-900">
           The measured ground of a physical place — climate, terrain, water — with Rhino-ready
           exports. Hard data is free and sourced; AI judgment is tagged for you to verify.
         </p>
       </header>
 
       {/* control bar */}
-      <div className="sticky top-0 z-20 -mx-2 border-b border-neutral-200 bg-neutral-50/90 px-2 py-3 backdrop-blur">
+      <div className="sticky top-14 z-20 -mx-2 border-b border-neutral-200 bg-neutral-50/90 px-2 py-3 backdrop-blur">
         <div className="flex flex-wrap items-center gap-3">
           <Segmented
             value={mode}

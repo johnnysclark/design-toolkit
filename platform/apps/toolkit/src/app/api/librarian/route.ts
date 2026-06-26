@@ -10,14 +10,13 @@ import {
 import { enrich } from "@/lib/library/enrich";
 
 export const runtime = "nodejs";
-// One vision pass + a fan-out of (timeout-guarded) archive calls. Hobby caps at
-// 60s; raise on Vercel Pro if needed.
 export const maxDuration = 60;
 
 const BUCKET = "library";
 const MAX_BYTES = 4_500_000; // keep base64 well under the vision API per-image limit
 const MAX_IMAGES = 6; // cap images per analysis to bound tokens/latency
 const ALLOWED = new Set(["image/jpeg", "image/png", "image/gif", "image/webp"]);
+const EFFORTS = new Set(["low", "medium", "high"]);
 
 // Only fetch public http(s) URLs — block internal hosts (basic SSRF guard).
 function isPublicHttpUrl(raw: string): boolean {
@@ -55,7 +54,6 @@ function mediaTypeFor(contentType: string | null, url: string): string | null {
   return null;
 }
 
-// Fetch an image (from a signed Storage URL or a pasted web URL) → base64.
 async function fetchImage(url: string): Promise<{ data: string; mediaType: string }> {
   const res = await fetch(url, { signal: AbortSignal.timeout(15000) });
   if (!res.ok) throw new Error(`Could not fetch the image (HTTP ${res.status}).`);
@@ -111,7 +109,8 @@ export async function POST(req: Request) {
   }
 
   const projectId: string | null = body?.projectId || null;
-  const mode = body?.mode === "search" ? "search" : "analyze";
+  const mode: "search" | "enrich" | "analyze" =
+    body?.mode === "search" ? "search" : body?.mode === "enrich" ? "enrich" : "analyze";
 
   try {
     // ── Mode: keyword archive search (no model cost) ──────────────────────
@@ -121,36 +120,52 @@ export async function POST(req: Request) {
         return NextResponse.json({ error: "Enter something to search for." }, { status: 400 });
       }
       const enrichment = await enrich({ building: query, searchTerms: [query] });
-
-      let searchId: string | null = null;
       const { data: row } = await supabase
         .from("library_searches")
-        .insert({
-          owner: user.id,
-          project_id: projectId,
-          analysis: { query },
-          enrichment
-        })
+        .insert({ owner: user.id, project_id: projectId, analysis: { query }, enrichment })
         .select("id")
         .single();
-      searchId = row?.id ?? null;
-
       return NextResponse.json({
         mode,
-        searchId,
+        searchId: row?.id ?? null,
         query,
         enrichment,
         meta: { generated_at: new Date().toISOString() }
       });
     }
 
-    // ── Mode: analyze image(s) (first pass, or a conversational refinement) ─
+    // ── Mode: enrich (phase 2 — the free-archive lookups, no model cost) ───
+    // Split out from analyze so the AI read can return first ("quick answer").
+    if (mode === "enrich") {
+      const enrichment = await enrich({
+        building: String(body?.building || "").trim(),
+        architect: String(body?.architect || "").trim(),
+        searchTerms: Array.isArray(body?.searchTerms) ? body.searchTerms : [],
+        vocabularyTerms: Array.isArray(body?.vocabularyTerms) ? body.vocabularyTerms : []
+      });
+      const searchId: string | null = body?.searchId || null;
+      if (searchId) {
+        await supabase
+          .from("library_searches")
+          .update({ enrichment })
+          .eq("id", searchId)
+          .eq("owner", user.id);
+      }
+      return NextResponse.json({
+        mode,
+        searchId,
+        enrichment,
+        meta: { generated_at: new Date().toISOString() }
+      });
+    }
+
+    // ── Mode: analyze image(s) (phase 1 — the vision read; fast) ──────────
     const note: string | null = body?.note ? String(body.note).trim() : null;
-    // Accumulated authoritative facts the student has typed in the conversation.
     const userContext: string | null = body?.userContext ? String(body.userContext).trim() : null;
-    // When refining an existing search, update that row instead of inserting.
     const incomingSearchId: string | null = body?.searchId || null;
-    // One or more images: uploaded storage paths and/or public image URLs.
+    // Effort tunes speed vs. depth of the vision pass (the "quick answer" slider).
+    const effort: string | undefined = EFFORTS.has(body?.effort) ? body.effort : undefined;
+
     const paths: string[] = Array.isArray(body?.imagePaths)
       ? body.imagePaths.filter((p: unknown): p is string => typeof p === "string" && !!p)
       : body?.imagePath
@@ -164,12 +179,9 @@ export async function POST(req: Request) {
     const primaryPath = paths[0] || null;
     const primaryUrl = urls[0] || null;
 
-    // Resolve each image to a fetchable URL (signed for uploads; validated for URLs).
     const refUrls: string[] = [];
     for (const p of paths.slice(0, MAX_IMAGES)) {
-      const { data: signed, error } = await supabase.storage
-        .from(BUCKET)
-        .createSignedUrl(p, 120);
+      const { data: signed, error } = await supabase.storage.from(BUCKET).createSignedUrl(p, 120);
       if (error || !signed?.signedUrl) {
         return NextResponse.json(
           { error: "Could not read an uploaded image. Try re-uploading." },
@@ -217,13 +229,18 @@ export async function POST(req: Request) {
       );
     }
 
-    // Vision pass — structured output, no extended thinking (perception task).
+    // Vision pass — structured output; effort tunes depth (lives inside output_config).
+    const outputConfig: any = {
+      format: { type: "json_schema", schema: IMAGE_ANALYSIS_SCHEMA }
+    };
+    if (effort) outputConfig.effort = effort;
+
     const client = new Anthropic();
     const message: any = await client.messages.create({
       model: MODEL,
       max_tokens: 4000,
       system: IMAGE_ANALYSIS_SYSTEM,
-      output_config: { format: { type: "json_schema", schema: IMAGE_ANALYSIS_SCHEMA } },
+      output_config: outputConfig,
       messages: [
         {
           role: "user",
@@ -252,24 +269,13 @@ export async function POST(req: Request) {
       .join("");
     const analysis = parseJson(text);
 
-    // Enrich from the best candidate (+ the model's search terms / vocabulary).
-    const top = (analysis.candidates || [])[0] || {};
-    const enrichment = await enrich({
-      building: top.building || "",
-      architect: top.architect || "",
-      searchTerms: analysis.suggested_search_terms || [],
-      vocabularyTerms: (analysis.vocabulary || []).map((v: any) => v.term)
-    });
-
-    // Catalogue the search (this is what grows the reference database). On a
-    // conversational refinement we update the same row rather than spawn a new
-    // one, and stash the student's authoritative notes alongside the analysis.
+    // Catalogue the read now (enrichment fills in on the follow-up enrich call).
     const analysisToStore = userContext ? { ...analysis, user_context: userContext } : analysis;
     let searchId: string | null = incomingSearchId;
     if (incomingSearchId) {
       await supabase
         .from("library_searches")
-        .update({ analysis: analysisToStore, enrichment })
+        .update({ analysis: analysisToStore })
         .eq("id", incomingSearchId)
         .eq("owner", user.id);
     } else {
@@ -280,15 +286,13 @@ export async function POST(req: Request) {
           project_id: projectId,
           input_image_path: primaryPath,
           input_url: primaryUrl,
-          analysis: analysisToStore,
-          enrichment
+          analysis: analysisToStore
         })
         .select("id")
         .single();
       searchId = row?.id ?? null;
     }
 
-    // "The trace" — generic per-tool log (best-effort).
     try {
       await supabase.from("tool_runs").insert({
         owner: user.id,
@@ -301,9 +305,10 @@ export async function POST(req: Request) {
           urls,
           note,
           userContext,
+          effort,
           refine: !!incomingSearchId
         },
-        output: { analysis, enrichment }
+        output: { analysis }
       });
     } catch {
       /* never let trace logging break the response */
@@ -313,7 +318,6 @@ export async function POST(req: Request) {
       mode,
       searchId,
       analysis,
-      enrichment,
       meta: { model: MODEL, generated_at: new Date().toISOString() }
     });
   } catch (err: any) {
