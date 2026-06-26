@@ -14,7 +14,7 @@ const cap = (x: number, t: string): string =>
   `<text x="${x}" y="40" font-size="11" fill="#bbb" letter-spacing="1.5">${t}</text>`;
 
 export const DIAGRAMS: Record<string, string> = {
-  // ── Design Concepts & Theory ─────────────────────────────────────────────
+  // ── Design Concepts &amp; Theory ─────────────────────────────────────────────
   "dt-elements": D(`${cap(40, "FORMAL ELEMENTS")}
     <g stroke="#111" stroke-width="1.6" fill="none" stroke-linejoin="round">
       <circle cx="95" cy="110" r="5" fill="#111"/>
@@ -69,7 +69,7 @@ export const DIAGRAMS: Record<string, string> = {
     <text x="300" y="200" font-size="12.5" fill="#777" text-anchor="middle">one move = the whole scheme</text>
     <text x="300" y="222" font-size="11.5" fill="#999" text-anchor="middle">explained in a sentence + a sketch</text>`),
 
-  "dt-scale-body": D(`${cap(40, "SCALE & THE BODY")}
+  "dt-scale-body": D(`${cap(40, "SCALE &amp; THE BODY")}
     <line x1="60" y1="178" x2="540" y2="178" stroke="#111" stroke-width="1.4"/>
     <g stroke="#111" stroke-width="1.5" fill="none">
       <circle cx="210" cy="98" r="11"/>
@@ -85,13 +85,11 @@ export const DIAGRAMS: Record<string, string> = {
     <rect x="300" y="76" width="180" height="102" fill="none" stroke="#111" stroke-width="1.4"/>
     <text x="270" y="212" font-size="12" fill="#777" text-anchor="middle">design against the figure</text>`),
 
-  "dt-site-context": D(`${cap(40, "SITE & CONTEXT")}
+  "dt-site-context": D(`${cap(40, "SITE &amp; CONTEXT")}
     <rect x="60" y="70" width="480" height="120" fill="#f7f7f5" stroke="#e3e3e0"/>
     <g stroke="#bbb" stroke-width="1.2" fill="#eef0f2"><rect x="92" y="92" width="40" height="40"/><rect x="92" y="146" width="40" height="30"/><rect x="450" y="100" width="44" height="60"/></g>
     <rect x="250" y="104" width="80" height="64" fill="#111"/>
-    <circle cx="120" cy="86" r="9" fill="none" stroke="#ff3b21" stroke-width="1.4"/>
-    <path d="M120 86 l-18 -14 M120 86 l-22 4 M120 86 l-10 -22" stroke="#ff3b21" stroke-width="1.2"/>
-    <text x="96" y="84" font-size="10.5" fill="#ff3b21">sun</text>
+    <g stroke="#ff3b21" stroke-width="1.2" fill="none"><circle cx="110" cy="84" r="6"/><path d="M110 74 v-4 M110 94 v4 M100 84 h-4 M120 84 h4 M103 77 l-3 -3 M117 77 l3 -3 M103 91 l-3 3 M117 91 l3 3"/></g>
     <path d="M470 130 l-110 6 m12 -6 l-12 6 l12 6" stroke="#ff3b21" stroke-width="1.4" fill="none"/>
     <text x="430" y="120" font-size="10.5" fill="#ff3b21">view</text>
     <text x="290" y="190" font-size="11.5" fill="#fff" text-anchor="middle" dy="-78">site</text>
@@ -143,7 +141,7 @@ export const DIAGRAMS: Record<string, string> = {
     <text x="372" y="120" font-size="11.5" fill="#ff3b21">house_v03.3dm</text>
     <text x="300" y="214" font-size="12" fill="#777" text-anchor="middle">one folder · clear names · versions</text>`),
 
-  "gen-units": D(`${cap(40, "UNITS & SCALE")}
+  "gen-units": D(`${cap(40, "UNITS &amp; SCALE")}
     <rect x="120" y="146" width="16" height="16" fill="none" stroke="#111" stroke-width="1.4"/>
     <text x="128" y="184" font-size="11" fill="#777" text-anchor="middle">mm</text>
     <path d="M168 150 l66 -42 m-13 1 l13 -1 l-1 13" stroke="#ff3b21" stroke-width="1.5" fill="none"/>
@@ -159,7 +157,7 @@ export const DIAGRAMS: Record<string, string> = {
     <circle cx="360" cy="162" r="4" fill="#fff" stroke="#111"/><circle cx="470" cy="84" r="4" fill="#fff" stroke="#111"/>
     <text x="415" y="192" font-size="12" fill="#777" text-anchor="middle">vector · paths</text>`),
 
-  "gen-color-output": D(`${cap(40, "COLOUR & OUTPUT")}
+  "gen-color-output": D(`${cap(40, "COLOUR &amp; OUTPUT")}
     <g fill-opacity="0.5"><circle cx="195" cy="108" r="34" fill="#ee2233"/><circle cx="172" cy="142" r="34" fill="#22aa55"/><circle cx="218" cy="142" r="34" fill="#3366ff"/></g>
     <text x="195" y="192" font-size="12" fill="#777" text-anchor="middle">RGB · screen</text>
     <path d="M270 128 h54 m-11 -6 l11 6 l-11 6" stroke="#111" stroke-width="1.4" fill="none"/>
@@ -217,7 +215,7 @@ export const DIAGRAMS: Record<string, string> = {
     <g font-size="11" fill="#777"><text x="348" y="158">move</text><text x="244" y="74">·</text></g>
     <text x="300" y="206" font-size="12" fill="#777" text-anchor="middle">move · rotate · scale, by number</text>`),
 
-  "rhino-curves": D(`${cap(40, "CURVES & CONTROL POINTS")}
+  "rhino-curves": D(`${cap(40, "CURVES &amp; CONTROL POINTS")}
     <polyline points="110,160 180,86 300,110 420,70 500,150" fill="none" stroke="#ddd" stroke-width="1.3" stroke-dasharray="4 4"/>
     <path d="M110 160 C 150 96 240 96 300 110 C 360 124 450 96 500 150" fill="none" stroke="#111" stroke-width="2"/>
     <g fill="#fff" stroke="#ff3b21" stroke-width="1.6"><circle cx="110" cy="160" r="4.5"/><circle cx="180" cy="86" r="4.5"/><circle cx="300" cy="110" r="4.5"/><circle cx="420" cy="70" r="4.5"/><circle cx="500" cy="150" r="4.5"/></g>
@@ -232,7 +230,7 @@ export const DIAGRAMS: Record<string, string> = {
     <g stroke="#aaa" stroke-width="1.2" fill="none"><path d="M386 97 q6 -7 12 0 q-6 7 -12 0"/><circle cx="392" cy="97" r="1.6" fill="#aaa"/><path d="M386 129 q6 -7 12 0 q-6 7 -12 0"/><circle cx="392" cy="129" r="1.6" fill="#aaa"/><rect x="387" y="161" width="10" height="8"/><path d="M389 161 v-3 a3 3 0 0 1 6 0 v3"/></g>
     <text x="300" y="206" font-size="12" fill="#777" text-anchor="middle">show · hide · lock · colour together</text>`),
 
-  "rhino-surfaces": D(`${cap(40, "SURFACES & LOFTING")}
+  "rhino-surfaces": D(`${cap(40, "SURFACES &amp; LOFTING")}
     <path d="M150 80 C 180 60 200 100 230 84" fill="none" stroke="#111" stroke-width="1.8"/>
     <path d="M150 170 C 180 150 200 190 230 174" fill="none" stroke="#111" stroke-width="1.8"/>
     <path d="M150 80 L150 170 M230 84 L230 174 M190 78 L190 182" stroke="#ddd" stroke-width="1"/>
@@ -241,7 +239,7 @@ export const DIAGRAMS: Record<string, string> = {
     <path d="M390 86 C 420 66 470 70 500 84 L500 174 C 470 190 420 186 390 166 Z" fill="#f4f4f4" stroke="#111" stroke-width="1.6"/>
     <text x="445" y="206" font-size="12" fill="#777" text-anchor="middle">loft sections into a surface</text>`),
 
-  "rhino-solids": D(`${cap(40, "SOLIDS & BOOLEANS")}
+  "rhino-solids": D(`${cap(40, "SOLIDS &amp; BOOLEANS")}
     <rect x="120" y="96" width="80" height="80" fill="#eef0f2" stroke="#111" stroke-width="1.5"/>
     <circle cx="210" cy="136" r="34" fill="#fff" fill-opacity="0.7" stroke="#111" stroke-width="1.5"/>
     <text x="262" y="142" font-size="22" fill="#ff3b21" text-anchor="middle">−</text>
@@ -276,10 +274,9 @@ export const DIAGRAMS: Record<string, string> = {
     <g stroke="#111" stroke-width="1.5" fill="none"><path d="M360 150 L360 96 L470 96 L470 150 Z"/><line x1="415" y1="96" x2="415" y2="150" stroke-dasharray="4 4"/></g>
     <text x="415" y="200" font-size="12" fill="#777" text-anchor="middle">flat 2D linework</text>`),
 
-  "rhino-render": D(`${cap(40, "VIEWS & RENDERS")}
-    <circle cx="150" cy="80" r="11" fill="none" stroke="#ff3b21" stroke-width="1.5"/>
-    <path d="M150 80 l-16 -12 M150 80 l-20 4 M150 80 l-6 -20" stroke="#ff3b21" stroke-width="1.3"/>
-    <text x="132" y="74" font-size="10.5" fill="#ff3b21">sun</text>
+  "rhino-render": D(`${cap(40, "VIEWS &amp; RENDERS")}
+    <g stroke="#ff3b21" stroke-width="1.3" fill="none"><circle cx="150" cy="80" r="8"/><path d="M150 67 v-5 M150 93 v5 M137 80 h-5 M163 80 h5 M141 71 l-4 -4 M159 71 l4 -4 M141 89 l-4 4 M159 89 l4 4"/></g>
+    <text x="150" y="112" font-size="10" fill="#ff3b21" text-anchor="middle">sun</text>
     <path d="M250 168 L250 100 L320 76 L390 100 L390 168 Z" fill="#fff" stroke="#111" stroke-width="1.6"/>
     <path d="M250 100 L320 124 L390 100 M320 124 L320 168" stroke="#111" stroke-width="1.4" fill="none"/>
     <path d="M320 124 L390 100 L390 168 L320 168 Z" fill="#ececec"/>
@@ -303,7 +300,7 @@ export const DIAGRAMS: Record<string, string> = {
     <circle cx="400" cy="129" r="42" fill="none" stroke="#ff3b21" stroke-width="2"/>
     <text x="300" y="206" font-size="12" fill="#777" text-anchor="middle">drag the slider → geometry updates live</text>`),
 
-  "gh-lists": D(`${cap(40, "LISTS & SEQUENCES")}
+  "gh-lists": D(`${cap(40, "LISTS &amp; SEQUENCES")}
     <text x="118" y="102" font-size="13" fill="#333">0, 1, 2, 3, 4 …</text>
     <path d="M150 114 v22 m-5 -8 l5 8 l5 -8" stroke="#ff3b21" stroke-width="1.5" fill="none"/>
     <g fill="#111"><circle cx="120" cy="160" r="4"/><circle cx="180" cy="160" r="4"/><circle cx="240" cy="160" r="4"/><circle cx="300" cy="160" r="4"/><circle cx="360" cy="160" r="4"/><circle cx="420" cy="160" r="4"/><circle cx="480" cy="160" r="4"/></g>
@@ -326,7 +323,7 @@ export const DIAGRAMS: Record<string, string> = {
     <g fill="#111"><circle cx="392" cy="88" r="3"/><circle cx="408" cy="88" r="3"/><circle cx="392" cy="128" r="3"/><circle cx="392" cy="168" r="3"/><circle cx="408" cy="168" r="3"/><circle cx="424" cy="168" r="3"/></g>
     <text x="300" y="210" font-size="12" fill="#777" text-anchor="middle">data in branches, addressed by path</text>`),
 
-  "gh-matching": D(`${cap(40, "MATCHING & FILTERING")}
+  "gh-matching": D(`${cap(40, "MATCHING &amp; FILTERING")}
     <g fill="#111"><circle cx="170" cy="92" r="4"/><circle cx="170" cy="128" r="4"/><circle cx="170" cy="164" r="4"/></g>
     <g fill="#ff3b21"><rect x="356" y="88" width="9" height="9"/><rect x="356" y="124" width="9" height="9"/><rect x="356" y="160" width="9" height="9"/></g>
     <g stroke="#111" stroke-width="1.2"><line x1="176" y1="92" x2="356" y2="92"/><line x1="176" y1="128" x2="356" y2="128"/><line x1="176" y1="164" x2="356" y2="164"/></g>
@@ -351,7 +348,7 @@ export const DIAGRAMS: Record<string, string> = {
     <g fill="#ff3b21"><circle cx="120" cy="92" r="4"/><circle cx="440" cy="94" r="4"/><circle cx="140" cy="152" r="4"/><circle cx="460" cy="152" r="4"/></g>
     <text x="290" y="210" font-size="12" fill="#777" text-anchor="middle">goals relax into a shape (anchors in red)</text>`),
 
-  "gh-export": D(`${cap(40, "BAKE & EXPORT")}
+  "gh-export": D(`${cap(40, "BAKE &amp; EXPORT")}
     <rect x="84" y="106" width="80" height="40" rx="3" fill="#eef0f2" stroke="#111" stroke-width="1.2"/><text x="124" y="130" font-size="10.5" fill="#333" text-anchor="middle">definition</text>
     <path d="M164 126 h40 m-12 -5 l12 5 l-12 5" stroke="#ff3b21" stroke-width="1.4" fill="none"/><text x="184" y="108" font-size="9.5" fill="#ff3b21" text-anchor="middle">bake</text>
     <g stroke="#111" stroke-width="1.3" fill="#f4f4f4"><rect x="244" y="100" width="44" height="24"/><rect x="294" y="100" width="44" height="24"/><rect x="244" y="130" width="44" height="24"/></g><text x="291" y="174" font-size="10.5" fill="#777" text-anchor="middle">layers</text>
@@ -432,7 +429,7 @@ export const DIAGRAMS: Record<string, string> = {
     <text x="394" y="178" font-size="10.5" fill="#777" text-anchor="middle">instances</text>
     <text x="300" y="212" font-size="12" fill="#777" text-anchor="middle">type changes all · instance changes one</text>`),
 
-  "rvt-levels": D(`${cap(40, "LEVELS & GRIDS")}
+  "rvt-levels": D(`${cap(40, "LEVELS &amp; GRIDS")}
     <g stroke="#111" stroke-width="1.2"><line x1="120" y1="104" x2="480" y2="104"/><line x1="120" y1="142" x2="480" y2="142"/><line x1="120" y1="180" x2="480" y2="180"/></g>
     <g fill="#fff" stroke="#111" stroke-width="1.1"><circle cx="112" cy="104" r="9"/><circle cx="112" cy="142" r="9"/><circle cx="112" cy="180" r="9"/></g>
     <g font-size="8.5" fill="#333" text-anchor="middle"><text x="112" y="107">L3</text><text x="112" y="145">L2</text><text x="112" y="183">L1</text></g>
@@ -500,13 +497,13 @@ export const DIAGRAMS: Record<string, string> = {
     <g font-size="11" fill="#777" text-anchor="middle"><text x="135" y="180">raster</text><text x="297" y="180">vector</text><text x="459" y="180">layout</text></g>
     <text x="300" y="212" font-size="12" fill="#777" text-anchor="middle">match the app to the task</text>`),
 
-  "ps-basics": D(`${cap(40, "LAYERS & MASKS")}
+  "ps-basics": D(`${cap(40, "LAYERS &amp; MASKS")}
     <g stroke="#111" stroke-width="1.3"><rect x="200" y="92" width="200" height="26" fill="#fff"/><rect x="200" y="124" width="200" height="26" fill="#fff"/><rect x="200" y="156" width="200" height="26" fill="#f4f4f4"/></g>
     <rect x="208" y="98" width="14" height="14" fill="#ff3b21"/><rect x="226" y="98" width="14" height="14" fill="#111"/>
     <g font-size="11" fill="#333"><text x="250" y="109">cut-out + mask</text><text x="250" y="141">adjustment</text><text x="250" y="173">background</text></g>
     <text x="300" y="208" font-size="12" fill="#777" text-anchor="middle">mask, don't delete — stay editable</text>`),
 
-  "ai-basics": D(`${cap(40, "ARTBOARDS & PEN")}
+  "ai-basics": D(`${cap(40, "ARTBOARDS &amp; PEN")}
     <rect x="160" y="80" width="200" height="110" fill="#fff" stroke="#111" stroke-width="1.4"/>
     <text x="160" y="74" font-size="10" fill="#999">artboard</text>
     <path d="M190 160 C 230 100 300 100 340 150" fill="none" stroke="#111" stroke-width="1.8"/>
@@ -585,7 +582,8 @@ export const DIAGRAMS: Record<string, string> = {
     <text x="300" y="206" font-size="12" fill="#777" text-anchor="middle">flat, textured, atmospheric</text>`),
 
   "am-rendering": D(`${cap(40, "RENDERING")}
-    <circle cx="150" cy="80" r="11" fill="none" stroke="#ff3b21" stroke-width="1.5"/><path d="M150 80 l-16 -12 M150 80 l-20 4 M150 80 l-6 -20" stroke="#ff3b21" stroke-width="1.3"/>
+    <g stroke="#ff3b21" stroke-width="1.3" fill="none"><circle cx="150" cy="80" r="8"/><path d="M150 67 v-5 M150 93 v5 M137 80 h-5 M163 80 h5 M141 71 l-4 -4 M159 71 l4 -4 M141 89 l-4 4 M159 89 l4 4"/></g>
+    <text x="150" y="110" font-size="10" fill="#ff3b21" text-anchor="middle">sun</text>
     <path d="M250 170 L250 104 L320 80 L390 104 L390 170 Z" fill="#fff" stroke="#111" stroke-width="1.5"/>
     <path d="M250 104 L320 128 L390 104 M320 128 L320 170" stroke="#111" stroke-width="1.3" fill="none"/>
     <path d="M320 128 L390 104 L390 170 L320 170 Z" fill="#ececec"/>
@@ -615,7 +613,7 @@ export const DIAGRAMS: Record<string, string> = {
     <text x="300" y="186" font-size="11" fill="#ff3b21" text-anchor="middle">camera path</text>
     <text x="300" y="210" font-size="12" fill="#777" text-anchor="middle">a motivated move, kept short</text>`),
 
-  "am-realtime": D(`${cap(40, "REAL-TIME & VR")}
+  "am-realtime": D(`${cap(40, "REAL-TIME &amp; VR")}
     <rect x="170" y="84" width="180" height="106" rx="4" fill="#fff" stroke="#111" stroke-width="1.4"/>
     <path d="M180 178 L240 120 L280 150 L330 108 L340 178 Z" fill="#eef0f2"/>
     <rect x="170" y="84" width="180" height="106" rx="4" fill="none" stroke="#111" stroke-width="1.4"/>
@@ -631,7 +629,7 @@ export const DIAGRAMS: Record<string, string> = {
     <path d="M186 120 h120 m-12 -5 l12 5 l-12 5" stroke="#111" stroke-width="1.4" fill="none"/>
     <rect x="320" y="100" width="110" height="56" rx="6" fill="#ff3b21" fill-opacity="0.1" stroke="#ff3b21" stroke-width="1.5"/><text x="375" y="133" font-size="12" fill="#333" text-anchor="middle">agent</text>
     <path d="M375 156 q 0 42 -112 42 q -113 0 -113 -36" stroke="#111" stroke-width="1.2" fill="none" stroke-dasharray="5 4"/>
-    <text x="300" y="216" font-size="12" fill="#777" text-anchor="middle">direct & verify, don't type</text>`),
+    <text x="300" y="216" font-size="12" fill="#777" text-anchor="middle">direct &amp; verify, don't type</text>`),
 
   "ac-setup": D(`${cap(40, "FIRST SETUP")}
     <rect x="160" y="84" width="220" height="110" rx="5" fill="#111"/>
@@ -642,13 +640,13 @@ export const DIAGRAMS: Record<string, string> = {
     <text x="300" y="216" font-size="12" fill="#777" text-anchor="middle">a tool, a folder, a tiny first goal</text>`),
 
   "ac-prompting": D(`${cap(40, "PROMPTING")}
-    <rect x="120" y="96" width="120" height="80" fill="#fff" stroke="#111" stroke-width="1.2"/>
-    <g stroke="#999999" stroke-width="1.2"><line x1="134" y1="116" x2="226" y2="116"/><line x1="134" y1="132" x2="226" y2="132"/><line x1="134" y1="148" x2="200" y2="148"/></g>
-    <text x="180" y="192" font-size="10.5" fill="#ff3b21" text-anchor="middle">clear spec</text>
-    <path d="M250 136 h44 m-12 -5 l12 5 l-12 5" stroke="#111" stroke-width="1.3" fill="none"/>
-    <rect x="320" y="96" width="120" height="80" fill="#eef0f2" stroke="#111" stroke-width="1.2"/><text x="380" y="142" font-size="11" fill="#333" text-anchor="middle">output</text>
-    <path d="M380 176 q 0 32 -100 32 q -100 0 -100 -28" stroke="#ff3b21" stroke-width="1.3" fill="none" stroke-dasharray="5 4"/>
-    <text x="300" y="212" font-size="12" fill="#777" text-anchor="middle">specify, then iterate in small steps</text>`),
+    <rect x="120" y="80" width="120" height="74" fill="#fff" stroke="#111" stroke-width="1.2"/>
+    <g stroke="#999999" stroke-width="1.2"><line x1="134" y1="100" x2="226" y2="100"/><line x1="134" y1="116" x2="226" y2="116"/><line x1="134" y1="132" x2="200" y2="132"/></g>
+    <text x="180" y="172" font-size="10.5" fill="#ff3b21" text-anchor="middle">clear spec</text>
+    <path d="M250 117 h44 m-12 -5 l12 5 l-12 5" stroke="#111" stroke-width="1.3" fill="none"/>
+    <rect x="320" y="80" width="120" height="74" fill="#eef0f2" stroke="#111" stroke-width="1.2"/><text x="380" y="122" font-size="11" fill="#333" text-anchor="middle">output</text>
+    <path d="M380 154 q 0 36 -100 36 q -100 0 -100 -32" stroke="#ff3b21" stroke-width="1.3" fill="none" stroke-dasharray="5 4"/>
+    <text x="300" y="216" font-size="12" fill="#777" text-anchor="middle">specify, then iterate in small steps</text>`),
 
   "ac-webapp": D(`${cap(40, "A SIMPLE WEB APP")}
     <rect x="180" y="84" width="240" height="106" rx="5" fill="#fff" stroke="#111" stroke-width="1.4"/>
@@ -658,7 +656,7 @@ export const DIAGRAMS: Record<string, string> = {
     <text x="258" y="165" font-size="10" fill="#ff3b21" text-anchor="middle">run</text>
     <text x="300" y="212" font-size="12" fill="#777" text-anchor="middle">one tool, one job, in the browser</text>`),
 
-  "ac-data": D(`${cap(40, "DATA & THE KEY TRAP")}
+  "ac-data": D(`${cap(40, "DATA &amp; THE KEY TRAP")}
     <g stroke="#111" stroke-width="1.3" fill="#fff"><rect x="74" y="106" width="96" height="44" rx="4"/><rect x="252" y="106" width="96" height="44" rx="4"/><rect x="430" y="106" width="96" height="44" rx="4"/></g>
     <g font-size="11" fill="#333" text-anchor="middle"><text x="122" y="124">browser</text><text x="300" y="121">function</text><text x="478" y="124">model</text></g>
     <text x="300" y="138" font-size="8.5" fill="#777" text-anchor="middle">(holds the key)</text>
@@ -691,7 +689,7 @@ export const DIAGRAMS: Record<string, string> = {
     <text x="322" y="184" font-size="10.5" fill="#777" text-anchor="middle">Rhino / Grasshopper</text>
     <text x="300" y="214" font-size="12" fill="#777" text-anchor="middle">turn a chore into a button</text>`),
 
-  "ac-judgment": D(`${cap(40, "JUDGMENT & ETHICS")}
+  "ac-judgment": D(`${cap(40, "JUDGMENT &amp; ETHICS")}
     <line x1="300" y1="80" x2="300" y2="170" stroke="#111" stroke-width="1.6"/><rect x="288" y="170" width="24" height="8" fill="#111"/>
     <line x1="210" y1="100" x2="390" y2="100" stroke="#111" stroke-width="1.6"/>
     <path d="M210 100 L190 140 L230 140 Z" fill="#eef0f2" stroke="#111" stroke-width="1.1"/>
