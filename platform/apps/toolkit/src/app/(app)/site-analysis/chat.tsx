@@ -60,6 +60,9 @@ export default function SiteChat({ context }: { context: any }) {
 
     const ctrl = new AbortController();
     abortRef.current = ctrl;
+    // Track the turn locally so we can finalize even if the connection drops with
+    // no terminal frame (e.g. a function hard-kill) instead of hanging forever.
+    const turn = { acc: "", terminal: false };
     try {
       const res = await fetch("/api/site-analysis/chat", {
         method: "POST",
@@ -90,16 +93,37 @@ export default function SiteChat({ context }: { context: any }) {
         buffer += decoder.decode(value, { stream: true });
         const frames = buffer.split("\n\n");
         buffer = frames.pop() ?? "";
-        for (const frame of frames) handleFrame(frame);
+        for (const frame of frames) handleFrame(frame, turn);
+      }
+      // Stream ended without a done/error frame — commit whatever streamed so the
+      // student keeps the partial answer instead of staring at a frozen bubble.
+      if (!turn.terminal) {
+        const text = turn.acc.trim();
+        if (text) {
+          setMessages((m) => [
+            ...m,
+            {
+              id: crypto.randomUUID(),
+              role: "assistant",
+              content: text + "\n\n_(Connection ended early — this answer may be cut off. Ask me to continue.)_"
+            }
+          ]);
+        } else {
+          setError("The answer didn't come through. Please try again.");
+        }
+        setStreamingText("");
+        setSearching(false);
+        setStreaming(false);
       }
     } catch (err: any) {
       if (err?.name !== "AbortError") setError(err?.message || "Connection lost.");
       setStreaming(false);
       setStreamingText("");
+      setSearching(false);
     }
   }
 
-  function handleFrame(frame: string) {
+  function handleFrame(frame: string, turn: { acc: string; terminal: boolean }) {
     let event = "";
     let dataStr = "";
     for (const line of frame.split("\n")) {
@@ -114,17 +138,20 @@ export default function SiteChat({ context }: { context: any }) {
       return;
     }
     if (event === "token") {
+      turn.acc += data.text ?? "";
       setStreamingText((t) => t + (data.text ?? ""));
     } else if (event === "status") {
       if (data.searching) setSearching(true);
     } else if (event === "sources") {
       mergeSources(data.sources ?? []);
     } else if (event === "done") {
+      turn.terminal = true;
       setMessages((m) => [...m, { id: crypto.randomUUID(), role: "assistant", content: data.text ?? "" }]);
       setStreamingText("");
       setSearching(false);
       setStreaming(false);
     } else if (event === "error") {
+      turn.terminal = true;
       setError(data.message || "Something went wrong.");
       setStreamingText("");
       setSearching(false);

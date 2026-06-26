@@ -7,6 +7,8 @@ import { WindRoseChart, SunPathChart, MonthlyClimate } from "./charts";
 import { Card, Stat, Pill, CoverageStrip, Read } from "./ui";
 import { SynthesisStrip, ContaminationPanel } from "./ai";
 import SiteChat from "./chat";
+import SiteSources from "./sources";
+import FurtherResources from "./resources";
 import {
   buildExportList,
   download,
@@ -305,6 +307,9 @@ export default function SiteAnalysisTool({ signedIn }: { signedIn: boolean }) {
         aiError={aiError}
         onRunAI={runAI}
       />}
+
+      {/* The wider toolbox — always available, with or without an active analysis. */}
+      <FurtherResources />
     </div>
   );
 }
@@ -381,6 +386,14 @@ function Results({
 
       {/* AI band (always visible) */}
       <div className="space-y-5">
+        {/* Auto first pass — sources appear on their own, no button. */}
+        {signedIn && (
+          <SiteSources
+            key={`src-${site.epaId || site.name}`}
+            place={chatContext(result, contamination, synthesis).place}
+            context={chatContext(result, contamination, synthesis)}
+          />
+        )}
         <AiControls
           mode={mode}
           signedIn={signedIn}

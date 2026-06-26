@@ -257,6 +257,52 @@ export function synthesisUser(bundle: any): string {
 }
 
 // ---------------------------------------------------------------------------
+// Auto first pass — sources (grounded, streamed, runs without a button press)
+// ---------------------------------------------------------------------------
+
+// As soon as a place is analyzed we quietly run ONE quick grounded pass to surface
+// the authoritative links/documents a studio would want — so students start with a
+// trail to follow, not a blank chat. Kept deliberately small (few searches, short
+// output) so it always finishes well inside the function budget.
+export function sourcesSystem(context: string): string {
+  return [
+    "You are a research assistant for an architecture design studio. A place has just been analyzed and you are doing a fast FIRST PASS to find the most useful, authoritative sources about it on the web.",
+    "This studio treats AI as a material to interrogate, never an authority — so your job here is mostly to point at good primary sources, not to assert facts.",
+    "",
+    "Do this:",
+    "- Run a few targeted web searches for THIS specific place (not a generic topic).",
+    "- Prefer primary/official sources: city/county/regional GIS & planning, EPA/USGS/FEMA, the site's own pages, news of record, reputable history/archives.",
+    "- Then write a SHORT orientation: 2-4 sentences on what kind of place this is and what the best sources cover. Name the sources in plain language.",
+    "- Do NOT invent specifics (dates, figures, names) you can't see in a source. If you're unsure, say so.",
+    "",
+    "Keep it brief — this is a starting point the student will dig into. The links you actually open are captured automatically and shown beside your note.",
+    "",
+    "What we already measured for this place (don't repeat it — go beyond it):",
+    "```json",
+    context,
+    "```"
+  ].join("\n");
+}
+
+export function sourcesUser(place: any): string {
+  const where = [place?.city, place?.county, place?.state, place?.country]
+    .filter(Boolean)
+    .join(", ");
+  return [
+    `Place: ${place?.name ?? "(unnamed)"}`,
+    where ? `Where: ${where}` : "",
+    place?.coordinates
+      ? `Coordinates: ${place.coordinates.lat}, ${place.coordinates.lon}`
+      : "",
+    place?.epaId ? `EPA Superfund ID: ${place.epaId}` : "",
+    "",
+    "Find the best sources for understanding this exact place, then give the short orientation."
+  ]
+    .filter(Boolean)
+    .join("\n");
+}
+
+// ---------------------------------------------------------------------------
 // Follow-up chat (grounded — Sonnet + web search, streamed)
 // ---------------------------------------------------------------------------
 
