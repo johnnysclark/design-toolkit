@@ -1,5 +1,12 @@
 # Site Analysis — Build Plan & Feature Spec
 
+> **⚡ CURRENT STATE (2026-06-26): BUILT + MERGED + LIVE, in-app title is now "Surveyor"
+> (route/folder/nav key stay `site-analysis`).** For the authoritative, up-to-date handoff —
+> incl. the 60s-cap reliability fixes, the auto source-finder, the Further-resources section,
+> what's verified vs. still untested (signed-in AI streaming / the Tar Creek live test), and the
+> open backlog — see the **Surveyor** entries in [`platform/STATUS.md`](../../../../../../STATUS.md).
+> The draft below is the original build plan, kept for provenance.
+
 > **Status: BUILT (2026-06-25), with two changes from this draft —** the tool is now
 > **general-purpose** (a *Place mode* geocodes any address via OSM Nominatim; *Superfund mode*
 > keeps the EPA flow for the class), and the screen is organized by a **Macro ⇄ Micro** toggle

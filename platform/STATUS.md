@@ -30,8 +30,9 @@
 > Librarian** so the Anthropic key is never reachable publicly — re-add auth before sharing
 > widely. Repo is being **trimmed to build-essential docs**.
 >
-> **Site Analysis — BUILT (2026-06-25, branch `site-analysis`, worktree
-> `design-toolkit-site-analysis`, not yet merged).** The ported engine
+> **Site Analysis / "Surveyor" — BUILT + MERGED + LIVE (branch `site-analysis`, worktree
+> `design-toolkit-site-analysis`; the in-app title is now _Surveyor_ but the route/folder/nav
+> key all stay `site-analysis`).** The ported engine
 > (`lib/site-analysis/*`) now has a full React UI at `(app)/site-analysis/`. Two new things vs.
 > the original spec: (1) it's **general-purpose** — a **Place mode** geocodes *any* address
 > (OSM Nominatim, keyless) plus a **Superfund mode** tuned for the class (EPA NPL search +
@@ -51,6 +52,53 @@
 > mirrors the Skills Coach streaming pattern; auth-gated. (4) **Hover tooltips (ⓘ) + a Source
 > line on every data card** (Open-Meteo / USGS 3DEP / FEMA / EPA / OSM). (5) Macro/Micro buttons
 > relabeled **Macro · Region / Micro · Site** (kept the orientation from John's original spec).
+>
+> **Surveyor — reliability + auto-sources + further-resources (2026-06-26 · PR #26, MERGED to
+> `main` → DEPLOYED → verified live).** John reported the AI reading "stalls out most of the
+> time" and the chat "times out / doesn't complete." **Root cause:** the AI passes were blowing
+> Vercel Hobby's **60s function cap**, and a hard-kill returns a non-JSON error _page_ → the
+> client's `res.json()` throws "Unexpected token 'A'…". Two culprits: synthesis ran with
+> `thinking:{type:"adaptive"}` + 16k `max_tokens` (slow), and the grounded contamination pass
+> had an **uncapped** `web_search`. **Fixes (all shipped):**
+> - **`lib/anthropic/structured.ts`** (shared by synthesis + contamination): adaptive thinking
+>   **OFF by default** (`thinking` opt-in param), `web_search` **capped** (`maxUses`, default 5),
+>   `max_tokens` 16k→6k, and a **server-side soft-timeout** via `AbortSignal` (`timeoutMs`,
+>   default 54s) that ends the stream early and throws a **clean** error instead of a hard-kill.
+>   This is the core reliability primitive — keep new passes under the cap or raise the budget.
+> - **`api/site-analysis/chat/route.ts`**: `max_uses` 6→4, sources collected **incrementally**
+>   from stream events (so a soft-timeout still ships them), and a **53s** abort that always
+>   emits a terminal `done` frame (with the partial answer + a "stopped early" note).
+> - **`(app)/site-analysis/chat.tsx`**: client now **finalizes on stream-end even with no
+>   terminal frame** (commits the partial answer) — fixes the "frozen half-answer" hang.
+> - **Auto first pass — NEW, no button:** `api/site-analysis/sources/route.ts` (streamed,
+>   grounded, `max_uses:4`, 50s soft-timeout, auth-gated, logs `tool_runs` as
+>   `site-analysis:sources`) + `(app)/site-analysis/sources.tsx` (`SiteSources`, auto-fires on
+>   mount keyed per place, streams a short orientation + authoritative links into a "Sources &
+>   documents" card above the chat). ⚠️ **Cost note:** this fires automatically for **signed-in**
+>   users on **every** analyze — intentional per John's ask; kept cheap (Sonnet, 4 searches,
+>   1600 tokens). If cost becomes a concern, gate it behind a toggle or a first-view-only guard.
+> - **Further resources — NEW:** `(app)/site-analysis/resources.tsx` (`FurtherResources`) — a
+>   static, curated, grouped link list (Maps/GIS · Terrain/LiDAR · Climate/Sun/Energy ·
+>   Water/Soils/Hazards · Parcels/Zoning/Demographics · History) of the tools arch/landscape/
+>   planning students actually use. **Always visible** at the bottom (renders with or without an
+>   active analysis). No AI, no account. Curated links are real but unowned — sanity-check them
+>   periodically (EPA EJScreen was dropped in favor of EnviroAtlas for stability).
+> - **All-black-text rule** (now hard in `CLAUDE.md` §4): the two NEW files use only
+>   `neutral-900` body text. ⚠️ **The rest of `site-analysis-tool.tsx`/`ui.tsx`/`charts.tsx`
+>   still uses `neutral-400/500/600` greys** — a sitewide black-text sweep of this tool is an
+>   open follow-up (not done this session to avoid scope-creep on a production hotfix).
+> - **Verified on prod:** page 200; `analyze` (public) 200 in ~9.7s w/ correct climate (GHI
+>   1604, HDD 2513) + terrain true; `sources`/`chat`/`synthesis`/`contamination` all **401 for
+>   anon** (cost protection holds). ⚠️ **NOT exercised:** the **signed-in** AI streaming paths —
+>   headless can't hold John's session. **The real test is John running a signed-in analysis on
+>   Tar Creek** (the site that always failed). If it still stalls there: lower the budgets
+>   further, or **split contamination + synthesis into two shorter sequential requests** (each
+>   then has its own 60s), or stream synthesis to the UI like the chat. Budget knobs live in
+>   `structured.ts` (`timeoutMs`/`maxTokens`/`maxUses`) and the two streamed routes (their
+>   `setTimeout(...abort)` values + `max_uses`).
+> - **Open backlog (from SPEC §4 + this session):** blind-vs-grounded teaching toggle ·
+>   accessible chart data-tables (ARIA) · global terrain (USGS 3DEP is **US-only** — non-US
+>   sites get terrain:null) · the black-text sweep above.
 >
 > **Librarian — REBUILT + DEPLOYED (2026-06-25 · branch `tool/librarian`).**
 > Repurposed from the text-only precedent-dossier tool into a **visual reference library**:
