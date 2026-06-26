@@ -113,6 +113,54 @@
 > P373 + LoC HABS collections endpoint). **Free-data v1**; paid reverse-image + Google-Images
 > search is a planned upgrade (needs SerpAPI/Serper keys). **Merged to `main` → deployed live.**
 >
+> **Coach (was "Skills Coach") — BUILT + LIVE + polished (through 2026-06-25 · merged to
+> `main`, deployed).** A Claude tutor for **Rhino / Grasshopper / AutoCAD / Revit / Adobe**
+> (+ a `general` fallback). Streaming chat (SSE), a **3-level toggle** (beginner / intermediate /
+> advanced — only re-pitches the *next* answer, never rewrites history), **image + PDF upload**
+> via Claude vision, a **report-back loop**, and trustworthy doc links. *Teaching stance:* always
+> give the real solution, metered by level + gated on a report-back at beginner (never refusal).
+> - **Live at** `https://toolkit.allmeans.works/skills-coach` (route/folder is still
+>   `skills-coach`; only the visible label was renamed to **"Coach"** in a parallel session —
+>   the `<h1>` in `skills-coach-chat.tsx` and `<AuthGate tool="Coach"/>` in `page.tsx`).
+> - **Auth / cost (DO NOT REMOVE):** the page gates anon → `<AuthGate>`, and
+>   `api/skills-coach/route.ts` returns **401 for anon** so the Anthropic key can't be hit
+>   anonymously. A **password login** (`signInPassword` in `login/actions.ts`) was added next to
+>   the magic link because built-in email only delivers to the owner until Resend SMTP is set up.
+> - **Files:** UI `(app)/skills-coach/{page.tsx, skills-coach-chat.tsx, MessageBubble.tsx,
+>   CoachSidebar.tsx}` · route `api/skills-coach/route.ts` (runtime nodejs, maxDuration 60,
+>   persists `coach_messages` + one `tool_runs` row) · prompts
+>   `lib/anthropic/skills-coach-prompts.ts` (`MODEL=claude-opus-4-8`, `buildSystem(level,
+>   discipline)`, `⟦META⟧` sentinel + `splitMeta`) · curated KB `lib/skills-coach/concepts.ts`
+>   (verified official doc roots only) · code helpers `lib/skills-coach/code.ts`
+>   (`latestScript`) · migration **`0002_skills_coach.sql`** (`coach_conversations`,
+>   `coach_messages`, private `coach-uploads` bucket — **already applied to live Supabase**).
+> - **How the trust model works:** the model emits concept **slugs** `[[concept:slug]]` (never
+>   raw URLs); the client resolves them to vetted docs via `concepts.ts`. Each turn ends with a
+>   trailing `⟦META⟧` + JSON tail carrying `{concept, claims, report_back, further_ideas}`, parsed
+>   server-side and sent as an SSE `meta` event.
+> - **Right sidebar = three collapsible panels** (`CoachSidebar.tsx`): **In context** (active
+>   concept), **Script** (latest Python the tutor wrote, with a big copy-into-Rhino button), and
+>   **Further ideas** (alternate commands/workflows/resources, from the `further_ideas` meta).
+> - **Last two changes (2026-06-25, PR #27 → squash `cd44aba`):** (1) the empty-state **example
+>   prompts now rotate** — a 26-prompt pool, a random 4 drawn on each mount + on "New chat"
+>   (`EXAMPLE_POOL`/`sampleExamples` in `skills-coach-chat.tsx`; SSR renders first 4
+>   deterministically, client reshuffles after mount → no hydration mismatch). (2) **All Coach UI
+>   text swept to black** (`text-neutral-900`) per the all-text-black rule — kept the functional
+>   accents (`#ff3b21` CTAs/links, the ✓/?/⚠ claim chips, error red). *The black rule is
+>   site-wide; only the Coach surface has been swept so far — other pages may still have grey.*
+> - **Deferred (not built):** Phase-2 `.ghx`/`.3dm` parsing (today non-image/PDF uploads get an
+>   honest "drop a screenshot" fallback; **HEIC is rejected** client-side); Resend SMTP + a
+>   6-digit OTP for `@illinois.edu` (campus scanners burn magic links).
+>
+> **⚠️ Multi-worktree hazard the next agent WILL hit (learned twice now):** several Claude
+> sessions share this repo via separate worktrees, so **a folder's local `main` can be many
+> commits behind `origin/main`** and the working tree can pick up another session's edits. Before
+> branching: `git fetch origin` and **base your branch on `origin/main`, not local HEAD** (last
+> time local `main` was 15 commits behind and a parallel session had renamed Skills Coach→Coach;
+> a naive branch would have reverted it). Also: **a *merge* commit does NOT trigger a Vercel
+> build — always `gh pr merge --squash`**, and direct `git push origin main` is blocked. Verify
+> every merge with `git show <sha> --stat` to confirm it touched only your files.
+>
 > **Multi-agent rule:** one agent = one folder = one git worktree = one branch (see
 > `../RUNNING-MULTIPLE-AGENTS.md`). The **GOAL-1 walkthrough below is now historical**; the
 > **GOAL-2 tool-porting roadmap is still current.** Actionable build list: [`BUILD-BACKLOG.md`](BUILD-BACKLOG.md).
