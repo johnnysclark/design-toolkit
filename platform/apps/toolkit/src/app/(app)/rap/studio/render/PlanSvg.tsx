@@ -38,16 +38,19 @@ function Prim({ p, fy }: { p: DrawPrim; fy: (y: number) => number }) {
         d={d}
         fill="none"
         stroke="#111"
-        strokeWidth={WEIGHTS[p.weight]}
+        strokeWidth={p.widthFt ?? WEIGHTS[p.weight]}
         strokeLinecap="round"
         strokeLinejoin="round"
-        strokeDasharray={p.dashed ? "3 2" : undefined}
+        strokeDasharray={p.dash?.join(" ") ?? (p.dashed ? "3 2" : undefined)}
       />
     );
   }
   if (p.kind === "fill") {
     const d = p.pts.map((pt, i) => `${i === 0 ? "M" : "L"} ${pt.x} ${fy(pt.y)}`).join(" ") + " Z";
     return <path d={d} fill="#111" stroke="none" />;
+  }
+  if (p.kind === "tactileDot") {
+    return <circle cx={p.c.x} cy={fy(p.c.y)} r={p.r} fill="#111" stroke="none" />;
   }
   if (p.kind === "circle") {
     return <circle cx={p.c.x} cy={fy(p.c.y)} r={p.r} fill={p.fill ? "#111" : "none"} stroke="#111" strokeWidth={WEIGHTS.light} />;

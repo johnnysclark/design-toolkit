@@ -10,12 +10,15 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { applyTransform, deriveGeometry, type Pt, type Transform } from "../engine/geometry";
-import type { State } from "../engine/types";
+import type { LineType, State, TactilePattern } from "../engine/types";
 
 export type DrawPrim =
-  | { kind: "line"; pts: Pt[]; weight: "light" | "heavy" | "corridor"; dashed?: boolean }
+  // `dash` (explicit ft dash array from a linetype) and `widthFt` (explicit stroke
+  // from a layer lineweight) override the named-weight defaults when present.
+  | { kind: "line"; pts: Pt[]; weight: "light" | "heavy" | "corridor"; dashed?: boolean; dash?: number[]; widthFt?: number }
   | { kind: "fill"; pts: Pt[] } // filled black polygon (walls)
   | { kind: "circle"; c: Pt; r: number; fill: boolean }
+  | { kind: "tactileDot"; c: Pt; r: number } // filled relief dot (raised on PIAF/STL)
   | { kind: "text"; at: Pt; text: string; size: number; braille?: boolean; anchor?: "start" | "middle" };
 
 export interface PlanModel {
@@ -27,6 +30,26 @@ export interface PlanModel {
  *  screen == print. (Deliberately not derived from state.style.*_lineweight_mm,
  *  which is the desktop Rhino renderer's mm scale — a different ratio.) */
 export const PLAN_WEIGHTS = { light: 0.18, heavy: 0.55, corridor: 0.3 } as const;
+
+// ── Tactile + layer-style scales (shared by SVG, PIAF and STL for parity) ─────
+
+// mm → plan-feet display scale. PINNED by contract (spacing_mm * 0.0328). This is
+// a tactile-display scale (≈10× the literal mm→ft of 0.00328) so a 4 mm pitch
+// reads ~0.13 ft on the sheet. STL reuses it for lateral tiling so dot/ridge
+// POSITIONS coincide between plan and print.
+export const MM_TO_PLAN_FT = 0.0328;
+
+// Linetype → dash array in FEET. solid => undefined (continuous).
+export const LINE_DASH: Record<LineType, number[] | undefined> = {
+  solid: undefined,
+  dashed: [3, 2],
+  dotted: [0.6, 1.2],
+  center: [4, 1, 1, 1],
+  hidden: [1.5, 1]
+};
+
+// Lineweight mm → plan stroke ft, clamped to the light pen.
+export const weightToFt = (lineweight_mm: number) => Math.max(PLAN_WEIGHTS.light, lineweight_mm * 0.04);
 
 function rectCorners(x: number, y: number, w: number, h: number, t: Transform): Pt[] {
   return [
@@ -49,6 +72,69 @@ function arcPolyline(hinge: Pt, radius: number, a0: number, a1: number, t: Trans
     pts.push(applyTransform({ x: hinge.x + radius * Math.cos(ang), y: hinge.y + radius * Math.sin(ang) }, t));
   }
   return pts;
+}
+
+/** Clip an infinite line (point P, unit dir d) to an axis-aligned rect → the
+ *  in-rect segment, or null. Liang–Barsky. Exported so the STL relief reuses the
+ *  exact same clip, keeping ridge positions spatially identical to the plan. */
+export function clipLineToRect(P: Pt, d: Pt, r: { x: number; y: number; w: number; h: number }): [Pt, Pt] | null {
+  let t0 = -1e9;
+  let t1 = 1e9;
+  const p = [-d.x, d.x, -d.y, d.y];
+  const q = [P.x - r.x, r.x + r.w - P.x, P.y - r.y, r.y + r.h - P.y];
+  for (let i = 0; i < 4; i++) {
+    if (Math.abs(p[i]) < 1e-9) {
+      if (q[i] < 0) return null;
+    } else {
+      const t = q[i] / p[i];
+      if (p[i] < 0) t0 = Math.max(t0, t);
+      else t1 = Math.min(t1, t);
+    }
+  }
+  if (t0 > t1) return null;
+  return [
+    { x: P.x + d.x * t0, y: P.y + d.y * t0 },
+    { x: P.x + d.x * t1, y: P.y + d.y * t1 }
+  ];
+}
+
+/** Emit one TactilePattern clipped to a region footprint rect, using its resolved
+ *  layer stroke. dots → a plain grid of relief dots (angle ignored, per contract);
+ *  lines/crosshatch/grid → parallel ridges swept across the rect at the angle(s). */
+function emitTactile(prims: DrawPrim[], r: { x: number; y: number; w: number; h: number }, tac: TactilePattern, lineweight_mm: number) {
+  if (!tac || tac.pattern === "none") return;
+  const pitch = Math.max(0.05, tac.spacing_mm * MM_TO_PLAN_FT);
+  const stroke = weightToFt(lineweight_mm);
+
+  if (tac.pattern === "dots") {
+    const rad = pitch * 0.18;
+    for (let gx = r.x + pitch / 2; gx <= r.x + r.w - rad; gx += pitch)
+      for (let gy = r.y + pitch / 2; gy <= r.y + r.h - rad; gy += pitch) prims.push({ kind: "tactileDot", c: { x: gx, y: gy }, r: rad });
+    return;
+  }
+  // line families: pick the angle set, then sweep parallels across the rect.
+  const angles = tac.pattern === "grid" ? [0, 90] : tac.pattern === "crosshatch" ? [tac.angle_deg, tac.angle_deg + 90] : [tac.angle_deg];
+  for (const deg of angles) {
+    const a = (deg * Math.PI) / 180;
+    const d = { x: Math.cos(a), y: Math.sin(a) }; // line direction
+    const n = { x: -Math.sin(a), y: Math.cos(a) }; // sweep normal
+    const cx = r.x + r.w / 2;
+    const cy = r.y + r.h / 2;
+    // project the 4 corners onto n to bound the sweep
+    const offs = [
+      [r.x, r.y],
+      [r.x + r.w, r.y],
+      [r.x + r.w, r.y + r.h],
+      [r.x, r.y + r.h]
+    ].map(([x, y]) => (x - cx) * n.x + (y - cy) * n.y);
+    const lo = Math.min(...offs);
+    const hi = Math.max(...offs);
+    for (let o = lo + pitch / 2; o < hi; o += pitch) {
+      const P = { x: cx + n.x * o, y: cy + n.y * o };
+      const seg = clipLineToRect(P, d, r);
+      if (seg) prims.push({ kind: "line", pts: seg, weight: "light", widthFt: stroke });
+    }
+  }
 }
 
 export function buildPlanModel(state: State, levelFilter: number | null = null): PlanModel {
@@ -118,9 +204,33 @@ export function buildPlanModel(state: State, levelFilter: number | null = null):
     prims.push({ kind: "text", at: { x: lp.x, y: lp.y - 3 }, text: bay.label.braille, size: 3.2, braille: true });
   }
 
-  // Rooms — outline (program spaces).
-  for (const rm of scene.rooms) {
-    prims.push({ kind: "line", pts: [{ x: rm.x, y: rm.y }, { x: rm.x + rm.w, y: rm.y }, { x: rm.x + rm.w, y: rm.y + rm.h }, { x: rm.x, y: rm.y + rm.h }, { x: rm.x, y: rm.y }], weight: "light" });
+  // Geometric regions — footprint outline (linetype/lineweight from the layer),
+  // box gets an inset double-outline to read as a solid volume, plus any tactile
+  // pattern clipped to the footprint.
+  for (const rg of scene.regions) {
+    const dash = LINE_DASH[rg.style.linetype];
+    const widthFt = weightToFt(rg.style.lineweight_mm);
+    const rect = { x: rg.x, y: rg.y, w: rg.w, h: rg.h };
+    const outline = (rr: { x: number; y: number; w: number; h: number }) =>
+      prims.push({
+        kind: "line",
+        widthFt,
+        dash,
+        weight: "light",
+        pts: [
+          { x: rr.x, y: rr.y },
+          { x: rr.x + rr.w, y: rr.y },
+          { x: rr.x + rr.w, y: rr.y + rr.h },
+          { x: rr.x, y: rr.y + rr.h },
+          { x: rr.x, y: rr.y }
+        ]
+      });
+    outline(rect);
+    if (rg.kind === "box") {
+      const ins = Math.min(2, rg.w / 6, rg.h / 6);
+      outline({ x: rg.x + ins, y: rg.y + ins, w: rg.w - 2 * ins, h: rg.h - 2 * ins });
+    }
+    if (rg.style.tactile) emitTactile(prims, rect, rg.style.tactile, rg.style.lineweight_mm);
   }
 
   // Free walls — solid black chunks + door/window symbols.
@@ -142,10 +252,12 @@ export function buildPlanModel(state: State, levelFilter: number | null = null):
     prims.push({ kind: "fill", pts: rectCorners(c.x - c.size / 2, c.y - c.size / 2, c.size, c.size, idT) });
   }
 
-  // Room labels (drawn last so walls don't cover them).
-  for (const rm of scene.rooms) {
-    prims.push({ kind: "text", at: { x: rm.cx, y: rm.cy + 1.4 }, text: rm.name, size: 2.6, anchor: "middle" });
-    prims.push({ kind: "text", at: { x: rm.cx, y: rm.cy - 2.4 }, text: rm.braille, size: 3, braille: true, anchor: "middle" });
+  // Region labels (drawn last so outlines/tactile fill don't cover them). A box
+  // annotates its extrusion height so a non-zero massing reads on a flat plan.
+  for (const rg of scene.regions) {
+    const tag = rg.kind === "box" ? `${rg.name} (↑ ${rg.height} ft)` : rg.name;
+    prims.push({ kind: "text", at: { x: rg.cx, y: rg.cy + 1.4 }, text: tag, size: 2.6, anchor: "middle" });
+    prims.push({ kind: "text", at: { x: rg.cx, y: rg.cy - 2.4 }, text: rg.braille, size: 3, braille: true, anchor: "middle" });
   }
 
   // Voids (world-space outline).

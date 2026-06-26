@@ -12,7 +12,8 @@
 // coordinates (the desktop tool stores them in site space).
 // ─────────────────────────────────────────────────────────────────────────────
 
-import type { ApertureType, Axis, Level, State } from "./types";
+import type { ApertureType, Axis, Level, LineType, State, TactilePattern } from "./types";
+import { toBraille } from "./braille";
 
 export interface Pt {
   x: number;
@@ -94,9 +95,18 @@ export interface FreeWallG {
   doors: DoorSwing[]; // world coords, absolute arc angles
   windows: { a: Pt; b: Pt }[];
 }
-export interface RoomG {
+// A geometric region (floor plate or extruded box) resolved to world feet, with
+// its layer's drafting style + the resolved tactile pattern baked in so renderers
+// never look up state.layers themselves (parity: one resolution, all channels).
+export interface RegionStyleG {
+  lineweight_mm: number;
+  linetype: LineType;
+  tactile: TactilePattern | null; // null = flat (pattern "none" collapses to null)
+}
+export interface RegionG {
   id: string;
   level: number;
+  kind: "plate" | "box";
   x: number;
   y: number;
   w: number;
@@ -104,8 +114,10 @@ export interface RoomG {
   cx: number;
   cy: number;
   name: string;
-  use: string;
   braille: string;
+  height: number; // box: extrusion height ft (0 for a plate)
+  thickness: number; // plate: slab thickness ft (0 for a box)
+  style: RegionStyleG;
 }
 export interface ColG {
   id: string;
@@ -120,7 +132,7 @@ export interface SceneGeometry {
   bays: BayGeometry[];
   voids: VoidG[];
   freeWalls: FreeWallG[];
-  rooms: RoomG[];
+  regions: RegionG[];
   freeColumns: ColG[];
   levels: Level[];
   /** World-space bounds of everything, for a 2D viewBox. */
@@ -376,15 +388,40 @@ export function deriveGeometry(state: State, levelFilter: number | null = null):
     expand({ x: bx, y: by });
   }
 
-  // ── Rooms (program spaces) ──────────────────────────────────────────────────
-  const rooms: RoomG[] = state.rooms
-    .filter((r) => onLevel(r.level))
+  // ── Geometric regions (floor plates + extruded boxes) ───────────────────────
+  // Resolve each region's layer style + tactile pattern ONCE here, so every
+  // renderer reads the same drafting intent (parity). Tactile resolution order
+  // (contract A.7): region.tactile ?? layer.tactile ?? none.
+  const regions: RegionG[] = state.regions
+    .filter((r) => onLevel(r.level ?? 0))
     .map((r) => {
       const [x, y] = r.origin;
       const [w, h] = r.size;
       expand({ x, y });
       expand({ x: x + w, y: y + h });
-      return { id: r.id, level: r.level, x, y, w, h, cx: x + w / 2, cy: y + h / 2, name: r.name, use: r.use, braille: r.braille };
+      const layer = state.layers[r.layer];
+      const resolved = r.tactile ?? layer?.tactile ?? null;
+      const tactile = resolved && resolved.pattern !== "none" ? resolved : null;
+      return {
+        id: r.id,
+        level: r.level ?? 0,
+        kind: r.kind,
+        x,
+        y,
+        w,
+        h,
+        cx: x + w / 2,
+        cy: y + h / 2,
+        name: r.name,
+        braille: toBraille(r.name),
+        height: r.kind === "box" ? r.height ?? 0 : 0,
+        thickness: r.kind === "plate" ? r.thickness ?? state.tactile3d.floor_thickness : 0,
+        style: {
+          lineweight_mm: layer?.lineweight_mm ?? state.style.wall_lineweight_mm,
+          linetype: layer?.linetype ?? "solid",
+          tactile
+        }
+      };
     });
 
   // ── Free columns ────────────────────────────────────────────────────────────
@@ -401,7 +438,7 @@ export function deriveGeometry(state: State, levelFilter: number | null = null):
     bays,
     voids,
     freeWalls,
-    rooms,
+    regions,
     freeColumns,
     levels: state.levels,
     bounds: { minX, minY, maxX, maxY }

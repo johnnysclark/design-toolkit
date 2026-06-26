@@ -6,8 +6,9 @@
 // view, so the print matches the screen.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { applyTransform, deriveGeometry, type Transform } from "../engine/geometry";
-import type { State } from "../engine/types";
+import { applyTransform, deriveGeometry, type Pt, type RegionG, type Transform } from "../engine/geometry";
+import type { State, TactilePattern } from "../engine/types";
+import { clipLineToRect, MM_TO_PLAN_FT } from "./planModel";
 
 const FT_TO_MM = 304.8;
 
@@ -49,6 +50,57 @@ function addBox(tris: Tri[], x: number, y: number, w: number, h: number, zBot: n
   pushBox(tris, corners);
 }
 
+/** Raised tactile relief on a region's top surface. Each mark is an independent
+ *  watertight box (so the mesh stays manifold — crossing crosshatch ridges just
+ *  produce overlapping closed solids a slicer unions cleanly). Marks sink EPS
+ *  into the slab so the union is solid, not a coincident-face touch, and are
+ *  clipped to the footprint so nothing pokes past the slab edge. Lateral pitch
+ *  reuses MM_TO_PLAN_FT + clipLineToRect, so dot/ridge positions coincide with
+ *  the 2D plan; only the relief height is STL-specific. */
+function addTactileRelief(tris: Tri[], rg: RegionG, topZ: number, tac: TactilePattern | null) {
+  if (!tac || tac.pattern === "none") return;
+  const pitch = Math.max(0.05, tac.spacing_mm * MM_TO_PLAN_FT);
+  const reliefH = tac.height_mm / 304.8; // ft (then × FT_TO_MM × scale on serialize)
+  const EPS = 0.005; // sink into the slab → clean union, still manifold
+  const z0 = topZ - EPS;
+  const z1 = topZ + reliefH;
+  const r = { x: rg.x, y: rg.y, w: rg.w, h: rg.h };
+  const idT = { ox: 0, oy: 0, rot: 0 };
+
+  if (tac.pattern === "dots") {
+    const side = pitch * 0.4;
+    for (let gx = r.x + pitch / 2; gx <= r.x + r.w - side; gx += pitch)
+      for (let gy = r.y + pitch / 2; gy <= r.y + r.h - side; gy += pitch)
+        addBox(tris, gx - side / 2, gy - side / 2, side, side, z0, z1, idT); // stud, fully inside
+    return;
+  }
+  const width = pitch * 0.25;
+  const angles = tac.pattern === "grid" ? [0, 90] : tac.pattern === "crosshatch" ? [tac.angle_deg, tac.angle_deg + 90] : [tac.angle_deg];
+  for (const deg of angles) {
+    const a = (deg * Math.PI) / 180;
+    const d: Pt = { x: Math.cos(a), y: Math.sin(a) };
+    const n: Pt = { x: -Math.sin(a), y: Math.cos(a) };
+    const cx = r.x + r.w / 2;
+    const cy = r.y + r.h / 2;
+    const offs = [
+      [r.x, r.y],
+      [r.x + r.w, r.y],
+      [r.x + r.w, r.y + r.h],
+      [r.x, r.y + r.h]
+    ].map(([x, y]) => (x - cx) * n.x + (y - cy) * n.y);
+    const lo = Math.min(...offs);
+    const hi = Math.max(...offs);
+    for (let o = lo + pitch / 2; o < hi; o += pitch) {
+      const P: Pt = { x: cx + n.x * o, y: cy + n.y * o };
+      const seg = clipLineToRect(P, d, r);
+      if (!seg) continue;
+      const L = Math.hypot(seg[1].x - seg[0].x, seg[1].y - seg[0].y);
+      // ridge as a rotated box: local x runs 0..L along the segment, width centered on the line.
+      addBox(tris, 0, -width / 2, L, width, z0, z1, { ox: seg[0].x, oy: seg[0].y, rot: deg });
+    }
+  }
+}
+
 export function buildStl(state: State, levelFilter: number | null = null): ArrayBuffer {
   const scene = deriveGeometry(state, levelFilter);
   const cut = state.tactile3d.cut_height;
@@ -84,11 +136,27 @@ export function buildStl(state: State, levelFilter: number | null = null): Array
     addBox(tris, c.x - c.size / 2, c.y - c.size / 2, c.size, c.size, levelZ, levelZ + cut, idTransform);
   }
 
+  // ── Regions — plates are slabs, boxes are massing volumes. Boxes are NOT
+  // clipped at cut height (walls/columns keep their cut clip); each region also
+  // gets raised tactile relief on its top surface. ──────────────────────────────
+  for (const rg of scene.regions) {
+    const levelZ = scene.levels[rg.level]?.z ?? 0;
+    if (rg.kind === "plate") {
+      const thick = rg.thickness || floorT;
+      addBox(tris, rg.x, rg.y, rg.w, rg.h, levelZ - thick, levelZ, idTransform); // top at level z
+      addTactileRelief(tris, rg, levelZ, rg.style.tactile);
+    } else {
+      addBox(tris, rg.x, rg.y, rg.w, rg.h, levelZ, levelZ + rg.height, idTransform); // massing, full height
+      addTactileRelief(tris, rg, levelZ + rg.height, rg.style.tactile);
+    }
+  }
+
   // ── Floor slabs — ONE per level, spanning the union bounding box of EVERYTHING
-  // on that level (bay footprints + free walls/rooms/columns). A single slab per
+  // on that level (bay footprints + free walls/regions/columns). A single slab per
   // level avoids coincident double-slabs (non-manifold) AND guarantees free
-  // elements outside a bay footprint — including rooms, which print ONLY via the
-  // floor — still get a base. (A rotated bay's slab is its AABB; benign.)
+  // elements outside a bay footprint still get a base. Regions also emit their own
+  // closed solids above; a plate + this auto slab may overlap, which is benign for
+  // slicing (both closed manifolds). (A rotated bay's slab is its AABB; benign.)
   if (state.tactile3d.floor) {
     type BBox = { minX: number; minY: number; maxX: number; maxY: number };
     const bboxes = new Map<number, BBox>();
@@ -112,9 +180,9 @@ export function buildStl(state: State, levelFilter: number | null = null): Array
       grow(c.level, c.x - c.size / 2, c.y - c.size / 2);
       grow(c.level, c.x + c.size / 2, c.y + c.size / 2);
     }
-    for (const r of scene.rooms) {
-      grow(r.level, r.x, r.y);
-      grow(r.level, r.x + r.w, r.y + r.h);
+    for (const rg of scene.regions) {
+      grow(rg.level, rg.x, rg.y);
+      grow(rg.level, rg.x + rg.w, rg.y + rg.h);
     }
     for (const [lvl, b] of bboxes) {
       if (b.minX < b.maxX && b.minY < b.maxY) {

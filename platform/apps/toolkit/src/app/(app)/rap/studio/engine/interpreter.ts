@@ -9,11 +9,12 @@
 // COMMAND_GRAMMAR below (which the agent is taught).
 // ─────────────────────────────────────────────────────────────────────────────
 
-import type { ApertureType, Axis, Bay, CommandResult, ProgramUse, State, Vec2 } from "./types";
-import { cloneState, makeSeedState, newBay } from "./seed";
+import type { ApertureType, Axis, Bay, CommandResult, Layer, LineType, Region, State, TactileKind, TactilePattern, Vec2 } from "./types";
+import { cloneState, defaultLayer, makeSeedState, newBay } from "./seed";
 import { toBraille } from "./braille";
 
-const USES: ProgramUse[] = ["residential", "retail", "office", "lobby", "circulation", "parking", "amenity", "core", "mechanical", "open", "other"];
+const LINETYPES: LineType[] = ["solid", "dashed", "dotted", "center", "hidden"];
+const TACTILE_KINDS: TactileKind[] = ["none", "dots", "lines", "crosshatch", "grid"];
 
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
@@ -21,6 +22,66 @@ function nextId(existing: { id: string }[], prefix: string): string {
   let i = existing.length + 1;
   while (existing.some((e) => e.id === `${prefix}${i}`)) i++;
   return `${prefix}${i}`;
+}
+
+/** Shared keyword-argument parser. After the fixed positional args, the rest of
+ *  the tokens are read as `<key> <value>` pairs in any order. An unknown key is
+ *  reported as an error naming the allowed keys; multi-word values use quotes
+ *  (the tokenizer already handles `"`). */
+function parseOpts(tokens: string[], start: number, keys: string[]): { opts: Record<string, string>; error?: string } {
+  const opts: Record<string, string> = {};
+  for (let i = start; i < tokens.length; i += 2) {
+    const key = tokens[i];
+    if (!keys.includes(key)) return { opts, error: `Unknown option "${key}". Allowed: ${keys.join(", ")}.` };
+    const val = tokens[i + 1];
+    if (val === undefined) return { opts, error: `Option "${key}" needs a value.` };
+    opts[key] = val;
+  }
+  return { opts };
+}
+
+/** Build a TactilePattern from a kind plus optional spacing/angle/height opts.
+ *  Returns `{ pattern: null }` for kind "none" (flat); `{ error }` on a bad kind
+ *  or value. spacing default 4 mm, angle 0°, height 0.6 mm (contract A.1). */
+function buildTactile(kind: string | undefined, opts: Record<string, string>): { pattern?: TactilePattern | null; error?: string } {
+  if (kind === undefined) return { error: `Usage: tactile <${TACTILE_KINDS.join("|")}> [spacing <mm>] [angle <deg>] [height <mm>]` };
+  if (!TACTILE_KINDS.includes(kind as TactileKind)) return { error: `Unknown tactile pattern "${kind}". One of: ${TACTILE_KINDS.join(", ")}.` };
+  if (kind === "none") return { pattern: null };
+  const spacing = opts.spacing !== undefined ? Number(opts.spacing) : 4;
+  const angle = opts.angle !== undefined ? Number(opts.angle) : 0;
+  const height = opts.height !== undefined ? Number(opts.height) : 0.6;
+  if (!Number.isFinite(spacing) || spacing <= 0) return { error: "Tactile spacing must be a positive number of mm." };
+  if (!Number.isFinite(angle)) return { error: "Tactile angle must be a number of degrees." };
+  if (!Number.isFinite(height) || height <= 0) return { error: "Tactile height must be a positive number of mm." };
+  return { pattern: { pattern: kind as TactileKind, spacing_mm: spacing, angle_deg: angle, height_mm: height } };
+}
+
+/** A one-line, spoken-style summary of a tactile pattern (or "" when flat). */
+function tactileSummary(t: TactilePattern | undefined | null): string {
+  if (!t || t.pattern === "none") return "";
+  return `${t.pattern} ${t.spacing_mm} mm @ ${t.angle_deg}°`;
+}
+
+/** Count every piece of geometry that references a given layer name (so a layer
+ *  can't be removed out from under live geometry). */
+function layerRefCount(state: State, name: string): number {
+  let n = 0;
+  for (const r of state.regions) if ((r.layer ?? "Default") === name) n++;
+  for (const w of state.walls) if ((w.layer ?? "Default") === name) n++;
+  for (const c of state.columns) if ((c.layer ?? "Default") === name) n++;
+  for (const b of Object.values(state.bays)) if ((b.layer ?? "Default") === name) n++;
+  return n;
+}
+
+/** Scan a token slice for an optional `layer <name>` tail keyword; validate it
+ *  names an existing layer. Returns no layer when the keyword is absent. */
+function pickLayer(state: State, tokens: string[], start: number): { layer?: string; error?: string } {
+  const idx = tokens.indexOf("layer", start);
+  if (idx === -1) return {};
+  const name = tokens[idx + 1];
+  if (!name) return { error: "Usage: … layer <name>" };
+  if (!state.layers[name]) return { error: `No layer "${name}". Create it first: layer add ${name}` };
+  return { layer: name };
 }
 
 /** Split input into tokens, respecting double-quoted strings (port of the CLI). */
@@ -325,8 +386,10 @@ function cmdWallFree(state: State, tokens: string[]): CommandResult {
     if (level < 0 || level >= next.levels.length) return err(state, `No level ${level} (levels are 0–${next.levels.length - 1}). Add one first: level add <name> <z>.`);
     if (!id) id = nextId(next.walls, "w");
     if (next.walls.some((w) => w.id === id)) return err(state, `Wall ${id} already exists.`);
-    next.walls.push({ id, level, a: [x1, y1], b: [x2, y2], thickness: th });
-    return ok(next, `Added wall ${id} (${x1},${y1})→(${x2},${y2}), ${(th * 12).toFixed(0)}-inch, level ${level}.`);
+    const pl = pickLayer(next, tokens, i + 4);
+    if (pl.error) return err(state, pl.error);
+    next.walls.push({ id, level, a: [x1, y1], b: [x2, y2], thickness: th, layer: pl.layer ?? "Default" });
+    return ok(next, `Added wall ${id} (${x1},${y1})→(${x2},${y2}), ${(th * 12).toFixed(0)}-inch, level ${level}, on layer ${pl.layer ?? "Default"}.`);
   }
   if (sub === "remove") {
     const id = tokens[2];
@@ -361,15 +424,173 @@ function cmdWallFree(state: State, tokens: string[]): CommandResult {
   return err(state, "Usage: wall add|remove|move|thickness|list … (bay walls: wall <bay> on|off)");
 }
 
-function cmdRoom(state: State, tokens: string[]): CommandResult {
+// ── Rhino layers ──────────────────────────────────────────────────────────────
+
+function cmdLayer(state: State, tokens: string[]): CommandResult {
+  const sub = tokens[1];
+
+  if (sub === "list") {
+    const names = Object.keys(state.layers);
+    const rows = names.map((n) => {
+      const l = state.layers[n];
+      const t = tactileSummary(l.tactile);
+      return `  ${l.name}: ${l.lineweight_mm} mm, ${l.linetype}${t ? `, ${t}` : ""}`;
+    });
+    return read(state, `Layers (${names.length}):\n${rows.join("\n")}`);
+  }
+
+  if (sub === "add") {
+    const name = tokens[2];
+    if (!name) return err(state, "Usage: layer add <name> [linetype <…>] [lineweight <mm>] [tactile <kind> …]");
+    if (["add", "set", "remove", "list"].includes(name)) return err(state, `"${name}" is a reserved word and can't be a layer name.`);
+    if (state.layers[name]) return err(state, `Layer "${name}" already exists.`);
+    const { opts, error } = parseOpts(tokens, 3, ["linetype", "lineweight", "tactile", "spacing", "angle", "height"]);
+    if (error) return err(state, error);
+    const layer: Layer = { name, lineweight_mm: 0.25, linetype: "solid" };
+    if (opts.linetype !== undefined) {
+      if (!LINETYPES.includes(opts.linetype as LineType)) return err(state, `Unknown linetype "${opts.linetype}". One of: ${LINETYPES.join(", ")}.`);
+      layer.linetype = opts.linetype as LineType;
+    }
+    if (opts.lineweight !== undefined) {
+      const lw = Number(opts.lineweight);
+      if (!Number.isFinite(lw) || lw <= 0) return err(state, "Lineweight must be a positive number of mm.");
+      layer.lineweight_mm = lw;
+    }
+    if (opts.tactile !== undefined) {
+      const t = buildTactile(opts.tactile, opts);
+      if (t.error) return err(state, t.error);
+      if (t.pattern) layer.tactile = t.pattern;
+    }
+    const next = cloneState(state);
+    next.layers[name] = layer;
+    return ok(next, `Added layer "${name}" (${layer.linetype}, ${layer.lineweight_mm} mm${layer.tactile ? `, ${tactileSummary(layer.tactile)}` : ""}).`);
+  }
+
+  if (sub === "set") {
+    const name = tokens[2];
+    const field = tokens[3];
+    if (!name || !state.layers[name]) return err(state, `No layer "${name}". Create it first: layer add ${name}`);
+    const next = cloneState(state);
+    const l = next.layers[name];
+    if (field === "linetype") {
+      const v = tokens[4];
+      if (!v || !LINETYPES.includes(v as LineType)) return err(state, `Usage: layer set ${name} linetype <${LINETYPES.join("|")}>`);
+      l.linetype = v as LineType;
+      return ok(next, `Layer "${name}" linetype = ${v}.`);
+    }
+    if (field === "lineweight") {
+      const lw = num(tokens[4]);
+      if (lw === null || lw <= 0) return err(state, `Usage: layer set ${name} lineweight <mm>`);
+      l.lineweight_mm = lw;
+      return ok(next, `Layer "${name}" lineweight = ${lw} mm.`);
+    }
+    if (field === "tactile") {
+      const { opts, error } = parseOpts(tokens, 5, ["spacing", "angle", "height"]);
+      if (error) return err(state, error);
+      const t = buildTactile(tokens[4], opts);
+      if (t.error) return err(state, t.error);
+      if (t.pattern) l.tactile = t.pattern;
+      else delete l.tactile;
+      return ok(next, t.pattern ? `Layer "${name}" tactile = ${tactileSummary(t.pattern)}.` : `Layer "${name}" tactile cleared (flat).`);
+    }
+    return err(state, "Usage: layer set <name> linetype|lineweight|tactile …");
+  }
+
+  if (sub === "remove") {
+    const name = tokens[2];
+    if (!name || !state.layers[name]) return err(state, `No layer "${name}".`);
+    if (name === "Default") return err(state, `The "Default" layer can't be removed.`);
+    const refs = layerRefCount(state, name);
+    if (refs > 0) return err(state, `Layer "${name}" still has ${refs} element${refs === 1 ? "" : "s"} on it — move or delete them first.`);
+    const next = cloneState(state);
+    delete next.layers[name];
+    return ok(next, `Removed layer "${name}".`);
+  }
+
+  return err(state, "Usage: layer add|set|remove|list …");
+}
+
+// ── Geometric regions: floor plates + extruded boxes ──────────────────────────
+
+/** Shared `set <id> <field> …` handler for both region kinds. `orig` is the
+ *  untouched state (returned on error so a half-built `next` is discarded);
+ *  `next` is the clone whose region `r` is mutated in place. */
+function regionSet(orig: State, next: State, r: Region, tokens: string[], kind: "plate" | "box"): CommandResult {
+  const field = tokens[3];
+  const id = r.id;
+  switch (field) {
+    case "origin": {
+      const x = num(tokens[4]);
+      const y = num(tokens[5]);
+      if (x === null || y === null) return err(orig, `Usage: ${kind} set ${id} origin <x> <y>`);
+      r.origin = [x, y];
+      return ok(next, `${cap(kind)} ${id} origin = (${x}, ${y}).`);
+    }
+    case "size": {
+      const w = num(tokens[4]);
+      const h = num(tokens[5]);
+      if (w === null || h === null || w <= 0 || h <= 0) return err(orig, `Usage: ${kind} set ${id} size <w> <h>`);
+      r.size = [w, h];
+      return ok(next, `${cap(kind)} ${id} footprint = ${w}×${h} ft.`);
+    }
+    case "thickness": {
+      if (kind !== "plate") return err(orig, `Boxes have no thickness — set the height instead: box set ${id} height <ft>.`);
+      const t = num(tokens[4]);
+      if (t === null || t <= 0) return err(orig, `Usage: plate set ${id} thickness <ft>`);
+      r.thickness = t;
+      return ok(next, `Plate ${id} thickness = ${t} ft.`);
+    }
+    case "height": {
+      if (kind !== "box") return err(orig, `Plates have no height — set the thickness instead: plate set ${id} thickness <ft>.`);
+      const hh = num(tokens[4]);
+      if (hh === null || hh <= 0) return err(orig, `Usage: box set ${id} height <ft>`);
+      r.height = hh;
+      return ok(next, `Box ${id} height = ${hh} ft.`);
+    }
+    case "layer": {
+      const name = tokens[4];
+      if (!name || !next.layers[name]) return err(orig, `No layer "${name}". Create it first: layer add ${name}`);
+      r.layer = name;
+      return ok(next, `${cap(kind)} ${id} on layer ${name}.`);
+    }
+    case "level": {
+      const l = num(tokens[4]);
+      if (l === null) return err(orig, `Usage: ${kind} set ${id} level <n>`);
+      const lv = Math.round(l);
+      if (lv < 0 || lv >= next.levels.length) return err(orig, `No level ${lv} (levels are 0–${next.levels.length - 1}). Add one first: level add <name> <z>.`);
+      r.level = lv;
+      return ok(next, `${cap(kind)} ${id} on level ${lv}.`);
+    }
+    case "name": {
+      const nm = tokens.slice(4).join(" ");
+      if (!nm) return err(orig, `Usage: ${kind} set ${id} name <text>`);
+      r.name = nm;
+      return ok(next, `${cap(kind)} ${id} = "${nm}".`);
+    }
+    case "tactile": {
+      const { opts, error } = parseOpts(tokens, 5, ["spacing", "angle", "height"]);
+      if (error) return err(orig, error);
+      const t = buildTactile(tokens[4], opts);
+      if (t.error) return err(orig, t.error);
+      if (t.pattern) r.tactile = t.pattern;
+      else delete r.tactile;
+      return ok(next, t.pattern ? `${cap(kind)} ${id} tactile override = ${tactileSummary(t.pattern)}.` : `${cap(kind)} ${id} tactile override cleared (back to its layer).`);
+    }
+    default:
+      return err(orig, `Unknown field "${field}". Try: origin · size · ${kind === "plate" ? "thickness" : "height"} · layer · level · name · tactile`);
+  }
+}
+
+function cmdPlate(state: State, tokens: string[]): CommandResult {
   const sub = tokens[1];
   if (sub === "list") {
-    if (state.rooms.length === 0) return read(state, "No rooms yet. Try: room add 18 12 36 20 retail");
-    return read(state, `Rooms (${state.rooms.length}):\n` + state.rooms.map((r) => `  ${r.id}: ${r.name} [${r.use}] ${r.size[0]}×${r.size[1]}ft @ (${r.origin[0]},${r.origin[1]}) L${r.level} = ${(r.size[0] * r.size[1]).toFixed(0)} sf`).join("\n"));
+    const plates = state.regions.filter((r) => r.kind === "plate");
+    if (plates.length === 0) return read(state, "No floor plates yet. Try: floor plate add 0 0 36 20");
+    return read(state, `Floor plates (${plates.length}):\n` + plates.map((r) => `  ${r.id}: ${r.name} ${r.size[0]}×${r.size[1]}ft, ${r.thickness ?? 0}ft thick @ (${r.origin[0]},${r.origin[1]}) on ${r.layer} L${r.level ?? 0}`).join("\n"));
   }
   const next = cloneState(state);
   if (sub === "add") {
-    // room add [id] <x> <y> <w> <h> <use> [name…]
+    // plate add [id] <x> <y> <w> <h> [thickness <ft>] [layer <name>] [name <text>]
     let i = 2;
     let id: string | undefined;
     if (tokens[2] !== undefined && !Number.isFinite(Number(tokens[2]))) {
@@ -380,63 +601,87 @@ function cmdRoom(state: State, tokens: string[]): CommandResult {
     const y = num(tokens[i + 1]);
     const w = num(tokens[i + 2]);
     const h = num(tokens[i + 3]);
-    const use = (tokens[i + 4] || "other") as ProgramUse;
-    const name = tokens.slice(i + 5).join(" ") || cap(use);
-    if (x === null || y === null || w === null || h === null || w <= 0 || h <= 0) return err(state, "Usage: room add [id] <x> <y> <w> <h> <use> [name]");
-    if (!USES.includes(use)) return err(state, `Unknown use "${use}". One of: ${USES.join(", ")}.`);
-    if (!id) id = nextId(next.rooms, "rm");
-    if (next.rooms.some((r) => r.id === id)) return err(state, `Room ${id} already exists.`);
-    next.rooms.push({ id, level: 0, origin: [x, y], size: [w, h], name, use, braille: toBraille(name) });
-    return ok(next, `Added ${use} room ${id} "${name}", ${w}×${h} ft (${(w * h).toFixed(0)} sf).`);
+    if (x === null || y === null || w === null || h === null || w <= 0 || h <= 0)
+      return err(state, "Usage: floor plate add [id] <x> <y> <w> <h> [thickness <ft>] [layer <name>] [name <text>]");
+    const { opts, error } = parseOpts(tokens, i + 4, ["thickness", "layer", "name"]);
+    if (error) return err(state, error);
+    const layer = opts.layer ?? "Default";
+    if (!next.layers[layer]) return err(state, `No layer "${layer}". Create it first: layer add ${layer}`);
+    let thickness = state.tactile3d.floor_thickness;
+    if (opts.thickness !== undefined) {
+      const t = Number(opts.thickness);
+      if (!Number.isFinite(t) || t <= 0) return err(state, "Plate thickness must be a positive number of feet.");
+      thickness = t;
+    }
+    if (!id) id = nextId(next.regions, "g");
+    if (next.regions.some((r) => r.id === id)) return err(state, `Region ${id} already exists.`);
+    const name = opts.name ?? `Plate ${next.regions.filter((r) => r.kind === "plate").length + 1}`;
+    next.regions.push({ id, name, kind: "plate", origin: [x, y], size: [w, h], thickness, layer, level: 0 });
+    return ok(next, `Added floor plate ${id} "${name}", ${w}×${h} ft, ${thickness} ft thick, on layer ${layer}.`);
   }
   if (sub === "remove") {
     const id = tokens[2];
-    const before = next.rooms.length;
-    next.rooms = next.rooms.filter((r) => r.id !== id);
-    if (next.rooms.length === before) return err(state, `No room ${id}.`);
-    return ok(next, `Removed room ${id}.`);
+    const before = next.regions.length;
+    next.regions = next.regions.filter((r) => !(r.id === id && r.kind === "plate"));
+    if (next.regions.length === before) return err(state, `No floor plate ${id}.`);
+    return ok(next, `Removed floor plate ${id}.`);
   }
-  // room <id> <field> …
-  const id = sub;
-  const r = next.rooms.find((rm) => rm.id === id);
-  if (!r) return err(state, `No room ${id}. (room add … to create one · room list)`);
-  const field = tokens[2];
-  if (field === "use") {
-    const u = tokens[3] as ProgramUse;
-    if (!USES.includes(u)) return err(state, `Unknown use. One of: ${USES.join(", ")}.`);
-    r.use = u;
-    return ok(next, `Room ${id} use = ${u}.`);
+  if (sub === "set") {
+    const id = tokens[2];
+    const r = next.regions.find((rg) => rg.id === id && rg.kind === "plate");
+    if (!r) return err(state, `No floor plate ${id}. (floor plate add … to create one · plate list)`);
+    return regionSet(state, next, r, tokens, "plate");
   }
-  if (field === "name") {
-    const nm = tokens.slice(3).join(" ");
-    if (!nm) return err(state, "Usage: room <id> name <text>");
-    r.name = nm;
-    r.braille = toBraille(nm);
-    return ok(next, `Room ${id} = "${nm}" (braille updated).`);
+  return err(state, "Usage: floor plate add … | plate set <id> … | plate remove <id> | plate list");
+}
+
+function cmdBox(state: State, tokens: string[]): CommandResult {
+  const sub = tokens[1];
+  if (sub === "list") {
+    const boxes = state.regions.filter((r) => r.kind === "box");
+    if (boxes.length === 0) return read(state, "No extruded boxes yet. Try: extruded box add 0 0 24 24 40");
+    return read(state, `Extruded boxes (${boxes.length}):\n` + boxes.map((r) => `  ${r.id}: ${r.name} ${r.size[0]}×${r.size[1]}ft × ${r.height ?? 0}ft tall @ (${r.origin[0]},${r.origin[1]}) on ${r.layer} L${r.level ?? 0}`).join("\n"));
   }
-  if (field === "move") {
-    const x = num(tokens[3]);
-    const y = num(tokens[4]);
-    if (x === null || y === null) return err(state, "Usage: room <id> move <x> <y>");
-    r.origin = [x, y];
-    return ok(next, `Moved room ${id} to (${x}, ${y}).`);
+  const next = cloneState(state);
+  if (sub === "add") {
+    // box add [id] <x> <y> <w> <h> <height> [layer <name>] [name <text>]
+    let i = 2;
+    let id: string | undefined;
+    if (tokens[2] !== undefined && !Number.isFinite(Number(tokens[2]))) {
+      id = tokens[2];
+      i = 3;
+    }
+    const x = num(tokens[i]);
+    const y = num(tokens[i + 1]);
+    const w = num(tokens[i + 2]);
+    const h = num(tokens[i + 3]);
+    const height = num(tokens[i + 4]);
+    if (x === null || y === null || w === null || h === null || height === null || w <= 0 || h <= 0 || height <= 0)
+      return err(state, "Usage: extruded box add [id] <x> <y> <w> <h> <height> [layer <name>] [name <text>]");
+    const { opts, error } = parseOpts(tokens, i + 5, ["layer", "name"]);
+    if (error) return err(state, error);
+    const layer = opts.layer ?? "Default";
+    if (!next.layers[layer]) return err(state, `No layer "${layer}". Create it first: layer add ${layer}`);
+    if (!id) id = nextId(next.regions, "g");
+    if (next.regions.some((r) => r.id === id)) return err(state, `Region ${id} already exists.`);
+    const name = opts.name ?? `Box ${next.regions.filter((r) => r.kind === "box").length + 1}`;
+    next.regions.push({ id, name, kind: "box", origin: [x, y], size: [w, h], height, layer, level: 0 });
+    return ok(next, `Added extruded box ${id} "${name}", ${w}×${h} ft footprint, ${height} ft tall, on layer ${layer}.`);
   }
-  if (field === "size") {
-    const w = num(tokens[3]);
-    const h = num(tokens[4]);
-    if (w === null || h === null || w <= 0 || h <= 0) return err(state, "Usage: room <id> size <w> <h>");
-    r.size = [w, h];
-    return ok(next, `Room ${id} = ${w}×${h} ft.`);
+  if (sub === "remove") {
+    const id = tokens[2];
+    const before = next.regions.length;
+    next.regions = next.regions.filter((r) => !(r.id === id && r.kind === "box"));
+    if (next.regions.length === before) return err(state, `No extruded box ${id}.`);
+    return ok(next, `Removed extruded box ${id}.`);
   }
-  if (field === "level") {
-    const l = num(tokens[3]);
-    if (l === null) return err(state, "Usage: room <id> level <n>");
-    const lv = Math.round(l);
-    if (lv < 0 || lv >= next.levels.length) return err(state, `No level ${lv} (levels are 0–${next.levels.length - 1}). Add one first: level add <name> <z>.`);
-    r.level = lv;
-    return ok(next, `Room ${id} on level ${lv}.`);
+  if (sub === "set") {
+    const id = tokens[2];
+    const r = next.regions.find((rg) => rg.id === id && rg.kind === "box");
+    if (!r) return err(state, `No extruded box ${id}. (extruded box add … to create one · box list)`);
+    return regionSet(state, next, r, tokens, "box");
   }
-  return err(state, "Usage: room add … | room remove <id> | room <id> use|name|move|size|level …");
+  return err(state, "Usage: extruded box add … | box set <id> … | box remove <id> | box list");
 }
 
 function cmdColumn(state: State, tokens: string[]): CommandResult {
@@ -460,8 +705,10 @@ function cmdColumn(state: State, tokens: string[]): CommandResult {
     if (size <= 0) return err(state, "Column size must be > 0 ft.");
     if (!id) id = nextId(next.columns, "col");
     if (next.columns.some((c) => c.id === id)) return err(state, `Column ${id} already exists.`);
-    next.columns.push({ id, level: 0, at: [x, y], size });
-    return ok(next, `Added column ${id} at (${x}, ${y}).`);
+    const pl = pickLayer(next, tokens, i + 2);
+    if (pl.error) return err(state, pl.error);
+    next.columns.push({ id, level: 0, at: [x, y], size, layer: pl.layer ?? "Default" });
+    return ok(next, `Added column ${id} at (${x}, ${y}), on layer ${pl.layer ?? "Default"}.`);
   }
   if (sub === "remove") {
     const id = tokens[2];
@@ -549,42 +796,72 @@ function listBays(state: State): string {
   return `Bays (${names.length}):\n${rows.join("\n")}`;
 }
 
+/** Resolve a region's effective tactile pattern (per contract A.7):
+ *  region.tactile ?? its layer's tactile ?? none. */
+function resolvedTactile(state: State, r: Region): TactilePattern | null {
+  if (r.tactile) return r.tactile;
+  const layer = state.layers[r.layer];
+  return layer?.tactile ?? null;
+}
+
+/** A spoken-style read-back line for one region, in CAD-literal terms. */
+function regionLine(state: State, r: Region): string {
+  const t = resolvedTactile(state, r);
+  const tNote = t && t.pattern !== "none" ? ` tactile ${t.pattern} at ${t.spacing_mm} mm, ${t.angle_deg} degrees.` : "";
+  if (r.kind === "plate") {
+    return `floor plate ${r.name}: ${r.size[0]} by ${r.size[1]} ft, ${r.thickness ?? 0} ft thick, on layer ${r.layer}, origin (${r.origin[0]},${r.origin[1]}).${tNote}`;
+  }
+  return `extruded box ${r.name}: ${r.size[0]} by ${r.size[1]} ft footprint, ${r.height ?? 0} ft tall, on layer ${r.layer}, origin (${r.origin[0]},${r.origin[1]}).${tNote}`;
+}
+
 /** Whole-to-Part (Macro/Meso/Micro) text — the paper's description schema.
- *  Now reads back the full building: site, levels + program mix, bays, free
- *  walls, rooms, columns, openings. */
+ *  Reads back the full model geometrically: site, levels, layers, structural
+ *  bays, geometric regions (floor plates + extruded boxes), free walls,
+ *  columns, openings. No program vocabulary. */
 export function describe(state: State, levelFilter: number | null = null): string {
   const names = Object.keys(state.bays);
   const siteDesc = state.site.boundary
     ? `an irregular infill lot (${state.site.boundary.length}-sided, within ${state.site.width}×${state.site.height} ft)`
     : `a ${state.site.width}×${state.site.height} ft site`;
 
-  // Program mix across all rooms.
-  const useTotals = new Map<string, number>();
-  for (const r of state.rooms) useTotals.set(r.use, (useTotals.get(r.use) ?? 0) + r.size[0] * r.size[1]);
-  const programMix = useTotals.size ? [...useTotals.entries()].map(([u, a]) => `${u} ${a.toFixed(0)} sf`).join(", ") : "no program assigned yet";
+  const plates = state.regions.filter((r) => r.kind === "plate");
+  const boxes = state.regions.filter((r) => r.kind === "box");
+  const layerNames = Object.keys(state.layers);
 
   const macro =
     `MACRO — ${cap(siteDesc)}. ` +
     `${state.levels.length} level${state.levels.length === 1 ? "" : "s"}, ` +
-    `${names.length} structural bay${names.length === 1 ? "" : "s"}, ${state.rooms.length} room${state.rooms.length === 1 ? "" : "s"}, ` +
-    `${state.walls.length} free wall${state.walls.length === 1 ? "" : "s"}. Program: ${programMix}.`;
+    `${names.length} structural bay${names.length === 1 ? "" : "s"}, ` +
+    `${plates.length} floor plate${plates.length === 1 ? "" : "s"}, ` +
+    `${boxes.length} extruded box${boxes.length === 1 ? "" : "es"}, ` +
+    `${state.walls.length} free wall${state.walls.length === 1 ? "" : "s"}, ` +
+    `${layerNames.length} layer${layerNames.length === 1 ? "" : "s"}.`;
 
-  // Meso — one block per level, listing its rooms (scoped if a level is active).
+  // Layers — name, lineweight, linetype, and any tactile texture.
+  const layerBlock = `LAYERS — ${layerNames
+    .map((n) => {
+      const l = state.layers[n];
+      const t = tactileSummary(l.tactile);
+      return `${l.name} (${l.linetype}, ${l.lineweight_mm} mm${t ? `, ${t}` : ""})`;
+    })
+    .join("; ")}.`;
+
+  // Meso — one block per level, listing its regions (scoped if a level is active).
   const meso = state.levels
     .map((lvl, li) => ({ lvl, li }))
     .filter(({ li }) => levelFilter === null || li === levelFilter)
     .map(({ lvl, li }) => {
-      const rooms = state.rooms.filter((r) => r.level === li);
-      const roomTxt = rooms.length ? rooms.map((r) => `${r.name} [${r.use}, ${(r.size[0] * r.size[1]).toFixed(0)} sf]`).join("; ") : "no rooms";
-      return `MESO — Level ${li} (${lvl.label}, z=${lvl.z} ft): ${roomTxt}.`;
+      const regions = state.regions.filter((r) => (r.level ?? 0) === li);
+      const regionTxt = regions.length ? regions.map((r) => regionLine(state, r)).join(" ") : "no regions";
+      return `MESO — Level ${li} (${lvl.label}, z=${lvl.z} ft): ${regionTxt}`;
     })
     .join("\n");
 
-  // Rooms on an out-of-range level still count in MACRO — surface them so the
-  // spoken read-back always reconciles with the count (e.g. after an import).
+  // Regions/walls/columns on an out-of-range level still count in MACRO — surface
+  // them so the spoken read-back always reconciles with the count (e.g. after an import).
   const oob = (lvl: number) => lvl < 0 || lvl >= state.levels.length;
   const orphans = [
-    ...state.rooms.filter((r) => oob(r.level)).map((r) => `room ${r.name} (L${r.level})`),
+    ...state.regions.filter((r) => oob(r.level ?? 0)).map((r) => `${r.kind === "plate" ? "floor plate" : "extruded box"} ${r.name} (L${r.level ?? 0})`),
     ...state.walls.filter((w) => oob(w.level)).map((w) => `wall ${w.id} (L${w.level})`),
     ...state.columns.filter((c) => oob(c.level)).map((c) => `column ${c.id} (L${c.level})`)
   ];
@@ -613,7 +890,7 @@ export function describe(state: State, levelFilter: number | null = null): strin
     : [];
   const scope = levelFilter === null ? [] : [`SCOPE — Level ${levelFilter} only (matches the filtered PIAF / STL export).`, ""];
 
-  return [...scope, macro, "", meso, ...orphanBlock, "", ...bayMicro, ...wallMicro, ...openMicro, ...voidMicro].join("\n");
+  return [...scope, macro, layerBlock, "", meso, ...orphanBlock, "", ...bayMicro, ...wallMicro, ...openMicro, ...voidMicro].join("\n");
 }
 
 // ─── Dispatcher ──────────────────────────────────────────────────────────────
@@ -621,6 +898,12 @@ export function describe(state: State, levelFilter: number | null = null): strin
 export function applyCommand(state: State, raw: string): CommandResult {
   const tokens = tokenize(raw.trim());
   if (tokens.length === 0) return read(state, "");
+
+  // Two-word alias normalization (before the switch): `floor plate …` → `plate …`,
+  // `extruded box …` → `box …`.
+  if (tokens[0] === "floor" && tokens[1] === "plate") tokens.splice(0, 2, "plate");
+  else if (tokens[0] === "extruded" && tokens[1] === "box") tokens.splice(0, 2, "box");
+
   const cmd = tokens[0].toLowerCase();
 
   switch (cmd) {
@@ -637,7 +920,10 @@ export function applyCommand(state: State, raw: string): CommandResult {
     case "reset":
       return ok(makeSeedState(), "Model reset to the seed plan.");
     case "clear":
-      return ok({ ...cloneState(state), bays: {}, walls: [], rooms: [], columns: [], openings: [] }, "Cleared the whole model.");
+      return ok(
+        { ...cloneState(state), bays: {}, walls: [], regions: [], columns: [], openings: [], layers: { Default: defaultLayer() } },
+        "Cleared the whole model."
+      );
     case "add":
       if (tokens[1] === "bay") return cmdAddBay(state, tokens);
       return err(state, "Usage: add bay <name> [at <x> <y>]");
@@ -652,8 +938,14 @@ export function applyCommand(state: State, raw: string): CommandResult {
       // `wall add|remove|move|thickness|list` = free walls; `wall <bay> …` = bay perimeter.
       if (["add", "remove", "move", "thickness", "list"].includes(tokens[1])) return cmdWallFree(state, tokens);
       return cmdWall(state, tokens);
+    case "layer":
+      return cmdLayer(state, tokens);
+    case "plate":
+      return cmdPlate(state, tokens);
+    case "box":
+      return cmdBox(state, tokens);
     case "room":
-      return cmdRoom(state, tokens);
+      return err(state, `"room" is retired — use "plate add …" (floor slab) or "box add …" (massing volume). See help.`);
     case "column":
     case "col":
       return cmdColumn(state, tokens);
@@ -674,31 +966,37 @@ export function applyCommand(state: State, raw: string): CommandResult {
 
 // ─── Help + grammar (shared with the UI and the agent) ───────────────────────
 
-export const HELP_TEXT = `RAP Studio commands — build a full building, inside and out.
+export const HELP_TEXT = `RAP Studio commands — a literal Rhino/CAD model: layers, regions, geometry.
 
 READ
   describe                              read the model back (Macro / Meso / Micro)
-  list bays · room list · wall list · column list · opening list
+  list bays · layer list · plate list · box list · wall list · column list · opening list
   undo · redo                           step backward / forward through your edits
 
 SITE & LEVELS
   set site width|height <ft>            site extents
   set site boundary <x1,y1> <x2,y2> …   irregular infill lot (≥3 pts) · or: clear
-  level add <name> <z>                  add a floor level (z in ft) for mixed-use
+  level add <name> <z>                  add a level (z in ft)
 
-ROOMS (program: residential·retail·office·lobby·circulation·parking·amenity·core·mechanical·open·other)
-  room add [id] <x> <y> <w> <h> <use> [name]    place a program space
-  room <id> use <use> · name <text> · move <x> <y> · size <w> <h> · level <n>
-  room remove <id>
+LAYERS (Rhino layers carry lineweight + linetype + tactile texture)
+  layer add <name> [linetype solid|dashed|dotted|center|hidden] [lineweight <mm>]
+                   [tactile dots|lines|crosshatch|grid] [spacing <mm>] [angle <deg>] [height <mm>]
+  layer set <name> linetype|lineweight|tactile …   ·   layer remove <name>   ·   layer list
+
+GEOMETRIC REGIONS (placed on a layer, described by feet dimensions)
+  floor plate add [id] <x> <y> <w> <h> [thickness <ft>] [layer <name>] [name <text>]
+  plate set <id> origin|size|thickness|layer|level|name|tactile …   ·   plate remove <id> · plate list
+  extruded box add [id] <x> <y> <w> <h> <height> [layer <name>] [name <text>]
+  box set <id> origin|size|height|layer|level|name|tactile …   ·   box remove <id> · box list
 
 FREE WALLS (interior partitions AND exterior envelope, any angle)
-  wall add [id] <x1> <y1> <x2> <y2> [thickness] [level]
+  wall add [id] <x1> <y1> <x2> <y2> [thickness] [level] [layer <name>]
   wall move <id> <x1> <y1> <x2> <y2> · wall thickness <id> <ft> · wall remove <id>
   opening add <wallId> <door|window|portal> <pos 0–1> <width> [height]
   opening remove <id>
 
 COLUMNS
-  column add [id] <x> <y> [size] · column remove <id>
+  column add [id] <x> <y> [size] [layer <name>] · column remove <id>
 
 STRUCTURAL BAY JIG (the original grid)
   add bay <name> [at <x> <y>] · remove bay <name>
@@ -709,7 +1007,7 @@ STRUCTURAL BAY JIG (the original grid)
 
 OUTPUT
   tactile3d on|off · wall_height|cut_height <ft> · floor on|off
-  reset                                 back to the seed plan · clear  (empty model)`;
+  reset                                 back to the sample model · clear  (empty model)`;
 
 /** Compact grammar handed to the agent so it can compile NL → commands. */
 export const COMMAND_GRAMMAR = HELP_TEXT;

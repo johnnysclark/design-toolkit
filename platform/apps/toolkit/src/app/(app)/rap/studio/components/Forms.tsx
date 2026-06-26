@@ -177,76 +177,200 @@ export default function Forms({ state, onCommand }: { state: State; onCommand: (
         </>
       )}
 
-      {/* Building elements — rooms, interior walls, columns (not tied to a bay) */}
-      <BuildingAdd onCommand={onCommand} />
+      {/* Geometry — layers, floor plates, extruded boxes, free walls, columns */}
+      <BuildingAdd state={state} onCommand={onCommand} />
     </div>
   );
 }
 
-const USES = ["residential", "retail", "office", "lobby", "circulation", "parking", "amenity", "core", "mechanical", "open", "other"];
+const LINETYPES = ["solid", "dashed", "dotted", "center", "hidden"];
+const TACTILES = ["none", "dots", "lines", "crosshatch", "grid"];
 
-function BuildingAdd({ onCommand }: { onCommand: (raw: string) => void }) {
-  // Room
-  const [rx, setRx] = useState(18);
-  const [ry, setRy] = useState(12);
-  const [rw, setRw] = useState(24);
-  const [rh, setRh] = useState(18);
-  const [use, setUse] = useState("retail");
-  const [rname, setRname] = useState("");
-  // Wall
+function tactileSummary(t?: { pattern: string; spacing_mm: number; angle_deg: number }): string {
+  if (!t || t.pattern === "none") return "flat";
+  return `${t.pattern} ${t.spacing_mm} mm @ ${t.angle_deg}°`;
+}
+
+function BuildingAdd({ state, onCommand }: { state: State; onCommand: (raw: string) => void }) {
+  const layerNames = Object.keys(state.layers);
+  // Layer
+  const [lname, setLname] = useState("");
+  const [llt, setLlt] = useState("solid");
+  const [llw, setLlw] = useState(0.25);
+  const [ltac, setLtac] = useState("none");
+  const [lsp, setLsp] = useState(4);
+  const [lang, setLang] = useState(0);
+  const [lht, setLht] = useState(0.6);
+  // Floor plate
+  const [px, setPx] = useState(18);
+  const [py, setPy] = useState(12);
+  const [pw, setPw] = useState(36);
+  const [pd, setPd] = useState(20);
+  const [pt, setPt] = useState(0.5);
+  const [player, setPlayer] = useState(layerNames[0] ?? "Default");
+  const [pname, setPname] = useState("");
+  // Extruded box
+  const [bx, setBx] = useState(60);
+  const [by, setBy] = useState(40);
+  const [bw, setBw] = useState(24);
+  const [bd, setBd] = useState(24);
+  const [bht, setBht] = useState(40);
+  const [blayer, setBlayer] = useState(layerNames[0] ?? "Default");
+  const [bname, setBname] = useState("");
+  // Free wall
   const [x1, setX1] = useState(18);
   const [y1, setY1] = useState(32);
   const [x2, setX2] = useState(78);
   const [y2, setY2] = useState(32);
   const [wt, setWt] = useState(0.5);
+  const [wlayer, setWlayer] = useState(layerNames[0] ?? "Default");
   // Column
   const [cx, setCx] = useState(40);
   const [cy, setCy] = useState(40);
+  const [clayer, setClayer] = useState(layerNames[0] ?? "Default");
+
+  const layerSelect = (value: string, onChange: (v: string) => void, label = "Layer") => (
+    <label className={labelCls}>
+      {label}
+      <select className={fieldCls} value={layerNames.includes(value) ? value : "Default"} onChange={(e) => onChange(e.target.value)}>
+        {layerNames.map((n) => (
+          <option key={n} value={n}>
+            {n}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
 
   return (
     <div className="space-y-3 rounded-lg border-2 border-neutral-900 p-3">
-      <h3 className="display-font text-xs uppercase tracking-tight text-neutral-900">Building — rooms, walls, columns</h3>
+      <h3 className="display-font text-xs uppercase tracking-tight text-neutral-900">Geometry — layers, plates, boxes</h3>
 
+      {/* (i) Layers */}
       <fieldset className="rounded border border-neutral-300 p-3">
-        <legend className="px-1 text-xs font-bold uppercase text-neutral-900">Add room (program)</legend>
-        <div className="grid grid-cols-3 gap-2 sm:grid-cols-6">
-          <label className={labelCls}>X<input type="number" className={fieldCls} value={rx} onChange={(e) => setRx(+e.target.value)} /></label>
-          <label className={labelCls}>Y<input type="number" className={fieldCls} value={ry} onChange={(e) => setRy(+e.target.value)} /></label>
-          <label className={labelCls}>W<input type="number" className={fieldCls} value={rw} onChange={(e) => setRw(+e.target.value)} /></label>
-          <label className={labelCls}>H<input type="number" className={fieldCls} value={rh} onChange={(e) => setRh(+e.target.value)} /></label>
-          <label className={labelCls}>Use
-            <select className={fieldCls} value={use} onChange={(e) => setUse(e.target.value)}>
-              {USES.map((u) => <option key={u}>{u}</option>)}
+        <legend className="px-1 text-xs font-bold uppercase text-neutral-900">Add layer (lineweight · linetype · tactile)</legend>
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+          <label className={labelCls}>Name<input className={fieldCls} value={lname} onChange={(e) => setLname(e.target.value)} placeholder="e.g. slab" /></label>
+          <label className={labelCls}>Linetype
+            <select className={fieldCls} value={llt} onChange={(e) => setLlt(e.target.value)}>
+              {LINETYPES.map((t) => <option key={t}>{t}</option>)}
             </select>
           </label>
-          <label className={labelCls}>Name<input className={fieldCls} value={rname} onChange={(e) => setRname(e.target.value)} placeholder="(optional)" /></label>
+          <label className={labelCls}>Lineweight (mm)<input type="number" step={0.05} min={0.05} className={fieldCls} value={llw} onChange={(e) => setLlw(+e.target.value)} /></label>
+          <label className={labelCls}>Tactile
+            <select className={fieldCls} value={ltac} onChange={(e) => setLtac(e.target.value)}>
+              {TACTILES.map((t) => <option key={t}>{t}</option>)}
+            </select>
+          </label>
         </div>
-        <button type="button" onClick={() => onCommand(`room add ${rx} ${ry} ${rw} ${rh} ${use}${rname.trim() ? ` "${rname.trim()}"` : ""}`)} className="display-font mt-2 rounded border-2 border-neutral-900 px-3 py-1.5 text-xs uppercase hover:bg-neutral-900 hover:text-white">
-          + Place room
+        {ltac !== "none" && (
+          <div className="mt-2 grid grid-cols-3 gap-2">
+            <label className={labelCls}>Spacing (mm)<input type="number" min={1} className={fieldCls} value={lsp} onChange={(e) => setLsp(+e.target.value)} /></label>
+            <label className={labelCls}>Angle (°)<input type="number" className={fieldCls} value={lang} onChange={(e) => setLang(+e.target.value)} /></label>
+            <label className={labelCls}>Height (mm)<input type="number" step={0.1} min={0.1} className={fieldCls} value={lht} onChange={(e) => setLht(+e.target.value)} /></label>
+          </div>
+        )}
+        <button
+          type="button"
+          disabled={!lname.trim()}
+          onClick={() => {
+            const tac = ltac !== "none" ? ` tactile ${ltac} spacing ${lsp} angle ${lang} height ${lht}` : "";
+            onCommand(`layer add ${lname.trim()} linetype ${llt} lineweight ${llw}${tac}`);
+            setLname("");
+          }}
+          className="display-font mt-2 rounded border-2 border-neutral-900 px-3 py-1.5 text-xs uppercase hover:bg-neutral-900 hover:text-white disabled:opacity-40"
+        >
+          + Add layer
+        </button>
+        {/* Existing layers */}
+        <ul className="mt-3 space-y-1 border-t border-neutral-200 pt-2 text-xs text-neutral-900">
+          {layerNames.map((n) => {
+            const ly = state.layers[n];
+            return (
+              <li key={n} className="flex items-center justify-between gap-2">
+                <span>
+                  <b>{n}</b> · {ly.lineweight_mm} mm · {ly.linetype} · {tactileSummary(ly.tactile)}
+                </span>
+                {n !== "Default" && (
+                  <button type="button" onClick={() => onCommand(`layer remove ${n}`)} className="rounded border border-neutral-900 px-1.5 py-0.5 text-[11px] font-semibold hover:bg-[#ff3b21] hover:border-[#ff3b21] hover:text-white">
+                    Remove
+                  </button>
+                )}
+              </li>
+            );
+          })}
+        </ul>
+      </fieldset>
+
+      {/* (ii) Floor plate */}
+      <fieldset className="rounded border border-neutral-300 p-3">
+        <legend className="px-1 text-xs font-bold uppercase text-neutral-900">Floor plate (slab region, feet)</legend>
+        <div className="grid grid-cols-3 gap-2 sm:grid-cols-6">
+          <label className={labelCls}>X<input type="number" className={fieldCls} value={px} onChange={(e) => setPx(+e.target.value)} /></label>
+          <label className={labelCls}>Y<input type="number" className={fieldCls} value={py} onChange={(e) => setPy(+e.target.value)} /></label>
+          <label className={labelCls}>W<input type="number" className={fieldCls} value={pw} onChange={(e) => setPw(+e.target.value)} /></label>
+          <label className={labelCls}>D<input type="number" className={fieldCls} value={pd} onChange={(e) => setPd(+e.target.value)} /></label>
+          <label className={labelCls}>Thickness<input type="number" step={0.1} className={fieldCls} value={pt} onChange={(e) => setPt(+e.target.value)} /></label>
+          {layerSelect(player, setPlayer)}
+          <label className={labelCls}>Name<input className={fieldCls} value={pname} onChange={(e) => setPname(e.target.value)} placeholder="(optional)" /></label>
+        </div>
+        <button
+          type="button"
+          onClick={() => onCommand(`floor plate add ${px} ${py} ${pw} ${pd} thickness ${pt} layer ${player}${pname.trim() ? ` name "${pname.trim()}"` : ""}`)}
+          className="display-font mt-2 rounded border-2 border-neutral-900 px-3 py-1.5 text-xs uppercase hover:bg-neutral-900 hover:text-white"
+        >
+          + Place floor plate
         </button>
       </fieldset>
 
+      {/* (iii) Extruded box */}
       <fieldset className="rounded border border-neutral-300 p-3">
-        <legend className="px-1 text-xs font-bold uppercase text-neutral-900">Add wall (interior / exterior)</legend>
-        <div className="grid grid-cols-3 gap-2 sm:grid-cols-5">
+        <legend className="px-1 text-xs font-bold uppercase text-neutral-900">Extruded box (massing volume, feet)</legend>
+        <div className="grid grid-cols-3 gap-2 sm:grid-cols-6">
+          <label className={labelCls}>X<input type="number" className={fieldCls} value={bx} onChange={(e) => setBx(+e.target.value)} /></label>
+          <label className={labelCls}>Y<input type="number" className={fieldCls} value={by} onChange={(e) => setBy(+e.target.value)} /></label>
+          <label className={labelCls}>W<input type="number" className={fieldCls} value={bw} onChange={(e) => setBw(+e.target.value)} /></label>
+          <label className={labelCls}>D<input type="number" className={fieldCls} value={bd} onChange={(e) => setBd(+e.target.value)} /></label>
+          <label className={labelCls}>Height<input type="number" className={fieldCls} value={bht} onChange={(e) => setBht(+e.target.value)} /></label>
+          {layerSelect(blayer, setBlayer)}
+        </div>
+        <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3">
+          <label className={labelCls}>Name<input className={fieldCls} value={bname} onChange={(e) => setBname(e.target.value)} placeholder="(optional)" /></label>
+        </div>
+        <button
+          type="button"
+          onClick={() => onCommand(`extruded box add ${bx} ${by} ${bw} ${bd} ${bht} layer ${blayer}${bname.trim() ? ` name "${bname.trim()}"` : ""}`)}
+          className="display-font mt-2 rounded border-2 border-neutral-900 px-3 py-1.5 text-xs uppercase hover:bg-neutral-900 hover:text-white"
+        >
+          + Place extruded box
+        </button>
+      </fieldset>
+
+      {/* (iv) Free wall */}
+      <fieldset className="rounded border border-neutral-300 p-3">
+        <legend className="px-1 text-xs font-bold uppercase text-neutral-900">Free wall (any angle)</legend>
+        <div className="grid grid-cols-3 gap-2 sm:grid-cols-6">
           <label className={labelCls}>X1<input type="number" className={fieldCls} value={x1} onChange={(e) => setX1(+e.target.value)} /></label>
           <label className={labelCls}>Y1<input type="number" className={fieldCls} value={y1} onChange={(e) => setY1(+e.target.value)} /></label>
           <label className={labelCls}>X2<input type="number" className={fieldCls} value={x2} onChange={(e) => setX2(+e.target.value)} /></label>
           <label className={labelCls}>Y2<input type="number" className={fieldCls} value={y2} onChange={(e) => setY2(+e.target.value)} /></label>
           <label className={labelCls}>Thick<input type="number" step={0.1} className={fieldCls} value={wt} onChange={(e) => setWt(+e.target.value)} /></label>
+          {layerSelect(wlayer, setWlayer)}
         </div>
-        <button type="button" onClick={() => onCommand(`wall add ${x1} ${y1} ${x2} ${y2} ${wt}`)} className="display-font mt-2 rounded border-2 border-neutral-900 px-3 py-1.5 text-xs uppercase hover:bg-neutral-900 hover:text-white">
+        <button type="button" onClick={() => onCommand(`wall add ${x1} ${y1} ${x2} ${y2} ${wt} layer ${wlayer}`)} className="display-font mt-2 rounded border-2 border-neutral-900 px-3 py-1.5 text-xs uppercase hover:bg-neutral-900 hover:text-white">
           + Draw wall
         </button>
       </fieldset>
 
+      {/* (v) Column */}
       <fieldset className="rounded border border-neutral-300 p-3">
-        <legend className="px-1 text-xs font-bold uppercase text-neutral-900">Add column</legend>
+        <legend className="px-1 text-xs font-bold uppercase text-neutral-900">Free column</legend>
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
           <label className={labelCls}>X<input type="number" className={fieldCls} value={cx} onChange={(e) => setCx(+e.target.value)} /></label>
           <label className={labelCls}>Y<input type="number" className={fieldCls} value={cy} onChange={(e) => setCy(+e.target.value)} /></label>
+          {layerSelect(clayer, setClayer)}
         </div>
-        <button type="button" onClick={() => onCommand(`column add ${cx} ${cy}`)} className="display-font mt-2 rounded border-2 border-neutral-900 px-3 py-1.5 text-xs uppercase hover:bg-neutral-900 hover:text-white">
+        <button type="button" onClick={() => onCommand(`column add ${cx} ${cy} layer ${clayer}`)} className="display-font mt-2 rounded border-2 border-neutral-900 px-3 py-1.5 text-xs uppercase hover:bg-neutral-900 hover:text-white">
           + Place column
         </button>
       </fieldset>

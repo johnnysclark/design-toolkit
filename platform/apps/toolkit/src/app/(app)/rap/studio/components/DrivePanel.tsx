@@ -12,7 +12,7 @@ const card = "rounded-lg border-2 border-neutral-900 p-3 space-y-2";
 const btn = "display-font rounded border-2 border-neutral-900 px-3 py-1.5 text-xs uppercase text-neutral-900 hover:bg-neutral-900 hover:text-white disabled:opacity-40";
 const field = "rounded border-2 border-neutral-900 px-2 py-1 text-sm text-neutral-900 outline-none focus:border-[#ff3b21] focus-visible:ring-2 focus-visible:ring-[#ff3b21] focus-visible:ring-offset-1";
 
-export default function DrivePanel({ stateText, onDownloadState, webOnly }: { stateText: string; onDownloadState: () => void; webOnly?: { walls: number; columns: number; openings: number; rooms: number } }) {
+export default function DrivePanel({ stateText, onDownloadState, webOnly }: { stateText: string; onDownloadState: () => void; webOnly?: { walls: number; columns: number; openings: number; regions: number } }) {
   // ── Direct folder write ────────────────────────────────────────────────────
   const [dir, setDir] = useState<FileSystemDirectoryHandle | null>(null);
   const [dirName, setDirName] = useState("");
@@ -105,18 +105,18 @@ export default function DrivePanel({ stateText, onDownloadState, webOnly }: { st
       {/* Static visual note (NOT a live region): the embedded counts change on
           every add/remove, so role="alert" would re-speak the whole paragraph
           assertively each edit. The edit itself is already announced. */}
-      {webOnly && webOnly.walls + webOnly.columns + webOnly.openings + webOnly.rooms > 0 && (
+      {webOnly && webOnly.walls + webOnly.columns + webOnly.openings + webOnly.regions > 0 && (
         <p className="rounded-md border-2 border-[#ff3b21] bg-[#fff2f0] px-3 py-2 text-sm text-neutral-900">
           <b>Heads up:</b>{" "}
           {[
-            webOnly.rooms ? `${webOnly.rooms} program room${webOnly.rooms === 1 ? "" : "s"}` : "",
+            webOnly.regions ? `${webOnly.regions} geometric region${webOnly.regions === 1 ? "" : "s"}` : "",
             webOnly.walls ? `${webOnly.walls} free wall${webOnly.walls === 1 ? "" : "s"}` : "",
             webOnly.columns ? `${webOnly.columns} free column${webOnly.columns === 1 ? "" : "s"}` : "",
             webOnly.openings ? `${webOnly.openings} wall opening${webOnly.openings === 1 ? "" : "s"}` : ""
           ]
             .filter(Boolean)
             .join(", ")}{" "}
-          are studio-native and the current desktop Watcher does <b>not</b> rebuild them yet — they stay in the file (rooms in the native <code className="font-mono">rooms</code> key, the rest under <code className="font-mono">web_*</code>). Bays, apertures and levels do round-trip; an irregular site boundary currently flattens to a rectangle in Rhino.
+          are studio-native and the current desktop Watcher does <b>not</b> rebuild them yet — regions and free geometry stay in the file under <code className="font-mono">web_*</code> keys. Bays, apertures and levels do round-trip; an irregular site boundary currently flattens to a rectangle in Rhino.
         </p>
       )}
 
@@ -147,6 +147,18 @@ export default function DrivePanel({ stateText, onDownloadState, webOnly }: { st
       {/* 2 — Companion bridge */}
       <div className={card}>
         <h3 className="display-font text-xs uppercase tracking-tight">2 · Companion bridge (any browser, + live Watcher)</h3>
+        <div className="flex flex-wrap items-center gap-3">
+          <a
+            href="/rap-bridge/rap_bridge.py"
+            download
+            className="display-font inline-block rounded border-2 border-neutral-900 bg-neutral-900 px-3 py-1.5 text-xs uppercase text-white hover:bg-[#ff3b21] hover:border-[#ff3b21]"
+          >
+            Download Watcher (rap_bridge.py)
+          </a>
+          <a href="/rap-bridge/README.md" download className="text-xs underline underline-offset-2 hover:text-[#ff3b21]">
+            readme
+          </a>
+        </div>
         <div className="flex flex-wrap items-end gap-2">
           <label className="flex flex-col gap-1 text-xs font-semibold">
             Bridge URL
@@ -172,13 +184,22 @@ export default function DrivePanel({ stateText, onDownloadState, webOnly }: { st
             Optional live link: <b>on</b> (Rhino is answering on port {info.watcher.port}).
           </p>
         )}
-        <p className="text-xs leading-relaxed text-neutral-900">
-          Run the bridge:{" "}
-          <a href="/rap-bridge/rap_bridge.py" download className="font-semibold underline underline-offset-2 hover:text-[#ff3b21]">download rap_bridge.py</a>{" "}
-          (<a href="/rap-bridge/README.md" download className="underline underline-offset-2 hover:text-[#ff3b21]">readme</a>), then:
-        </p>
+        <p className="text-xs leading-relaxed text-neutral-900">Run the bridge with the file you downloaded above, then:</p>
         <pre className="overflow-x-auto rounded bg-[#0e0e0e] p-2 font-mono text-[11px] text-[#e8e8e8]">python3 rap_bridge.py --folder /path/to/your/rap-project</pre>
         <p className="text-xs text-neutral-900">It prints a URL and token — paste them above.</p>
+      </div>
+
+      {/* 2.5 — Numbered "start watching in Rhino" walkthrough */}
+      <div className={card}>
+        <h3 className="display-font text-xs uppercase tracking-tight">Start watching in Rhino — step by step</h3>
+        <ol className="list-decimal space-y-1.5 pl-5 text-sm text-neutral-900">
+          <li>Click <b>Download Watcher (rap_bridge.py)</b> above and save it next to your RAP project folder.</li>
+          <li>Open a terminal. Run <code className="font-mono">python3 rap_bridge.py --folder /path/to/your/rap-project</code>.</li>
+          <li>It prints a <b>URL</b> and a <b>token</b>. Paste both into the fields below and click <b>Test connection</b>.</li>
+          <li>In Rhino, open the RAP Watcher script and point it at the <b>same project folder</b>; press play so it watches <code className="font-mono">state.json</code>.</li>
+          <li>Back here, click <b>Push to Rhino</b> (or tick <b>Auto-push on change</b>). Rhino rebuilds the geometry on every file change.</li>
+          <li>Optional: <b>Check live link</b> confirms Rhino&rsquo;s query port — off is normal; pushes still rebuild via the file watcher.</li>
+        </ol>
       </div>
 
       {/* 3 — Always-available fallback */}

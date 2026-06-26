@@ -14,7 +14,8 @@ import { useCallback, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 
 import type { CommandResult, State } from "./engine/types";
-import { makeSeedState } from "./engine/seed";
+import { makeSeedState, STARTERS, type Starter } from "./engine/seed";
+import { toBraille } from "./engine/braille";
 import { applyCommand, describe } from "./engine/interpreter";
 import { fullStateString } from "./engine/exportState";
 import PlanSvg from "./render/PlanSvg";
@@ -178,6 +179,16 @@ export default function RapStudio({ signedIn }: { signedIn: boolean }) {
         return { ok: false, error: data.error };
       }
 
+      // ASSISTANT ASKS A QUESTION: when the request is missing a dimension,
+      // position, or layer, the assistant returns { question } and NO commands.
+      // Apply nothing; surface the ask so the student can answer and resend.
+      if (typeof data?.question === "string" && data.question.trim()) {
+        const q = data.question.trim();
+        setLog((l) => [...l, { id: idRef.current++, output: `ASSISTANT asks: ${q}`, ok: true }]);
+        announce(`The assistant has a question: ${q}`);
+        return { ok: true, question: q };
+      }
+
       const commands: string[] = Array.isArray(data.commands) ? data.commands : [];
       setLog((l) => [...l, { id: idRef.current++, output: `ASSISTANT: ${data.reply ?? "(applied changes)"}`, ok: true }]);
       const before = stateRef.current;
@@ -224,15 +235,33 @@ export default function RapStudio({ signedIn }: { signedIn: boolean }) {
     download("rap-tactile.stl", new Blob([buildStl(state, activeLevel)], { type: "model/stl" }));
     announce(`OK: Exported the STL (${scopeLabel}).`);
   };
-  const restoreSample = () => {
-    if (typeof window === "undefined" || window.confirm("Restore the sample building? Your current model will be discarded — you can Undo this.")) runCommand("reset");
-  };
-  const startFromScratch = () => {
-    if (typeof window === "undefined" || window.confirm("Start from scratch with an empty model? Your current model will be discarded — you can Undo this.")) runCommand("clear");
-  };
+  // Load a named starter — mirrors the undo-able reset/clear flow: push the
+  // current state to the undo stack and swap in a fresh starter State.
+  const loadStarter = useCallback(
+    (s: Starter) => {
+      if (typeof window !== "undefined" && !window.confirm(`Load “${s.label}”? Your current model will be discarded — you can Undo this.`)) return;
+      const prev = stateRef.current;
+      const next = s.make();
+      undoRef.current.push(prev);
+      if (undoRef.current.length > 50) undoRef.current.shift();
+      redoRef.current = [];
+      setHistLen({ undo: undoRef.current.length, redo: 0 });
+      stateRef.current = next;
+      setState(next);
+      setChanged(diffPaths(prev, next));
+      setLog((l) => [...l, { id: idRef.current++, output: `OK: Loaded starter — ${s.label}.`, ok: true }]);
+      setHistory((h) => [...h, `load ${s.id}`]);
+      announce(`OK: Loaded the ${s.label} starter.`);
+    },
+    [announce]
+  );
 
   const readback = describe(state, activeLevel);
   const bayList = Object.values(state.bays);
+  const brailleKey = [
+    ...bayList.map((b) => ({ glyph: b.braille, label: b.label })),
+    ...state.regions.map((r) => ({ glyph: toBraille(r.name), label: r.name }))
+  ];
 
   return (
     <div className="space-y-5">
@@ -253,16 +282,15 @@ export default function RapStudio({ signedIn }: { signedIn: boolean }) {
           <input type="checkbox" checked={speak} onChange={(e) => setSpeak(e.target.checked)} />
           Speak confirmations
         </label>
-        <ToolbarBtn onClick={startFromScratch}>Start from scratch</ToolbarBtn>
-        <ToolbarBtn onClick={restoreSample}>Restore sample</ToolbarBtn>
+        <StarterSelect onPick={loadStarter} />
       </div>
 
       <p className="text-sm text-neutral-900">
-        Loaded with a <b>sample building</b> (Bay A — ground-floor retail + lobby, two levels) so you can see what the tool does. The{" "}
-        <b>Assistant</b> is the main way to author: describe what you want in plain language and it writes the Controller commands for you —
-        the same way a designer directs <b>Claude Code</b> in a terminal. Every change is read back in all channels (plan, 3D, text, Braille,
-        state tree). Prefer to type commands yourself? Switch to the <b>Console</b>. Hit <b>Start from scratch</b> to build your own from an
-        empty model, or <b>Restore sample</b> to bring the example back.
+        Loaded with a <b>sample model</b> (one structural bay, a partition wall, two floor plates on a slab layer, two levels) so you can see
+        what the tool does. The <b>Assistant</b> is the main way to author: describe what you want in plain language and it writes the
+        Controller commands for you — the same way a designer directs <b>Claude Code</b> in a terminal. Every change is read back in all
+        channels (plan, 3D, text, Braille, state tree). Prefer to type commands yourself? Switch to the <b>Console</b>. Use <b>Load starter</b>{" "}
+        to begin from an empty model, a structural bay grid, a massing diagram, a single floor plate, or the sample.
       </p>
 
       {/* Row 1 — visual model + canonical state */}
@@ -272,7 +300,7 @@ export default function RapStudio({ signedIn }: { signedIn: boolean }) {
           right={
             <div className="flex items-center gap-2">
               <LevelSelect levels={state.levels} value={activeLevel} onChange={setActiveLevel} />
-              <Tabs label="Choose the model view" tabs={[["3d", "3D"], ["plan", "Tactile plan"]]} active={viewTab} onPick={(t) => setViewTab(t as ViewTab)} />
+              <Tabs label="Choose the model view" tabs={[["3d", "3D model"], ["plan", "Tactile plan (2D)"]]} active={viewTab} onPick={(t) => setViewTab(t as ViewTab)} />
             </div>
           }
         >
@@ -283,7 +311,7 @@ export default function RapStudio({ signedIn }: { signedIn: boolean }) {
             {viewTab === "3d" ? <Scene3D state={state} levelFilter={activeLevel} /> : <PlanSvg state={state} levelFilter={activeLevel} className="h-full w-full p-2" />}
           </div>
           <p className="mt-2 text-xs text-neutral-900">
-            The 3D view is an aid for sighted testing (hidden from screen readers). The model is fully readable in the tactile plan, the read-back text, and the state tree — none is the source of truth.
+            The 3D view is an orthographic (parallel) black-and-white aid for sighted testing — hidden from screen readers. Solid black edges are visible; dotted black edges are hidden lines. The model is fully readable in the tactile plan, the read-back text, and the state tree.
           </p>
         </Panel>
 
@@ -325,10 +353,10 @@ export default function RapStudio({ signedIn }: { signedIn: boolean }) {
             <pre className="whitespace-pre-wrap font-mono text-xs leading-relaxed text-neutral-900">{readback}</pre>
             <div className="mt-3 border-t border-neutral-200 pt-3">
               <div className="text-xs font-bold uppercase text-neutral-900">Braille key</div>
-              {bayList.map((b) => (
-                <div key={b.label} className="mt-1 text-neutral-900">
+              {brailleKey.map((b, i) => (
+                <div key={`${b.label}:${i}`} className="mt-1 text-neutral-900">
                   <span className="text-sm" style={{ fontFamily: "'Apple Braille','Segoe UI Symbol',monospace" }}>
-                    {b.braille}
+                    {b.glyph}
                   </span>{" "}
                   <span className="text-xs">— {b.label}</span>
                 </div>
@@ -343,7 +371,7 @@ export default function RapStudio({ signedIn }: { signedIn: boolean }) {
         <DrivePanel
           stateText={fullState}
           onDownloadState={exportState}
-          webOnly={{ walls: state.walls.length, columns: state.columns.length, openings: state.openings.length, rooms: state.rooms.length }}
+          webOnly={{ walls: state.walls.length, columns: state.columns.length, openings: state.openings.length, regions: state.regions.length }}
         />
       </Panel>
 
@@ -361,9 +389,9 @@ export default function RapStudio({ signedIn }: { signedIn: boolean }) {
             </p>
             <h3 className="display-font mt-4 text-xs uppercase tracking-tight text-neutral-900">Getting started</h3>
             <ol className="mt-1.5 list-decimal space-y-1 pl-5">
-              <li>Read the <b>sample building</b> in the views to see what a finished model looks like.</li>
-              <li>Press <b>Start from scratch</b> to empty it (or <b>Restore sample</b> to bring it back).</li>
-              <li>In the <b>Assistant</b>, describe a move — e.g. <i>&ldquo;lay out a lobby and two retail units.&rdquo;</i></li>
+              <li>Read the <b>sample model</b> in the views to see what a finished model looks like.</li>
+              <li>Use <b>Load starter → Empty</b> to start from an empty model (or <b>→ Sample model</b> to bring the example back).</li>
+              <li>In the <b>Assistant</b>, describe a move — e.g. <i>&ldquo;add a 36 by 20 floor plate on a new slab layer.&rdquo;</i></li>
               <li>Watch the commands it ran, and confirm the change in the read-back and the plan.</li>
               <li>Keep going one move at a time; <b>export</b> when you&apos;re ready to drive Rhino.</li>
             </ol>
@@ -373,7 +401,7 @@ export default function RapStudio({ signedIn }: { signedIn: boolean }) {
             <ul className="mt-1.5 list-disc space-y-1 pl-5">
               <li><b>Assistant</b> is fastest for whole moves; <b>Console</b> gives you exact control — type <code className="font-mono">help</code> for every command.</li>
               <li>Send an assistant request with <b>⌘/Ctrl + Enter</b>.</li>
-              <li>Made a wrong move? <b>Undo</b> / <b>Redo</b> step through your whole history (the Reset/Start-from-scratch buttons are undoable too).</li>
+              <li>Made a wrong move? <b>Undo</b> / <b>Redo</b> step through your whole history (loading a starter is undoable too).</li>
               <li>Turn on <b>Speak confirmations</b> to hear every change announced aloud.</li>
               <li>Use the <b>level selector</b> on the model to view and export one floor at a time.</li>
               <li>The <b>3D view is only a sighted aid</b> — it&apos;s hidden from screen readers. The plan, read-back, and Braille are the real model.</li>
@@ -401,6 +429,36 @@ function ToolbarBtn({ onClick, children, disabled }: { onClick: () => void; chil
     >
       {children}
     </button>
+  );
+}
+
+// Starter picker — a dropdown (best for 5 presets: one focus stop, screen-reader
+// friendly). Self-resets to the placeholder after each pick so the same starter
+// can be re-loaded.
+function StarterSelect({ onPick }: { onPick: (s: Starter) => void }) {
+  return (
+    <label className="flex items-center gap-1.5 text-xs font-semibold text-neutral-900">
+      Load starter
+      <select
+        defaultValue=""
+        onChange={(e) => {
+          const s = STARTERS.find((x) => x.id === e.target.value);
+          if (s) onPick(s);
+          e.currentTarget.value = "";
+        }}
+        className="rounded border-2 border-neutral-900 px-2 py-1.5 text-xs font-semibold text-neutral-900"
+        aria-label="Load a starter model"
+      >
+        <option value="" disabled>
+          Choose a starter…
+        </option>
+        {STARTERS.map((s) => (
+          <option key={s.id} value={s.id} title={s.description}>
+            {s.label}
+          </option>
+        ))}
+      </select>
+    </label>
   );
 }
 

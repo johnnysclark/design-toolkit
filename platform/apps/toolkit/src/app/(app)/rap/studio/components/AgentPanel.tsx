@@ -6,27 +6,29 @@
 // announced like any other edit. Spends the API key, so it gates to signed-in
 // members (the real guard is a 401 in /api/rap/agent).
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 
 export interface AgentResult {
   ok: boolean;
   reply?: string;
   commands?: string[];
+  question?: string; // assistant needs a missing dimension / position / layer
   error?: string;
   needsAuth?: boolean;
 }
 
 const EXAMPLES = [
-  "lay out a ground-floor lobby and two retail units",
-  "add an interior wall splitting the retail, with a door",
-  "stack residential on level 2",
-  "trace the exterior envelope along the site boundary"
+  "add a 36 by 20 floor plate on a new slab layer",
+  "make a 24 by 24 extruded box 40 feet tall on a massing layer",
+  "give the slab layer a crosshatch tactile texture at 5 mm",
+  "add a hidden-line layer with a dotted linetype"
 ];
 
 export default function AgentPanel({ onSubmit }: { onSubmit: (instruction: string) => Promise<AgentResult> }) {
   const [value, setValue] = useState("");
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<AgentResult | null>(null);
+  const taRef = useRef<HTMLTextAreaElement>(null);
 
   const run = async (text: string) => {
     const instruction = text.trim();
@@ -36,6 +38,9 @@ export default function AgentPanel({ onSubmit }: { onSubmit: (instruction: strin
     try {
       const r = await onSubmit(instruction);
       setResult(r);
+      // When the assistant asks for a missing detail, keep the user's text and
+      // return focus to the box so they can add it and send again.
+      if (r.question) taRef.current?.focus();
     } catch (e: unknown) {
       setResult({ ok: false, error: e instanceof Error ? e.message : "Something went wrong." });
     } finally {
@@ -62,6 +67,7 @@ export default function AgentPanel({ onSubmit }: { onSubmit: (instruction: strin
       </label>
       <textarea
         id="rap-agent"
+        ref={taRef}
         value={value}
         onChange={(e) => setValue(e.target.value)}
         onKeyDown={(e) => {
@@ -82,7 +88,13 @@ export default function AgentPanel({ onSubmit }: { onSubmit: (instruction: strin
 
       {result && (
         <div className="rounded-md border border-neutral-300 p-3 text-sm">
-          {result.needsAuth ? (
+          {result.question ? (
+            <div className="rounded-md border-2 border-[#ff3b21] bg-[#fff7f5] p-3" role="status">
+              <div className="display-font text-xs uppercase text-neutral-900">Assistant asks</div>
+              <p className="mt-1 text-sm text-neutral-900">{result.question}</p>
+              <p className="mt-1 text-xs text-neutral-900">Answer in the box above (add the missing dimension, position, or layer) and send again.</p>
+            </div>
+          ) : result.needsAuth ? (
             <p className="text-neutral-900">
               Sign in to use the AI assistant — the deterministic console, forms, and exports work without it.{" "}
               <a href="/login" className="font-semibold underline underline-offset-2 hover:text-[#ff3b21]">

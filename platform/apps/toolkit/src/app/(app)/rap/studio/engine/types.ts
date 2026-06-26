@@ -68,6 +68,8 @@ export interface Bay {
   braille: string;
   /** Which level this bay belongs to (index into State.levels). */
   level: number;
+  /** Rhino layer this bay's geometry is drawn on. Missing = "Default". */
+  layer?: string;
 }
 
 export interface Level {
@@ -88,31 +90,48 @@ export interface Wall {
   b: Vec2;
   thickness: number; // ft
   height?: number; // ft; defaults to tactile3d.wall_height
+  /** Rhino layer this wall is drawn on (lineweight/linetype/tactile). Missing = "Default". */
+  layer?: string;
 }
 
-/** A named program space (mixed-use): retail, residential, office, lobby, etc.
- *  Axis-aligned rectangle for now (origin = lower-left). */
-export type ProgramUse =
-  | "residential"
-  | "retail"
-  | "office"
-  | "lobby"
-  | "circulation"
-  | "parking"
-  | "amenity"
-  | "core"
-  | "mechanical"
-  | "open"
-  | "other";
+// ── Rhino layers + tactile patterns (drafting-literal, no program vocabulary) ──
 
-export interface Room {
+/** Linetype as a CAD pen pattern (drives the 2D dash table + 3D hidden lines). */
+export type LineType = "solid" | "dashed" | "dotted" | "center" | "hidden";
+
+/** A tactile surface texture for PIAF swell paper + STL raised relief. */
+export type TactileKind = "none" | "dots" | "lines" | "crosshatch" | "grid";
+
+export interface TactilePattern {
+  pattern: TactileKind;
+  spacing_mm: number; // center-to-center of dots / pitch of lines. Default 4.
+  angle_deg: number; // hatch rotation; 0 = lines run along +x. Default 0.
+  height_mm: number; // raised relief height for STL + PIAF swell. Default 0.6.
+}
+
+/** A Rhino layer: carries a lineweight (mm), a linetype, and an optional default
+ *  tactile pattern applied to every piece of geometry placed on the layer. */
+export interface Layer {
+  name: string; // key in State.layers AND the value stored here (kept in sync)
+  lineweight_mm: number; // pen weight in mm (Rhino lineweight). Default 0.25.
+  linetype: LineType; // Default "solid".
+  tactile?: TactilePattern; // default texture for geometry on this layer; omitted/none = flat
+}
+
+/** A geometric region — the only two region kinds. A "plate" is a flat slab; a
+ *  "box" is an extruded massing volume. Each is placed ON A LAYER and described
+ *  purely by dimensions in feet (origin = lower-left). Replaces the old Room. */
+export interface Region {
   id: string;
-  level: number;
-  origin: Vec2; // lower-left, world ft
-  size: Vec2; // [w, h] ft
   name: string;
-  use: ProgramUse;
-  braille: string;
+  kind: "plate" | "box";
+  origin: Vec2; // lower-left, world ft
+  size: Vec2; // [w, d] ft footprint
+  height?: number; // box only: extrusion height ft (required for box, ignored for plate)
+  thickness?: number; // plate only: slab thickness ft (required for plate, ignored for box)
+  layer: string; // REQUIRED — must be a key in State.layers
+  level?: number; // index into State.levels; default 0
+  tactile?: TactilePattern; // OPTIONAL per-region override of the layer's tactile
 }
 
 /** A free-standing column, anywhere (not tied to a bay grid). */
@@ -121,6 +140,8 @@ export interface Column {
   level: number;
   at: Vec2;
   size: number; // ft (square)
+  /** Rhino layer this column is drawn on. Missing = "Default". */
+  layer?: string;
 }
 
 /** A door/window/portal placed on a free Wall, positioned along it. */
@@ -172,10 +193,13 @@ export interface State {
   meta: { created: string; last_saved: string; notes: string };
   site: Site;
   style: Style;
+  /** Rhino layers — always contains "Default". Geometry references these by name. */
+  layers: Record<string, Layer>;
   bays: Record<string, Bay>;
   /** Free elements — the full building beyond the structural bay jig. */
   walls: Wall[];
-  rooms: Room[];
+  /** Geometric regions (floor plates + extruded boxes). Replaces program rooms. */
+  regions: Region[];
   columns: Column[];
   openings: Opening[];
   levels: Level[];
