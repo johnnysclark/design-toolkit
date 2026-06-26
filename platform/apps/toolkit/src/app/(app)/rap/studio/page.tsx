@@ -26,10 +26,16 @@ export default async function RapStudioPage() {
         </Link>
         <h1 className="display-font text-3xl uppercase leading-none tracking-tight text-neutral-900 sm:text-4xl">RAP Studio</h1>
         <p className="max-w-3xl text-[15px] leading-relaxed text-neutral-900">
-          A runnable slice of the workflow. There is <b>one canonical state</b> — the same <code className="font-mono">state.json</code> the desktop
-          tool uses — and every panel is a <b>renderer</b> of it. Author by typed command, by form, or in plain language; read the model
-          back as a 3D view, a tactile plan, structured text, and Braille; export a PIAF swell-paper image and a 3D-print STL. Because the
-          state matches the real schema, what you make here round-trips to Rhino through the desktop Watcher.
+          <b>Design a building without needing to see it.</b> The Radical Accessibility Project (RAP) is a way for blind and
+          low-vision students to author architecture alongside sighted classmates — and this page is a hands-on demo of it,
+          running right in your browser. No account or install needed to try it.
+        </p>
+        <p className="max-w-3xl text-[15px] leading-relaxed text-neutral-900">
+          You lay out a plan by typing plain-English requests, short commands, or filling in form fields. The studio keeps your
+          whole design as a single text file and shows it back to you several ways at once — a 3D model, a touch-readable plan, a
+          written description, and Braille — plus downloads for a swell-paper tactile print and a 3D print. The 3D view is only an
+          aid for sighted testing; nothing here needs sight to use. When you&rsquo;re ready, the same design can be sent to
+          <b> Rhino</b>, the 3D CAD software architects design in.
         </p>
       </header>
 
