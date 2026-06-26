@@ -64,14 +64,14 @@ export const TOOLKIT_NAV: ToolItem[] = [
   {
     href: "/media-2d",
     label: "2D Tooling",
-    blurb: "Drawing cleanup · live video · fabrication.",
-    status: "soon"
+    blurb: "A bench of 2D-media tools — drawing & scan cleanup now, more proposed.",
+    status: "live"
   },
   {
     href: "/tools-3d",
     label: "3D Tooling",
-    blurb: "Python · tutorials · Three.js · 3D-print settings.",
-    status: "soon"
+    blurb: "Model-to-machine on-ramps — Obliquify (oblique projection) now, more proposed.",
+    status: "live"
   },
   {
     href: "/rap",
