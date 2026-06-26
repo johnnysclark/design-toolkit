@@ -46,16 +46,19 @@ export interface DroppedImage {
 }
 
 export interface AnalyzeResult {
-  mode: "analyze" | "search";
+  mode: "analyze" | "search" | "enrich";
   searchId: string | null;
   analysis?: Analysis;
-  enrichment: Enrichment;
+  enrichment?: Enrichment; // filled by phase 2 (enrich); undefined while loading
   query?: string;
   meta?: { model?: string; generated_at?: string };
   // client-only extras attached after the request
   _images?: DroppedImage[];
   _sourceLink?: string | null;
+  _enrichLoading?: boolean; // true while the archive lookups (phase 2) are in flight
 }
+
+export type Effort = "low" | "medium" | "high";
 
 export interface LibraryItem {
   id: string;

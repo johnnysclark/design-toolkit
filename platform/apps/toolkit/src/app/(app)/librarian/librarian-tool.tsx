@@ -49,6 +49,7 @@ export default function LibrarianTool() {
   const [srcLink, setSrcLink] = useState("");
   const [urlInput, setUrlInput] = useState("");
   const [queryInput, setQueryInput] = useState("");
+  const [effort, setEffort] = useState(0); // 0 Quick · 1 Balanced · 2 Deep
 
   const [busy, setBusy] = useState<null | "analyze" | "search">(null);
   const [error, setError] = useState<string | null>(null);
@@ -182,15 +183,57 @@ export default function LibrarianTool() {
     setMessages(json.analysis?.reply ? [{ role: "librarian", text: json.analysis.reply }] : []);
   }
 
+  function effortValue(): "low" | "medium" | "high" {
+    return effort === 0 ? "low" : effort === 2 ? "high" : "medium";
+  }
+
   async function postAnalyze(extra: Record<string, unknown>): Promise<AnalyzeResult> {
     const res = await fetch("/api/librarian", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ mode: "analyze", projectId: projectId || null, ...extra })
+      body: JSON.stringify({
+        mode: "analyze",
+        projectId: projectId || null,
+        effort: effortValue(),
+        ...extra
+      })
     });
     const json = await res.json();
     if (!res.ok) throw new Error(json.error || "Request failed");
     return json as AnalyzeResult;
+  }
+
+  // Phase 2 — the free-archive lookups. Runs after the AI read is already on
+  // screen, then fills in the context + links sections.
+  async function runEnrich(searchId: string | null, analysis?: Analysis) {
+    if (!analysis) {
+      setResult((prev) => (prev ? { ...prev, _enrichLoading: false } : prev));
+      return;
+    }
+    const top = analysis.candidates?.[0];
+    try {
+      const res = await fetch("/api/librarian", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          mode: "enrich",
+          projectId: projectId || null,
+          searchId,
+          building: top?.building || "",
+          architect: top?.architect || "",
+          searchTerms: analysis.suggested_search_terms || [],
+          vocabularyTerms: (analysis.vocabulary || []).map((v) => v.term)
+        })
+      });
+      const json = await res.json();
+      setResult((prev) =>
+        prev
+          ? { ...prev, enrichment: res.ok ? json.enrichment : prev.enrichment, _enrichLoading: false }
+          : prev
+      );
+    } catch {
+      setResult((prev) => (prev ? { ...prev, _enrichLoading: false } : prev));
+    }
   }
 
   async function onFiles(list: FileList | File[]) {
@@ -231,8 +274,14 @@ export default function LibrarianTool() {
       }
 
       const json = await postAnalyze({ imagePaths: images.map((i) => i.path), note: buildNote() });
-      setResult({ ...json, _images: images, _sourceLink: srcLink.trim() || null });
+      setResult({
+        ...json,
+        _images: images,
+        _sourceLink: srcLink.trim() || null,
+        _enrichLoading: true
+      });
       seedConversation(json);
+      runEnrich(json.searchId, json.analysis);
     } catch (e: any) {
       setError(e?.message || "Analysis failed.");
     } finally {
@@ -247,8 +296,14 @@ export default function LibrarianTool() {
     setBusy("analyze");
     try {
       const json = await postAnalyze({ imageUrls: [u], note: buildNote() });
-      setResult({ ...json, _images: [{ url: u }], _sourceLink: srcLink.trim() || u });
+      setResult({
+        ...json,
+        _images: [{ url: u }],
+        _sourceLink: srcLink.trim() || u,
+        _enrichLoading: true
+      });
       seedConversation(json);
+      runEnrich(json.searchId, json.analysis);
     } catch (e: any) {
       setError(e?.message || "Analysis failed.");
     } finally {
@@ -302,6 +357,7 @@ export default function LibrarianTool() {
         body: JSON.stringify({
           mode: "analyze",
           projectId: projectId || null,
+          effort: effortValue(),
           ...ref,
           userContext: facts,
           searchId: result.searchId
@@ -309,10 +365,16 @@ export default function LibrarianTool() {
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || "Request failed");
-      setResult((prev) => ({ ...(json as AnalyzeResult), _images: prev?._images, _sourceLink: prev?._sourceLink }));
+      setResult((prev) => ({
+        ...(json as AnalyzeResult),
+        _images: prev?._images,
+        _sourceLink: prev?._sourceLink,
+        _enrichLoading: true
+      }));
       if (json.analysis?.reply) {
         setMessages((m) => [...m, { role: "librarian", text: json.analysis.reply }]);
       }
+      runEnrich(json.searchId, json.analysis);
     } catch (e: any) {
       setError(e?.message || "Message failed.");
       setMessages((m) => [...m, { role: "librarian", text: "(couldn't respond — try again)" }]);
@@ -557,6 +619,34 @@ export default function LibrarianTool() {
             </button>
           ))}
         </div>
+
+        {tab !== "search" && (
+          <div className="mt-3 flex flex-wrap items-center gap-3">
+            <span className="display-font text-xs uppercase tracking-wide text-neutral-900">
+              Effort
+            </span>
+            <input
+              type="range"
+              min={0}
+              max={2}
+              step={1}
+              value={effort}
+              onChange={(e) => setEffort(Number(e.target.value))}
+              className="w-40 accent-neutral-900"
+              aria-label="Analysis effort"
+            />
+            <span className="text-xs font-medium text-neutral-900">
+              {effort === 0 ? "Quick" : effort === 1 ? "Balanced" : "Deep"}
+            </span>
+            <span className="text-xs text-neutral-900">
+              {effort === 0
+                ? "— fastest read"
+                : effort === 1
+                  ? "— more thorough"
+                  : "— hardest IDs, slower"}
+            </span>
+          </div>
+        )}
 
         {tab === "upload" && (
           <div className="mt-4 space-y-3">
@@ -917,6 +1007,7 @@ function ResultPanel({
 }) {
   const a = result.analysis;
   const e = result.enrichment;
+  const enrichLoading = !!result._enrichLoading;
   const images = result._images || [];
 
   const vocab = [
@@ -1115,7 +1206,11 @@ function ResultPanel({
           images because automatic matches are unreliable; click through, judge for yourself, and
           drop anything good back in above.
         </p>
-        {e?.links?.length ? (
+        {enrichLoading ? (
+          <div className="mt-3">
+            <Thinking label="Gathering context and where to look…" />
+          </div>
+        ) : e?.links?.length ? (
           <ul className="mt-3 space-y-2">
             {e.links.map((l, i) => (
               <li
