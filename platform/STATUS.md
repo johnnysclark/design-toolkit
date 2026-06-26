@@ -100,18 +100,51 @@
 >   accessible chart data-tables (ARIA) · global terrain (USGS 3DEP is **US-only** — non-US
 >   sites get terrain:null) · the black-text sweep above.
 >
-> **Librarian — REBUILT + DEPLOYED (2026-06-25 · branch `tool/librarian`).**
-> Repurposed from the text-only precedent-dossier tool into a **visual reference library**:
-> upload / paste / URL a single found image → Claude vision reads it (identifications framed as
-> *leads to verify*, never facts) → free open-archive enrichment (Wikidata · Wikimedia Commons ·
-> Wikipedia · Getty AAT · LoC HABS) surfaces related plans / drawings / other views / photos +
-> textual context → catalogue finds (metadata-tagged) into **per-project libraries** that grow
-> over time, shared studio-wide (read-all / write-own RLS). New migration **`0003_library.sql`**
-> (`library_projects` / `library_searches` / `library_items` + a private `library` storage
-> bucket) — applied to the live Supabase. Still **auth-gated** — `/api/librarian` returns **401
-> for anon** (cost protection holds). Enrichment verified against live archives (Commons category
-> P373 + LoC HABS collections endpoint). **Free-data v1**; paid reverse-image + Google-Images
-> search is a planned upgrade (needs SerpAPI/Serper keys). **Merged to `main` → deployed live.**
+> **Librarian — REBUILT into a VISUAL REFERENCE LIBRARY · LIVE (2026-06-25 · branch
+> `tool/librarian`, worktree `design-toolkit-librarian` · deployed to `main`).**
+> Was the text-only precedent-dossier tool; now: a student drops one *or more* found images
+> (upload / clipboard-paste / web-URL), optionally with a context note + source link → Claude
+> **vision** reads them (IDs framed as *leads to verify*, never facts; **abstains** rather than
+> guessing) → the student can **converse** ("the architect is Ando…") and it re-catalogs from
+> those authoritative facts → finds get catalogued, metadata-tagged, into **per-project
+> libraries** (create / edit / delete, with descriptions), shared studio-wide (read-all /
+> write-own RLS). Auth-gated (`/api/librarian` 401s anon — cost protection).
+>
+> **Key design decision (after the first cut):** we do **NOT** auto-show archive images —
+> free image-matching was unreliable ("all wrong"). The **"Where to find related material"**
+> panel is **curated LINKS** (confirmed Wikipedia / Wikimedia Commons category / Wikidata pages
+> + pre-built Google-Images and ArchDaily / Dezeen / LoC-HABS queries). The only images ever
+> shown are the student's own (dropped, or saved into a project). Save a link as a `reference`
+> item; save dropped images as image items; a destination picker lets you add to any project or
+> make a new one on the spot.
+>
+> **Model = `claude-sonnet-4-6`** (toolkit-wide policy). Verified against the Claude API ref:
+> structured output `output_config: {format: {type:"json_schema", schema}}`, the **effort**
+> control `output_config.effort` (low/medium/high — the "Effort" slider: Quick/Balanced/Deep),
+> and multiple image blocks per message are all correct/supported. The analyze route is **two
+> phase** for a quick answer first: phase 1 `mode:"analyze"` (vision read, returns immediately)
+> → phase 2 `mode:"enrich"` (the slower free archive lookups; a "gathering context" animation
+> shows until links fill in). `mode:"search"` = keyword archive lookup (no model cost).
+>
+> **Files:** migration `supabase/0003_library.sql` (`library_projects`/`library_searches`/
+> `library_items` + private `library` bucket — APPLIED to live Supabase); `src/lib/library/*`
+> (keyless enrichment: wikidata/wikipedia/getty + `enrich.ts` link-builder); `src/lib/anthropic/
+> library-prompts.ts` (vision prompt + JSON schema); `src/app/api/librarian/route.ts`;
+> `src/app/(app)/librarian/{page,librarian-tool,project-gallery,Thinking,types,image}.tsx`.
+>
+> **⏭ NEXT / PENDING (for whoever picks this up):**
+> 1. **Run `supabase/seed-sample-projects.sql`** in the Supabase SQL editor — seeds 3 starter
+>    projects (Modern Houses / Light & Concrete / Civic Monuments, 10 openly-licensed Commons
+>    images). **NOT run yet.** (Idempotent; owner = `jsclark2@gmail.com` — edit the email if
+>    seeding for someone else.)
+> 2. **Signed-in end-to-end test** of the vision flow (couldn't run from the build env — gated):
+>    drop an image, confirm it reads + the links + save all work in prod.
+> 3. **Resend SMTP / OTP (backlog I3)** is the precondition before a student cohort can log in.
+> 4. **v2 upgrade** = true reverse-image ("other angles of *this* building") via **SerpAPI Lens**
+>    + Google Images via **Serper** — slots in behind 2 paid env vars (`SERPAPI_KEY`,
+>    `SERPER_API_KEY`) without reworking the pipeline. Currently free-data only.
+> Caveats: vision is weak on obscure/interior/model/sketch IDs (hence the verify framing +
+> conversation); images downscaled client-side to ≤~4 MB; Vercel Hobby 60s function cap.
 >
 > **Coach (was "Skills Coach") — BUILT + LIVE + polished (through 2026-06-25 · merged to
 > `main`, deployed).** A Claude tutor for **Rhino / Grasshopper / AutoCAD / Revit / Adobe**
