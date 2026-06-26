@@ -4,6 +4,7 @@ export default function Page() {
   return (
     <ComingSoon
       title="3D Tooling"
+      subtitle="Modeling & 3D Print"
       blurb="Python, tutorials, Three.js, and 3D-print settings — the 3D side of the toolkit."
     />
   );

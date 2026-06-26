@@ -35,7 +35,7 @@ export default async function PinupPage() {
         Archivist{" "}
         <span className="font-sans text-lg font-normal normal-case text-neutral-900">— Studio Digital Pinup Wall</span>
       </h1>
-      <p className="mt-2 max-w-2xl text-neutral-600">
+      <p className="mt-2 max-w-2xl text-neutral-900">
         Studio memory + metadata. Everyone signed in sees the wall; you can add,
         edit, and remove your own pins.
       </p>

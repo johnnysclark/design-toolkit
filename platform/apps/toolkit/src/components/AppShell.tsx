@@ -22,15 +22,33 @@ export default function AppShell({
         <button
           type="button"
           onClick={() => setOpen((o) => !o)}
-          aria-label={open ? "Close menu" : "Open menu"}
+          aria-label={open ? "Collapse menu" : "Expand menu"}
           aria-expanded={open}
-          className="display-font px-1 text-2xl leading-none text-neutral-900 transition-colors hover:text-[#ff3b21]"
+          className="px-1 leading-none text-neutral-900 transition-colors hover:text-[#ff3b21]"
         >
-          ☰
+          <svg
+            width="30"
+            height="30"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="3"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+            className={`transition-transform duration-200 ${open ? "" : "rotate-180"}`}
+          >
+            <path d="M19 12 H6" />
+            <path d="M12 6 L6 12 L12 18" />
+          </svg>
         </button>
-        <span className="display-font text-xl uppercase tracking-tight sm:text-2xl">
+        <button
+          type="button"
+          onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
+          className="display-font text-xl uppercase tracking-tight transition-colors hover:text-[#ff3b21] sm:text-2xl"
+        >
           Design Toolkit
-        </span>
+        </button>
         <span className="flex-1" />
         {signedIn ? (
           <form action="/auth/signout" method="post">
