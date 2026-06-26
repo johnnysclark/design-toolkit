@@ -13,7 +13,7 @@ import type { CodeBlock } from "@/lib/skills-coach/code";
 function Chevron() {
   return (
     <svg
-      className="h-3.5 w-3.5 shrink-0 text-neutral-400 transition-transform group-open:rotate-90"
+      className="h-3.5 w-3.5 shrink-0 text-neutral-900 transition-transform group-open:rotate-90"
       viewBox="0 0 12 12"
       fill="none"
       aria-hidden
@@ -31,7 +31,7 @@ function Chevron() {
 
 const CARD = "group rounded-2xl border border-neutral-200 bg-white";
 const SUMMARY =
-  "flex cursor-pointer list-none select-none items-center gap-2 px-4 py-3 text-[11px] font-semibold uppercase tracking-wide text-neutral-500 [&::-webkit-details-marker]:hidden";
+  "flex cursor-pointer list-none select-none items-center gap-2 px-4 py-3 text-[11px] font-semibold uppercase tracking-wide text-neutral-900 [&::-webkit-details-marker]:hidden";
 
 function ConceptSection({ slug }: { slug: string | null }) {
   const concept = slug ? getConcept(slug) : undefined;
@@ -42,7 +42,7 @@ function ConceptSection({ slug }: { slug: string | null }) {
       </summary>
       <div className="px-4 pb-4 text-sm">
         {!concept ? (
-          <p className="text-neutral-400">
+          <p className="text-neutral-900">
             As you and the coach discuss a 3D or graphic concept — a data tree, a NURBS surface, a
             layer mask — its explanation appears here.
           </p>
@@ -53,15 +53,15 @@ function ConceptSection({ slug }: { slug: string | null }) {
                 {concept.title}
               </h3>
               {concept.source === "community" && (
-                <span className="shrink-0 rounded-full bg-neutral-100 px-2 py-0.5 text-[10px] text-neutral-500">
+                <span className="shrink-0 rounded-full bg-neutral-100 px-2 py-0.5 text-[10px] text-neutral-900">
                   community
                 </span>
               )}
             </div>
-            <p className="mt-1 text-[13px] italic text-neutral-500">{concept.oneLiner}</p>
-            <p className="mt-3 leading-relaxed text-neutral-700">{concept.explanation}</p>
+            <p className="mt-1 text-[13px] italic text-neutral-900">{concept.oneLiner}</p>
+            <p className="mt-3 leading-relaxed text-neutral-900">{concept.explanation}</p>
             {concept.versionNote && (
-              <p className="mt-2 text-xs text-neutral-400">Note: {concept.versionNote}</p>
+              <p className="mt-2 text-xs text-neutral-900">Note: {concept.versionNote}</p>
             )}
             <a
               href={concept.docUrl}
@@ -94,7 +94,7 @@ function ScriptSection({ script }: { script: CodeBlock | null }) {
       </summary>
       <div className="px-4 pb-4">
         {!script ? (
-          <p className="text-sm text-neutral-400">
+          <p className="text-sm text-neutral-900">
             When the coach writes a Python script for Rhino or Grasshopper, it lands here — ready to
             copy straight into a GhPython / Script component.
           </p>
@@ -107,7 +107,7 @@ function ScriptSection({ script }: { script: CodeBlock | null }) {
             >
               {copied ? "Copied ✓ — paste into Rhino" : "⧉ Copy script"}
             </button>
-            <pre className="max-h-72 overflow-auto rounded-lg border border-neutral-200 bg-neutral-50 p-3 text-[12px] leading-relaxed text-neutral-800">
+            <pre className="max-h-72 overflow-auto rounded-lg border border-neutral-200 bg-neutral-50 p-3 text-[12px] leading-relaxed text-neutral-900">
               <code className="font-mono">{script.code}</code>
             </pre>
           </>
@@ -125,13 +125,13 @@ function IdeasSection({ ideas }: { ideas: string[] }) {
       </summary>
       <div className="px-4 pb-4 text-sm">
         {ideas.length === 0 ? (
-          <p className="text-neutral-400">
+          <p className="text-neutral-900">
             Other commands, workflows, or resources that could get the job done will show up here.
           </p>
         ) : (
           <ul className="space-y-2">
             {ideas.map((idea, i) => (
-              <li key={i} className="flex gap-2 leading-relaxed text-neutral-700">
+              <li key={i} className="flex gap-2 leading-relaxed text-neutral-900">
                 <span className="mt-0.5 text-[#ff3b21]">→</span>
                 <span>{idea}</span>
               </li>

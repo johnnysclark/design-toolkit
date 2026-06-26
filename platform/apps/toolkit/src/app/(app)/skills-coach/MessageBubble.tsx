@@ -87,14 +87,14 @@ function CodeCard({ lang, code }: { lang: string; code: string }) {
   return (
     <div className="overflow-hidden rounded-xl border border-neutral-200">
       <div className="flex items-center justify-between gap-2 border-b border-neutral-200 bg-neutral-50 px-3 py-1.5">
-        <span className="font-mono text-[11px] uppercase tracking-wide text-neutral-500">
+        <span className="font-mono text-[11px] uppercase tracking-wide text-neutral-900">
           {language}
         </span>
         <div className="flex items-center gap-1.5">
           <button
             type="button"
             onClick={copy}
-            className="rounded-md px-2 py-1 text-xs text-neutral-600 hover:bg-neutral-200"
+            className="rounded-md px-2 py-1 text-xs text-neutral-900 hover:bg-neutral-200"
           >
             {copied ? "Copied ✓" : "Copy"}
           </button>
@@ -107,7 +107,7 @@ function CodeCard({ lang, code }: { lang: string; code: string }) {
           </button>
         </div>
       </div>
-      <pre className="overflow-x-auto px-3 py-3 text-[13px] leading-relaxed text-neutral-800">
+      <pre className="overflow-x-auto px-3 py-3 text-[13px] leading-relaxed text-neutral-900">
         <code className="font-mono">{code}</code>
       </pre>
     </div>
@@ -177,7 +177,7 @@ function MessageBubbleImpl({ message }: { message: ChatMessage }) {
   return (
     <div className="flex justify-start">
       <div className="max-w-[92%] space-y-3">
-        <div className="rounded-2xl rounded-bl-sm border border-neutral-200 bg-white px-4 py-3 text-sm leading-relaxed text-neutral-800">
+        <div className="rounded-2xl rounded-bl-sm border border-neutral-200 bg-white px-4 py-3 text-sm leading-relaxed text-neutral-900">
           <div className="space-y-3">{renderBody(message.content)}</div>
         </div>
 
@@ -200,7 +200,7 @@ function MessageBubbleImpl({ message }: { message: ChatMessage }) {
         )}
 
         {meta?.report_back && (
-          <div className="rounded-xl border border-[#ff3b21]/30 bg-[#ff3b21]/[0.04] px-3 py-2.5 text-sm text-neutral-800">
+          <div className="rounded-xl border border-[#ff3b21]/30 bg-[#ff3b21]/[0.04] px-3 py-2.5 text-sm text-neutral-900">
             <span className="mr-1 font-semibold uppercase tracking-wide text-[11px] text-[#ff3b21]">
               ▸ Try it, then tell me
             </span>
