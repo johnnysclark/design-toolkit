@@ -6,7 +6,7 @@ import { TOOLKIT_NAV } from "@/lib/toolkit-nav";
 // uppercase, and a readable system sans for the long-form statement body.
 // Scoped to the `.di-doc` wrapper.
 
-// The nine tools, each with a tiny inline-SVG mock of how it works and a note on
+// The ten tools, each with a tiny inline-SVG mock of how it works and a note on
 // where it runs. SVGs are static, trusted markup ported verbatim from the
 // teaching statement; injected as-is to keep their (kebab-case) attributes.
 type Tool = { no: string; href: string | null; title: string; runs: React.ReactNode; body: React.ReactNode; mock: string };
@@ -48,17 +48,46 @@ const TOOLS: Tool[] = [
     no: "02",
     title: "Surveyor",
     href: "/site-analysis",
-    runs: "Runs as — Rhino / Grasshopper for the simulation, with a web front for inputs.",
+    runs: "Runs as — a web app; pulls open climate, terrain, and zoning data, exports Rhino-ready files.",
     body: (
       <p>
-        Two jobs in one. First it turns a real parcel into citable evidence — sun path, prevailing wind,
-        climate, zoning and code, hydrology, history — so a student&rsquo;s site claims are sourced, not
-        asserted. Then it lets them push massing and watch the physical consequences move: rotate the
-        building and solar gain shifts; raise it and wind exposure and views change. It makes the link
-        between <em>form</em> and <em>forces</em> legible while a scheme is still soft.
+        Turns a real parcel into citable evidence — sun path, prevailing wind, climate, zoning and code,
+        hydrology, history — so a student&rsquo;s site claims are <em>sourced</em>, not asserted. Hard data
+        is free and cited; AI judgment is tagged for the student to verify. The measured ground, exported
+        clean to Rhino before anything gets designed on it.
       </p>
     ),
-    mock: `<svg viewBox="0 0 640 260" role="img" aria-label="Form finding mock: massing controls, an axonometric box, and performance readouts">
+    mock: `<svg viewBox="0 0 640 230" role="img" aria-label="Surveyor mock: a site parcel under a sun-path arc with prevailing wind and sourced data readouts">
+      <rect width="640" height="230" fill="#fff"/>
+      <path d="M70 150 L210 122 L250 192 L104 212 Z" fill="#f4f4f4" stroke="#111" stroke-width="1.6"/>
+      <text x="78" y="174" font-family="IBM Plex Sans" font-size="11" fill="#777">site</text>
+      <path d="M44 150 A170 110 0 0 1 384 150" fill="none" stroke="#e0a000" stroke-width="1.6" stroke-dasharray="4 5"/>
+      <circle cx="214" cy="42" r="8" fill="#f0c000" stroke="#111" stroke-width="1.2"/>
+      <g stroke="#1A45F0" stroke-width="1.6" fill="#1A45F0"><path d="M300 70 l44 0 m-8 -5 l8 5 l-8 5"/></g>
+      <text x="300" y="60" font-family="IBM Plex Sans" font-size="11" fill="#777">prevailing wind</text>
+      <g font-family="IBM Plex Sans" font-size="12.5" fill="#111">
+        <text x="430" y="98">climate · 6a</text>
+        <text x="430" y="126">zoning · R-4</text>
+        <text x="430" y="154">slope · 4%</text>
+        <text x="430" y="182">creek · 80m</text>
+      </g>
+      <g font-family="IBM Plex Sans" font-size="10" fill="#1A45F0"><text x="582" y="98">cited</text><text x="582" y="126">cited</text></g>
+    </svg>`
+  },
+  {
+    no: "03",
+    title: "Eco-Architect",
+    href: "/site-design",
+    runs: "Runs as — a zero-build web app; exports native Rhino 8 + Grasshopper python.",
+    body: (
+      <p>
+        Push massing and watch the physical consequences move: rotate the building and solar gain shifts;
+        raise it and wind exposure and views change. Encode design intent as testable <em>rules</em>, then
+        round-trip the same constraints to Rhino 8 / Grasshopper. It makes the link between <em>form</em> and{" "}
+        <em>forces</em> legible while a scheme is still soft.
+      </p>
+    ),
+    mock: `<svg viewBox="0 0 640 260" role="img" aria-label="Eco-Architect mock: massing controls, an axonometric box, and performance readouts">
       <rect width="640" height="260" fill="#fff"/>
       <g font-family="IBM Plex Sans" font-size="12" fill="#777">
         <text x="24" y="44">orientation</text><line x1="24" y1="54" x2="200" y2="54" stroke="#ddd" stroke-width="3"/><circle cx="80" cy="54" r="7" fill="#1A45F0"/>
@@ -77,6 +106,34 @@ const TOOLS: Tool[] = [
         <text x="400" y="232" fill="#777">wind</text><rect x="400" y="238" width="50" height="6" fill="#111"/>
         <text x="470" y="232" fill="#777">view</text><rect x="470" y="238" width="95" height="6" fill="#111"/>
       </g>
+    </svg>`
+  },
+  {
+    no: "04",
+    title: "Cartographer",
+    href: "/skills-pathways",
+    runs: "Runs as — a static map + video library; no sign-in.",
+    body: (
+      <p>
+        A trail map of 2D and 3D skills from beginner to advanced. Each step opens a tutorial video and the
+        shared concept notes, with &ldquo;builds on / leads to&rdquo; links and a hand-off to Coach when a
+        student gets stuck. It charts <em>what</em> to learn and in what order; Coach is the tutor for the
+        learning itself.
+      </p>
+    ),
+    mock: `<svg viewBox="0 0 640 200" role="img" aria-label="Cartographer mock: a beginner-to-advanced node trail with a tutorial video">
+      <rect width="640" height="200" fill="#fff"/>
+      <g font-family="IBM Plex Sans" font-size="11" fill="#777"><text x="60" y="40">BEGINNER</text><text x="514" y="40">ADVANCED</text></g>
+      <line x1="90" y1="104" x2="552" y2="104" stroke="#ddd" stroke-width="2"/>
+      <g fill="#1A45F0"><circle cx="90" cy="104" r="9"/><circle cx="244" cy="104" r="9"/></g>
+      <g fill="#fff" stroke="#111" stroke-width="1.6"><circle cx="398" cy="104" r="9"/><circle cx="552" cy="104" r="9"/></g>
+      <g font-family="IBM Plex Sans" font-size="12" fill="#111">
+        <text x="72" y="140">Lines</text><text x="214" y="140">Surfaces</text><text x="372" y="140">Solids</text><text x="508" y="140">Grasshopper</text>
+      </g>
+      <rect x="214" y="50" width="60" height="30" rx="6" fill="#111"/>
+      <path d="M226 58 l10 7 l-10 7 Z" fill="#fff"/>
+      <text x="240" y="69" font-family="IBM Plex Sans" font-size="10.5" fill="#fff">video</text>
+      <line x1="244" y1="80" x2="244" y2="95" stroke="#111" stroke-width="1.4"/>
     </svg>`
   },
   {
@@ -104,41 +161,6 @@ const TOOLS: Tool[] = [
       </g>
       <g font-family="IBM Plex Sans" font-size="10.5" fill="#777">
         <text x="30" y="170">stone · section</text><text x="186" y="170">concrete · light</text><text x="342" y="170">brick · court</text>
-      </g>
-    </svg>`
-  },
-  {
-    no: "04",
-    title: "Portfolio / Storyteller Helper",
-    href: null,
-    runs: "Runs as — LLM chat behind a proxy.",
-    body: (
-      <p>
-        Turns a pile of work into an argument. It pulls a project down to a single defensible thesis,
-        sequences the drawings that prove it, and — for review prep — interviews the student to surface the
-        questions a jury is likely to ask. A coach for narrative and presentation, not a layout engine.
-      </p>
-    ),
-    mock: `<svg viewBox="0 0 640 170" role="img" aria-label="Storyteller mock: a four-beat narrative arc">
-      <rect width="640" height="170" fill="#fff"/>
-      <g font-family="IBM Plex Sans">
-        <rect x="24" y="46" width="130" height="78" rx="6" fill="#f4f4f4" stroke="#ddd"/>
-        <text x="36" y="70" font-size="11" fill="#999">01 · QUESTION</text>
-        <text x="36" y="92" font-size="12.5" fill="#222">What problem</text><text x="36" y="108" font-size="12.5" fill="#222">does it take on?</text>
-        <rect x="186" y="46" width="130" height="78" rx="6" fill="#f4f4f4" stroke="#ddd"/>
-        <text x="198" y="70" font-size="11" fill="#999">02 · SITE</text>
-        <text x="198" y="92" font-size="12.5" fill="#222">Why here?</text>
-        <rect x="348" y="46" width="130" height="78" rx="6" fill="#f4f4f4" stroke="#ddd"/>
-        <text x="360" y="70" font-size="11" fill="#999">03 · MOVE</text>
-        <text x="360" y="92" font-size="12.5" fill="#222">The one</text><text x="360" y="108" font-size="12.5" fill="#222">decision.</text>
-        <rect x="510" y="46" width="106" height="78" rx="6" fill="#f4f4f4" stroke="#ddd"/>
-        <text x="522" y="70" font-size="11" fill="#999">04 · PROOF</text>
-        <text x="522" y="92" font-size="12.5" fill="#222">The drawing</text><text x="522" y="108" font-size="12.5" fill="#222">that shows it.</text>
-      </g>
-      <g stroke="#111" stroke-width="1.4" fill="#111">
-        <path d="M158 85 l16 0 m-5 -4 l6 4 l-6 4"/>
-        <path d="M320 85 l16 0 m-5 -4 l6 4 l-6 4"/>
-        <path d="M482 85 l16 0 m-5 -4 l6 4 l-6 4"/>
       </g>
     </svg>`
   },
@@ -255,10 +277,11 @@ const TOOLS: Tool[] = [
     runs: "Runs as — LLM behind a proxy; each persona is a system prompt.",
     body: (
       <p>
-        A sparring partner, explicitly not a verdict. It adopts a critical persona — a tectonic reading, a
-        social one, a formal one — and gives the lay of the land so a student can find blind spots before
-        review. The caution is built into the framing: one synthetic position among many, to be weighed
-        against a range of human critics, never substituted for them.
+        A review partner, explicitly not a verdict. It adopts a critical persona — tectonic, social, formal —
+        to give the lay of the land and surface blind spots, and it helps build the case for review: pulling a
+        project down to a defensible thesis, sequencing the drawings that prove it, and interviewing the
+        student for the questions a jury will ask. One synthetic position among many — weigh it against human
+        critics, never substitute it for them.
       </p>
     ),
     mock: `<svg viewBox="0 0 640 210" role="img" aria-label="Design critic mock: a lens selector, a critique block, and a caution tag">
@@ -278,7 +301,7 @@ const TOOLS: Tool[] = [
   },
   {
     no: "09",
-    title: "3D Tools",
+    title: "3D Tooling",
     href: "/tools-3d",
     runs: "Runs as — Rhino-coupled, plus a static web viewer.",
     body: (
@@ -422,15 +445,16 @@ export default function Overview() {
               instruments that supply the logics, language, and data behind a judgment while leaving the
               judgment to the student
             </span>
-            . I&rsquo;ve built nine such tools with Claude Code, covering site analysis, precedent research,
-            skills coaching, critique, portfolio narrative, studio culture, and accessibility. They&rsquo;re
+            . I&rsquo;ve built ten such tools with Claude Code, covering site analysis and design, precedent
+            research, skills coaching, drawing and 3D production, critique and portfolio, studio culture, and
+            accessibility. They&rsquo;re
             taught inside studio sequences and a short series of agentic-coding workshops, in a &ldquo;trust
             but verify&rdquo; stance that values iteration and edge-case hunting over fluent-sounding answers.
           </p>
           <div className="glance">
             <div className="gcell">
               <div className="gk">What</div>
-              <div className="gv">Nine AI tools for the design studio, built in Claude Code.</div>
+              <div className="gv">Ten AI tools for the design studio, built in Claude Code.</div>
             </div>
             <div className="gcell">
               <div className="gk">How it&rsquo;s taught</div>
@@ -446,7 +470,7 @@ export default function Overview() {
         <div className="khead">
           <h2>The toolkit, in examples</h2>
           <p>
-            Nine tools, each with a simple mock of how it works and a note on where it runs. Fuller context
+            Ten tools, each with a simple mock of how it works and a note on where it runs. Fuller context
             is in the statement below.
           </p>
         </div>
@@ -505,9 +529,10 @@ export default function Overview() {
             design and the process that produced it. Teaching students to work with AI follows the same
             tenets as teaching them to be resilient designers — which is why building these tools should
             reinforce the core of the studio rather than replace it. The toolkit is detailed in the examples
-            above — a production tutor, a site analyzer and form generator, a precedent librarian, a
-            portfolio coach, the RAP accessibility toolkit, drawing and fabrication widgets, a studio pin-up
-            wall, a design critic, and a set of 3D on-ramps — each at some stage of production, all built
+            above — Surveyor for site analysis and Eco-Architect for design with context, Coach the production
+            tutor and Cartographer the skills map, a precedent Librarian, a studio Archivist, a Critic for
+            critique and portfolio, 2D and 3D production tooling, and the RAP accessibility project — each at
+            some stage of production, all built
             with Claude Code.
           </p>
 

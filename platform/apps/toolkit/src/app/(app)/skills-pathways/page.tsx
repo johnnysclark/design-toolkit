@@ -6,7 +6,7 @@ import TrailBoard from "./TrailBoard";
 // beginner to advanced across 2D and 3D software, and watch the tutorial behind
 // each step.
 export const metadata = {
-  title: "Skills Pathways · Design Toolkit",
+  title: "Cartographer · Design Toolkit",
   description:
     "A beginner-to-advanced map of 2D and 3D digital skills, with a tutorial video behind every step."
 };
@@ -14,7 +14,7 @@ export const metadata = {
 export default function SkillsPathwaysPage() {
   return (
     <div>
-      <h1 className="text-3xl font-semibold tracking-tight">Skills Pathways</h1>
+      <h1 className="text-3xl font-semibold tracking-tight">Cartographer</h1>
       <p className="mt-2 max-w-2xl text-neutral-900">
         A trail map for digital skills — how to climb from beginner to advanced in
         both 2D and 3D software, aimed at studio work: modeling, representation,
