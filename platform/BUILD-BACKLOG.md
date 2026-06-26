@@ -100,11 +100,15 @@ paragraphs of student-facing basics) so the page is useful before any video exis
 
 ### T7-followup · Skills Pathways — deepen the content (good overnight-bot task)
 A self-contained, parallelizable content job — ideal for a workflow/overnight agents. **Do not
-touch the schema or UI; only edit `lib/skills-pathways/pathways.ts`.** Each unit of work = one
-`SkillNode`.
-- **Deepen guides:** expand thin `guide[]` entries; add a concrete "try this in studio" exercise
-  paragraph and common-mistake callouts. Keep the studio (not CD-production) framing; keep them
-  accurate (trust-but-verify — these teach students).
+touch the schema or UI; only edit the two content files** — `lib/skills-pathways/pathways.ts`
+(the `guide[]` prose) and `lib/skills-pathways/practice.ts` (per-node `keyMoves` cheat-sheet +
+`tryThis` exercise + `watchOut` pitfall, keyed by node id). Each unit of work = one node.
+- **Content pass 2 — DONE (2026-06-25):** added `practice.ts` — every node now has a command/tool
+  cheat-sheet, a concrete studio exercise, and a common-mistake callout, rendered under "The
+  basics" in the step modal.
+- **Deepen further:** sharpen thin guides; add more `keyMoves`/exercises; make `watchOut` notes
+  more specific. Keep the studio (not CD-production) framing; keep them accurate (trust-but-verify
+  — these teach students).
 - **Widen coverage:** add steps for gaps (e.g. Rhino `Make2D` cleanup, GH Kangaroo basics,
   Photoshop sky/entourage, InDesign data-merge for plates), still ≥3 per level per software.
   Consider new lanes only via the existing `Discipline` set in `lib/skills-coach/concepts.ts`.

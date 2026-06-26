@@ -11,6 +11,7 @@ import {
   type SkillNode
 } from "@/lib/skills-pathways/pathways";
 import { DISCIPLINES } from "@/lib/skills-coach/concepts";
+import { getPractice } from "@/lib/skills-pathways/practice";
 import LazyVideo from "./LazyVideo";
 
 function disciplineLabel(id: SkillNode["discipline"]): string {
@@ -32,6 +33,7 @@ export default function NodeModal({
 }) {
   const closeRef = useRef<HTMLButtonElement | null>(null);
   const next = unlocks(node.id);
+  const practice = getPractice(node.id);
 
   // Focus the close button on open, restore body scroll on close, Esc to close.
   useEffect(() => {
@@ -107,6 +109,49 @@ export default function NodeModal({
                   <p key={i}>{para}</p>
                 ))}
               </div>
+            </section>
+          )}
+
+          {/* key moves — quick command / tool cheat-sheet */}
+          {practice?.keyMoves && practice.keyMoves.length > 0 && (
+            <section>
+              <h3 className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-neutral-900">
+                Key moves
+              </h3>
+              <div className="flex flex-wrap gap-1.5">
+                {practice.keyMoves.map((m, i) => (
+                  <code
+                    key={i}
+                    className="rounded-md bg-neutral-100 px-2 py-1 font-mono text-[12.5px] text-neutral-900"
+                  >
+                    {m}
+                  </code>
+                ))}
+              </div>
+            </section>
+          )}
+
+          {/* try this — a concrete studio exercise */}
+          {practice?.tryThis && (
+            <section>
+              <h3 className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-neutral-900">
+                Try this in studio
+              </h3>
+              <p className="rounded-xl border border-l-4 border-neutral-200 border-l-[#ff3b21] bg-neutral-50 p-3 text-[15px] leading-relaxed text-neutral-900">
+                {practice.tryThis}
+              </p>
+            </section>
+          )}
+
+          {/* watch out — the common pitfall + fix */}
+          {practice?.watchOut && (
+            <section>
+              <h3 className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-neutral-900">
+                Watch out for
+              </h3>
+              <p className="rounded-xl border border-l-4 border-amber-200 border-l-amber-400 bg-amber-50 p-3 text-[15px] leading-relaxed text-neutral-900">
+                {practice.watchOut}
+              </p>
             </section>
           )}
 
