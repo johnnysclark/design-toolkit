@@ -1,4 +1,25 @@
 <!-- ───────────────────────────── CURRENT STATE (top) ───────────────────────────── -->
+> **Design Critic / "Critic" — BUILT (2026-06-26, branch `claude/design-critic-agent-plan-07tb1o`,
+> not yet merged).** Backlog **T3** shipped as the full three-mode critic at **`/design-critic`**,
+> built on the Librarian pattern. One multi-mode route `api/design-critic/route.ts` (Sonnet 4.6,
+> **401 for anon**, logs every run to `tool_runs`) dispatching on `mode`:
+> **Jury** (adoptable critic personas — technical · theory · client-pragmatist · accessibility ·
+> context-urbanist · materials-maker — each makes "the strongest case it fails" over uploaded work
+> + a thesis), **Review Prep** (crit weather report forecasting 5–8 jury questions tagged
+> fair/loaded/out-of-scope + rebuttal rehearsal), and **Portfolio** (a voice-preserving two-pane
+> editor — read-only AI scaffold, the student rewrites, a "% in your words" meter + export-lock,
+> then the critic attacks the **student's own words**; plus a defensible-thesis builder). Every
+> factual claim is a tagged CLAIM (✓ supported / ? verify / ⚠ likely-wrong). New tables +
+> owner-only RLS + a private `critic` bucket in `supabase/migrations/0005_design_critic.sql`
+> (`critic_sessions` / `critic_critiques` / `critic_portfolio` / `critic_rebuttals`) — **apply in
+> the Supabase SQL editor** before the tool works in prod. Slice: `(app)/design-critic/*`,
+> `api/design-critic/route.ts`, `lib/anthropic/critic-prompts.ts`. Nav status flipped to **live**
+> (`requiresAuth: true`). Image upload + `prepareImage` reuse the Librarian flow. Export-lock is a
+> UX nudge (commented as such); the real server guard refuses self-attack on empty student text.
+> Build (types) green; **not browser-screenshot-tested and not run live** (no Supabase/Anthropic
+> creds in the build env) — open `/design-critic` signed-in to eyeball it. Next: trace/Markdown
+> export, desk-crit transcript ingestion, screen-reader-first portfolio export.
+>
 > **RAP Studio — BUILT (2026-06-25, branch `feat/rap-studio`, worktree `design-toolkit-rap`,
 > not yet merged).** A runnable, interactive slice of the Radical Accessibility Project at
 > **`/rap/studio`** (linked from the `/rap` page; no new nav entry). One canonical in-browser

@@ -58,7 +58,8 @@ export const TOOLKIT_NAV: ToolItem[] = [
     href: "/design-critic",
     label: "Critic",
     blurb: "Critique + portfolio narrative — adoptable personas, a defensible thesis, and review prep. Use with caution; consult humans too.",
-    status: "soon"
+    status: "live",
+    requiresAuth: true
   },
   {
     href: "/media-2d",
