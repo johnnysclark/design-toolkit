@@ -5,10 +5,10 @@
 // so a clean 1-bit image is exactly the deliverable. Client-side via <canvas>.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { buildPlanModel } from "./planModel";
+import { buildPlanModel, PLAN_WEIGHTS } from "./planModel";
 import type { State } from "../engine/types";
 
-const WEIGHT_FT = { light: 0.18, heavy: 0.55, corridor: 0.3 } as const;
+const WEIGHT_FT = PLAN_WEIGHTS;
 
 /** Draw the plan to a canvas, then threshold to a crisp 1-bit black/white. */
 export function buildPiafCanvas(state: State, pxWidth = 1700, levelFilter: number | null = null): HTMLCanvasElement {

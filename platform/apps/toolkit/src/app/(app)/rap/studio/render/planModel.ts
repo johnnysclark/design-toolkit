@@ -23,6 +23,11 @@ export interface PlanModel {
   bounds: { minX: number; minY: number; maxX: number; maxY: number };
 }
 
+/** Stroke weights in FEET, shared by the on-screen SVG and the PIAF raster so
+ *  screen == print. (Deliberately not derived from state.style.*_lineweight_mm,
+ *  which is the desktop Rhino renderer's mm scale — a different ratio.) */
+export const PLAN_WEIGHTS = { light: 0.18, heavy: 0.55, corridor: 0.3 } as const;
+
 function rectCorners(x: number, y: number, w: number, h: number, t: Transform): Pt[] {
   return [
     applyTransform({ x, y }, t),
@@ -84,9 +89,10 @@ export function buildPlanModel(state: State, levelFilter: number | null = null):
       prims.push({ kind: "fill", pts: rectCorners(wRect.x, wRect.y, wRect.w, wRect.h, t) });
     }
 
-    // Columns (filled circles).
+    // Columns (filled squares — matches the 3D + STL box footprint, so a reader
+    // feels the same shape on swell paper and in the print).
     for (const col of bay.columns) {
-      prims.push({ kind: "circle", c: applyTransform({ x: col.x, y: col.y }, t), r: col.r, fill: true });
+      prims.push({ kind: "fill", pts: rectCorners(col.x - col.r, col.y - col.r, col.r * 2, col.r * 2, t) });
     }
 
     // Door swings (leaf + arc).
@@ -130,9 +136,10 @@ export function buildPlanModel(state: State, levelFilter: number | null = null):
     }
   }
 
-  // Free columns.
+  // Free columns (square footprint to match 3D + STL).
+  const idT = { ox: 0, oy: 0, rot: 0 };
   for (const c of scene.freeColumns) {
-    prims.push({ kind: "circle", c: { x: c.x, y: c.y }, r: c.size / 2, fill: true });
+    prims.push({ kind: "fill", pts: rectCorners(c.x - c.size / 2, c.y - c.size / 2, c.size, c.size, idT) });
   }
 
   // Room labels (drawn last so walls don't cover them).
@@ -152,15 +159,20 @@ export function buildPlanModel(state: State, levelFilter: number | null = null):
     }
   }
 
-  // Pad bounds a little for labels/margins.
+  // Grow bounds to include label/braille glyph boxes — geometry-only bounds
+  // would clip text on south/east-edge or rotated bays, and the braille key is
+  // the primary non-visual deliverable. (Monospace ≈ 0.62 em advance.)
+  let { minX, minY, maxX, maxY } = scene.bounds;
+  for (const p of prims) {
+    if (p.kind !== "text") continue;
+    const w = p.text.length * p.size * 0.62;
+    const x0 = p.anchor === "middle" ? p.at.x - w / 2 : p.at.x;
+    const x1 = p.anchor === "middle" ? p.at.x + w / 2 : p.at.x + w;
+    minX = Math.min(minX, x0);
+    maxX = Math.max(maxX, x1);
+    minY = Math.min(minY, p.at.y - p.size);
+    maxY = Math.max(maxY, p.at.y + p.size);
+  }
   const pad = 6;
-  return {
-    prims,
-    bounds: {
-      minX: scene.bounds.minX - pad,
-      minY: scene.bounds.minY - pad,
-      maxX: scene.bounds.maxX + pad,
-      maxY: scene.bounds.maxY + pad
-    }
-  };
+  return { prims, bounds: { minX: minX - pad, minY: minY - pad, maxX: maxX + pad, maxY: maxY + pad } };
 }

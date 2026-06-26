@@ -223,8 +223,13 @@ export function deriveGeometry(state: State, levelFilter: number | null = null):
         walls.push({ x: W - th, y: a, w: th, h: b - a });
     }
 
-    // Aperture symbols (door swings, window/portal marks) for ALL apertures.
+    // Aperture symbols — only where a wall gap actually exists (perimeter edge +
+    // walls enabled), so a door/window isn't drawn floating on an interior line.
     for (const ap of bay.apertures) {
+      const perimeter =
+        bay.walls.enabled &&
+        ((ap.axis === "x" && (ap.gridline === 0 || ap.gridline === ny)) || (ap.axis === "y" && (ap.gridline === 0 || ap.gridline === nx)));
+      if (!perimeter) continue;
       // Anchor point + direction of the opening line, in local coords.
       let p0: Pt;
       let dir: Pt; // unit-ish direction the opening runs

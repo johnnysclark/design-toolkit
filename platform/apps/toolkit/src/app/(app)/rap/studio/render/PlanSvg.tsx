@@ -1,10 +1,10 @@
 // 2D tactile plan — renders the shared plan model to SVG (north-up, 1-bit look).
 // The same model rasterises to the PIAF swell-paper PNG, so screen == print.
 
-import { buildPlanModel, type DrawPrim } from "./planModel";
+import { buildPlanModel, PLAN_WEIGHTS, type DrawPrim } from "./planModel";
 import type { State } from "../engine/types";
 
-const WEIGHTS = { light: 0.18, heavy: 0.55, corridor: 0.3 } as const;
+const WEIGHTS = PLAN_WEIGHTS;
 
 export default function PlanSvg({ state, className, levelFilter = null }: { state: State; className?: string; levelFilter?: number | null }) {
   const { prims, bounds } = buildPlanModel(state, levelFilter);
