@@ -545,7 +545,7 @@ function listBays(state: State): string {
 /** Whole-to-Part (Macro/Meso/Micro) text — the paper's description schema.
  *  Now reads back the full building: site, levels + program mix, bays, free
  *  walls, rooms, columns, openings. */
-export function describe(state: State): string {
+export function describe(state: State, levelFilter: number | null = null): string {
   const names = Object.keys(state.bays);
   const siteDesc = state.site.boundary
     ? `an irregular infill lot (${state.site.boundary.length}-sided, within ${state.site.width}×${state.site.height} ft)`
@@ -562,9 +562,11 @@ export function describe(state: State): string {
     `${names.length} structural bay${names.length === 1 ? "" : "s"}, ${state.rooms.length} room${state.rooms.length === 1 ? "" : "s"}, ` +
     `${state.walls.length} free wall${state.walls.length === 1 ? "" : "s"}. Program: ${programMix}.`;
 
-  // Meso — one block per level, listing its rooms + bays.
+  // Meso — one block per level, listing its rooms (scoped if a level is active).
   const meso = state.levels
-    .map((lvl, li) => {
+    .map((lvl, li) => ({ lvl, li }))
+    .filter(({ li }) => levelFilter === null || li === levelFilter)
+    .map(({ lvl, li }) => {
       const rooms = state.rooms.filter((r) => r.level === li);
       const roomTxt = rooms.length ? rooms.map((r) => `${r.name} [${r.use}, ${(r.size[0] * r.size[1]).toFixed(0)} sf]`).join("; ") : "no rooms";
       return `MESO — Level ${li} (${lvl.label}, z=${lvl.z} ft): ${roomTxt}.`;
@@ -592,8 +594,14 @@ export function describe(state: State): string {
   const openMicro = state.openings.length
     ? [`MICRO — Wall openings: ${state.openings.map((o) => `${o.type} ${o.id} on ${o.wallId}`).join(", ")}.`]
     : [];
+  // Atria/voids exist in the 2D plan — surface them in the read-back too.
+  const atria = Object.values(state.bays).filter((b) => b.void_center && b.void_size);
+  const voidMicro = atria.length
+    ? [`MICRO — Atria/voids: ${atria.map((b) => `${b.void_size![0]}×${b.void_size![1]} ft at (${b.void_center![0]}, ${b.void_center![1]})`).join(", ")}.`]
+    : [];
+  const scope = levelFilter === null ? [] : [`SCOPE — Level ${levelFilter} only (matches the filtered PIAF / STL export).`, ""];
 
-  return [macro, "", meso, ...orphanBlock, "", ...bayMicro, ...wallMicro, ...openMicro].join("\n");
+  return [...scope, macro, "", meso, ...orphanBlock, "", ...bayMicro, ...wallMicro, ...openMicro, ...voidMicro].join("\n");
 }
 
 // ─── Dispatcher ──────────────────────────────────────────────────────────────

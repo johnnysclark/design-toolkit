@@ -169,7 +169,7 @@ export default function RapStudio({ signedIn }: { signedIn: boolean }) {
   };
   const reset = () => runCommand("reset");
 
-  const readback = describe(state);
+  const readback = describe(state, activeLevel);
   const bayList = Object.values(state.bays);
 
   return (

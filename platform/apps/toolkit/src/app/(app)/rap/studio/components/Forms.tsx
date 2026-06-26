@@ -12,6 +12,41 @@ import type { State } from "../engine/types";
 const fieldCls = "rounded border-2 border-neutral-900 px-2 py-1 text-sm text-neutral-900 outline-none focus:border-[#ff3b21]";
 const labelCls = "flex flex-col gap-1 text-xs font-semibold text-neutral-900";
 
+// A numeric field that commits ONCE — on blur or Enter — not on every keystroke.
+// Uncontrolled (defaultValue + key) so it resyncs when the value changes via
+// another channel; empty/invalid input reverts to the current value.
+function NumField({ label, value, min, step, onCommit }: { label: string; value: number; min?: number; step?: number; onCommit: (n: number) => void }) {
+  const commit = (el: HTMLInputElement) => {
+    const raw = el.value.trim();
+    const n = Number(raw);
+    if (raw === "" || !Number.isFinite(n)) {
+      el.value = String(value);
+      return;
+    }
+    onCommit(n);
+  };
+  return (
+    <label className={labelCls}>
+      {label}
+      <input
+        type="number"
+        min={min}
+        step={step}
+        defaultValue={value}
+        key={value}
+        className={fieldCls}
+        onBlur={(e) => commit(e.currentTarget)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") {
+            e.preventDefault();
+            commit(e.currentTarget);
+          }
+        }}
+      />
+    </label>
+  );
+}
+
 export default function Forms({ state, onCommand }: { state: State; onCommand: (raw: string) => void }) {
   const bayNames = Object.keys(state.bays);
   const [sel, setSel] = useState(bayNames[0] ?? "");
@@ -21,6 +56,13 @@ export default function Forms({ state, onCommand }: { state: State; onCommand: (
   }, [state, sel, bayNames]);
 
   const bay = state.bays[sel];
+
+  // Rotation shows a live local value while dragging but only commits a command
+  // on release, so a drag doesn't flood the log / speech / Rhino auto-push.
+  const [rotDisplay, setRotDisplay] = useState(0);
+  useEffect(() => {
+    if (bay) setRotDisplay(bay.rotation_deg);
+  }, [bay?.rotation_deg, sel]);
 
   const addBay = () => {
     // next free single-letter name
@@ -61,37 +103,29 @@ export default function Forms({ state, onCommand }: { state: State; onCommand: (
         <>
           {/* Grid + spacing */}
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-            <label className={labelCls}>
-              Modules X
-              <input type="number" min={1} className={fieldCls} value={bay.bays[0]} onChange={(e) => onCommand(`set bay ${sel} bays ${Math.max(1, +e.target.value)} ${bay.bays[1]}`)} />
-            </label>
-            <label className={labelCls}>
-              Modules Y
-              <input type="number" min={1} className={fieldCls} value={bay.bays[1]} onChange={(e) => onCommand(`set bay ${sel} bays ${bay.bays[0]} ${Math.max(1, +e.target.value)}`)} />
-            </label>
-            <label className={labelCls}>
-              Spacing X (ft)
-              <input type="number" min={1} className={fieldCls} value={bay.spacing[0]} onChange={(e) => onCommand(`set bay ${sel} spacing ${Math.max(1, +e.target.value)} ${bay.spacing[1]}`)} />
-            </label>
-            <label className={labelCls}>
-              Spacing Y (ft)
-              <input type="number" min={1} className={fieldCls} value={bay.spacing[1]} onChange={(e) => onCommand(`set bay ${sel} spacing ${bay.spacing[0]} ${Math.max(1, +e.target.value)}`)} />
-            </label>
+            <NumField label="Modules X" value={bay.bays[0]} min={1} onCommit={(n) => onCommand(`set bay ${sel} bays ${Math.max(1, Math.round(n))} ${bay.bays[1]}`)} />
+            <NumField label="Modules Y" value={bay.bays[1]} min={1} onCommit={(n) => onCommand(`set bay ${sel} bays ${bay.bays[0]} ${Math.max(1, Math.round(n))}`)} />
+            <NumField label="Spacing X (ft)" value={bay.spacing[0]} min={1} onCommit={(n) => onCommand(`set bay ${sel} spacing ${Math.max(1, n)} ${bay.spacing[1]}`)} />
+            <NumField label="Spacing Y (ft)" value={bay.spacing[1]} min={1} onCommit={(n) => onCommand(`set bay ${sel} spacing ${bay.spacing[0]} ${Math.max(1, n)}`)} />
           </div>
 
           {/* Origin + rotation */}
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-            <label className={labelCls}>
-              Origin X
-              <input type="number" className={fieldCls} value={bay.origin[0]} onChange={(e) => onCommand(`set bay ${sel} origin ${+e.target.value} ${bay.origin[1]}`)} />
-            </label>
-            <label className={labelCls}>
-              Origin Y
-              <input type="number" className={fieldCls} value={bay.origin[1]} onChange={(e) => onCommand(`set bay ${sel} origin ${bay.origin[0]} ${+e.target.value}`)} />
-            </label>
+            <NumField label="Origin X" value={bay.origin[0]} onCommit={(n) => onCommand(`set bay ${sel} origin ${n} ${bay.origin[1]}`)} />
+            <NumField label="Origin Y" value={bay.origin[1]} onCommit={(n) => onCommand(`set bay ${sel} origin ${bay.origin[0]} ${n}`)} />
             <label className={`${labelCls} col-span-2`}>
-              Rotation {bay.rotation_deg}°
-              <input type="range" min={0} max={90} step={5} value={bay.rotation_deg} onChange={(e) => onCommand(`set bay ${sel} rotation ${+e.target.value}`)} aria-label="Bay rotation in degrees" />
+              Rotation {rotDisplay}°
+              <input
+                type="range"
+                min={0}
+                max={90}
+                step={5}
+                value={rotDisplay}
+                onChange={(e) => setRotDisplay(+e.target.value)}
+                onPointerUp={() => onCommand(`set bay ${sel} rotation ${rotDisplay}`)}
+                onKeyUp={() => onCommand(`set bay ${sel} rotation ${rotDisplay}`)}
+                aria-label="Bay rotation in degrees"
+              />
             </label>
           </div>
 
@@ -102,10 +136,7 @@ export default function Forms({ state, onCommand }: { state: State; onCommand: (
               <input type="checkbox" checked={bay.walls.enabled} onChange={(e) => onCommand(`wall ${sel} ${e.target.checked ? "on" : "off"}`)} />
               Walls
             </label>
-            <label className={labelCls}>
-              Wall thickness (ft)
-              <input type="number" min={0.1} step={0.1} className={fieldCls} value={bay.walls.thickness} onChange={(e) => onCommand(`wall ${sel} thickness ${Math.max(0.1, +e.target.value)}`)} />
-            </label>
+            <NumField label="Wall thickness (ft)" value={bay.walls.thickness} min={0.1} step={0.1} onCommit={(n) => onCommand(`wall ${sel} thickness ${Math.max(0.1, n)}`)} />
             <label className="flex items-center gap-2 text-sm font-semibold">
               <input type="checkbox" checked={bay.corridor.enabled} onChange={(e) => onCommand(`corridor ${sel} ${e.target.checked ? "on" : "off"}`)} />
               Corridor
@@ -119,10 +150,7 @@ export default function Forms({ state, onCommand }: { state: State; onCommand: (
                     <option value="y">y</option>
                   </select>
                 </label>
-                <label className={labelCls}>
-                  Corridor width (ft)
-                  <input type="number" min={1} className={fieldCls} value={bay.corridor.width} onChange={(e) => onCommand(`corridor ${sel} width ${Math.max(1, +e.target.value)}`)} />
-                </label>
+                <NumField label="Corridor width (ft)" value={bay.corridor.width} min={1} onCommit={(n) => onCommand(`corridor ${sel} width ${Math.max(1, n)}`)} />
               </>
             )}
           </fieldset>

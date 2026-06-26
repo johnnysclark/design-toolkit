@@ -30,7 +30,6 @@ const USE_COLOR: Record<string, string> = {
 function Model({ state, levelFilter }: { state: State; levelFilter: number | null }) {
   const scene = useMemo(() => deriveGeometry(state, levelFilter), [state, levelFilter]);
   const wallH = state.tactile3d.wall_height;
-  const colSize = state.style.column_size;
   const floorT = state.tactile3d.floor_thickness;
   const levelZ = (lvl: number) => scene.levels[lvl]?.z ?? 0;
 
@@ -62,7 +61,7 @@ function Model({ state, levelFilter }: { state: State; levelFilter: number | nul
             )}
             {bay.columns.map((c, i) => (
               <mesh key={`c${i}`} position={[c.x, z + wallH / 2, c.y]} castShadow>
-                <boxGeometry args={[colSize, wallH, colSize]} />
+                <boxGeometry args={[c.r * 2, wallH, c.r * 2]} />
                 <meshStandardMaterial color="#1a1a1a" />
               </mesh>
             ))}
