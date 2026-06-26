@@ -68,7 +68,7 @@ export default function RapStudio({ signedIn }: { signedIn: boolean }) {
   const [changed, setChanged] = useState<Set<string>>(new Set());
   const [live, setLive] = useState(""); // aria-live announcement
   const [speak, setSpeak] = useState(false);
-  const [authorTab, setAuthorTab] = useState<AuthorTab>("console");
+  const [authorTab, setAuthorTab] = useState<AuthorTab>("assistant");
   const [viewTab, setViewTab] = useState<ViewTab>("3d");
   const [activeLevel, setActiveLevel] = useState<number | null>(null); // null = all levels
   const idRef = useRef(1);
@@ -224,8 +224,11 @@ export default function RapStudio({ signedIn }: { signedIn: boolean }) {
     download("rap-tactile.stl", new Blob([buildStl(state, activeLevel)], { type: "model/stl" }));
     announce(`OK: Exported the STL (${scopeLabel}).`);
   };
-  const reset = () => {
-    if (typeof window === "undefined" || window.confirm("Reset to the sample model? Your current model will be discarded — you can Undo this.")) runCommand("reset");
+  const restoreSample = () => {
+    if (typeof window === "undefined" || window.confirm("Restore the sample building? Your current model will be discarded — you can Undo this.")) runCommand("reset");
+  };
+  const startFromScratch = () => {
+    if (typeof window === "undefined" || window.confirm("Start from scratch with an empty model? Your current model will be discarded — you can Undo this.")) runCommand("clear");
   };
 
   const readback = describe(state, activeLevel);
@@ -250,13 +253,16 @@ export default function RapStudio({ signedIn }: { signedIn: boolean }) {
           <input type="checkbox" checked={speak} onChange={(e) => setSpeak(e.target.checked)} />
           Speak confirmations
         </label>
-        <ToolbarBtn onClick={reset}>Reset</ToolbarBtn>
+        <ToolbarBtn onClick={startFromScratch}>Start from scratch</ToolbarBtn>
+        <ToolbarBtn onClick={restoreSample}>Restore sample</ToolbarBtn>
       </div>
 
       <p className="text-sm text-neutral-900">
-        Loaded with a <b>sample building</b> (Bay A — ground-floor retail + lobby, two levels) so you can explore. Edit it in the{" "}
-        <b>Author</b> panel below — type <code className="font-mono">help</code> in the console for every command. <b>Reset</b> restores the
-        sample; <code className="font-mono">clear</code> empties the model.
+        Loaded with a <b>sample building</b> (Bay A — ground-floor retail + lobby, two levels) so you can see what the tool does. The{" "}
+        <b>Assistant</b> is the main way to author: describe what you want in plain language and it writes the Controller commands for you —
+        the same way a designer directs <b>Claude Code</b> in a terminal. Every change is read back in all channels (plan, 3D, text, Braille,
+        state tree). Prefer to type commands yourself? Switch to the <b>Console</b>. Hit <b>Start from scratch</b> to build your own from an
+        empty model, or <b>Restore sample</b> to bring the example back.
       </p>
 
       {/* Row 1 — visual model + canonical state */}
@@ -292,16 +298,20 @@ export default function RapStudio({ signedIn }: { signedIn: boolean }) {
       <div className="grid gap-5 lg:grid-cols-2">
         <Panel
           title="Author"
-          right={<Tabs label="Choose an authoring channel" tabs={[["console", "Console"], ["forms", "Forms"], ["assistant", "Assistant"]]} active={authorTab} onPick={(t) => setAuthorTab(t as AuthorTab)} />}
+          right={<Tabs label="Choose an authoring channel" tabs={[["assistant", "Assistant"], ["console", "Console"], ["forms", "Forms"]]} active={authorTab} onPick={(t) => setAuthorTab(t as AuthorTab)} />}
         >
           <div className="min-h-[20rem]">
             {authorTab === "console" && <Console log={log} history={history} onCommand={runCommand} />}
             {authorTab === "forms" && <Forms state={state} onCommand={runCommand} />}
             {authorTab === "assistant" && (
               <div className="space-y-2">
+                <p className="text-xs text-neutral-900">
+                  Ask in plain language; the assistant replies and shows the exact <b>commands it ran</b> — nothing happens you can&apos;t see.
+                  This models directing <b>Claude Code</b> in a terminal: you describe intent, it writes the precise edits.
+                </p>
                 {!signedIn && (
                   <p className="rounded-md bg-[#fff2f0] px-3 py-2 text-xs text-neutral-900">
-                    The AI assistant needs sign-in (it spends the studio's API budget). The console, forms, and exports all work signed-out.
+                    The AI assistant needs sign-in (it spends the studio&apos;s API budget). The console, forms, and exports all work signed-out.
                   </p>
                 )}
                 <AgentPanel onSubmit={runAgent} />
@@ -335,6 +345,42 @@ export default function RapStudio({ signedIn }: { signedIn: boolean }) {
           onDownloadState={exportState}
           webOnly={{ walls: state.walls.length, columns: state.columns.length, openings: state.openings.length, rooms: state.rooms.length }}
         />
+      </Panel>
+
+      {/* Instructions + helpful tips */}
+      <Panel title="How to use this — instructions & tips">
+        <div className="grid gap-5 text-sm text-neutral-900 md:grid-cols-2">
+          <div>
+            <h3 className="display-font text-xs uppercase tracking-tight text-neutral-900">The idea</h3>
+            <p className="mt-1.5">
+              There is one <b>canonical model</b> (the <code className="font-mono">state.json</code> above). Every way of building —
+              the Assistant, the Console, and the Forms — writes the <i>same</i> commands to it, and every view — the tactile plan, the
+              3D aid, the read-back text, the Braille key, and the state tree — reads from that one model. Change it once, and it&apos;s
+              correct in every channel at the same time. That parity is the whole point: a designer using a screen reader and a designer
+              looking at the plan are working on the identical building.
+            </p>
+            <h3 className="display-font mt-4 text-xs uppercase tracking-tight text-neutral-900">Getting started</h3>
+            <ol className="mt-1.5 list-decimal space-y-1 pl-5">
+              <li>Read the <b>sample building</b> in the views to see what a finished model looks like.</li>
+              <li>Press <b>Start from scratch</b> to empty it (or <b>Restore sample</b> to bring it back).</li>
+              <li>In the <b>Assistant</b>, describe a move — e.g. <i>&ldquo;lay out a lobby and two retail units.&rdquo;</i></li>
+              <li>Watch the commands it ran, and confirm the change in the read-back and the plan.</li>
+              <li>Keep going one move at a time; <b>export</b> when you&apos;re ready to drive Rhino.</li>
+            </ol>
+          </div>
+          <div>
+            <h3 className="display-font text-xs uppercase tracking-tight text-neutral-900">Tips</h3>
+            <ul className="mt-1.5 list-disc space-y-1 pl-5">
+              <li><b>Assistant</b> is fastest for whole moves; <b>Console</b> gives you exact control — type <code className="font-mono">help</code> for every command.</li>
+              <li>Send an assistant request with <b>⌘/Ctrl + Enter</b>.</li>
+              <li>Made a wrong move? <b>Undo</b> / <b>Redo</b> step through your whole history (the Reset/Start-from-scratch buttons are undoable too).</li>
+              <li>Turn on <b>Speak confirmations</b> to hear every change announced aloud.</li>
+              <li>Use the <b>level selector</b> on the model to view and export one floor at a time.</li>
+              <li>The <b>3D view is only a sighted aid</b> — it&apos;s hidden from screen readers. The plan, read-back, and Braille are the real model.</li>
+              <li>Exports — <b>state.json</b>, <b>PIAF PNG</b> (tactile print), <b>STL</b> (3D print), and the <b>command log</b> — all match what&apos;s on screen.</li>
+            </ul>
+          </div>
+        </div>
       </Panel>
 
       {/* Screen-reader announcements for every state change */}
