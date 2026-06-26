@@ -22,15 +22,33 @@ export default function AppShell({
         <button
           type="button"
           onClick={() => setOpen((o) => !o)}
-          aria-label={open ? "Close menu" : "Open menu"}
+          aria-label={open ? "Collapse menu" : "Expand menu"}
           aria-expanded={open}
-          className="display-font px-1 text-2xl leading-none text-neutral-900 transition-colors hover:text-[#ff3b21]"
+          className="px-1 leading-none text-neutral-900 transition-colors hover:text-[#ff3b21]"
         >
-          ☰
+          <svg
+            width="30"
+            height="30"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="3"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+            className={`transition-transform duration-200 ${open ? "" : "rotate-180"}`}
+          >
+            <path d="M19 12 H6" />
+            <path d="M12 6 L6 12 L12 18" />
+          </svg>
         </button>
-        <span className="display-font text-xl uppercase tracking-tight sm:text-2xl">
+        <button
+          type="button"
+          onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
+          className="display-font text-xl uppercase tracking-tight transition-colors hover:text-[#ff3b21] sm:text-2xl"
+        >
           Design Toolkit
-        </span>
+        </button>
         <span className="flex-1" />
         {signedIn ? (
           <form action="/auth/signout" method="post">
@@ -53,10 +71,13 @@ export default function AppShell({
 
       <div className="flex flex-1">
         {open && (
-          <aside className="w-64 shrink-0 border-r border-neutral-200 bg-white pb-28">
-            <SidebarNav items={TOOLKIT_NAV} signedIn={signedIn} />
-            {/* credits — pinned to the bottom of the screen, always visible */}
-            <div className="fixed bottom-0 left-0 z-30 w-64 border-r border-t border-neutral-200 bg-white px-4 py-4 text-xs leading-relaxed text-neutral-900">
+          <aside className="sticky top-14 flex h-[calc(100vh-3.5rem)] w-64 shrink-0 flex-col border-r border-neutral-200 bg-white">
+            {/* nav scrolls only if it's taller than the sidebar — no scrollbar otherwise */}
+            <div className="min-h-0 flex-1 overflow-y-auto">
+              <SidebarNav items={TOOLKIT_NAV} signedIn={signedIn} />
+            </div>
+            {/* credits — pinned to the bottom of the always-visible sidebar */}
+            <div className="shrink-0 border-t border-neutral-200 px-4 py-4 text-xs leading-relaxed text-neutral-900">
               <p className="text-neutral-900">Built by John Clark &amp; Claude, 2026</p>
               <p className="mt-1.5">
                 Feedback?{" "}
