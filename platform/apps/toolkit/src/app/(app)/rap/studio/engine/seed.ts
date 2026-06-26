@@ -63,7 +63,7 @@ export function makeSeedState(): State {
     walls: { enabled: true, thickness: 0.5 },
     apertures: [
       { id: "d1", type: "door", axis: "x", gridline: 0, corner: 28, width: 3, height: 7, hinge: "start", swing: "positive" },
-      { id: "w1", type: "window", axis: "y", gridline: 0, corner: 8, width: 6, height: 4, hinge: "start", swing: "positive" }
+      { id: "win1", type: "window", axis: "y", gridline: 0, corner: 8, width: 6, height: 4, hinge: "start", swing: "positive" }
     ],
     void_center: null,
     void_size: null,
@@ -80,10 +80,33 @@ export function makeSeedState(): State {
       last_saved: "web-studio",
       notes: "Authored in RAP Studio (web)"
     },
-    site: { origin: [0, 0], width: 100, height: 100 },
+    // An irregular urban-infill lot (not a plain rectangle).
+    site: {
+      origin: [0, 0],
+      width: 100,
+      height: 100,
+      boundary: [
+        [8, 6],
+        [92, 6],
+        [92, 78],
+        [60, 94],
+        [8, 78]
+      ]
+    },
     style: { ...DEFAULT_STYLE },
     bays: { A: bayA },
-    levels: [{ name: "ground", z: 0, label: "Ground floor" }],
+    // The building beyond the grid: ground-floor program + an interior partition.
+    walls: [{ id: "iw1", level: 0, a: [18, 32], b: [78, 32], thickness: 0.5 }],
+    rooms: [
+      { id: "r_retail", level: 0, origin: [18, 12], size: [36, 20], name: "Retail", use: "retail", braille: toBraille("Retail") },
+      { id: "r_lobby", level: 0, origin: [54, 12], size: [24, 20], name: "Lobby", use: "lobby", braille: toBraille("Lobby") }
+    ],
+    columns: [],
+    openings: [],
+    levels: [
+      { name: "ground", z: 0, label: "Ground — retail + lobby" },
+      { name: "level2", z: 12, label: "Level 2 — residential" }
+    ],
     tactile3d: { ...DEFAULT_TACTILE3D }
   };
 }

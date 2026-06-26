@@ -76,10 +76,52 @@ export interface BayGeometry {
   label: { x: number; y: number; text: string; braille: string };
   level: number;
 }
+// ── Free elements (world coordinates, no per-bay transform) ──────────────────
+export interface FreeWallSolid {
+  quad: Pt[]; // 4 world points (a filled wall chunk)
+  cx: number;
+  cy: number;
+  len: number;
+  angleDeg: number;
+  start: Pt; // world start corner (for STL box placement)
+}
+export interface FreeWallG {
+  id: string;
+  level: number;
+  thickness: number;
+  height: number;
+  solids: FreeWallSolid[];
+  doors: DoorSwing[]; // world coords, absolute arc angles
+  windows: { a: Pt; b: Pt }[];
+}
+export interface RoomG {
+  id: string;
+  level: number;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  cx: number;
+  cy: number;
+  name: string;
+  use: string;
+  braille: string;
+}
+export interface ColG {
+  id: string;
+  level: number;
+  x: number;
+  y: number;
+  size: number;
+}
+
 export interface SceneGeometry {
-  site: { w: number; h: number; ox: number; oy: number };
+  site: { w: number; h: number; ox: number; oy: number; boundary: Pt[] | null };
   bays: BayGeometry[];
   voids: VoidG[];
+  freeWalls: FreeWallG[];
+  rooms: RoomG[];
+  freeColumns: ColG[];
   levels: Level[];
   /** World-space bounds of everything, for a 2D viewBox. */
   bounds: { minX: number; minY: number; maxX: number; maxY: number };
@@ -112,7 +154,10 @@ function solidSpans(len: number, gaps: Array<[number, number]>): Array<[number, 
   return spans;
 }
 
-export function deriveGeometry(state: State): SceneGeometry {
+/** levelFilter: when set, only elements on that level are emitted (mixed-use
+ *  floor-by-floor view); null = the whole building. */
+export function deriveGeometry(state: State, levelFilter: number | null = null): SceneGeometry {
+  const onLevel = (lvl: number) => levelFilter === null || lvl === levelFilter;
   const bays: BayGeometry[] = [];
   const voids: VoidG[] = [];
   let minX = state.site.origin[0];
@@ -128,6 +173,7 @@ export function deriveGeometry(state: State): SceneGeometry {
   };
 
   for (const [name, bay] of Object.entries(state.bays)) {
+    if (!onLevel(bay.level ?? 0)) continue;
     const [nx, ny] = bay.bays;
     const [sx, sy] = bay.spacing;
     const W = nx * sx;
@@ -177,8 +223,13 @@ export function deriveGeometry(state: State): SceneGeometry {
         walls.push({ x: W - th, y: a, w: th, h: b - a });
     }
 
-    // Aperture symbols (door swings, window/portal marks) for ALL apertures.
+    // Aperture symbols — only where a wall gap actually exists (perimeter edge +
+    // walls enabled), so a door/window isn't drawn floating on an interior line.
     for (const ap of bay.apertures) {
+      const perimeter =
+        bay.walls.enabled &&
+        ((ap.axis === "x" && (ap.gridline === 0 || ap.gridline === ny)) || (ap.axis === "y" && (ap.gridline === 0 || ap.gridline === nx)));
+      if (!perimeter) continue;
       // Anchor point + direction of the opening line, in local coords.
       let p0: Pt;
       let dir: Pt; // unit-ish direction the opening runs
@@ -262,10 +313,96 @@ export function deriveGeometry(state: State): SceneGeometry {
     }
   }
 
+  // ── Free walls (interior + exterior), gapped at their openings ──────────────
+  const freeWalls: FreeWallG[] = [];
+  for (const w of state.walls) {
+    if (!onLevel(w.level)) continue;
+    const [ax, ay] = w.a;
+    const [bx, by] = w.b;
+    const dx = bx - ax;
+    const dy = by - ay;
+    const len = Math.hypot(dx, dy) || 1e-6;
+    const ux = dx / len;
+    const uy = dy / len; // along
+    const nx = -uy;
+    const ny = ux; // normal
+    const angleDeg = (Math.atan2(dy, dx) * 180) / Math.PI;
+    const half = w.thickness / 2;
+    const height = w.height ?? state.tactile3d.wall_height;
+
+    const mine = state.openings.filter((o) => o.wallId === w.id);
+    const ints = mine.map((o) => [o.pos * len - o.width / 2, o.pos * len + o.width / 2] as [number, number]);
+    const solids: FreeWallSolid[] = solidSpans(len, ints).map(([s0, s1]) => {
+      const p0x = ax + ux * s0;
+      const p0y = ay + uy * s0;
+      const p1x = ax + ux * s1;
+      const p1y = ay + uy * s1;
+      return {
+        quad: [
+          { x: p0x + nx * half, y: p0y + ny * half },
+          { x: p1x + nx * half, y: p1y + ny * half },
+          { x: p1x - nx * half, y: p1y - ny * half },
+          { x: p0x - nx * half, y: p0y - ny * half }
+        ],
+        cx: (p0x + p1x) / 2,
+        cy: (p0y + p1y) / 2,
+        len: s1 - s0,
+        angleDeg,
+        start: { x: p0x - nx * half, y: p0y - ny * half }
+      };
+    });
+
+    const doors: DoorSwing[] = [];
+    const windows: { a: Pt; b: Pt }[] = [];
+    for (const o of mine) {
+      const c = o.pos * len;
+      const e0 = { x: ax + ux * (c - o.width / 2), y: ay + uy * (c - o.width / 2) };
+      const e1 = { x: ax + ux * (c + o.width / 2), y: ay + uy * (c + o.width / 2) };
+      if (o.type === "door") {
+        doors.push({
+          hinge: e0,
+          leafEnd: { x: e0.x + nx * o.width, y: e0.y + ny * o.width },
+          radius: o.width,
+          a0: (Math.atan2(uy, ux) * 180) / Math.PI,
+          a1: (Math.atan2(ny, nx) * 180) / Math.PI
+        });
+      } else if (o.type === "window") {
+        windows.push({ a: e0, b: e1 });
+      }
+      // portal = an open gap, no symbol
+    }
+    freeWalls.push({ id: w.id, level: w.level, thickness: w.thickness, height, solids, doors, windows });
+    expand({ x: ax, y: ay });
+    expand({ x: bx, y: by });
+  }
+
+  // ── Rooms (program spaces) ──────────────────────────────────────────────────
+  const rooms: RoomG[] = state.rooms
+    .filter((r) => onLevel(r.level))
+    .map((r) => {
+      const [x, y] = r.origin;
+      const [w, h] = r.size;
+      expand({ x, y });
+      expand({ x: x + w, y: y + h });
+      return { id: r.id, level: r.level, x, y, w, h, cx: x + w / 2, cy: y + h / 2, name: r.name, use: r.use, braille: r.braille };
+    });
+
+  // ── Free columns ────────────────────────────────────────────────────────────
+  const freeColumns: ColG[] = state.columns
+    .filter((c) => onLevel(c.level))
+    .map((c) => ({ id: c.id, level: c.level, x: c.at[0], y: c.at[1], size: c.size }));
+  for (const c of freeColumns) expand({ x: c.x, y: c.y });
+
+  const boundary = state.site.boundary ? state.site.boundary.map(([x, y]) => ({ x, y })) : null;
+  if (boundary) for (const p of boundary) expand(p);
+
   return {
-    site: { w: state.site.width, h: state.site.height, ox: state.site.origin[0], oy: state.site.origin[1] },
+    site: { w: state.site.width, h: state.site.height, ox: state.site.origin[0], oy: state.site.origin[1], boundary },
     bays,
     voids,
+    freeWalls,
+    rooms,
+    freeColumns,
     levels: state.levels,
     bounds: { minX, minY, maxX, maxY }
   };

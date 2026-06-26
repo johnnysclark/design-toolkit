@@ -109,6 +109,9 @@ export default function Console({
           Run
         </button>
       </div>
+      <p className="mt-1.5 text-xs text-neutral-900">
+        Type <code className="font-mono">help</code> for the full command list · <kbd>↑</kbd> / <kbd>↓</kbd> for history.
+      </p>
     </div>
   );
 }

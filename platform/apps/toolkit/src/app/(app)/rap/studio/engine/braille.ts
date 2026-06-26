@@ -38,6 +38,7 @@ const PUNCT: Record<string, string> = {
 
 const CAPITAL = "⠠"; // dots 6
 const NUMBER = "⠼"; // dots 3456
+const LETTER_SIGN = "⠰"; // dots 56 — terminates number mode before a–j
 
 /** Convert ASCII text to Unicode Grade-1 Braille. */
 export function toBraille(text: string): string {
@@ -53,8 +54,12 @@ export function toBraille(text: string): string {
       out += DIGITS[ch];
       continue;
     }
+    const wasInNumber = inNumber;
     inNumber = false;
     if (lower >= "a" && lower <= "z") {
+      // a–j directly after digits are ambiguous with numbers — insert the
+      // letter sign so "3d" reads as three-dee, not the number 34.
+      if (wasInNumber && lower >= "a" && lower <= "j") out += LETTER_SIGN;
       if (ch !== lower) out += CAPITAL; // a capital
       out += LETTERS[lower];
     } else if (ch in PUNCT) {

@@ -13,14 +13,16 @@
 import { useCallback, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 
-import type { State } from "./engine/types";
+import type { CommandResult, State } from "./engine/types";
 import { makeSeedState } from "./engine/seed";
 import { applyCommand, describe } from "./engine/interpreter";
+import { fullStateString } from "./engine/exportState";
 import PlanSvg from "./render/PlanSvg";
 import JsonTree from "./components/JsonTree";
 import Console, { type LogEntry } from "./components/Console";
 import Forms from "./components/Forms";
 import AgentPanel, { type AgentResult } from "./components/AgentPanel";
+import DrivePanel from "./components/DrivePanel";
 import { buildPiafCanvas } from "./render/piaf";
 import { buildStl } from "./render/stl";
 
@@ -68,11 +70,19 @@ export default function RapStudio({ signedIn }: { signedIn: boolean }) {
   const [speak, setSpeak] = useState(false);
   const [authorTab, setAuthorTab] = useState<AuthorTab>("console");
   const [viewTab, setViewTab] = useState<ViewTab>("3d");
+  const [activeLevel, setActiveLevel] = useState<number | null>(null); // null = all levels
   const idRef = useRef(1);
+  // Undo/redo history (applyCommand is pure, so history lives in the caller).
+  const undoRef = useRef<State[]>([]);
+  const redoRef = useRef<State[]>([]);
+  const [histLen, setHistLen] = useState({ undo: 0, redo: 0 });
 
   const announce = useCallback(
     (msg: string) => {
-      setLive(msg);
+      // Force a real text-node change even for an identical message, so a
+      // screen reader re-announces it (a second "wall A off" must still speak).
+      // The trailing no-break space is not voiced but guarantees a diff.
+      setLive((prev) => (prev === msg ? msg + " " : msg));
       if (speak && typeof window !== "undefined" && "speechSynthesis" in window) {
         const clean = msg.replace(/^(OK:|ERROR:)\s*/, "");
         const u = new SpeechSynthesisUtterance(clean);
@@ -86,16 +96,50 @@ export default function RapStudio({ signedIn }: { signedIn: boolean }) {
 
   // The single path every channel runs through.
   const runCommand = useCallback(
-    (raw: string) => {
+    (raw: string): CommandResult => {
+      const cmd = raw.trim().toLowerCase();
+
+      // Undo / redo are handled here, stepping the whole-state history stacks.
+      if (cmd === "undo" || cmd === "redo") {
+        const from = cmd === "undo" ? undoRef.current : redoRef.current;
+        const to = cmd === "undo" ? redoRef.current : undoRef.current;
+        if (from.length === 0) {
+          const msg = `ERROR: Nothing to ${cmd}.`;
+          setLog((l) => [...l, { id: idRef.current++, input: raw, output: msg, ok: false }]);
+          announce(msg);
+          return { state: stateRef.current, message: msg, ok: false, readOnly: true };
+        }
+        const prev = stateRef.current;
+        const target = from.pop() as State;
+        to.push(prev);
+        stateRef.current = target;
+        setState(target);
+        setChanged(diffPaths(prev, target));
+        setHistLen({ undo: undoRef.current.length, redo: redoRef.current.length });
+        const msg = `OK: ${cmd === "undo" ? "Undid" : "Redid"} the last change.`;
+        setLog((l) => [...l, { id: idRef.current++, input: raw, output: msg, ok: true }]);
+        setHistory((h) => [...h, raw]);
+        announce(msg);
+        return { state: target, message: msg, ok: true };
+      }
+
       const prev = stateRef.current;
       const res = applyCommand(prev, raw);
-      const entry: LogEntry = { id: idRef.current++, input: raw, output: res.message, ok: res.ok };
-      setLog((l) => [...l, entry]);
+      setLog((l) => [...l, { id: idRef.current++, input: raw, output: res.message, ok: res.ok }]);
       setHistory((h) => (h[h.length - 1] === raw ? h : [...h, raw]));
       if (res.ok && !res.readOnly) {
-        stateRef.current = res.state;
-        setState(res.state);
-        setChanged(diffPaths(prev, res.state));
+        // Only a real change touches history — an idempotent command (e.g. set
+        // rotation to its current value) must not pollute undo/redo.
+        const d = diffPaths(prev, res.state);
+        if (d.size > 0) {
+          undoRef.current.push(prev);
+          if (undoRef.current.length > 50) undoRef.current.shift();
+          redoRef.current = [];
+          setHistLen({ undo: undoRef.current.length, redo: 0 });
+          stateRef.current = res.state;
+          setState(res.state);
+          setChanged(d);
+        }
       }
       announce(res.message);
       return res;
@@ -113,19 +157,32 @@ export default function RapStudio({ signedIn }: { signedIn: boolean }) {
           body: JSON.stringify({ instruction, state: stateRef.current })
         });
       } catch {
-        return { ok: false, error: "Couldn't reach the assistant. Check your connection." };
+        const msg = "Couldn't reach the assistant. Check your connection.";
+        announce("ERROR: " + msg);
+        return { ok: false, error: msg };
       }
-      if (res.status === 401) return { ok: false, needsAuth: true };
+      if (res.status === 401) {
+        announce("Sign in to use the AI assistant.");
+        return { ok: false, needsAuth: true };
+      }
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) return { ok: false, error: data?.error || "The assistant is unavailable right now." };
+      if (!res.ok) {
+        const msg = data?.error || "The assistant is unavailable right now.";
+        announce("ERROR: " + msg);
+        return { ok: false, error: msg };
+      }
 
       const commands: string[] = Array.isArray(data.commands) ? data.commands : [];
       setLog((l) => [...l, { id: idRef.current++, output: `ASSISTANT: ${data.reply ?? "(applied changes)"}`, ok: true }]);
+      const before = stateRef.current;
       const applied: string[] = [];
       for (const c of commands) {
         const r = runCommand(c);
         if (r.ok) applied.push(c);
       }
+      // Highlight the net before→after diff of the whole batch (not just the
+      // last command), so the JSON tree shows everything the assistant changed.
+      setChanged(diffPaths(before, stateRef.current));
       announce(data.reply ?? "Done.");
       return { ok: true, reply: data.reply, commands: applied };
     },
@@ -133,16 +190,35 @@ export default function RapStudio({ signedIn }: { signedIn: boolean }) {
   );
 
   // ── exports ────────────────────────────────────────────────────────────────
-  const exportState = () => download("state.json", new Blob([JSON.stringify(state, null, 2)], { type: "application/json" }));
+  const fullState = useMemo(() => fullStateString(state), [state]);
+  const scopeLabel = activeLevel === null ? "all levels" : `level ${activeLevel}${state.levels[activeLevel]?.label ? ` · ${state.levels[activeLevel].label}` : ""}`;
+  const exportState = () => {
+    download("state.json", new Blob([fullState], { type: "application/json" }));
+    announce("OK: Downloaded state.json.");
+  };
   const exportLog = () => {
     const text = log.filter((e) => e.input).map((e) => `>> ${e.input}\n${e.output}`).join("\n");
     download("rap-command-log.txt", new Blob([text], { type: "text/plain" }));
+    announce("OK: Saved the command log.");
   };
-  const exportPiaf = () => buildPiafCanvas(state).toBlob((b) => b && download("rap-tactile-piaf.png", b), "image/png");
-  const exportStl = () => download("rap-tactile.stl", new Blob([buildStl(state)], { type: "model/stl" }));
-  const reset = () => runCommand("reset");
+  const exportPiaf = () =>
+    buildPiafCanvas(state, 1700, activeLevel).toBlob((b) => {
+      if (b) {
+        download("rap-tactile-piaf.png", b);
+        announce(`OK: Exported the PIAF tactile image (${scopeLabel}).`);
+      } else {
+        announce("ERROR: Could not export the PIAF image.");
+      }
+    }, "image/png");
+  const exportStl = () => {
+    download("rap-tactile.stl", new Blob([buildStl(state, activeLevel)], { type: "model/stl" }));
+    announce(`OK: Exported the STL (${scopeLabel}).`);
+  };
+  const reset = () => {
+    if (typeof window === "undefined" || window.confirm("Reset to the sample model? Your current model will be discarded — you can Undo this.")) runCommand("reset");
+  };
 
-  const readback = describe(state);
+  const readback = describe(state, activeLevel);
   const bayList = Object.values(state.bays);
 
   return (
@@ -150,10 +226,16 @@ export default function RapStudio({ signedIn }: { signedIn: boolean }) {
       {/* Toolbar */}
       <div className="flex flex-wrap items-center gap-2 rounded-lg border-2 border-neutral-900 p-2.5">
         <ToolbarBtn onClick={exportState}>Download state.json</ToolbarBtn>
-        <ToolbarBtn onClick={exportPiaf}>Export PIAF PNG</ToolbarBtn>
-        <ToolbarBtn onClick={exportStl}>Export STL</ToolbarBtn>
+        <ToolbarBtn onClick={exportPiaf}>Export PIAF PNG{activeLevel !== null ? ` · L${activeLevel}` : ""}</ToolbarBtn>
+        <ToolbarBtn onClick={exportStl}>Export STL{activeLevel !== null ? ` · L${activeLevel}` : ""}</ToolbarBtn>
         <ToolbarBtn onClick={exportLog}>Save command log</ToolbarBtn>
         <span className="flex-1" />
+        <ToolbarBtn onClick={() => runCommand("undo")} disabled={histLen.undo === 0}>
+          Undo
+        </ToolbarBtn>
+        <ToolbarBtn onClick={() => runCommand("redo")} disabled={histLen.redo === 0}>
+          Redo
+        </ToolbarBtn>
         <label className="flex items-center gap-1.5 text-xs font-semibold text-neutral-900">
           <input type="checkbox" checked={speak} onChange={(e) => setSpeak(e.target.checked)} />
           Speak confirmations
@@ -161,14 +243,31 @@ export default function RapStudio({ signedIn }: { signedIn: boolean }) {
         <ToolbarBtn onClick={reset}>Reset</ToolbarBtn>
       </div>
 
+      <p className="text-sm text-neutral-900">
+        Loaded with a <b>sample building</b> (Bay A — ground-floor retail + lobby, two levels) so you can explore. Edit it in the{" "}
+        <b>Author</b> panel below — type <code className="font-mono">help</code> in the console for every command. <b>Reset</b> restores the
+        sample; <code className="font-mono">clear</code> empties the model.
+      </p>
+
       {/* Row 1 — visual model + canonical state */}
       <div className="grid gap-5 lg:grid-cols-2">
-        <Panel title="Model — visual test" right={<Tabs tabs={[["3d", "3D"], ["plan", "Tactile plan"]]} active={viewTab} onPick={(t) => setViewTab(t as ViewTab)} />}>
-          <div className="h-80 w-full overflow-hidden rounded-md border border-neutral-300 bg-white">
-            {viewTab === "3d" ? <Scene3D state={state} /> : <PlanSvg state={state} className="h-full w-full p-2" />}
+        <Panel
+          title="Model — visual test"
+          right={
+            <div className="flex items-center gap-2">
+              <LevelSelect levels={state.levels} value={activeLevel} onChange={setActiveLevel} />
+              <Tabs label="Choose the model view" tabs={[["3d", "3D"], ["plan", "Tactile plan"]]} active={viewTab} onPick={(t) => setViewTab(t as ViewTab)} />
+            </div>
+          }
+        >
+          <div
+            className="h-80 w-full overflow-hidden rounded-md border border-neutral-300 bg-white"
+            aria-hidden={viewTab === "3d" ? true : undefined}
+          >
+            {viewTab === "3d" ? <Scene3D state={state} levelFilter={activeLevel} /> : <PlanSvg state={state} levelFilter={activeLevel} className="h-full w-full p-2" />}
           </div>
           <p className="mt-2 text-xs text-neutral-900">
-            The 3D view is an aid for sighted testing. The model is fully readable in the tactile plan, the read-back text, and the state tree — none is the source of truth.
+            The 3D view is an aid for sighted testing (hidden from screen readers). The model is fully readable in the tactile plan, the read-back text, and the state tree — none is the source of truth.
           </p>
         </Panel>
 
@@ -183,7 +282,7 @@ export default function RapStudio({ signedIn }: { signedIn: boolean }) {
       <div className="grid gap-5 lg:grid-cols-2">
         <Panel
           title="Author"
-          right={<Tabs tabs={[["console", "Console"], ["forms", "Forms"], ["assistant", "Assistant"]]} active={authorTab} onPick={(t) => setAuthorTab(t as AuthorTab)} />}
+          right={<Tabs label="Choose an authoring channel" tabs={[["console", "Console"], ["forms", "Forms"], ["assistant", "Assistant"]]} active={authorTab} onPick={(t) => setAuthorTab(t as AuthorTab)} />}
         >
           <div className="min-h-[20rem]">
             {authorTab === "console" && <Console log={log} history={history} onCommand={runCommand} />}
@@ -219,6 +318,15 @@ export default function RapStudio({ signedIn }: { signedIn: boolean }) {
         </Panel>
       </div>
 
+      {/* Row 3 — drive real Rhino */}
+      <Panel title="Drive Rhino — talk to state.json + the Watcher">
+        <DrivePanel
+          stateText={fullState}
+          onDownloadState={exportState}
+          webOnly={{ walls: state.walls.length, columns: state.columns.length, openings: state.openings.length }}
+        />
+      </Panel>
+
       {/* Screen-reader announcements for every state change */}
       <div aria-live="polite" className="sr-only">
         {live}
@@ -227,12 +335,13 @@ export default function RapStudio({ signedIn }: { signedIn: boolean }) {
   );
 }
 
-function ToolbarBtn({ onClick, children }: { onClick: () => void; children: React.ReactNode }) {
+function ToolbarBtn({ onClick, children, disabled }: { onClick: () => void; children: React.ReactNode; disabled?: boolean }) {
   return (
     <button
       type="button"
       onClick={onClick}
-      className="rounded border-2 border-neutral-900 px-2.5 py-1.5 text-xs font-semibold text-neutral-900 hover:bg-neutral-900 hover:text-white"
+      disabled={disabled}
+      className="rounded border-2 border-neutral-900 px-2.5 py-1.5 text-xs font-semibold text-neutral-900 hover:bg-neutral-900 hover:text-white disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-neutral-900"
     >
       {children}
     </button>
@@ -251,18 +360,39 @@ function Panel({ title, right, children }: { title: string; right?: React.ReactN
   );
 }
 
-function Tabs({ tabs, active, onPick }: { tabs: string[][]; active: string; onPick: (t: string) => void }) {
+function LevelSelect({ levels, value, onChange }: { levels: { label: string }[]; value: number | null; onChange: (v: number | null) => void }) {
   return (
-    <div role="tablist" className="flex gap-1">
-      {tabs.map(([id, label]) => (
+    <select
+      value={value === null ? "all" : String(value)}
+      onChange={(e) => onChange(e.target.value === "all" ? null : Number(e.target.value))}
+      className="rounded border border-neutral-300 px-1.5 py-1 text-xs font-semibold text-neutral-900"
+      aria-label="Active level to view and export"
+    >
+      <option value="all">All levels</option>
+      {levels.map((l, i) => (
+        <option key={i} value={i}>
+          L{i} · {l.label}
+        </option>
+      ))}
+    </select>
+  );
+}
+
+// Honest toggle-button group. (A full ARIA tab pattern needs all panels present
+// + roving tabindex + arrow keys; here only the selected panel is rendered, so
+// aria-pressed buttons in a labelled group are the correct, non-misleading model.)
+function Tabs({ tabs, active, onPick, label }: { tabs: string[][]; active: string; onPick: (t: string) => void; label?: string }) {
+  return (
+    <div role="group" aria-label={label} className="flex gap-1">
+      {tabs.map(([id, lbl]) => (
         <button
           key={id}
-          role="tab"
-          aria-selected={active === id}
+          type="button"
+          aria-pressed={active === id}
           onClick={() => onPick(id)}
           className={`rounded px-2.5 py-1 text-xs font-semibold ${active === id ? "bg-neutral-900 text-white" : "border border-neutral-300 text-neutral-900 hover:border-neutral-900"}`}
         >
-          {label}
+          {lbl}
         </button>
       ))}
     </div>

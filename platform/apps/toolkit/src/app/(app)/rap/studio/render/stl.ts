@@ -49,11 +49,10 @@ function addBox(tris: Tri[], x: number, y: number, w: number, h: number, zBot: n
   pushBox(tris, corners);
 }
 
-export function buildStl(state: State): ArrayBuffer {
-  const scene = deriveGeometry(state);
+export function buildStl(state: State, levelFilter: number | null = null): ArrayBuffer {
+  const scene = deriveGeometry(state, levelFilter);
   const cut = state.tactile3d.cut_height;
   const floorT = state.tactile3d.floor_thickness;
-  const colSize = state.style.column_size;
   const tris: Tri[] = [];
 
   for (const bay of scene.bays) {
@@ -69,7 +68,60 @@ export function buildStl(state: State): ArrayBuffer {
     }
     // Columns clipped at cut height.
     for (const c of bay.columns) {
-      addBox(tris, c.x - colSize / 2, c.y - colSize / 2, colSize, colSize, levelZ, levelZ + cut, bay.transform);
+      addBox(tris, c.x - c.r, c.y - c.r, c.r * 2, c.r * 2, levelZ, levelZ + cut, bay.transform);
+    }
+  }
+
+  const idTransform = { ox: 0, oy: 0, rot: 0 };
+
+  // Free walls (interior + exterior) — each solid chunk as a rotated box.
+  for (const fw of scene.freeWalls) {
+    const levelZ = scene.levels[fw.level]?.z ?? 0;
+    for (const s of fw.solids) {
+      addBox(tris, 0, 0, s.len, fw.thickness, levelZ, levelZ + cut, { ox: s.start.x, oy: s.start.y, rot: s.angleDeg });
+    }
+  }
+
+  // Free columns.
+  for (const c of scene.freeColumns) {
+    const levelZ = scene.levels[c.level]?.z ?? 0;
+    addBox(tris, c.x - c.size / 2, c.y - c.size / 2, c.size, c.size, levelZ, levelZ + cut, idTransform);
+  }
+
+  // Floor slab under free elements per level — bays floor themselves, but a
+  // level with only free walls/rooms/columns would otherwise print as floating
+  // geometry with no base. One slab over the union bounding box per level.
+  if (state.tactile3d.floor) {
+    const freeLevels = new Set<number>();
+    for (const fw of scene.freeWalls) freeLevels.add(fw.level);
+    for (const c of scene.freeColumns) freeLevels.add(c.level);
+    for (const r of scene.rooms) freeLevels.add(r.level);
+    for (const lvl of freeLevels) {
+      let minX = Infinity;
+      let minY = Infinity;
+      let maxX = -Infinity;
+      let maxY = -Infinity;
+      const grow = (x: number, y: number) => {
+        minX = Math.min(minX, x);
+        minY = Math.min(minY, y);
+        maxX = Math.max(maxX, x);
+        maxY = Math.max(maxY, y);
+      };
+      for (const fw of scene.freeWalls) if (fw.level === lvl) for (const s of fw.solids) for (const q of s.quad) grow(q.x, q.y);
+      for (const c of scene.freeColumns)
+        if (c.level === lvl) {
+          grow(c.x - c.size / 2, c.y - c.size / 2);
+          grow(c.x + c.size / 2, c.y + c.size / 2);
+        }
+      for (const r of scene.rooms)
+        if (r.level === lvl) {
+          grow(r.x, r.y);
+          grow(r.x + r.w, r.y + r.h);
+        }
+      if (minX <= maxX && minY <= maxY) {
+        const levelZ = scene.levels[lvl]?.z ?? 0;
+        addBox(tris, minX, minY, maxX - minX, maxY - minY, levelZ - floorT, levelZ, idTransform);
+      }
     }
   }
 
