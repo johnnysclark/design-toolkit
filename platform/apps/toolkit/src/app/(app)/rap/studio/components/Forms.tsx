@@ -6,7 +6,7 @@
 // converge on one grammar and one auditable log. Fully labelled for keyboard +
 // screen-reader use.
 
-import { useEffect, useState } from "react";
+import { useEffect, useReducer, useState } from "react";
 import type { State } from "../engine/types";
 
 const fieldCls = "rounded border-2 border-neutral-900 px-2 py-1 text-sm text-neutral-900 outline-none focus:border-[#ff3b21]";
@@ -16,6 +16,10 @@ const labelCls = "flex flex-col gap-1 text-xs font-semibold text-neutral-900";
 // Uncontrolled (defaultValue + key) so it resyncs when the value changes via
 // another channel; empty/invalid input reverts to the current value.
 function NumField({ label, value, min, step, onCommit }: { label: string; value: number; min?: number; step?: number; onCommit: (n: number) => void }) {
+  // Bump on every commit so the field always remounts to the current model
+  // value — even when the committed value clamps to the value it already had
+  // (otherwise the stale typed text would linger, misreading to a screen reader).
+  const [gen, bump] = useReducer((x: number) => x + 1, 0);
   const commit = (el: HTMLInputElement) => {
     const raw = el.value.trim();
     const n = Number(raw);
@@ -24,6 +28,7 @@ function NumField({ label, value, min, step, onCommit }: { label: string; value:
       return;
     }
     onCommit(n);
+    bump();
   };
   return (
     <label className={labelCls}>
@@ -33,7 +38,7 @@ function NumField({ label, value, min, step, onCommit }: { label: string; value:
         min={min}
         step={step}
         defaultValue={value}
-        key={value}
+        key={`${value}:${gen}`}
         className={fieldCls}
         onBlur={(e) => commit(e.currentTarget)}
         onKeyDown={(e) => {
@@ -122,8 +127,8 @@ export default function Forms({ state, onCommand }: { state: State; onCommand: (
                 step={5}
                 value={rotDisplay}
                 onChange={(e) => setRotDisplay(+e.target.value)}
-                onPointerUp={() => onCommand(`set bay ${sel} rotation ${rotDisplay}`)}
-                onKeyUp={() => onCommand(`set bay ${sel} rotation ${rotDisplay}`)}
+                onPointerUp={() => { if (rotDisplay !== bay.rotation_deg) onCommand(`set bay ${sel} rotation ${rotDisplay}`); }}
+                onKeyUp={() => { if (rotDisplay !== bay.rotation_deg) onCommand(`set bay ${sel} rotation ${rotDisplay}`); }}
                 aria-label="Bay rotation in degrees"
               />
             </label>
@@ -158,7 +163,7 @@ export default function Forms({ state, onCommand }: { state: State; onCommand: (
           {/* Label */}
           <label className={labelCls}>
             Label (braille auto-updates)
-            <input className={fieldCls} defaultValue={bay.label} key={bay.label} onBlur={(e) => e.target.value.trim() && onCommand(`set bay ${sel} label "${e.target.value.trim()}"`)} />
+            <input className={fieldCls} defaultValue={bay.label} key={bay.label} onBlur={(e) => { const v = e.target.value.trim(); if (v) onCommand(`set bay ${sel} label "${v}"`); else e.target.value = bay.label; }} />
           </label>
 
           {/* Quick aperture add */}

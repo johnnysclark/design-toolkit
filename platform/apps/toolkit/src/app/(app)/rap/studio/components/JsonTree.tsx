@@ -46,9 +46,11 @@ function Branch({ name, value, path, exact, onPath, depth }: { name: string; val
   const hit = onPath.has(path); // this node or a descendant changed
   const [open, setOpen] = useState(depth < 2 || hit);
   // Auto-open when a change lands here; never auto-close (user stays in control).
+  // Depend on the per-edit onPath identity (fresh each diff) so two consecutive
+  // edits to the same subtree both re-open it, even if collapsed in between.
   useEffect(() => {
-    if (hit) setOpen(true);
-  }, [hit]);
+    if (onPath.has(path)) setOpen(true);
+  }, [onPath, path]);
 
   const entries = Array.isArray(value) ? value.map((v, i) => [String(i), v] as const) : Object.entries(value);
   return (

@@ -128,13 +128,18 @@ export default function RapStudio({ signedIn }: { signedIn: boolean }) {
       setLog((l) => [...l, { id: idRef.current++, input: raw, output: res.message, ok: res.ok }]);
       setHistory((h) => (h[h.length - 1] === raw ? h : [...h, raw]));
       if (res.ok && !res.readOnly) {
-        undoRef.current.push(prev);
-        if (undoRef.current.length > 50) undoRef.current.shift();
-        redoRef.current = [];
-        setHistLen({ undo: undoRef.current.length, redo: 0 });
-        stateRef.current = res.state;
-        setState(res.state);
-        setChanged(diffPaths(prev, res.state));
+        // Only a real change touches history — an idempotent command (e.g. set
+        // rotation to its current value) must not pollute undo/redo.
+        const d = diffPaths(prev, res.state);
+        if (d.size > 0) {
+          undoRef.current.push(prev);
+          if (undoRef.current.length > 50) undoRef.current.shift();
+          redoRef.current = [];
+          setHistLen({ undo: undoRef.current.length, redo: 0 });
+          stateRef.current = res.state;
+          setState(res.state);
+          setChanged(d);
+        }
       }
       announce(res.message);
       return res;
@@ -152,11 +157,20 @@ export default function RapStudio({ signedIn }: { signedIn: boolean }) {
           body: JSON.stringify({ instruction, state: stateRef.current })
         });
       } catch {
-        return { ok: false, error: "Couldn't reach the assistant. Check your connection." };
+        const msg = "Couldn't reach the assistant. Check your connection.";
+        announce("ERROR: " + msg);
+        return { ok: false, error: msg };
       }
-      if (res.status === 401) return { ok: false, needsAuth: true };
+      if (res.status === 401) {
+        announce("Sign in to use the AI assistant.");
+        return { ok: false, needsAuth: true };
+      }
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) return { ok: false, error: data?.error || "The assistant is unavailable right now." };
+      if (!res.ok) {
+        const msg = data?.error || "The assistant is unavailable right now.";
+        announce("ERROR: " + msg);
+        return { ok: false, error: msg };
+      }
 
       const commands: string[] = Array.isArray(data.commands) ? data.commands : [];
       setLog((l) => [...l, { id: idRef.current++, output: `ASSISTANT: ${data.reply ?? "(applied changes)"}`, ok: true }]);

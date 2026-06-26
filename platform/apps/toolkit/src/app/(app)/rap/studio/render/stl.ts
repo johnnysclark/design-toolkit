@@ -108,8 +108,16 @@ export function buildStl(state: State, levelFilter: number | null = null): Array
         maxY = Math.max(maxY, y);
       };
       for (const fw of scene.freeWalls) if (fw.level === lvl) for (const s of fw.solids) for (const q of s.quad) grow(q.x, q.y);
-      for (const c of scene.freeColumns) if (c.level === lvl) grow(c.x, c.y);
-      for (const r of scene.rooms) if (r.level === lvl) (grow(r.x, r.y), grow(r.x + r.w, r.y + r.h));
+      for (const c of scene.freeColumns)
+        if (c.level === lvl) {
+          grow(c.x - c.size / 2, c.y - c.size / 2);
+          grow(c.x + c.size / 2, c.y + c.size / 2);
+        }
+      for (const r of scene.rooms)
+        if (r.level === lvl) {
+          grow(r.x, r.y);
+          grow(r.x + r.w, r.y + r.h);
+        }
       if (minX <= maxX && minY <= maxY) {
         const levelZ = scene.levels[lvl]?.z ?? 0;
         addBox(tris, minX, minY, maxX - minX, maxY - minY, levelZ - floorT, levelZ, idTransform);
