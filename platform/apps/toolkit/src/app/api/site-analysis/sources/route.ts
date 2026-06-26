@@ -1,14 +1,16 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { createClient } from "@/lib/supabase/server";
-import { MODEL, chatSystem } from "@/lib/anthropic/site-analysis-prompts";
+import { MODEL, sourcesSystem, sourcesUser } from "@/lib/anthropic/site-analysis-prompts";
 
-// Cost pass: the grounded follow-up chat. Sonnet + web search, STREAMED so a slow
-// search never trips an idle timeout and tokens show up live. Auth-gated — the key
-// must never be reachable anonymously. Its own request, ≤60s on Vercel Hobby.
+// Auto first pass: the moment a place is analyzed the client fires this (no button)
+// to surface the authoritative links/documents a studio should start from. Streamed
+// so the links land as soon as the model finds them, and a server-side soft-timeout
+// guarantees a clean finish inside Vercel Hobby's 60s cap. Auth-gated — it spends
+// the studio key, so it must never be reachable anonymously.
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
-type Msg = { role: "user" | "assistant"; content: string };
+const SOFT_TIMEOUT_MS = 50000;
 
 export async function POST(req: Request) {
   if (!process.env.ANTHROPIC_API_KEY) {
@@ -23,7 +25,7 @@ export async function POST(req: Request) {
     data: { user }
   } = await supabase.auth.getUser();
   if (!user) {
-    return Response.json({ error: "Sign in to use the AI chat." }, { status: 401 });
+    return Response.json({ error: "Sign in to use the AI." }, { status: 401 });
   }
 
   let body: any;
@@ -33,30 +35,22 @@ export async function POST(req: Request) {
     return Response.json({ error: "Invalid JSON body." }, { status: 400 });
   }
 
-  const messages: Msg[] = Array.isArray(body?.messages)
-    ? body.messages
-        .filter((m: any) => (m?.role === "user" || m?.role === "assistant") && typeof m?.content === "string")
-        .map((m: any) => ({ role: m.role, content: m.content.slice(0, 8000) }))
-        .slice(-16)
-    : [];
-  if (!messages.length || messages[messages.length - 1].role !== "user") {
-    return Response.json({ error: "Ask a question." }, { status: 400 });
+  const place = body?.place;
+  if (!place || typeof place !== "object" || !place?.name) {
+    return Response.json({ error: "A place is required." }, { status: 400 });
   }
 
-  const context = JSON.stringify(body?.context ?? {}, null, 2).slice(0, 60000);
-  const system = chatSystem(context);
+  const context = JSON.stringify(body?.context ?? {}, null, 2).slice(0, 24000);
 
   const client = new Anthropic();
   const ctrl = new AbortController();
-  // No `thinking` block → fastest path; web search does the heavy lifting here.
   const stream = client.messages.stream(
     {
       model: MODEL,
-      max_tokens: 4000,
-      system,
-      messages,
-      // Cap searches so a turn can't spiral (cost + the server-tool pause_turn limit).
-      // Four is enough to answer well and leaves time to actually write the answer.
+      max_tokens: 1600,
+      system: sourcesSystem(context),
+      messages: [{ role: "user", content: sourcesUser(place) }],
+      // A first pass — keep it cheap and fast. A handful of searches is plenty.
       tools: [{ type: "web_search_20260209", name: "web_search", max_uses: 4 }]
     } as any,
     { signal: ctrl.signal }
@@ -68,32 +62,28 @@ export async function POST(req: Request) {
       const send = (event: string, data: unknown) =>
         controller.enqueue(enc.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`));
 
-      // Collect sources as they stream so a soft-timeout still ships them.
       const sources: { title: string; url: string }[] = [];
       const seen = new Set<string>();
       const addSources = (blocks: any[]) => {
+        let added = false;
         for (const block of blocks || []) {
           if (block?.type === "web_search_tool_result" && Array.isArray(block.content)) {
             for (const r of block.content) {
               if (r?.type === "web_search_result" && r.url && !seen.has(r.url)) {
                 seen.add(r.url);
                 sources.push({ title: (r.title || r.url).slice(0, 200), url: r.url });
+                added = true;
               }
             }
           }
         }
+        if (added) send("sources", { sources });
       };
 
       let full = "";
-      let stopReason: string | null = null;
       let searching = false;
-      let timedOut = false;
-      // Stop ~7s before the function cap and finish cleanly. A hard-kill at 60s would
-      // close the connection with no terminal frame → the UI hangs on a half-answer.
-      const timer = setTimeout(() => {
-        timedOut = true;
-        ctrl.abort();
-      }, 53000);
+      // Stop a few seconds early and finish cleanly rather than let Vercel hard-kill us.
+      const timer = setTimeout(() => ctrl.abort(), SOFT_TIMEOUT_MS);
 
       try {
         try {
@@ -108,47 +98,31 @@ export async function POST(req: Request) {
             } else if (ev.type === "content_block_delta" && ev.delta?.type === "text_delta") {
               full += ev.delta.text;
               send("token", { text: ev.delta.text });
-            } else if (ev.type === "message_delta" && ev.delta?.stop_reason) {
-              stopReason = ev.delta.stop_reason;
             }
           }
-          // Sweep the final message for any sources the events didn't carry.
+          // Sweep the final message for any sources the stream events didn't carry.
           const final = await stream.finalMessage();
           addSources((final?.content ?? []) as any[]);
         } catch (err: any) {
-          // Soft-timeout (or a dropped upstream) — finish with what we have.
+          // Soft-timeout (or a dropped stream) — finish with whatever we gathered.
           if (!ctrl.signal.aborted) throw err;
-        }
-
-        if (stopReason === "refusal") {
-          send("error", { message: "The model declined this request." });
-          return;
         }
 
         try {
           await supabase.from("tool_runs").insert({
             owner: user.id,
-            tool: "site-analysis:chat",
-            input: { question: messages[messages.length - 1].content, turns: messages.length },
-            output: { answer: full.slice(0, 8000), sources, model: MODEL }
+            tool: "site-analysis:sources",
+            input: { place: place?.name },
+            output: { note: full.slice(0, 4000), sources, model: MODEL }
           });
         } catch {
           // never let trace logging break the response
         }
 
         send("sources", { sources });
-        send("done", {
-          text:
-            (full &&
-              (timedOut || stopReason === "max_tokens"
-                ? full + "\n\n_(Answer stopped early to stay within the time limit — ask me to continue or narrow the question.)_"
-                : full)) ||
-            (timedOut
-              ? "(That one ran long and was stopped — try a narrower question.)"
-              : "(No answer was produced — please try again.)")
-        });
+        send("done", { text: full });
       } catch (err: any) {
-        send("error", { message: err?.message || "Something went wrong." });
+        send("error", { message: err?.message || "Could not gather sources." });
       } finally {
         clearTimeout(timer);
         controller.close();
