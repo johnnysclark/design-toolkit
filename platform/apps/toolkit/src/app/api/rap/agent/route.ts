@@ -87,7 +87,9 @@ export async function POST(req: Request) {
     } as any);
 
     if (message.stop_reason === "refusal") {
-      return NextResponse.json({ error: "The assistant declined this request." }, { status: 200 });
+      // Use the {reply, commands} shape (NOT {error} at 200) so the client speaks
+      // the refusal as the assistant's message instead of a false "Done.".
+      return NextResponse.json({ reply: "The assistant declined this request.", commands: [] }, { status: 200 });
     }
     if (message.stop_reason === "max_tokens") {
       return NextResponse.json({ reply: "That request was too large to plan in one go — try splitting it into smaller steps.", commands: [] }, { status: 200 });

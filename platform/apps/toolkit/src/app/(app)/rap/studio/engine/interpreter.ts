@@ -243,6 +243,12 @@ function cmdAperture(state: State, tokens: string[]): CommandResult {
     if (!id || !["door", "window", "portal"].includes(type) || (axis !== "x" && axis !== "y") || gridline === null || corner === null || width === null || height === null)
       return err(state, "Usage: aperture <bay> add <id> <door|window|portal> <x|y> <gridline> <corner> <width> <height>");
     if (width <= 0 || height <= 0) return err(state, "Aperture width and height must be > 0 ft.");
+    // Apertures only render on a perimeter wall (gridline 0 or the far edge);
+    // an interior gridline would store + report a door that draws nothing — a
+    // renderer-parity break a non-visual user couldn't catch.
+    const gl = Math.round(gridline);
+    const far = axis === "x" ? bay.bays[1] : bay.bays[0];
+    if (gl !== 0 && gl !== far) return err(state, `Gridline ${gl} isn't a perimeter wall of bay ${name} — use 0 or ${far} (apertures sit on the bay's outer edges).`);
     if (b.apertures.some((a) => a.id === id)) return err(state, `Aperture ${id} already exists in bay ${name}.`);
     b.apertures.push({ id, type, axis, gridline: Math.round(gridline), corner, width, height, hinge: "start", swing: "positive" });
     return ok(next, `Added ${type} ${id} to bay ${name} (${axis}-wall gridline ${Math.round(gridline)}, ${width}×${height} ft).`);
@@ -316,6 +322,7 @@ function cmdWallFree(state: State, tokens: string[]): CommandResult {
     const th = num(tokens[i + 4]) ?? 0.5;
     if (th <= 0) return err(state, "Wall thickness must be > 0 ft.");
     const level = Math.round(num(tokens[i + 5]) ?? 0);
+    if (level < 0 || level >= next.levels.length) return err(state, `No level ${level} (levels are 0–${next.levels.length - 1}). Add one first: level add <name> <z>.`);
     if (!id) id = nextId(next.walls, "w");
     if (next.walls.some((w) => w.id === id)) return err(state, `Wall ${id} already exists.`);
     next.walls.push({ id, level, a: [x1, y1], b: [x2, y2], thickness: th });
@@ -575,9 +582,14 @@ export function describe(state: State, levelFilter: number | null = null): strin
 
   // Rooms on an out-of-range level still count in MACRO — surface them so the
   // spoken read-back always reconciles with the count (e.g. after an import).
-  const orphans = state.rooms.filter((r) => r.level < 0 || r.level >= state.levels.length);
+  const oob = (lvl: number) => lvl < 0 || lvl >= state.levels.length;
+  const orphans = [
+    ...state.rooms.filter((r) => oob(r.level)).map((r) => `room ${r.name} (L${r.level})`),
+    ...state.walls.filter((w) => oob(w.level)).map((w) => `wall ${w.id} (L${w.level})`),
+    ...state.columns.filter((c) => oob(c.level)).map((c) => `column ${c.id} (L${c.level})`)
+  ];
   const orphanBlock = orphans.length
-    ? [`UNPLACED — ${orphans.length} room(s) on an out-of-range level: ${orphans.map((r) => `${r.name} (L${r.level})`).join(", ")}.`]
+    ? [`UNPLACED — ${orphans.length} element(s) on an out-of-range level: ${orphans.join(", ")}.`]
     : [];
 
   // Micro — bay detail + free walls + openings.

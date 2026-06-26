@@ -171,6 +171,12 @@ export default function RapStudio({ signedIn }: { signedIn: boolean }) {
         announce("ERROR: " + msg);
         return { ok: false, error: msg };
       }
+      // Defense-in-depth: a 200 that still carries an {error} (e.g. a refusal)
+      // must be announced as a failure, never fall through to "Done.".
+      if (typeof data?.error === "string") {
+        announce("ERROR: " + data.error);
+        return { ok: false, error: data.error };
+      }
 
       const commands: string[] = Array.isArray(data.commands) ? data.commands : [];
       setLog((l) => [...l, { id: idRef.current++, output: `ASSISTANT: ${data.reply ?? "(applied changes)"}`, ok: true }]);
@@ -183,7 +189,11 @@ export default function RapStudio({ signedIn }: { signedIn: boolean }) {
       // Highlight the net before→after diff of the whole batch (not just the
       // last command), so the JSON tree shows everything the assistant changed.
       setChanged(diffPaths(before, stateRef.current));
-      announce(data.reply ?? "Done.");
+      // Failure-aware: if a command didn't apply, don't announce a cheerful
+      // reply — the per-command ERROR was batched away, so say it plainly.
+      const failed = commands.length - applied.length;
+      const base = data.reply ?? "Done.";
+      announce(failed > 0 ? `ERROR: Applied ${applied.length} of ${commands.length} changes; ${failed} could not be applied. ${base}` : base);
       return { ok: true, reply: data.reply, commands: applied };
     },
     [runCommand, announce]
@@ -323,7 +333,7 @@ export default function RapStudio({ signedIn }: { signedIn: boolean }) {
         <DrivePanel
           stateText={fullState}
           onDownloadState={exportState}
-          webOnly={{ walls: state.walls.length, columns: state.columns.length, openings: state.openings.length }}
+          webOnly={{ walls: state.walls.length, columns: state.columns.length, openings: state.openings.length, rooms: state.rooms.length }}
         />
       </Panel>
 

@@ -40,6 +40,25 @@ function Model({ state, levelFilter }: { state: State; levelFilter: number | nul
         <Line points={[...scene.site.boundary, scene.site.boundary[0]].map((p) => [p.x, 0.02, p.y] as [number, number, number])} color="#111" lineWidth={1.5} />
       )}
 
+      {/* Atrium voids — outline on the floor (parity with the 2D plan + read-back) */}
+      {scene.voids.map((v, i) => {
+        const pts: [number, number, number][] =
+          v.shape === "circle"
+            ? Array.from({ length: 49 }, (_, k) => {
+                const a = (k / 48) * Math.PI * 2;
+                const r = Math.max(v.w, v.h) / 2;
+                return [v.cx + r * Math.cos(a), 0.03, v.cy + r * Math.sin(a)] as [number, number, number];
+              })
+            : ([
+                [v.cx - v.w / 2, 0.03, v.cy - v.h / 2],
+                [v.cx + v.w / 2, 0.03, v.cy - v.h / 2],
+                [v.cx + v.w / 2, 0.03, v.cy + v.h / 2],
+                [v.cx - v.w / 2, 0.03, v.cy + v.h / 2],
+                [v.cx - v.w / 2, 0.03, v.cy - v.h / 2]
+              ] as [number, number, number][]);
+        return <Line key={`void${i}`} points={pts} color="#111" lineWidth={1.5} />;
+      })}
+
       {/* Bays (the structural grid jig) */}
       {scene.bays.map((bay) => {
         const z = levelZ(bay.level);

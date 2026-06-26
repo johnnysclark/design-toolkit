@@ -57,11 +57,7 @@ export function buildStl(state: State, levelFilter: number | null = null): Array
 
   for (const bay of scene.bays) {
     const levelZ = scene.levels[bay.level]?.z ?? 0;
-    const { w: W, d: D } = bay.footprint;
 
-    if (state.tactile3d.floor) {
-      addBox(tris, 0, 0, W, D, levelZ - floorT, levelZ, bay.transform);
-    }
     // Walls clipped at cut height.
     for (const wll of bay.walls) {
       addBox(tris, wll.x, wll.y, wll.w, wll.h, levelZ, levelZ + cut, bay.transform);
@@ -88,39 +84,42 @@ export function buildStl(state: State, levelFilter: number | null = null): Array
     addBox(tris, c.x - c.size / 2, c.y - c.size / 2, c.size, c.size, levelZ, levelZ + cut, idTransform);
   }
 
-  // Floor slab under free elements per level — bays floor themselves, but a
-  // level with only free walls/rooms/columns would otherwise print as floating
-  // geometry with no base. One slab over the union bounding box per level.
+  // ── Floor slabs — ONE per level, spanning the union bounding box of EVERYTHING
+  // on that level (bay footprints + free walls/rooms/columns). A single slab per
+  // level avoids coincident double-slabs (non-manifold) AND guarantees free
+  // elements outside a bay footprint — including rooms, which print ONLY via the
+  // floor — still get a base. (A rotated bay's slab is its AABB; benign.)
   if (state.tactile3d.floor) {
-    const freeLevels = new Set<number>();
-    for (const fw of scene.freeWalls) freeLevels.add(fw.level);
-    for (const c of scene.freeColumns) freeLevels.add(c.level);
-    for (const r of scene.rooms) freeLevels.add(r.level);
-    for (const lvl of freeLevels) {
-      let minX = Infinity;
-      let minY = Infinity;
-      let maxX = -Infinity;
-      let maxY = -Infinity;
-      const grow = (x: number, y: number) => {
-        minX = Math.min(minX, x);
-        minY = Math.min(minY, y);
-        maxX = Math.max(maxX, x);
-        maxY = Math.max(maxY, y);
-      };
-      for (const fw of scene.freeWalls) if (fw.level === lvl) for (const s of fw.solids) for (const q of s.quad) grow(q.x, q.y);
-      for (const c of scene.freeColumns)
-        if (c.level === lvl) {
-          grow(c.x - c.size / 2, c.y - c.size / 2);
-          grow(c.x + c.size / 2, c.y + c.size / 2);
-        }
-      for (const r of scene.rooms)
-        if (r.level === lvl) {
-          grow(r.x, r.y);
-          grow(r.x + r.w, r.y + r.h);
-        }
-      if (minX <= maxX && minY <= maxY) {
+    type BBox = { minX: number; minY: number; maxX: number; maxY: number };
+    const bboxes = new Map<number, BBox>();
+    const grow = (lvl: number, x: number, y: number) => {
+      const b = bboxes.get(lvl) ?? { minX: Infinity, minY: Infinity, maxX: -Infinity, maxY: -Infinity };
+      b.minX = Math.min(b.minX, x);
+      b.minY = Math.min(b.minY, y);
+      b.maxX = Math.max(b.maxX, x);
+      b.maxY = Math.max(b.maxY, y);
+      bboxes.set(lvl, b);
+    };
+    for (const bay of scene.bays) {
+      const { w: W, d: D } = bay.footprint;
+      for (const corner of [{ x: 0, y: 0 }, { x: W, y: 0 }, { x: W, y: D }, { x: 0, y: D }]) {
+        const p = applyTransform(corner, bay.transform);
+        grow(bay.level, p.x, p.y);
+      }
+    }
+    for (const fw of scene.freeWalls) for (const s of fw.solids) for (const q of s.quad) grow(fw.level, q.x, q.y);
+    for (const c of scene.freeColumns) {
+      grow(c.level, c.x - c.size / 2, c.y - c.size / 2);
+      grow(c.level, c.x + c.size / 2, c.y + c.size / 2);
+    }
+    for (const r of scene.rooms) {
+      grow(r.level, r.x, r.y);
+      grow(r.level, r.x + r.w, r.y + r.h);
+    }
+    for (const [lvl, b] of bboxes) {
+      if (b.minX < b.maxX && b.minY < b.maxY) {
         const levelZ = scene.levels[lvl]?.z ?? 0;
-        addBox(tris, minX, minY, maxX - minX, maxY - minY, levelZ - floorT, levelZ, idTransform);
+        addBox(tris, b.minX, b.minY, b.maxX - b.minX, b.maxY - b.minY, levelZ - floorT, levelZ, idTransform);
       }
     }
   }

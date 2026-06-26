@@ -10,9 +10,9 @@ import { fsSupported, pickDirectory, writeStateToDir, pingBridge, pushStateToBri
 
 const card = "rounded-lg border-2 border-neutral-900 p-3 space-y-2";
 const btn = "display-font rounded border-2 border-neutral-900 px-3 py-1.5 text-xs uppercase text-neutral-900 hover:bg-neutral-900 hover:text-white disabled:opacity-40";
-const field = "rounded border-2 border-neutral-900 px-2 py-1 text-sm text-neutral-900 outline-none focus:border-[#ff3b21]";
+const field = "rounded border-2 border-neutral-900 px-2 py-1 text-sm text-neutral-900 outline-none focus:border-[#ff3b21] focus-visible:ring-2 focus-visible:ring-[#ff3b21] focus-visible:ring-offset-1";
 
-export default function DrivePanel({ stateText, onDownloadState, webOnly }: { stateText: string; onDownloadState: () => void; webOnly?: { walls: number; columns: number; openings: number } }) {
+export default function DrivePanel({ stateText, onDownloadState, webOnly }: { stateText: string; onDownloadState: () => void; webOnly?: { walls: number; columns: number; openings: number; rooms: number } }) {
   // ── Direct folder write ────────────────────────────────────────────────────
   const [dir, setDir] = useState<FileSystemDirectoryHandle | null>(null);
   const [dirName, setDirName] = useState("");
@@ -64,18 +64,20 @@ export default function DrivePanel({ stateText, onDownloadState, webOnly }: { st
     setBridgeMsg("Testing…");
     const r = await pingBridge(url, token);
     setInfo(r);
-    setBridgeMsg(r.ok ? `Connected. Folder: ${r.folder ?? "?"} · Watcher: ${r.watcher?.reachable ? "reachable" : "not reachable"}.` : r.error ?? "Failed.");
+    // The desktop Watcher's live TCP link is off by default, so only surface it
+    // when it's actually ON — a successful connection to the bridge is the signal.
+    setBridgeMsg(r.ok ? `Connected to the bridge. Folder: ${r.folder ?? "?"}.${r.watcher?.reachable ? " Live link is on." : ""}` : r.error ?? "Failed.");
   };
 
   const pushBridge = async (text: string, silent = false) => {
     const r = await pushStateToBridge(url, token, text);
-    if (!silent) setBridgeMsg(r.ok ? `Pushed ${r.bytes ?? 0} bytes at ${stamp()}.${r.watcherPinged ? " Watcher pinged." : ""}` : r.error ?? "Push failed.");
+    if (!silent) setBridgeMsg(r.ok ? `Pushed ${r.bytes ?? 0} bytes at ${stamp()} — Rhino will rebuild on the file change.` : r.error ?? "Push failed.");
   };
 
   const pingWatcher = async () => {
-    setBridgeMsg("Querying Watcher…");
+    setBridgeMsg("Checking the optional live link…");
     const r = await queryWatcher(url, token, { type: "ping" });
-    setBridgeMsg(r.ok ? (r.reachable ? "Watcher replied — Rhino is listening." : "Watcher not reachable. Is Rhino open with the Watcher running on 1998?") : r.error ?? "Query failed.");
+    setBridgeMsg(r.ok ? (r.reachable ? "Live link is on — Rhino is listening on the query port." : "Live link is off — that's normal; your pushes still rebuild Rhino via the file watcher.") : r.error ?? "Check failed.");
   };
 
   // ── Auto-push on change (debounced) ────────────────────────────────────────
@@ -97,20 +99,24 @@ export default function DrivePanel({ stateText, onDownloadState, webOnly }: { st
     <div className="space-y-4 text-neutral-900">
       <p className="text-sm leading-relaxed text-neutral-900">
         Send this model to your desktop Rhino. The studio emits a complete{" "}
-        <code className="font-mono">state.json</code>; the existing Watcher rebuilds the <b>bay-based</b> geometry, rooms, site and levels when that file changes.
+        <code className="font-mono">state.json</code>; the existing Watcher rebuilds the <b>bay-based</b> geometry (grids, walls, corridors, apertures) and levels when that file changes.
       </p>
 
-      {webOnly && webOnly.walls + webOnly.columns + webOnly.openings > 0 && (
-        <p role="alert" className="rounded-md border-2 border-[#ff3b21] bg-[#fff2f0] px-3 py-2 text-sm text-neutral-900">
+      {/* Static visual note (NOT a live region): the embedded counts change on
+          every add/remove, so role="alert" would re-speak the whole paragraph
+          assertively each edit. The edit itself is already announced. */}
+      {webOnly && webOnly.walls + webOnly.columns + webOnly.openings + webOnly.rooms > 0 && (
+        <p className="rounded-md border-2 border-[#ff3b21] bg-[#fff2f0] px-3 py-2 text-sm text-neutral-900">
           <b>Heads up:</b>{" "}
           {[
+            webOnly.rooms ? `${webOnly.rooms} program room${webOnly.rooms === 1 ? "" : "s"}` : "",
             webOnly.walls ? `${webOnly.walls} free wall${webOnly.walls === 1 ? "" : "s"}` : "",
             webOnly.columns ? `${webOnly.columns} free column${webOnly.columns === 1 ? "" : "s"}` : "",
             webOnly.openings ? `${webOnly.openings} wall opening${webOnly.openings === 1 ? "" : "s"}` : ""
           ]
             .filter(Boolean)
             .join(", ")}{" "}
-          are studio-native and will <b>not</b> be rebuilt in Rhino yet — they&rsquo;re kept in the file under <code className="font-mono">web_*</code> keys. Bays, apertures, rooms, the site boundary and levels do round-trip.
+          are studio-native and the current desktop Watcher does <b>not</b> rebuild them yet — they stay in the file (rooms in the native <code className="font-mono">rooms</code> key, the rest under <code className="font-mono">web_*</code>). Bays, apertures and levels do round-trip; an irregular site boundary currently flattens to a rectangle in Rhino.
         </p>
       )}
 
@@ -127,7 +133,7 @@ export default function DrivePanel({ stateText, onDownloadState, webOnly }: { st
                 Push state.json
               </button>
               <label className="flex items-center gap-1.5 text-xs font-semibold">
-                <input type="checkbox" checked={autoFolder} onChange={(e) => setAutoFolder(e.target.checked)} disabled={!dir} />
+                <input type="checkbox" checked={autoFolder} onChange={(e) => setAutoFolder(e.target.checked)} disabled={!dir} aria-label="Auto-push to the connected folder on change" />
                 Auto-push on change
               </label>
             </div>
@@ -154,16 +160,16 @@ export default function DrivePanel({ stateText, onDownloadState, webOnly }: { st
         <div className="flex flex-wrap items-center gap-2">
           <button type="button" className={btn} onClick={testBridge}>Test connection</button>
           <button type="button" className={btn} onClick={() => pushBridge(stateText)}>Push to Rhino</button>
-          <button type="button" className={btn} onClick={pingWatcher}>Query Watcher</button>
+          <button type="button" className={btn} onClick={pingWatcher} title="Optional live query link (advanced; off by default)">Check live link</button>
           <label className="flex items-center gap-1.5 text-xs font-semibold">
-            <input type="checkbox" checked={autoBridge} onChange={(e) => setAutoBridge(e.target.checked)} />
+            <input type="checkbox" checked={autoBridge} onChange={(e) => setAutoBridge(e.target.checked)} aria-label="Auto-push to the bridge on change" />
             Auto-push on change
           </label>
         </div>
         <p className="min-h-[1rem] text-xs text-neutral-900" aria-live="polite">{bridgeMsg}</p>
-        {info?.watcher && (
+        {info?.watcher?.reachable && (
           <p className="text-xs text-neutral-900">
-            Watcher (port {info.watcher.port}): <b>{info.watcher.reachable ? "reachable" : "not reachable"}</b>
+            Optional live link: <b>on</b> (Rhino is answering on port {info.watcher.port}).
           </p>
         )}
         <p className="text-xs leading-relaxed text-neutral-900">

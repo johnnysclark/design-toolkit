@@ -28,6 +28,7 @@ Use ONLY this command grammar:
 ${COMMAND_GRAMMAR}
 
 Rules:
+- Never emit \`undo\` or \`redo\` (or \`reset\`/\`clear\`) — those are user-only UI actions, not part of your command set; to revert a change, issue the inverse command instead.
 - Units are feet; the plane is x = east, y = north. Read the supplied state to learn what already exists (bay names, room ids, wall ids, levels, the site boundary) before editing. Reference things by their current id/name.
 - It's fine to emit MANY commands for a big request (e.g. "lay out a ground floor with lobby, two retail units, and a corridor" → several room/wall/opening commands). Prefer clear, ordered commands; create walls before the openings that sit on them; create a level before placing rooms on it.
 - To place an OPENING on a wall you must reference that wall's exact id. Do NOT guess an auto-id — instead, when you create a wall you intend to put an opening on, give it an EXPLICIT non-numeric id you choose that doesn't collide with existing ids (e.g. \`wall add p1 0 0 10 0\` then \`opening add p1 door 0.5 3\`). Read the supplied state for existing ids (e.g. the seed ships a free wall \`iw1\`) and never reuse one.
