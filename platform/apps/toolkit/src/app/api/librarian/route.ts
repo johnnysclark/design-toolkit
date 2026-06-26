@@ -55,9 +55,27 @@ function mediaTypeFor(contentType: string | null, url: string): string | null {
 }
 
 async function fetchImage(url: string): Promise<{ data: string; mediaType: string }> {
-  const res = await fetch(url, { signal: AbortSignal.timeout(15000) });
+  // Follow redirects MANUALLY so every hop is re-checked against the SSRF guard —
+  // default redirect:"follow" would let a public host 302 to an internal IP
+  // (cloud metadata / 127.0.0.1) that the pre-flight check never sees.
+  let current = url;
+  let res: Response | null = null;
+  for (let hop = 0; hop < 4; hop++) {
+    if (!isPublicHttpUrl(current)) {
+      throw new Error("That image URL points somewhere we can't fetch.");
+    }
+    res = await fetch(current, { redirect: "manual", signal: AbortSignal.timeout(15000) });
+    if (res.status >= 300 && res.status < 400) {
+      const loc = res.headers.get("location");
+      if (!loc) throw new Error("Could not fetch the image (bad redirect).");
+      current = new URL(loc, current).toString();
+      continue;
+    }
+    break;
+  }
+  if (!res) throw new Error("Could not fetch the image.");
   if (!res.ok) throw new Error(`Could not fetch the image (HTTP ${res.status}).`);
-  const mediaType = mediaTypeFor(res.headers.get("content-type"), url);
+  const mediaType = mediaTypeFor(res.headers.get("content-type"), current);
   if (!mediaType) {
     throw new Error("Unsupported image type — use JPEG, PNG, GIF, or WebP.");
   }
@@ -181,6 +199,16 @@ export async function POST(req: Request) {
 
     const refUrls: string[] = [];
     for (const p of paths.slice(0, MAX_IMAGES)) {
+      // Only sign paths in the caller's own folder. The 'library' bucket is
+      // readable by any authenticated user, so without this a signed-in student
+      // could pass another student's path and have the server fetch it into the
+      // billed vision call (IDOR). Mirrors the skills-coach attachment guard.
+      if (!p.startsWith(`${user.id}/`)) {
+        return NextResponse.json(
+          { error: "You can only analyze images from your own uploads." },
+          { status: 403 }
+        );
+      }
       const { data: signed, error } = await supabase.storage.from(BUCKET).createSignedUrl(p, 120);
       if (error || !signed?.signedUrl) {
         return NextResponse.json(

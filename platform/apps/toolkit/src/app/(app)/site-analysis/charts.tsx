@@ -118,7 +118,7 @@ export function WindRoseChart({ rose }: { rose: WindRose }) {
           );
         })}
       </svg>
-      <figcaption className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-neutral-500">
+      <figcaption className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-neutral-900">
         {bandLabels.map((l, i) => (
           <span key={l} className="inline-flex items-center gap-1">
             <span
@@ -128,7 +128,7 @@ export function WindRoseChart({ rose }: { rose: WindRose }) {
             {l}
           </span>
         ))}
-        <span className="text-neutral-400">
+        <span className="text-neutral-900">
           m/s · ring = {pct(maxTotal)} max · calm {pct(rose.calmFraction)}
         </span>
       </figcaption>
@@ -216,7 +216,7 @@ export function SunPathChart({ paths }: { paths: SunPath[] }) {
           );
         })}
       </svg>
-      <figcaption className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-neutral-500">
+      <figcaption className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-neutral-900">
         {paths.map((p) => (
           <span key={p.key} className="inline-flex items-center gap-1">
             <span
@@ -336,7 +336,7 @@ export function MonthlyClimate({
           </text>
         ))}
       </svg>
-      <figcaption className="mt-1 flex flex-wrap items-center gap-x-3 text-[11px] text-neutral-500">
+      <figcaption className="mt-1 flex flex-wrap items-center gap-x-3 text-[11px] text-neutral-900">
         <span className="inline-flex items-center gap-1">
           <span className="inline-block h-2.5 w-2.5 rounded-sm" style={{ background: "#fcd9b6" }} />
           monthly range
@@ -354,7 +354,7 @@ export function MonthlyClimate({
 function RHStrip({ rh }: { rh: MonthStat[] }) {
   const means = rh.map((m) => m.mean);
   return (
-    <span className="inline-flex items-center gap-1 text-neutral-400" title="Mean relative humidity by month">
+    <span className="inline-flex items-center gap-1 text-neutral-900" title="Mean relative humidity by month">
       RH
       <span className="inline-flex items-end gap-[1px]" aria-hidden>
         {means.map((v, i) => (

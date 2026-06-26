@@ -176,7 +176,7 @@ export default function SiteChat({ context }: { context: any }) {
           <div className="max-h-[22rem] min-h-[8rem] flex-1 space-y-3 overflow-y-auto rounded-lg border border-neutral-200 bg-neutral-50 p-3">
             {empty && (
               <div className="space-y-2">
-                <p className="text-xs text-neutral-500">
+                <p className="text-xs text-neutral-900">
                   Go deeper than the measured data — history, ownership, nearby context, current
                   proposals. Answers are web-searched and the sources land on the right.
                 </p>
@@ -184,7 +184,7 @@ export default function SiteChat({ context }: { context: any }) {
                   <button
                     key={s}
                     onClick={() => send(s)}
-                    className="block w-full rounded-lg border border-neutral-200 bg-white px-3 py-2 text-left text-sm text-neutral-700 hover:border-neutral-400"
+                    className="block w-full rounded-lg border border-neutral-200 bg-white px-3 py-2 text-left text-sm text-neutral-900 hover:border-neutral-400"
                   >
                     {s}
                   </button>
@@ -209,12 +209,12 @@ export default function SiteChat({ context }: { context: any }) {
               <div className="flex justify-start">
                 <div className="max-w-[92%] rounded-2xl rounded-bl-sm border border-neutral-200 bg-white px-3 py-2 text-sm leading-relaxed text-neutral-800">
                   {searching && !streamingText && (
-                    <span className="text-neutral-400">Searching the web…</span>
+                    <span className="text-neutral-900">Searching the web…</span>
                   )}
                   {streamingText ? (
                     <span className="whitespace-pre-wrap">{streamingText}</span>
                   ) : (
-                    !searching && <span className="text-neutral-400">Thinking…</span>
+                    !searching && <span className="text-neutral-900">Thinking…</span>
                   )}
                 </div>
               </div>
@@ -236,7 +236,7 @@ export default function SiteChat({ context }: { context: any }) {
             {streaming ? (
               <button
                 onClick={() => abortRef.current?.abort()}
-                className="shrink-0 rounded-lg border border-neutral-300 px-4 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-100"
+                className="shrink-0 rounded-lg border border-neutral-300 px-4 py-2 text-sm font-medium text-neutral-900 hover:bg-neutral-100"
               >
                 Stop
               </button>
@@ -250,18 +250,18 @@ export default function SiteChat({ context }: { context: any }) {
               </button>
             )}
           </div>
-          <p className="mt-1 text-[11px] text-neutral-400">
+          <p className="mt-1 text-[11px] text-neutral-900">
             AI judgment, web-searched — verify the sources before you rely on it.
           </p>
         </div>
 
         {/* sources rail */}
         <aside className="lg:border-l lg:border-neutral-100 lg:pl-4">
-          <div className="mb-2 text-[10px] font-semibold uppercase tracking-wide text-neutral-400">
+          <div className="mb-2 text-[10px] font-semibold uppercase tracking-wide text-neutral-900">
             Sources {sources.length > 0 && `(${sources.length})`}
           </div>
           {sources.length === 0 ? (
-            <p className="text-xs text-neutral-400">Links the AI cites will appear here.</p>
+            <p className="text-xs text-neutral-900">Links the AI cites will appear here.</p>
           ) : (
             <ul className="space-y-2">
               {sources.map((s, i) => (

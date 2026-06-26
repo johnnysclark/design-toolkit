@@ -18,6 +18,9 @@ export default function AppShell({
 
   return (
     <div className="flex min-h-screen flex-col">
+      <a href="#main" className="skip-link display-font text-xs uppercase tracking-wide">
+        Skip to content
+      </a>
       <header className="sticky top-0 z-30 flex items-center gap-3 border-b-2 border-neutral-900 bg-white px-4 py-3">
         <button
           type="button"
@@ -91,7 +94,7 @@ export default function AppShell({
             </div>
           </aside>
         )}
-        <main className="flex-1 overflow-x-hidden px-6 py-8 sm:px-10 sm:py-12">
+        <main id="main" tabIndex={-1} className="flex-1 overflow-x-hidden px-6 py-8 sm:px-10 sm:py-12">
           <div className="mx-auto max-w-5xl">{children}</div>
         </main>
       </div>

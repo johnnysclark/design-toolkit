@@ -32,7 +32,7 @@ export function Card({
       )}
       {children}
       {source && (
-        <p className="mt-3 border-t border-neutral-100 pt-2 text-[11px] text-neutral-400">
+        <p className="mt-3 border-t border-neutral-100 pt-2 text-[11px] text-neutral-900">
           <span className="font-semibold uppercase tracking-wide">Source</span> · {source}
         </p>
       )}
@@ -56,7 +56,7 @@ export function Stat({
   return (
     <div>
       <div
-        className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide text-neutral-400"
+        className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide text-neutral-900"
         title={hint}
       >
         {label}
@@ -67,7 +67,7 @@ export function Stat({
         )}
       </div>
       <div className="text-sm font-semibold text-neutral-900">{value ?? "—"}</div>
-      {sub && <div className="text-xs text-neutral-500">{sub}</div>}
+      {sub && <div className="text-xs text-neutral-900">{sub}</div>}
     </div>
   );
 }
@@ -80,7 +80,7 @@ export function Pill({
   tone?: "neutral" | "good" | "warn" | "bad" | "info";
 }) {
   const tones: Record<string, string> = {
-    neutral: "bg-neutral-100 text-neutral-700",
+    neutral: "bg-neutral-100 text-neutral-900",
     good: "bg-emerald-100 text-emerald-800",
     warn: "bg-amber-100 text-amber-800",
     bad: "bg-red-100 text-red-800",
@@ -105,7 +105,7 @@ export function CoverageStrip({ coverage, mode }: { coverage: Coverage; mode: "p
   ];
   return (
     <div className="flex flex-wrap items-center gap-2 text-xs">
-      <span className="font-semibold uppercase tracking-wide text-neutral-400">Coverage</span>
+      <span className="font-semibold uppercase tracking-wide text-neutral-900">Coverage</span>
       {layers
         .filter((l) => l.show)
         .map((l) => {
@@ -114,7 +114,7 @@ export function CoverageStrip({ coverage, mode }: { coverage: Coverage; mode: "p
             <span
               key={l.key}
               className={`inline-flex items-center gap-1 rounded-md px-2 py-1 font-medium ${
-                ok ? "bg-emerald-50 text-emerald-700" : "bg-neutral-100 text-neutral-400"
+                ok ? "bg-emerald-50 text-emerald-700" : "bg-neutral-100 text-neutral-900"
               }`}
             >
               <span aria-hidden>{ok ? "✓" : "✕"}</span>
@@ -153,7 +153,7 @@ export function ClaimRow({ claim }: { claim: Claim }) {
         <span className="text-sm text-neutral-800">{claim.claim}</span>
         <ClaimChip status={claim.status} />
       </div>
-      {claim.reason && <span className="text-xs text-neutral-500">{claim.reason}</span>}
+      {claim.reason && <span className="text-xs text-neutral-900">{claim.reason}</span>}
       {claim.source && (
         <a
           href={claim.source}
@@ -178,10 +178,10 @@ export function Read({ label, children }: { label: string; children: ReactNode }
   if (!children) return null;
   return (
     <div>
-      <div className="text-[10px] font-semibold uppercase tracking-wide text-neutral-400">
+      <div className="text-[10px] font-semibold uppercase tracking-wide text-neutral-900">
         {label}
       </div>
-      <p className="mt-0.5 whitespace-pre-line text-sm leading-relaxed text-neutral-700">{children}</p>
+      <p className="mt-0.5 whitespace-pre-line text-sm leading-relaxed text-neutral-900">{children}</p>
     </div>
   );
 }

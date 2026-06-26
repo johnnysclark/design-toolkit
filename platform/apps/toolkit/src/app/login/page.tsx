@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useEffect, useState } from "react";
 import { signIn, signInPassword, type LoginState } from "./actions";
 import RequestAccessButton from "@/components/RequestAccessButton";
 
@@ -9,6 +9,15 @@ const initialState: LoginState = {};
 export default function LoginPage() {
   const [pwState, pwAction, pwPending] = useActionState(signInPassword, initialState);
   const [mlState, mlAction, mlPending] = useActionState(signIn, initialState);
+
+  // Where to land after sign-in (a gated tool links here with ?next=…). Read
+  // from the URL on the client to avoid a Suspense boundary for useSearchParams;
+  // validated again server-side in the action.
+  const [next, setNext] = useState("/");
+  useEffect(() => {
+    const n = new URLSearchParams(window.location.search).get("next");
+    if (n && /^\/(?![/\\])/.test(n)) setNext(n);
+  }, []);
 
   const field =
     "w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm outline-none focus:border-neutral-900";
@@ -21,6 +30,7 @@ export default function LoginPage() {
 
         {/* Email + password — works on any domain (incl. Vercel previews), no email needed. */}
         <form action={pwAction} className="mt-6 space-y-3">
+          <input type="hidden" name="next" value={next} />
           <input
             name="email"
             type="email"
@@ -49,7 +59,7 @@ export default function LoginPage() {
 
         {/* Magic-link fallback. */}
         <details className="mt-4">
-          <summary className="cursor-pointer text-xs text-neutral-500 hover:text-neutral-800">
+          <summary className="cursor-pointer text-xs text-neutral-900 hover:text-[#ff3b21]">
             Or email me a magic link instead
           </summary>
           {mlState.sent ? (
@@ -58,6 +68,7 @@ export default function LoginPage() {
             </p>
           ) : (
             <form action={mlAction} className="mt-3 space-y-2">
+              <input type="hidden" name="next" value={next} />
               <input
                 name="email"
                 type="email"
@@ -69,7 +80,7 @@ export default function LoginPage() {
               <button
                 type="submit"
                 disabled={mlPending}
-                className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-100 disabled:opacity-50"
+                className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm font-medium text-neutral-900 hover:bg-neutral-100 disabled:opacity-50"
               >
                 {mlPending ? "Sending…" : "Send magic link"}
               </button>

@@ -643,8 +643,7 @@ export default function Overview() {
         <section className="end">
           <p>
             The panels above are simple static mocks; the live tools run in this toolkit and their own
-            repos. Use the sidebar — or the &ldquo;Live now&rdquo; links up top — to open the ones that are
-            ready.
+            repos. Use the sidebar to open the ones that are ready.
           </p>
         </section>
       </div>

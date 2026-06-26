@@ -107,10 +107,18 @@ export async function POST(req: Request) {
   if (body?.conversationId) {
     const { data } = await supabase
       .from("coach_conversations")
-      .select("id")
+      .select("id, discipline")
       .eq("id", body.conversationId)
       .maybeSingle();
     conversationId = data?.id ?? null;
+    // If the student switched the Tool on an existing thread, persist it so a
+    // reload restores the right discipline (page.tsx reads it from this row).
+    if (conversationId && data?.discipline !== discipline) {
+      await supabase
+        .from("coach_conversations")
+        .update({ discipline })
+        .eq("id", conversationId);
+    }
   }
   if (!conversationId) {
     const title = message ? message.slice(0, 80) : "Uploaded a file";

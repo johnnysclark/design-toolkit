@@ -17,7 +17,7 @@ export function SynthesisStrip({ synthesis }: { synthesis: Synthesis }) {
 
       {synthesis.design_opportunities?.length > 0 && (
         <div>
-          <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-neutral-400">
+          <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-neutral-900">
             Design opportunities
           </div>
           <ClaimList claims={synthesis.design_opportunities} />
@@ -33,10 +33,10 @@ export function SynthesisStrip({ synthesis }: { synthesis: Synthesis }) {
 
       {synthesis.field_checklist?.length > 0 && (
         <div>
-          <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-neutral-400">
+          <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-neutral-900">
             Field checklist — verify before you design
           </div>
-          <ul className="list-inside list-disc space-y-0.5 text-sm text-neutral-700">
+          <ul className="list-inside list-disc space-y-0.5 text-sm text-neutral-900">
             {synthesis.field_checklist.map((c, i) => (
               <li key={i}>{c}</li>
             ))}
@@ -57,11 +57,11 @@ export function ContaminationPanel({ contamination }: { contamination: Contamina
   const c = contamination;
   return (
     <Card title="Contamination (EPA-grounded)" className="space-y-4">
-      <p className="text-sm leading-relaxed text-neutral-700">{c.summary}</p>
+      <p className="text-sm leading-relaxed text-neutral-900">{c.summary}</p>
 
       {c.contaminants_of_concern?.length > 0 && (
         <div>
-          <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-neutral-400">
+          <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-neutral-900">
             Contaminants of concern
           </div>
           <ul className="space-y-2">
@@ -71,8 +71,8 @@ export function ContaminationPanel({ contamination }: { contamination: Contamina
                   <span className="text-sm font-semibold text-neutral-900">{x.name}</span>
                   <ClaimChip status={x.claim.status} />
                 </div>
-                <div className="text-xs text-neutral-500">in {x.media}</div>
-                <p className="mt-1 text-sm text-neutral-700">{x.health_or_design_note}</p>
+                <div className="text-xs text-neutral-900">in {x.media}</div>
+                <p className="mt-1 text-sm text-neutral-900">{x.health_or_design_note}</p>
                 {x.claim.source && (
                   <a
                     href={x.claim.source}
@@ -93,7 +93,7 @@ export function ContaminationPanel({ contamination }: { contamination: Contamina
 
       {c.institutional_controls?.length > 0 && (
         <div>
-          <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-neutral-400">
+          <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-neutral-900">
             Institutional controls
           </div>
           <ClaimList claims={c.institutional_controls} />
@@ -103,8 +103,8 @@ export function ContaminationPanel({ contamination }: { contamination: Contamina
       <Read label="Remediation status">{c.remediation_status}</Read>
 
       {c.sources?.length > 0 && (
-        <div className="text-xs text-neutral-500">
-          <span className="font-semibold uppercase tracking-wide text-neutral-400">Sources </span>
+        <div className="text-xs text-neutral-900">
+          <span className="font-semibold uppercase tracking-wide text-neutral-900">Sources </span>
           {c.sources.map((s, i) => (
             <a
               key={i}
