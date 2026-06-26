@@ -30,8 +30,9 @@
 > Librarian** so the Anthropic key is never reachable publicly — re-add auth before sharing
 > widely. Repo is being **trimmed to build-essential docs**.
 >
-> **Site Analysis — BUILT (2026-06-25, branch `site-analysis`, worktree
-> `design-toolkit-site-analysis`, not yet merged).** The ported engine
+> **Site Analysis / "Surveyor" — BUILT + MERGED + LIVE (branch `site-analysis`, worktree
+> `design-toolkit-site-analysis`; the in-app title is now _Surveyor_ but the route/folder/nav
+> key all stay `site-analysis`).** The ported engine
 > (`lib/site-analysis/*`) now has a full React UI at `(app)/site-analysis/`. Two new things vs.
 > the original spec: (1) it's **general-purpose** — a **Place mode** geocodes *any* address
 > (OSM Nominatim, keyless) plus a **Superfund mode** tuned for the class (EPA NPL search +
@@ -52,6 +53,53 @@
 > line on every data card** (Open-Meteo / USGS 3DEP / FEMA / EPA / OSM). (5) Macro/Micro buttons
 > relabeled **Macro · Region / Micro · Site** (kept the orientation from John's original spec).
 >
+> **Surveyor — reliability + auto-sources + further-resources (2026-06-26 · PR #26, MERGED to
+> `main` → DEPLOYED → verified live).** John reported the AI reading "stalls out most of the
+> time" and the chat "times out / doesn't complete." **Root cause:** the AI passes were blowing
+> Vercel Hobby's **60s function cap**, and a hard-kill returns a non-JSON error _page_ → the
+> client's `res.json()` throws "Unexpected token 'A'…". Two culprits: synthesis ran with
+> `thinking:{type:"adaptive"}` + 16k `max_tokens` (slow), and the grounded contamination pass
+> had an **uncapped** `web_search`. **Fixes (all shipped):**
+> - **`lib/anthropic/structured.ts`** (shared by synthesis + contamination): adaptive thinking
+>   **OFF by default** (`thinking` opt-in param), `web_search` **capped** (`maxUses`, default 5),
+>   `max_tokens` 16k→6k, and a **server-side soft-timeout** via `AbortSignal` (`timeoutMs`,
+>   default 54s) that ends the stream early and throws a **clean** error instead of a hard-kill.
+>   This is the core reliability primitive — keep new passes under the cap or raise the budget.
+> - **`api/site-analysis/chat/route.ts`**: `max_uses` 6→4, sources collected **incrementally**
+>   from stream events (so a soft-timeout still ships them), and a **53s** abort that always
+>   emits a terminal `done` frame (with the partial answer + a "stopped early" note).
+> - **`(app)/site-analysis/chat.tsx`**: client now **finalizes on stream-end even with no
+>   terminal frame** (commits the partial answer) — fixes the "frozen half-answer" hang.
+> - **Auto first pass — NEW, no button:** `api/site-analysis/sources/route.ts` (streamed,
+>   grounded, `max_uses:4`, 50s soft-timeout, auth-gated, logs `tool_runs` as
+>   `site-analysis:sources`) + `(app)/site-analysis/sources.tsx` (`SiteSources`, auto-fires on
+>   mount keyed per place, streams a short orientation + authoritative links into a "Sources &
+>   documents" card above the chat). ⚠️ **Cost note:** this fires automatically for **signed-in**
+>   users on **every** analyze — intentional per John's ask; kept cheap (Sonnet, 4 searches,
+>   1600 tokens). If cost becomes a concern, gate it behind a toggle or a first-view-only guard.
+> - **Further resources — NEW:** `(app)/site-analysis/resources.tsx` (`FurtherResources`) — a
+>   static, curated, grouped link list (Maps/GIS · Terrain/LiDAR · Climate/Sun/Energy ·
+>   Water/Soils/Hazards · Parcels/Zoning/Demographics · History) of the tools arch/landscape/
+>   planning students actually use. **Always visible** at the bottom (renders with or without an
+>   active analysis). No AI, no account. Curated links are real but unowned — sanity-check them
+>   periodically (EPA EJScreen was dropped in favor of EnviroAtlas for stability).
+> - **All-black-text rule** (now hard in `CLAUDE.md` §4): the two NEW files use only
+>   `neutral-900` body text. ⚠️ **The rest of `site-analysis-tool.tsx`/`ui.tsx`/`charts.tsx`
+>   still uses `neutral-400/500/600` greys** — a sitewide black-text sweep of this tool is an
+>   open follow-up (not done this session to avoid scope-creep on a production hotfix).
+> - **Verified on prod:** page 200; `analyze` (public) 200 in ~9.7s w/ correct climate (GHI
+>   1604, HDD 2513) + terrain true; `sources`/`chat`/`synthesis`/`contamination` all **401 for
+>   anon** (cost protection holds). ⚠️ **NOT exercised:** the **signed-in** AI streaming paths —
+>   headless can't hold John's session. **The real test is John running a signed-in analysis on
+>   Tar Creek** (the site that always failed). If it still stalls there: lower the budgets
+>   further, or **split contamination + synthesis into two shorter sequential requests** (each
+>   then has its own 60s), or stream synthesis to the UI like the chat. Budget knobs live in
+>   `structured.ts` (`timeoutMs`/`maxTokens`/`maxUses`) and the two streamed routes (their
+>   `setTimeout(...abort)` values + `max_uses`).
+> - **Open backlog (from SPEC §4 + this session):** blind-vs-grounded teaching toggle ·
+>   accessible chart data-tables (ARIA) · global terrain (USGS 3DEP is **US-only** — non-US
+>   sites get terrain:null) · the black-text sweep above.
+>
 > **Librarian — REBUILT + DEPLOYED (2026-06-25 · branch `tool/librarian`).**
 > Repurposed from the text-only precedent-dossier tool into a **visual reference library**:
 > upload / paste / URL a single found image → Claude vision reads it (identifications framed as
@@ -64,6 +112,54 @@
 > for anon** (cost protection holds). Enrichment verified against live archives (Commons category
 > P373 + LoC HABS collections endpoint). **Free-data v1**; paid reverse-image + Google-Images
 > search is a planned upgrade (needs SerpAPI/Serper keys). **Merged to `main` → deployed live.**
+>
+> **Coach (was "Skills Coach") — BUILT + LIVE + polished (through 2026-06-25 · merged to
+> `main`, deployed).** A Claude tutor for **Rhino / Grasshopper / AutoCAD / Revit / Adobe**
+> (+ a `general` fallback). Streaming chat (SSE), a **3-level toggle** (beginner / intermediate /
+> advanced — only re-pitches the *next* answer, never rewrites history), **image + PDF upload**
+> via Claude vision, a **report-back loop**, and trustworthy doc links. *Teaching stance:* always
+> give the real solution, metered by level + gated on a report-back at beginner (never refusal).
+> - **Live at** `https://toolkit.allmeans.works/skills-coach` (route/folder is still
+>   `skills-coach`; only the visible label was renamed to **"Coach"** in a parallel session —
+>   the `<h1>` in `skills-coach-chat.tsx` and `<AuthGate tool="Coach"/>` in `page.tsx`).
+> - **Auth / cost (DO NOT REMOVE):** the page gates anon → `<AuthGate>`, and
+>   `api/skills-coach/route.ts` returns **401 for anon** so the Anthropic key can't be hit
+>   anonymously. A **password login** (`signInPassword` in `login/actions.ts`) was added next to
+>   the magic link because built-in email only delivers to the owner until Resend SMTP is set up.
+> - **Files:** UI `(app)/skills-coach/{page.tsx, skills-coach-chat.tsx, MessageBubble.tsx,
+>   CoachSidebar.tsx}` · route `api/skills-coach/route.ts` (runtime nodejs, maxDuration 60,
+>   persists `coach_messages` + one `tool_runs` row) · prompts
+>   `lib/anthropic/skills-coach-prompts.ts` (`MODEL=claude-opus-4-8`, `buildSystem(level,
+>   discipline)`, `⟦META⟧` sentinel + `splitMeta`) · curated KB `lib/skills-coach/concepts.ts`
+>   (verified official doc roots only) · code helpers `lib/skills-coach/code.ts`
+>   (`latestScript`) · migration **`0002_skills_coach.sql`** (`coach_conversations`,
+>   `coach_messages`, private `coach-uploads` bucket — **already applied to live Supabase**).
+> - **How the trust model works:** the model emits concept **slugs** `[[concept:slug]]` (never
+>   raw URLs); the client resolves them to vetted docs via `concepts.ts`. Each turn ends with a
+>   trailing `⟦META⟧` + JSON tail carrying `{concept, claims, report_back, further_ideas}`, parsed
+>   server-side and sent as an SSE `meta` event.
+> - **Right sidebar = three collapsible panels** (`CoachSidebar.tsx`): **In context** (active
+>   concept), **Script** (latest Python the tutor wrote, with a big copy-into-Rhino button), and
+>   **Further ideas** (alternate commands/workflows/resources, from the `further_ideas` meta).
+> - **Last two changes (2026-06-25, PR #27 → squash `cd44aba`):** (1) the empty-state **example
+>   prompts now rotate** — a 26-prompt pool, a random 4 drawn on each mount + on "New chat"
+>   (`EXAMPLE_POOL`/`sampleExamples` in `skills-coach-chat.tsx`; SSR renders first 4
+>   deterministically, client reshuffles after mount → no hydration mismatch). (2) **All Coach UI
+>   text swept to black** (`text-neutral-900`) per the all-text-black rule — kept the functional
+>   accents (`#ff3b21` CTAs/links, the ✓/?/⚠ claim chips, error red). *The black rule is
+>   site-wide; only the Coach surface has been swept so far — other pages may still have grey.*
+> - **Deferred (not built):** Phase-2 `.ghx`/`.3dm` parsing (today non-image/PDF uploads get an
+>   honest "drop a screenshot" fallback; **HEIC is rejected** client-side); Resend SMTP + a
+>   6-digit OTP for `@illinois.edu` (campus scanners burn magic links).
+>
+> **⚠️ Multi-worktree hazard the next agent WILL hit (learned twice now):** several Claude
+> sessions share this repo via separate worktrees, so **a folder's local `main` can be many
+> commits behind `origin/main`** and the working tree can pick up another session's edits. Before
+> branching: `git fetch origin` and **base your branch on `origin/main`, not local HEAD** (last
+> time local `main` was 15 commits behind and a parallel session had renamed Skills Coach→Coach;
+> a naive branch would have reverted it). Also: **a *merge* commit does NOT trigger a Vercel
+> build — always `gh pr merge --squash`**, and direct `git push origin main` is blocked. Verify
+> every merge with `git show <sha> --stat` to confirm it touched only your files.
 >
 > **Multi-agent rule:** one agent = one folder = one git worktree = one branch (see
 > `../RUNNING-MULTIPLE-AGENTS.md`). The **GOAL-1 walkthrough below is now historical**; the
