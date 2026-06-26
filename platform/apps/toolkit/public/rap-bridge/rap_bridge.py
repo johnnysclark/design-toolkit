@@ -293,6 +293,14 @@ class RapBridgeHandler(BaseHTTPRequestHandler):
             self._send_json(400, {"ok": False, "error": "invalid JSON: %s" % exc})
             return
 
+        # Defense-in-depth: only relay read-only query types to the Watcher. The
+        # UI only ever sends {"type": "ping"}; never forward arbitrary commands
+        # to the Rhino TCP port from a browser.
+        mtype = payload.get("type") if isinstance(payload, dict) else None
+        if mtype not in ("ping", "status"):
+            self._send_json(400, {"ok": False, "error": "query type not allowed (only ping, status)"})
+            return
+
         reachable, response = watcher_query(payload, CONFIG.watcher_port)
         self._send_json(200, {
             "ok": True,

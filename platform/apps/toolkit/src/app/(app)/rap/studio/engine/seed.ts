@@ -63,7 +63,7 @@ export function makeSeedState(): State {
     walls: { enabled: true, thickness: 0.5 },
     apertures: [
       { id: "d1", type: "door", axis: "x", gridline: 0, corner: 28, width: 3, height: 7, hinge: "start", swing: "positive" },
-      { id: "w1", type: "window", axis: "y", gridline: 0, corner: 8, width: 6, height: 4, hinge: "start", swing: "positive" }
+      { id: "win1", type: "window", axis: "y", gridline: 0, corner: 8, width: 6, height: 4, hinge: "start", swing: "positive" }
     ],
     void_center: null,
     void_size: null,

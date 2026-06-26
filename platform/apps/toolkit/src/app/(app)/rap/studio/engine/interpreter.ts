@@ -63,6 +63,8 @@ function requireBay(state: State, name: string): Bay | null {
 function cmdAddBay(state: State, tokens: string[]): CommandResult {
   const name = tokens[2];
   if (!name) return err(state, "Usage: add bay <name> [at <x> <y>]");
+  if (["add", "remove", "move", "thickness", "list"].includes(name))
+    return err(state, `"${name}" is a reserved word and can't be a bay name. Pick another (e.g. ${name.toUpperCase()}1).`);
   if (state.bays[name]) return err(state, `Bay ${name} already exists.`);
   let origin: [number, number] = [10 + Object.keys(state.bays).length * 8, 10];
   if (tokens[3] === "at") {
@@ -240,6 +242,7 @@ function cmdAperture(state: State, tokens: string[]): CommandResult {
     const height = num(tokens[9]);
     if (!id || !["door", "window", "portal"].includes(type) || (axis !== "x" && axis !== "y") || gridline === null || corner === null || width === null || height === null)
       return err(state, "Usage: aperture <bay> add <id> <door|window|portal> <x|y> <gridline> <corner> <width> <height>");
+    if (width <= 0 || height <= 0) return err(state, "Aperture width and height must be > 0 ft.");
     if (b.apertures.some((a) => a.id === id)) return err(state, `Aperture ${id} already exists in bay ${name}.`);
     b.apertures.push({ id, type, axis, gridline: Math.round(gridline), corner, width, height, hinge: "start", swing: "positive" });
     return ok(next, `Added ${type} ${id} to bay ${name} (${axis}-wall gridline ${Math.round(gridline)}, ${width}×${height} ft).`);
@@ -311,6 +314,7 @@ function cmdWallFree(state: State, tokens: string[]): CommandResult {
     if (x1 === null || y1 === null || x2 === null || y2 === null)
       return err(state, "Usage: wall add [id] <x1> <y1> <x2> <y2> [thickness] [level]");
     const th = num(tokens[i + 4]) ?? 0.5;
+    if (th <= 0) return err(state, "Wall thickness must be > 0 ft.");
     const level = Math.round(num(tokens[i + 5]) ?? 0);
     if (!id) id = nextId(next.walls, "w");
     if (next.walls.some((w) => w.id === id)) return err(state, `Wall ${id} already exists.`);
@@ -420,8 +424,10 @@ function cmdRoom(state: State, tokens: string[]): CommandResult {
   if (field === "level") {
     const l = num(tokens[3]);
     if (l === null) return err(state, "Usage: room <id> level <n>");
-    r.level = Math.round(l);
-    return ok(next, `Room ${id} on level ${Math.round(l)}.`);
+    const lv = Math.round(l);
+    if (lv < 0 || lv >= next.levels.length) return err(state, `No level ${lv} (levels are 0–${next.levels.length - 1}). Add one first: level add <name> <z>.`);
+    r.level = lv;
+    return ok(next, `Room ${id} on level ${lv}.`);
   }
   return err(state, "Usage: room add … | room remove <id> | room <id> use|name|move|size|level …");
 }
@@ -444,7 +450,9 @@ function cmdColumn(state: State, tokens: string[]): CommandResult {
     const y = num(tokens[i + 1]);
     const size = num(tokens[i + 2]) ?? state.style.column_size;
     if (x === null || y === null) return err(state, "Usage: column add [id] <x> <y> [size]");
+    if (size <= 0) return err(state, "Column size must be > 0 ft.");
     if (!id) id = nextId(next.columns, "col");
+    if (next.columns.some((c) => c.id === id)) return err(state, `Column ${id} already exists.`);
     next.columns.push({ id, level: 0, at: [x, y], size });
     return ok(next, `Added column ${id} at (${x}, ${y}).`);
   }
@@ -474,6 +482,7 @@ function cmdOpening(state: State, tokens: string[]): CommandResult {
     const height = num(tokens[6]) ?? 7;
     if (!next.walls.some((w) => w.id === wallId)) return err(state, `No free wall ${wallId}. (openings go on free walls — see wall list)`);
     if (!["door", "window", "portal"].includes(type) || pos === null || width === null) return err(state, "Usage: opening add <wallId> <door|window|portal> <pos 0–1> <width> [height]");
+    if (width <= 0) return err(state, "Opening width must be > 0 ft.");
     const id = nextId(next.openings, type[0]);
     next.openings.push({ id, wallId, type, pos: Math.max(0, Math.min(1, pos)), width, height });
     return ok(next, `Added ${type} ${id} on wall ${wallId} at ${(pos * 100).toFixed(0)}%, ${width} ft.`);
@@ -562,6 +571,13 @@ export function describe(state: State): string {
     })
     .join("\n");
 
+  // Rooms on an out-of-range level still count in MACRO — surface them so the
+  // spoken read-back always reconciles with the count (e.g. after an import).
+  const orphans = state.rooms.filter((r) => r.level < 0 || r.level >= state.levels.length);
+  const orphanBlock = orphans.length
+    ? [`UNPLACED — ${orphans.length} room(s) on an out-of-range level: ${orphans.map((r) => `${r.name} (L${r.level})`).join(", ")}.`]
+    : [];
+
   // Micro — bay detail + free walls + openings.
   const bayMicro = names.map((n) => {
     const b = state.bays[n];
@@ -577,7 +593,7 @@ export function describe(state: State): string {
     ? [`MICRO — Wall openings: ${state.openings.map((o) => `${o.type} ${o.id} on ${o.wallId}`).join(", ")}.`]
     : [];
 
-  return [macro, "", meso, "", ...bayMicro, ...wallMicro, ...openMicro].join("\n");
+  return [macro, "", meso, ...orphanBlock, "", ...bayMicro, ...wallMicro, ...openMicro].join("\n");
 }
 
 // ─── Dispatcher ──────────────────────────────────────────────────────────────

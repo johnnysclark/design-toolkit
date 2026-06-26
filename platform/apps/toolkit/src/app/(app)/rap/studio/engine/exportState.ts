@@ -3,10 +3,13 @@
 // `rhino_controller_v4.0` file that the desktop Rhino Watcher can load.
 //
 // The studio holds a focused subset; the desktop tool writes many more top-level
-// keys. Here we fill every key with safe defaults so the file loads cleanly, and
-// we ALSO preserve the studio's richer building elements (free walls / rooms /
-// columns / openings) under `web_*` keys so a round-trip is lossless. The same
-// string feeds the "Download state.json" button and the Drive-Rhino push.
+// keys. Here we fill every key with safe defaults so the file loads cleanly. The
+// BAY-based geometry (bays, apertures, site, levels) maps to native keys the
+// Watcher rebuilds. The studio-native free elements (interior/exterior walls,
+// columns, wall openings) are carried under `web_*` keys for preservation, but
+// the current desktop Watcher does NOT rebuild them — the Drive panel warns the
+// user when the model contains such elements. The same string feeds the
+// "Download state.json" button and the Drive-Rhino push.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import type { State } from "./types";
@@ -115,9 +118,10 @@ export function toFullStateJson(state: State): Record<string, unknown> {
     tts: { enabled: false, rate: 2 },
     section: { axis: "x", offset: 0 },
 
-    // ── Studio-native building elements (lossless round-trip) ──
+    // ── Studio-native free elements (interior/exterior walls, columns, wall
+    // openings) the desktop Watcher does not yet read back. Rooms are already
+    // projected into the native `rooms` dict above, so they're not repeated here.
     web_walls: state.walls,
-    web_rooms: state.rooms,
     web_columns: state.columns,
     web_openings: state.openings
   };

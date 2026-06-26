@@ -265,7 +265,11 @@ export default function RapStudio({ signedIn }: { signedIn: boolean }) {
 
       {/* Row 3 — drive real Rhino */}
       <Panel title="Drive Rhino — talk to state.json + the Watcher">
-        <DrivePanel stateText={fullState} onDownloadState={exportState} />
+        <DrivePanel
+          stateText={fullState}
+          onDownloadState={exportState}
+          webOnly={{ walls: state.walls.length, columns: state.columns.length, openings: state.openings.length }}
+        />
       </Panel>
 
       {/* Screen-reader announcements for every state change */}

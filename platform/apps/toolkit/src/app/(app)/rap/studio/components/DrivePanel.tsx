@@ -12,7 +12,7 @@ const card = "rounded-lg border-2 border-neutral-900 p-3 space-y-2";
 const btn = "display-font rounded border-2 border-neutral-900 px-3 py-1.5 text-xs uppercase text-neutral-900 hover:bg-neutral-900 hover:text-white disabled:opacity-40";
 const field = "rounded border-2 border-neutral-900 px-2 py-1 text-sm text-neutral-900 outline-none focus:border-[#ff3b21]";
 
-export default function DrivePanel({ stateText, onDownloadState }: { stateText: string; onDownloadState: () => void }) {
+export default function DrivePanel({ stateText, onDownloadState, webOnly }: { stateText: string; onDownloadState: () => void; webOnly?: { walls: number; columns: number; openings: number } }) {
   // ── Direct folder write ────────────────────────────────────────────────────
   const [dir, setDir] = useState<FileSystemDirectoryHandle | null>(null);
   const [dirName, setDirName] = useState("");
@@ -97,8 +97,22 @@ export default function DrivePanel({ stateText, onDownloadState }: { stateText: 
     <div className="space-y-4 text-neutral-900">
       <p className="text-sm leading-relaxed text-neutral-900">
         Send this model to your desktop Rhino. The studio emits a complete{" "}
-        <code className="font-mono">state.json</code>; the existing Watcher rebuilds the model when that file changes.
+        <code className="font-mono">state.json</code>; the existing Watcher rebuilds the <b>bay-based</b> geometry, rooms, site and levels when that file changes.
       </p>
+
+      {webOnly && webOnly.walls + webOnly.columns + webOnly.openings > 0 && (
+        <p role="alert" className="rounded-md border-2 border-[#ff3b21] bg-[#fff2f0] px-3 py-2 text-sm text-neutral-900">
+          <b>Heads up:</b>{" "}
+          {[
+            webOnly.walls ? `${webOnly.walls} free wall${webOnly.walls === 1 ? "" : "s"}` : "",
+            webOnly.columns ? `${webOnly.columns} free column${webOnly.columns === 1 ? "" : "s"}` : "",
+            webOnly.openings ? `${webOnly.openings} wall opening${webOnly.openings === 1 ? "" : "s"}` : ""
+          ]
+            .filter(Boolean)
+            .join(", ")}{" "}
+          are studio-native and will <b>not</b> be rebuilt in Rhino yet — they&rsquo;re kept in the file under <code className="font-mono">web_*</code> keys. Bays, apertures, rooms, the site boundary and levels do round-trip.
+        </p>
+      )}
 
       {/* 1 — Direct folder write */}
       <div className={card}>

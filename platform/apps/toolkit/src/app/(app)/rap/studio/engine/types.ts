@@ -4,13 +4,14 @@
 // This is a faithful TypeScript subset of the real RAP `state.json`
 // (schema `rhino_controller_v4.0`). The web tool holds this state in the
 // browser and renders it many ways (2D tactile plan, 3D, STL, Braille, text) —
-// exactly the project's "sense-agnostic state + renderer parity" idea. Because
-// the shape matches the real file, anything the tool emits round-trips to the
-// desktop Rhino Watcher.
+// exactly the project's "sense-agnostic state + renderer parity" idea. The
+// shape matches the real file, so the BAY-based parts round-trip to the desktop
+// Rhino Watcher; the studio-native free elements (walls/rooms/columns/openings)
+// are carried under `web_*` keys by exportState and are NOT yet read back by the
+// desktop Watcher — see exportState.ts.
 //
 // We deliberately keep a *subset* of the fields the desktop controller writes
-// (the ones the web renderers use). Unknown fields on a loaded file are
-// preserved verbatim via `extra` so a round-tripped file isn't lossy.
+// (the ones the web renderers use); exportState.ts fills in the rest on export.
 // ─────────────────────────────────────────────────────────────────────────────
 
 export type Vec2 = [number, number];
@@ -66,7 +67,7 @@ export interface Bay {
   label: string;
   braille: string;
   /** Which level this bay belongs to (index into State.levels). */
-  level?: number;
+  level: number;
 }
 
 export interface Level {
@@ -179,8 +180,6 @@ export interface State {
   openings: Opening[];
   levels: Level[];
   tactile3d: Tactile3D;
-  /** Unknown top-level keys from a loaded file, preserved for lossless export. */
-  extra?: Record<string, unknown>;
 }
 
 /** Result of applying one command to the state. */
