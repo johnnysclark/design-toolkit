@@ -12,11 +12,11 @@ export const metadata = {
 const CARDS: HubCard[] = [
   {
     title: "Obliquify",
-    source: "Rebuilt — original source not found",
-    status: "rebuilt",
+    source: "Three.js paraline viewer",
+    status: "live",
     href: "/tools-3d/obliquify",
     blurb:
-      "Turn a flat drawing — an elevation, plan, or photo — into an oblique (paraline) projection: extrude it into depth at an adjustable angle and direction, choose cabinet / cavalier presets, shade the sides, outline the edges, and export a transparent PNG."
+      "Import a 3D model (STL/OBJ/PLY) and view it under a true oblique (paraline) projection — the front plane stays true-shape while depth recedes at a chosen angle and foreshortening. Cabinet / cavalier presets, adjustable angle, depth ratio and direction, a demo massing to test, and a PNG export. Client-side, nothing uploaded."
   },
   {
     title: "3D-Print & PIAF Settings",
@@ -46,7 +46,7 @@ export default function Tools3DPage() {
     <ToolHub
       title="3D Tooling"
       subtitle="Modeling & 3D Print"
-      intro="On-ramps for moving from model to machine and to the web. Obliquify, the Model Viewer, and the Rhino/Grasshopper Python gallery all run entirely in your browser — no account, nothing uploaded. (Obliquify is a fresh rebuild — point us at your original and we'll match it.)"
+      intro="On-ramps for moving from model to machine and to the web. Obliquify, the Model Viewer, and the Rhino/Grasshopper Python gallery all run entirely in your browser — no account, nothing uploaded."
       cards={CARDS}
     />
   );
