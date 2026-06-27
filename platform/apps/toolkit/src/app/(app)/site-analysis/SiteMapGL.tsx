@@ -374,7 +374,11 @@ export default function SiteMapGL({
 
   return (
     <div className="relative h-full w-full">
-      <div ref={containerRef} className="absolute inset-0" style={{ background: "#e5e5e5" }} aria-label="Site map — click to drop a pin and survey that spot" />
+      {/* The map container fills the box as an in-flow block. NB: it must NOT rely
+          on `absolute inset-0` — MapLibre forces `position: relative` on its own
+          `.maplibregl-map` class, overriding Tailwind's `.absolute` (equal
+          specificity, later source order), which collapses the element to 0 height. */}
+      <div ref={containerRef} className="h-full w-full" style={{ background: "#e5e5e5" }} aria-label="Site map — click to drop a pin and survey that spot" />
       <ControlPanel
         is3d={is3d}
         setIs3d={setIs3d}
