@@ -408,7 +408,7 @@ export default function RapStudio({ signedIn }: { signedIn: boolean }) {
             <h3 className="display-font text-xs uppercase tracking-tight text-neutral-900">Tips</h3>
             <ul className="mt-1.5 list-disc space-y-1 pl-5">
               <li><b>Assistant</b> is fastest for whole moves; <b>Console</b> gives you exact control — type <code className="font-mono">help</code> for every command.</li>
-              <li>Send an assistant request with <b>⌘/Ctrl + Enter</b>.</li>
+              <li>In the <b>Assistant</b>, press <b>Enter</b> to send (<b>Shift+Enter</b> for a new line).</li>
               <li>Made a wrong move? <b>Undo</b> / <b>Redo</b> step through your whole history (loading a starter is undoable too).</li>
               <li>Turn on <b>Speak confirmations</b> to hear every change announced aloud.</li>
               <li>Use the <b>level selector</b> on the model to view and export one floor at a time.</li>
