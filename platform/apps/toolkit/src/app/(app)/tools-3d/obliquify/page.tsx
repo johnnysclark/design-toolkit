@@ -4,7 +4,7 @@ import Obliquify from "./Obliquify";
 export const metadata = {
   title: "Obliquify · Design Toolkit",
   description:
-    "Import a 3D model (STL/OBJ/PLY) and view it under a true oblique (paraline) projection — cabinet/cavalier presets, angle, depth ratio and direction — in the browser."
+    "Import a 3D model (STL/OBJ/PLY/3DM) and view it under a true oblique (paraline) projection — cabinet/cavalier/planometric presets, angle, depth ratio and direction — in the browser."
 };
 
 // Native in-app 3D tool (no iframe), styled to read as part of the site like RAP
@@ -25,10 +25,11 @@ export default function ObliquifyPage() {
           </span>
         </div>
         <p className="mt-2 max-w-3xl text-neutral-900">
-          Import a 3D model and see it under a true <b>oblique (paraline) projection</b> — the camera-facing plane stays
-          true-shape while the depth axis recedes at a chosen angle and foreshortening (cabinet = ½, cavalier = 1). Pick a
-          preset or set the angle, depth and direction yourself, orbit to inspect, and export a PNG. A demo massing is loaded by
-          default so you can test it straight away. STL, OBJ and PLY — parsed entirely in your browser, never uploaded.
+          Import a 3D model and see it under a true <b>oblique (paraline) projection</b> — locked to a principal face (Front,
+          Plan or Side) so that face stays true-shape while the depth axis recedes at a chosen angle and foreshortening
+          (cabinet = ½, cavalier = 1). Pick a preset or set the angle, depth and direction yourself; switch to <b>3·4 Axon</b>{" "}
+          to free-orbit a true axonometric for comparison; then export a PNG. A demo massing is loaded by default so you can
+          test it straight away. STL, OBJ, PLY and Rhino <b>3DM</b> — parsed entirely in your browser, never uploaded.
         </p>
       </div>
 

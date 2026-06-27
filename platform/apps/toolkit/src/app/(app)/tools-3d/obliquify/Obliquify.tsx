@@ -4,9 +4,14 @@
 // Obliquify — import a 3D model and view it under a true oblique (paraline)
 // projection. Cabinet / cavalier presets, adjustable receding angle, depth ratio
 // and direction; a demo massing is loaded by default so the viewer always shows
-// something to test against. STL / OBJ / PLY, all parsed in the browser (nothing
-// is uploaded). Export the framed view as a PNG. Chrome matches the site / RAP:
-// white, Archivo-Black headers, black 2px-border panels, all-black text.
+// something to test against. STL / OBJ / PLY / 3DM (Rhino), all parsed in the
+// browser (nothing is uploaded). Export the framed view as a PNG. Chrome matches
+// the site / RAP: white, Archivo-Black headers, black 2px-border panels, all-black
+// text.
+//
+// Oblique is shown view-locked to a principal face (Front / Plan / Side), which is
+// what makes it a correct cabinet / cavalier / planometric drawing; "3·4 Axon" is
+// a free-orbit true axonometric for comparison.
 //
 // (Supersedes the old 2D image-extrusion tool — Obliquify is a 3D tool now.)
 // ─────────────────────────────────────────────────────────────────────────────
@@ -14,60 +19,109 @@
 import { useCallback, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import type * as THREE from "three";
-import type { ViewPreset } from "./ObliqueScene";
 
 const ObliqueScene = dynamic(() => import("./ObliqueScene"), {
   ssr: false,
   loading: () => <div className="flex h-full items-center justify-center text-sm font-semibold text-neutral-900">Loading 3D…</div>
 });
 
+// ── collect baked, world-space mesh geometries from a loaded scene graph ──────
+// Expands instanced meshes (Rhino blocks) so every placement shows, and skips
+// empty geometry. Uses only Matrix4 instance methods, so a type-only THREE
+// import is enough.
+function collectMeshGeometries(root: THREE.Object3D): THREE.BufferGeometry[] {
+  root.updateMatrixWorld(true);
+  const out: THREE.BufferGeometry[] = [];
+  root.traverse((c) => {
+    const mesh = c as THREE.Mesh & {
+      isInstancedMesh?: boolean;
+      count?: number;
+      getMatrixAt?: (i: number, m: THREE.Matrix4) => void;
+    };
+    if (!mesh.isMesh || !mesh.geometry) return;
+    const base = mesh.geometry as THREE.BufferGeometry;
+    const pos = base.getAttribute("position");
+    if (!pos || pos.count === 0) return;
+    const bake = (world: THREE.Matrix4) => {
+      const g = base.clone();
+      g.applyMatrix4(world);
+      if (!g.getAttribute("normal")) g.computeVertexNormals();
+      out.push(g);
+    };
+    if (mesh.isInstancedMesh && typeof mesh.getMatrixAt === "function" && mesh.count) {
+      const inst = mesh.matrixWorld.clone();
+      for (let i = 0; i < mesh.count; i++) {
+        mesh.getMatrixAt(i, inst); // inst ← per-instance local matrix
+        bake(mesh.matrixWorld.clone().multiply(inst)); // world = parentWorld · instance
+      }
+    } else {
+      bake(mesh.matrixWorld);
+    }
+  });
+  return out;
+}
+
 // ── parse a dropped/loaded model into an array of BufferGeometry ─────────────
 async function parseModel(file: File): Promise<THREE.BufferGeometry[]> {
   const name = file.name.toLowerCase();
+
   if (name.endsWith(".obj")) {
     const text = await file.text();
     const { OBJLoader } = await import("three/examples/jsm/loaders/OBJLoader.js");
-    const group = new OBJLoader().parse(text);
-    group.updateMatrixWorld(true);
-    const out: THREE.BufferGeometry[] = [];
-    group.traverse((c) => {
-      const mesh = c as THREE.Mesh;
-      if (mesh.isMesh && mesh.geometry) {
-        const g = (mesh.geometry as THREE.BufferGeometry).clone();
-        g.applyMatrix4(mesh.matrixWorld);
-        if (!g.getAttribute("normal")) g.computeVertexNormals();
-        out.push(g);
-      }
-    });
+    return collectMeshGeometries(new OBJLoader().parse(text));
+  }
+
+  if (name.endsWith(".3dm")) {
+    // Rhino files: parsed in a worker via rhino3dm WASM (vendored under
+    // /vendor/rhino3dm/). 3DMLoader returns Rhino's render meshes; Rhino is
+    // Z-up, so rotate −90° about X into three's Y-up before baking.
+    const buf = await file.arrayBuffer();
+    const { Rhino3dmLoader } = await import("three/examples/jsm/loaders/3DMLoader.js");
+    const loader = new Rhino3dmLoader();
+    loader.setLibraryPath("/vendor/rhino3dm/");
+    const object = await new Promise<THREE.Object3D>((resolve, reject) =>
+      loader.parse(buf, resolve, reject)
+    );
+    object.rotation.x = -Math.PI / 2; // Rhino Z-up → three Y-up
+    const out = collectMeshGeometries(object);
+    if (typeof (loader as unknown as { dispose?: () => void }).dispose === "function") {
+      (loader as unknown as { dispose: () => void }).dispose();
+    }
     return out;
   }
+
   const buf = await file.arrayBuffer();
   if (name.endsWith(".ply")) {
     const { PLYLoader } = await import("three/examples/jsm/loaders/PLYLoader.js");
     const g = new PLYLoader().parse(buf);
     if (!g.getAttribute("normal")) g.computeVertexNormals();
-    return [g];
+    const pos = g.getAttribute("position");
+    return pos && pos.count > 0 ? [g] : [];
   }
   // default: STL (binary or ascii)
   const { STLLoader } = await import("three/examples/jsm/loaders/STLLoader.js");
   const g = new STLLoader().parse(buf);
   if (!g.getAttribute("normal")) g.computeVertexNormals();
-  return [g];
+  const pos = g.getAttribute("position");
+  return pos && pos.count > 0 ? [g] : [];
 }
 
 type ProjPreset = { id: string; label: string; angle: number; depth: number };
 const PROJ_PRESETS: ProjPreset[] = [
   { id: "cabinet", label: "Cabinet", angle: 45, depth: 0.5 },
   { id: "cavalier", label: "Cavalier", angle: 45, depth: 1.0 },
-  { id: "thirty", label: "30°", angle: 30, depth: 0.6 },
-  { id: "sixty", label: "60°", angle: 60, depth: 0.6 }
+  { id: "thirty", label: "30°", angle: 30, depth: 0.5 },
+  { id: "sixty", label: "60°", angle: 60, depth: 0.5 }
 ];
 
-const VIEWS: { id: string; label: string; dir: [number, number, number] }[] = [
-  { id: "corner", label: "3/4", dir: [9, 7, 11] },
+// Views: the three principal faces give a TRUE oblique (face stays true-shape,
+// depth recedes). "3·4 Axon" is a free-orbit true axonometric for comparison.
+type ViewDef = { id: string; label: string; dir: [number, number, number]; axon?: boolean };
+const VIEWS: ViewDef[] = [
   { id: "front", label: "Front", dir: [0, 0, 1] },
-  { id: "right", label: "Right", dir: [1, 0, 0] },
-  { id: "top", label: "Top", dir: [0, 1, 0.0001] }
+  { id: "plan", label: "Plan", dir: [0, 1, 0.0001] },
+  { id: "side", label: "Side", dir: [1, 0, 0] },
+  { id: "axon", label: "3·4 Axon", dir: [9, 7, 11], axon: true }
 ];
 
 const DIRS: { id: string; glyph: string; dx: 1 | -1; dy: 1 | -1 }[] = [
@@ -87,33 +141,50 @@ export default function Obliquify() {
   const [dirId, setDirId] = useState("up-right");
   const [showEdges, setShowEdges] = useState(true);
   const [showGrid, setShowGrid] = useState(true);
-  const [preset, setPreset] = useState<ViewPreset>({ key: 0, dir: [9, 7, 11] });
-  const [status, setStatus] = useState("Demo massing loaded — import a model or orbit to inspect.");
+  const [viewId, setViewId] = useState("front");
+  const [viewNonce, setViewNonce] = useState(0);
+  const [status, setStatus] = useState("Demo massing loaded — cabinet projection, Front. Import a model or pick a view.");
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
   const dir = useMemo(() => DIRS.find((d) => d.id === dirId) ?? DIRS[1], [dirId]);
+  const view = useMemo(() => VIEWS.find((v) => v.id === viewId) ?? VIEWS[0], [viewId]);
+  const isAxon = !!view.axon;
+  const effectiveOblique = oblique && !isAxon;
 
   const onReady = useCallback((c: HTMLCanvasElement) => {
     canvasRef.current = c;
   }, []);
 
+  const pickView = useCallback((id: string) => {
+    setViewId(id);
+    setViewNonce((n) => n + 1); // re-snap even if same button is pressed again
+  }, []);
+
   const loadFile = useCallback(async (file: File) => {
-    if (!/\.(stl|obj|ply)$/i.test(file.name)) {
-      setStatus("Unsupported file — use STL, OBJ or PLY.");
+    if (!/\.(stl|obj|ply|3dm)$/i.test(file.name)) {
+      setStatus("Unsupported file — use STL, OBJ, PLY or 3DM.");
       return;
     }
     setStatus("Parsing " + file.name + "…");
     try {
       const geos = await parseModel(file);
       if (!geos.length) {
-        setStatus("No geometry found in " + file.name + ".");
+        setStatus(
+          /\.3dm$/i.test(file.name)
+            ? `No render meshes in ${file.name}. In Rhino, shade the view (or mesh the objects) before saving the .3dm.`
+            : "No geometry found in " + file.name + "."
+        );
         return;
       }
       setGeometries(geos);
       setModelName(file.name);
-      const tris = geos.reduce((n, g) => n + (g.getAttribute("position")?.count ?? 0) / 3, 0);
+      // triangles = index.count/3 for indexed meshes (OBJ/PLY/3DM), else position.count/3 (STL)
+      const tris = geos.reduce((n, g) => {
+        const idx = g.getIndex();
+        return n + (idx ? idx.count : (g.getAttribute("position")?.count ?? 0)) / 3;
+      }, 0);
       setStatus(`${file.name} — ${Math.round(tris).toLocaleString()} triangles`);
     } catch (err) {
       setStatus("Could not parse " + file.name + ": " + (err as Error).message);
@@ -126,12 +197,16 @@ export default function Obliquify() {
     setStatus("Demo massing loaded — import a model or orbit to inspect.");
   }, []);
 
-  const applyProjPreset = useCallback((p: ProjPreset) => {
-    setPresetId(p.id);
-    setAngle(p.angle);
-    setDepth(p.depth);
-    setOblique(true);
-  }, []);
+  const applyProjPreset = useCallback(
+    (p: ProjPreset) => {
+      setPresetId(p.id);
+      setAngle(p.angle);
+      setDepth(p.depth);
+      setOblique(true);
+      if (isAxon) pickView("front"); // a projection preset only reads on a face
+    },
+    [isAxon, pickView]
+  );
 
   const exportPng = useCallback(() => {
     const c = canvasRef.current;
@@ -153,7 +228,7 @@ export default function Obliquify() {
       <input
         ref={fileInputRef}
         type="file"
-        accept=".stl,.obj,.ply"
+        accept=".stl,.obj,.ply,.3dm"
         className="hidden"
         onChange={(e) => e.target.files?.[0] && loadFile(e.target.files[0])}
       />
@@ -170,15 +245,15 @@ export default function Obliquify() {
             </button>
           </div>
           <p className="mt-2 text-xs text-neutral-900">
-            STL, OBJ or PLY. Drop a file on the viewer or click Import — nothing is uploaded, it&apos;s parsed in your browser.
-            Orbit to inspect; the oblique shear holds as you turn.
+            STL, OBJ, PLY or 3DM (Rhino). Drop a file on the viewer or click Import — nothing is uploaded, it&apos;s parsed in
+            your browser. A .3dm needs render meshes saved in it (shade the Rhino view before saving).
           </p>
         </Panel>
 
         <Panel title="Projection">
           <div className="grid grid-cols-2 gap-1.5">
             {PROJ_PRESETS.map((p) => (
-              <button key={p.id} type="button" onClick={() => applyProjPreset(p)} className={oblique && presetId === p.id ? chipActive : chip}>
+              <button key={p.id} type="button" onClick={() => applyProjPreset(p)} className={effectiveOblique && presetId === p.id ? chipActive : chip}>
                 {p.label}
               </button>
             ))}
@@ -227,26 +302,31 @@ export default function Obliquify() {
             <span>Oblique projection</span>
             <input type="checkbox" checked={oblique} onChange={(e) => setOblique(e.target.checked)} className="h-4 w-4 accent-[#ff3b21]" />
           </label>
-          <p className="mt-1 text-xs text-neutral-900">Off = plain orthographic, for comparison.</p>
+          <p className="mt-1 text-xs text-neutral-900">
+            {isAxon
+              ? "3·4 Axon is a true axonometric — orbit freely. Oblique applies to the Front / Plan / Side views."
+              : "Off = plain orthographic (elevation / plan / section), for comparison."}
+          </p>
+        </Panel>
+
+        <Panel title="View">
+          <div className="grid grid-cols-4 gap-1.5">
+            {VIEWS.map((v) => (
+              <button key={v.id} type="button" className={viewId === v.id ? chipActive : chip} onClick={() => pickView(v.id)}>
+                {v.label}
+              </button>
+            ))}
+          </div>
+          <p className="mt-1.5 text-xs text-neutral-900">
+            Front / Plan / Side keep that face true-shape while depth recedes — a correct cabinet / cavalier / planometric
+            drawing.
+          </p>
         </Panel>
 
         <Panel title="Display">
           <div className="space-y-2.5">
             <CheckRow label="Edge outlines" checked={showEdges} onChange={setShowEdges} />
             <CheckRow label="Ground grid" checked={showGrid} onChange={setShowGrid} />
-          </div>
-          <div className="mt-3 text-xs font-semibold text-neutral-900">View</div>
-          <div className="mt-1.5 grid grid-cols-4 gap-1.5">
-            {VIEWS.map((v) => (
-              <button
-                key={v.id}
-                type="button"
-                className={chip}
-                onClick={() => setPreset((prev) => ({ key: prev.key + 1, dir: v.dir }))}
-              >
-                {v.label}
-              </button>
-            ))}
           </div>
         </Panel>
 
@@ -261,7 +341,9 @@ export default function Obliquify() {
       <div className="min-w-0 flex-1">
         <section className="rounded-lg border-2 border-neutral-900 p-3">
           <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-            <h2 className="display-font text-sm uppercase tracking-tight text-neutral-900">Viewport — oblique</h2>
+            <h2 className="display-font text-sm uppercase tracking-tight text-neutral-900">
+              Viewport — {isAxon ? "axonometric" : effectiveOblique ? "oblique" : "orthographic"}
+            </h2>
             <span className="text-xs font-semibold text-neutral-900">{modelName}</span>
           </div>
           <div
@@ -280,19 +362,21 @@ export default function Obliquify() {
             <ObliqueScene
               geometries={geometries}
               angle={angle}
-              depthRatio={oblique ? depth : 0}
+              depthRatio={effectiveOblique ? depth : 0}
               dirX={dir.dx}
               dirY={dir.dy}
-              oblique={oblique}
+              oblique={effectiveOblique}
+              allowOrbit={isAxon}
+              camDir={view.dir}
+              viewNonce={viewNonce}
               showEdges={showEdges}
               showGrid={showGrid}
-              preset={preset}
               onReady={onReady}
             />
           </div>
           <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-xs text-neutral-900">
             <span className="font-semibold">{status}</span>
-            <span>Drag-orbit · scroll-zoom · drop a model to load</span>
+            <span>{isAxon ? "drag-orbit · scroll-zoom · drop a model" : "scroll-zoom · drop a model · pick a view"}</span>
           </div>
         </section>
       </div>

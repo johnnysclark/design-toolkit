@@ -3,20 +3,25 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // ObliqueScene — the three.js (react-three-fiber) viewport for Obliquify.
 //
-// Oblique (paraline) projection done properly: an ORTHOGRAPHIC camera whose
-// projection matrix is post-sheared so eye-space depth slides into screen x/y.
-// That is the textbook definition of an oblique projection — the camera-facing
-// plane stays true-shape while the depth axis recedes at a chosen angle and
-// foreshortening ratio (cabinet = ½, cavalier = 1). The shear is injected by
-// wrapping camera.updateProjectionMatrix(), so it survives every orbit, zoom and
-// resize that rebuilds the projection.
+// Oblique (paraline) projection, done by the book: an ORTHOGRAPHIC camera locked
+// to a principal face (Front / Plan / Side) whose projection matrix is post-
+// sheared so the face-perpendicular depth axis slides across the screen at a
+// chosen angle and foreshortening (cabinet = ½, cavalier = 1). The face you look
+// at stays TRUE-SHAPE; the depth recedes. That is the exact definition of an
+// oblique projection — and because the camera is locked to the face while oblique
+// is on, the result is always a correct cabinet / cavalier / planometric drawing
+// (not an ambiguous skew). Turn oblique off, or pick "3·4 Axon", to free-orbit a
+// true orthographic / axonometric view for comparison.
 //
-// Loaded via next/dynamic({ ssr:false }) — WebGL + the STL/OBJ/PLY loaders are
-// browser-only. Look matches the site / RAP: white faces, black edges, a paraline
-// line-drawing read.
+// The shear is injected by wrapping camera.updateProjectionMatrix(), so it
+// survives every zoom and resize that rebuilds the projection, and is re-applied
+// each frame after the controls run.
+//
+// Loaded via next/dynamic({ ssr:false }) — WebGL + the model loaders are
+// browser-only. Look matches the site / RAP: white faces, black edges.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo } from "react";
 import * as THREE from "three";
 import { Canvas, useThree, useFrame } from "@react-three/fiber";
 import { OrbitControls, Center, Edges, Grid } from "@react-three/drei";
@@ -24,22 +29,27 @@ import { OrbitControls, Center, Edges, Grid } from "@react-three/drei";
 const INK = "#111111";
 const FACE = "#f4f4f2";
 
-export type ViewPreset = { key: number; dir: [number, number, number] };
-
 type Props = {
   geometries: THREE.BufferGeometry[] | null;
   angle: number; // degrees
   depthRatio: number; // 0..1.4 (cabinet .5, cavalier 1)
   dirX: 1 | -1;
   dirY: 1 | -1;
-  oblique: boolean;
+  oblique: boolean; // effective: oblique on AND a face view (not axon)
+  allowOrbit: boolean; // free orbit (axon / comparison mode)
+  camDir: [number, number, number];
+  viewNonce: number; // bump to re-snap the camera to camDir
   showEdges: boolean;
   showGrid: boolean;
-  preset: ViewPreset;
   onReady: (canvas: HTMLCanvasElement) => void;
 };
 
 // ── the oblique shear, applied by wrapping updateProjectionMatrix ────────────
+// Eye-space depth (z<0 in front of an ortho cam) → screen offset of
+// depthRatio·(cosα, sinα) per unit depth, in the chosen diagonal quadrant.
+// Because the camera is snapped to look straight down a principal world axis,
+// eye-space depth IS that model axis — so the projected drawing is a true
+// oblique of the facing plane.
 function ObliqueProjection({
   angle,
   depthRatio,
@@ -48,14 +58,21 @@ function ObliqueProjection({
   oblique
 }: Pick<Props, "angle" | "depthRatio" | "dirX" | "dirY" | "oblique">) {
   const camera = useThree((s) => s.camera);
+  const controls = useThree((s) => s.controls) as { target?: THREE.Vector3 } | null;
   useEffect(() => {
     const cam = camera as THREE.OrthographicCamera;
     const orig = cam.updateProjectionMatrix.bind(cam);
     const a = (angle * Math.PI) / 180;
-    // Eye-space depth (z<0 in front) → screen offset L·(cosα, sinα) per unit depth.
     const kx = -depthRatio * Math.cos(a) * dirX;
     const ky = -depthRatio * Math.sin(a) * dirY;
-    const shear = new THREE.Matrix4().set(1, 0, kx, 0, 0, 1, ky, 0, 0, 0, 1, 0, 0, 0, 0, 1);
+    // Shear eye-space depth into screen x/y, but measured from the model centre
+    // (the camera target at distance D), not from the camera itself. The kx·D /
+    // ky·D terms in the last column cancel the constant camera-distance offset so
+    // the centred model stays centred on screen — only the front↔back recede.
+    // D = distance to the orbit target (invariant under pan); falls back to the
+    // camera-to-origin distance before controls exist.
+    const D = controls?.target ? camera.position.distanceTo(controls.target) : camera.position.length() || 16;
+    const shear = new THREE.Matrix4().set(1, 0, kx, kx * D, 0, 1, ky, ky * D, 0, 0, 1, 0, 0, 0, 0, 1);
     cam.updateProjectionMatrix = function () {
       orig();
       if (oblique) {
@@ -68,20 +85,21 @@ function ObliqueProjection({
       cam.updateProjectionMatrix = orig;
       orig();
     };
-  }, [camera, angle, depthRatio, dirX, dirY, oblique]);
+  }, [camera, controls, angle, depthRatio, dirX, dirY, oblique]);
   return null;
 }
 
-// ── snap the camera to a preset direction (front / top / side / corner) ──────
-function CameraRig({ preset }: { preset: ViewPreset }) {
+// ── snap the camera to a principal direction (front / plan / side / corner) ──
+function CameraRig({ camDir, viewNonce }: { camDir: [number, number, number]; viewNonce: number }) {
   const camera = useThree((s) => s.camera);
   const controls = useThree((s) => s.controls) as { target: THREE.Vector3; update: () => void } | null;
   useEffect(() => {
-    const dist = 14;
-    const d = new THREE.Vector3(...preset.dir);
+    const dist = 16;
+    const d = new THREE.Vector3(...camDir);
     if (d.lengthSq() === 0) d.set(0, 0, 1);
     d.normalize().multiplyScalar(dist);
     camera.position.copy(d);
+    camera.up.set(0, 1, 0);
     if (controls) {
       controls.target.set(0, 0, 0);
       controls.update();
@@ -90,11 +108,11 @@ function CameraRig({ preset }: { preset: ViewPreset }) {
     }
     camera.updateProjectionMatrix();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [preset.key]);
+  }, [viewNonce]);
   return null;
 }
 
-// Re-apply the shear every frame (after controls), so zoom/orbit never strips it.
+// Re-apply the shear every frame (after controls), so zoom never strips it.
 function KeepObliqueAlive() {
   const camera = useThree((s) => s.camera);
   useFrame(() => camera.updateProjectionMatrix());
@@ -111,9 +129,9 @@ function ExportHook({ onReady }: { onReady: (c: HTMLCanvasElement) => void }) {
 
 function ModelMesh({ geometry, showEdges }: { geometry: THREE.BufferGeometry; showEdges: boolean }) {
   return (
-    <mesh geometry={geometry} castShadow receiveShadow>
-      <meshStandardMaterial color={FACE} roughness={0.85} metalness={0} flatShading />
-      {showEdges && <Edges threshold={18} color={INK} />}
+    <mesh geometry={geometry}>
+      <meshStandardMaterial color={FACE} roughness={0.85} metalness={0} flatShading side={THREE.DoubleSide} />
+      {showEdges && <Edges threshold={30} color={INK} />}
     </mesh>
   );
 }
@@ -129,7 +147,7 @@ function DemoMassing({ showEdges }: { showEdges: boolean }) {
   return (
     <group>
       {blocks.map((b, i) => (
-        <mesh key={i} position={b.pos} castShadow receiveShadow>
+        <mesh key={i} position={b.pos}>
           <boxGeometry args={b.size} />
           <meshStandardMaterial color={FACE} roughness={0.85} metalness={0} flatShading />
           {showEdges && <Edges threshold={1} color={INK} />}
@@ -146,13 +164,24 @@ export default function ObliqueScene({
   dirX,
   dirY,
   oblique,
+  allowOrbit,
+  camDir,
+  viewNonce,
   showEdges,
   showGrid,
-  preset,
   onReady
 }: Props) {
   // Re-center when the model identity changes.
   const fitKey = useMemo(() => (geometries ? geometries.length + ":" + (geometries[0]?.uuid ?? "") : "demo"), [geometries]);
+
+  // Own the GPU lifecycle of imported geometries: r3f only auto-disposes the
+  // geometries IT creates (e.g. <boxGeometry>), not BufferGeometry passed via the
+  // `geometry` prop. Dispose the previous set when the model changes or unmounts.
+  useEffect(() => {
+    return () => {
+      geometries?.forEach((g) => g.dispose());
+    };
+  }, [geometries]);
 
   // Normalize an imported model to a consistent ~8-unit size so the fixed camera
   // zoom frames it well (the demo massing is already authored at that scale).
@@ -173,21 +202,22 @@ export default function ObliqueScene({
   return (
     <Canvas
       orthographic
-      camera={{ position: [9, 7, 11], zoom: 38, near: -200, far: 400 }}
+      camera={{ position: [0, 0, 16], zoom: 38, near: -500, far: 1000 }}
       gl={{ preserveDrawingBuffer: true, antialias: true }}
       onCreated={({ gl }) => gl.setClearColor("#ffffff", 1)}
       dpr={[1, 2]}
       style={{ width: "100%", height: "100%", background: "#ffffff" }}
     >
-      <ambientLight intensity={0.75} />
-      <hemisphereLight args={["#ffffff", "#d8d8d2", 0.5]} />
-      <directionalLight position={[6, 12, 8]} intensity={0.9} />
+      <ambientLight intensity={0.7} />
+      <hemisphereLight args={["#ffffff", "#d8d8d2", 0.55]} />
+      <directionalLight position={[6, 12, 8]} intensity={0.85} />
+      <directionalLight position={[-8, 5, -6]} intensity={0.35} />
 
       <Center key={fitKey}>
         {geometries ? (
           <group scale={normScale}>
-            {geometries.map((g, i) => (
-              <ModelMesh key={i} geometry={g} showEdges={showEdges} />
+            {geometries.map((g) => (
+              <ModelMesh key={g.uuid} geometry={g} showEdges={showEdges} />
             ))}
           </group>
         ) : (
@@ -210,10 +240,10 @@ export default function ObliqueScene({
       )}
 
       <ObliqueProjection angle={angle} depthRatio={depthRatio} dirX={dirX} dirY={dirY} oblique={oblique} />
-      <CameraRig preset={preset} />
+      <CameraRig camDir={camDir} viewNonce={viewNonce} />
       <KeepObliqueAlive />
       <ExportHook onReady={onReady} />
-      <OrbitControls makeDefault enableDamping={false} />
+      <OrbitControls makeDefault enableDamping={false} enableRotate={allowOrbit} enablePan={allowOrbit} />
     </Canvas>
   );
 }
