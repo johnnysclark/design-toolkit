@@ -235,8 +235,8 @@ export function synthesisSystem(hasContamination: boolean): string {
     "Your job is to turn that data into a design-relevant reading of the place — NOT to add new facts. Reason over the numbers you were given.",
     "Rules:",
     "- Ground every quantitative statement in a value from the provided data. Do not introduce new figures; if you need one you weren't given, say it must be measured.",
-    "- The climate read is the priority: be specific about orientation, prevailing wind, and humidity/comfort using the wind rose and monthly profile provided.",
-    "- Tag design opportunities that rest on an assumption rather than the data.",
+    "- The climate read is the priority: be specific about orientation, prevailing wind, and humidity/comfort using the wind rose, comfort hours, design days, façade-solar and monthly profile provided.",
+    "- You have NO web search in this pass, so NOTHING may be tagged 'verified'. Tag each design opportunity 'plausible-unverified' (consistent with the data) or 'likely-hallucination' (rests on an assumption you can't stand behind), and leave the source field empty. 'verified' is reserved for the grounded, web-cited passes only.",
     hasContamination
       ? "- Use the contamination brief for the contamination_implications field."
       : "- No contamination data was gathered for this place. For contamination_implications, say plainly that none was assessed and that a Phase I ESA / records check would be needed; do NOT invent contaminants.",
@@ -297,6 +297,55 @@ export function sourcesUser(place: any): string {
     place?.epaId ? `EPA Superfund ID: ${place.epaId}` : "",
     "",
     "Find the best sources for understanding this exact place, then give the short orientation."
+  ]
+    .filter(Boolean)
+    .join("\n");
+}
+
+// ---------------------------------------------------------------------------
+// Blind-vs-grounded (the hallucination lesson): the SAME profile prompt run once
+// with no tools and once with web search, so students see what the model invents
+// without grounding vs. what it cites with it.
+// ---------------------------------------------------------------------------
+
+export const PROFILE_SCHEMA = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    answer: {
+      type: "string",
+      description: "A 3-5 sentence factual profile of this exact place: history, notable features, current use."
+    },
+    claims: {
+      type: "array",
+      description: "The atomic factual assertions inside your answer, each tagged for trust.",
+      items: CLAIM
+    }
+  },
+  required: ["answer", "claims"]
+} as const;
+
+export function profileSystem(grounded: boolean): string {
+  return [
+    "You are profiling a real, specific place for an architecture studio that treats AI as a material to interrogate — never as an authority.",
+    "Write a short factual profile (history, notable features, current use), then list the ATOMIC factual claims in it, each tagged.",
+    grounded
+      ? "- You HAVE a web_search tool. Search for THIS specific place, and ground each claim. Tag a claim 'verified' ONLY when a real source you actually found supports it, and put that URL in the source field."
+      : "- You have NO search tool — answer ONLY from memory. Tag every claim honestly: 'plausible-unverified' if you believe it but cannot source it, 'likely-hallucination' for any specific name/date/number/quote you are not certain of. NOTHING may be 'verified'; leave every source field empty.",
+    "- Do not hedge by omission — make the claims you'd actually make, so the tags are meaningful.",
+    "Return only the structured object."
+  ].join("\n");
+}
+
+export function profileUser(place: any): string {
+  const where = [place?.city, place?.county, place?.state].filter(Boolean).join(", ");
+  return [
+    `Place: ${place?.name ?? "(unnamed)"}`,
+    where ? `Where: ${where}` : "",
+    place?.coordinates ? `Coordinates: ${place.coordinates.lat}, ${place.coordinates.lon}` : "",
+    place?.epaId ? `EPA Superfund ID: ${place.epaId}` : "",
+    "",
+    "Profile this exact place, then list your tagged atomic claims."
   ]
     .filter(Boolean)
     .join("\n");
