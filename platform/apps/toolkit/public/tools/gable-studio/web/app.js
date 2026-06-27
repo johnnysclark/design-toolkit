@@ -9,7 +9,7 @@ const clone = (o) => JSON.parse(JSON.stringify(o));
 const state = {
   params: clone(DEFAULTS.params),
   site: clone(DEFAULTS.site),
-  display: { mode: "pen", shadowIntensity: 0.6, sunHour: 15, analysisField: "solarNow" },
+  display: { mode: "analysis", shadowIntensity: 0.6, sunHour: 15, analysisField: "solarNow" },
   ruleset: { name: "My rules", rules: [] },
   lastMetrics: null,
 };
@@ -42,10 +42,14 @@ function rebuildAll() {
 function setStatus(msg, kind = "") { statusEl.textContent = msg; statusEl.className = "status " + kind; }
 
 const modeBtn = $("#btn-mode");
+function syncModeBtn() {
+  const analysis = state.display.mode === "analysis";
+  modeBtn.textContent = analysis ? "☀ Analysis mode" : "◫ Pen mode";
+  modeBtn.classList.toggle("on", analysis);
+}
 modeBtn.addEventListener("click", () => {
   state.display.mode = state.display.mode === "pen" ? "analysis" : "pen";
-  modeBtn.textContent = state.display.mode === "pen" ? "◫ Pen mode" : "☀ Analysis mode";
-  modeBtn.classList.toggle("on", state.display.mode === "analysis");
+  syncModeBtn();
   if (viewport) viewport.setDisplay(state.display);
   setStatus(state.display.mode === "analysis" ? "Ladybug-style: envelope coloured by yearly solar; day-arcs show the sun path." : "Pen mode: hidden-line drawing with cast shadows (use the shadow + sun-hour sliders).");
 });
@@ -98,14 +102,34 @@ const showModal = (id) => { $("#" + id).style.display = "flex"; };
 const hideModal = (id) => { $("#" + id).style.display = "none"; };
 document.querySelectorAll("[data-close]").forEach((b) => b.addEventListener("click", () => hideModal(b.getAttribute("data-close"))));
 document.querySelectorAll(".modal").forEach((m) => m.addEventListener("click", (e) => { if (e.target === m) hideModal(m.id); }));
-document.addEventListener("keydown", (e) => { if (e.key === "Escape") { document.querySelectorAll(".modal").forEach((m) => (m.style.display = "none")); $("#studioWin").style.display = "none"; } });
+document.addEventListener("keydown", (e) => { if (e.key === "Escape") document.querySelectorAll(".modal").forEach((m) => (m.style.display = "none")); });
 $("#btn-info").addEventListener("click", () => showModal("infoModal"));
 
-// Gable Studio example — floating building/terrain window (toggle, non-modal).
-const studioWin = $("#studioWin");
-const toggleStudio = () => { studioWin.style.display = studioWin.style.display === "flex" ? "none" : "flex"; };
-$("#btn-studio").addEventListener("click", toggleStudio);
-$("#btn-studio-2").addEventListener("click", toggleStudio);
+// Collapsible docks. Collapsing only shrinks a grid track (top/bottom rows or the
+// right column) — a panel can never overlay the centred 3D view. The viewport's
+// ResizeObserver re-fits the render whenever the centre cell changes size.
+const mainEl = document.querySelector("main");
+function wireDock(id) {
+  const dock = document.getElementById(id);
+  const toggle = dock.querySelector(".dock-toggle");
+  toggle.addEventListener("click", () => {
+    const collapsed = dock.classList.toggle("collapsed");
+    toggle.setAttribute("aria-expanded", String(!collapsed));
+    if (id === "dock-right") mainEl.classList.toggle("right-collapsed", collapsed);
+  });
+}
+["dock-top", "dock-bottom", "dock-right"].forEach(wireDock);
+
+// The toolbar's "building & terrain" buttons reveal + scroll to the example
+// massing controls (which now live in the top dock, not a floating window).
+const topDock = document.getElementById("dock-top");
+const revealMassing = () => {
+  topDock.classList.remove("collapsed");
+  topDock.querySelector(".dock-toggle").setAttribute("aria-expanded", "true");
+  document.getElementById("massing").scrollIntoView({ behavior: "smooth", block: "nearest" });
+};
+$("#btn-studio").addEventListener("click", revealMassing);
+$("#btn-studio-2").addEventListener("click", revealMassing);
 
 let map = null, marker = null;
 const updateMapReadout = () => { $("#map-readout").textContent = `lat ${state.site.latitude.toFixed(2)}°, lon ${state.site.longitude.toFixed(2)}°`; };
@@ -133,4 +157,5 @@ $("#btn-map").addEventListener("click", () => {
 });
 
 rebuildAll();
-setStatus("Drag a slider to see the metrics move; toggle Pen / Analysis; set a Location; open Sources & math; add rules.");
+syncModeBtn();
+setStatus("Analysis view (parallel projection): the envelope is coloured by yearly solar. Drag a control to watch the data move; encode your intent as rules; export to Rhino.");
