@@ -256,6 +256,14 @@ export default function RapStudio({ signedIn }: { signedIn: boolean }) {
     [announce]
   );
 
+  // Empty the model but keep the active schema — "start fresh in this way of
+  // thinking." Undoable (clear pushes onto the history stack via runCommand).
+  const startFromScratch = useCallback(() => {
+    if (typeof window === "undefined" || window.confirm("Start from scratch? This clears all geometry (your modeling schema stays) — you can Undo it.")) {
+      runCommand("clear");
+    }
+  }, [runCommand]);
+
   const readback = describe(state, activeLevel);
   const bayList = Object.values(state.bays);
   const brailleKey = [
@@ -312,7 +320,15 @@ export default function RapStudio({ signedIn }: { signedIn: boolean }) {
         <Panel
           title="Model — visual test"
           right={
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={startFromScratch}
+                title="Clear all geometry and start fresh (the modeling schema stays)"
+                className="rounded border-2 border-neutral-900 px-2 py-1 text-xs font-semibold text-neutral-900 hover:bg-neutral-900 hover:text-white"
+              >
+                Start from scratch
+              </button>
               <LevelSelect levels={state.levels} value={activeLevel} onChange={setActiveLevel} />
               <Tabs label="Choose the model view" tabs={[["3d", "3D model"], ["plan", "Tactile plan (2D)"]]} active={viewTab} onPick={(t) => setViewTab(t as ViewTab)} />
             </div>
