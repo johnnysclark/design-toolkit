@@ -25,6 +25,8 @@
 //   21 wind speed m/s     (missing 999)
 //   22 total sky cover    (missing 99)
 
+import { buildSkyMatrix, referenceOrientations, dayOfYear } from "./sky.js";
+
 const COL = {
   dbt: { i: 6, miss: 99.9 }, dpt: { i: 7, miss: 99.9 }, rh: { i: 8, miss: 999 },
   pressure: { i: 9, miss: 999999 }, ghi: { i: 13, miss: 9999 }, dni: { i: 14, miss: 9999 },
@@ -70,9 +72,10 @@ export function parseEPW(text) {
   if (!rows.length) throw new Error("EPW has no hourly data rows");
 
   // hourly typed arrays + month index (1..12) per row
-  const month = [], dbt = [], dpt = [], rh = [], ghi = [], dni = [], dhi = [], windDir = [], windSpeed = [], sky = [];
+  const month = [], dbt = [], dpt = [], rh = [], ghi = [], dni = [], dhi = [], windDir = [], windSpeed = [], sky = [], hour = [], doy = [];
   for (const p of rows) {
-    month.push(parseInt(p[1], 10));
+    const mo = parseInt(p[1], 10);
+    month.push(mo); hour.push(parseFloat(p[3])); doy.push(dayOfYear(mo, parseInt(p[2], 10)));
     dbt.push(cell(p, COL.dbt)); dpt.push(cell(p, COL.dpt)); rh.push(cell(p, COL.rh));
     ghi.push(cell(p, COL.ghi)); dni.push(cell(p, COL.dni)); dhi.push(cell(p, COL.dhi));
     windDir.push(cell(p, COL.windDir)); windSpeed.push(cell(p, COL.windSpeed)); sky.push(cell(p, COL.skyCover));
@@ -106,10 +109,16 @@ export function parseEPW(text) {
     tMin: round3(percentile(dbt, 0)), tMax: round3(percentile(dbt, 1)),
   };
 
+  // STAGE A radiation: build the cumulative sky matrix (Tregenza-145) and the
+  // five teaching orientations in real kWh/m²·yr.
+  const tz = Number.isFinite(location.tz) ? location.tz : Math.round((location.lon || 0) / 15);
+  const skyMatrix = buildSkyMatrix({ lat: location.lat, lon: location.lon, tz, doy, hour, dni, dhi });
+
   return {
     location, recordsPerHour, nRows: n, leap: n >= 8784,
     monthly, annual, design,
     windRose: windRose(windDir, windSpeed),
+    sun: { matrix: skyMatrix, reference: referenceOrientations(skyMatrix) },
   };
 }
 

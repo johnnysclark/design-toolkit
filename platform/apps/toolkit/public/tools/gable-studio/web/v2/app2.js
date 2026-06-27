@@ -440,9 +440,13 @@ document.addEventListener("keydown", (e) => { if (e.key === "Escape") document.q
 function climateBlock(forceId) {
   const c = state.climate; if (!c) return null;
   if (forceId === "sun") {
-    const a = c.annual, mo = c.monthly;
-    return el("div", { class: "climate-read" }, el("span", { class: "cl-badge" }, "measured"),
-      ` GHI ${a.ghiTotalKWh} kWh/m²·yr · DNI ${a.dniTotalKWh} · Dec ${mo[11].ghiTotalKWh} / Jun ${mo[5].ghiTotalKWh} kWh/m²`);
+    const a = c.annual, mo = c.monthly, r = c.sun && c.sun.reference;
+    return el("div", { class: "climate-read" },
+      el("div", null, el("span", { class: "cl-badge" }, "measured"),
+        ` GHI ${a.ghiTotalKWh} kWh/m²·yr · Dec ${mo[11].ghiTotalKWh} / Jun ${mo[5].ghiTotalKWh}`),
+      r ? el("div", { style: "margin-top:3px" }, "incident: ",
+        el("b", null, `horiz ${r.horizontal} · S ${r.south} · E ${r.east} · W ${r.west} · N ${r.north}`),
+        " kWh/m²·yr", el("span", { class: "tiny" }, " — isotropic sky, no self-shading (not yet Perez/Ladybug)")) : null);
   }
   if (forceId === "wind") {
     const r = c.windRose;

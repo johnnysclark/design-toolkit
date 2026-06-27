@@ -190,3 +190,4 @@ button { font-family: inherit; color: var(--ink); }
   border-radius: 6px; padding: 6px 8px; margin: 0 0 8px; line-height: 1.5; }
 .windrose { margin-top: 4px; }
 .windrose svg { display: block; }
+.climate-read .tiny { opacity: .6; font-style: italic; }

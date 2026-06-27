@@ -65,5 +65,9 @@ check("rose mass in E/5-6 bin", c.windRose.counts[4][3] === 8760, c.windRose.cou
 const withMissing = parseEPW(synthEPW().replace(",50,101325", ",999,101325")); // first row RH -> missing
 check("sentinel RH dropped (mean still ~50)", approx(withMissing.monthly[0].rhMean, 50, 0.05), withMissing.monthly[0].rhMean);
 
+// sky matrix integration: reference orientations present and sane
+check("sky reference orientations present", !!(c.sun && Number.isFinite(c.sun.reference.horizontal) && Number.isFinite(c.sun.reference.south)), c.sun && c.sun.reference);
+check("horizontal incident > 0 kWh/m²", c.sun.reference.horizontal > 0, c.sun && c.sun.reference.horizontal);
+
 console.log(`\nweather parser: ${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);
