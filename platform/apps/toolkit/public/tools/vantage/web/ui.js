@@ -89,14 +89,9 @@ export function createUI(panel, state, handlers) {
     <section class="vg-block">
       <h2 class="vg-h">Overlays</h2>
       <label class="vg-check"><input id="vg-dof" type="checkbox" ${state.dofOn ? "checked" : ""}><span>Depth-of-field blur</span></label>
-      <label class="vg-check"><input id="vg-plan" type="checkbox" ${state.showDiagram ? "checked" : ""}><span>Plan diagram</span></label>
+      <label class="vg-check"><input id="vg-plan" type="checkbox" ${state.showDiagram ? "checked" : ""}><span>Side &amp; plan rig (frustum + in-focus zone)</span></label>
       <label class="vg-check"><input id="vg-draw" type="checkbox" ${state.showOverlay ? "checked" : ""}><span>Draughtsman overlay (horizon + vanishing points)</span></label>
       <button id="vg-reset" class="vg-reset">Reset view</button>
-    </section>
-
-    <section class="vg-block" id="vg-plan-block" ${state.showDiagram ? "" : "hidden"}>
-      <h2 class="vg-h">Plan — the optics from above</h2>
-      <svg id="vg-diagram" class="vg-diagram" role="img" aria-label="Top-down plan of the camera, field-of-view cone, focus plane and depth-of-field band"></svg>
     </section>
 
     <section class="vg-block">
@@ -120,10 +115,7 @@ export function createUI(panel, state, handlers) {
   // checkboxes
   on("#vg-lock", "change", (e) => handlers.set("lockSubjectSize", e.target.checked));
   on("#vg-dof", "change", (e) => handlers.set("dofOn", e.target.checked));
-  on("#vg-plan", "change", (e) => {
-    handlers.set("showDiagram", e.target.checked);
-    $("#vg-plan-block").hidden = !e.target.checked;
-  });
+  on("#vg-plan", "change", (e) => handlers.set("showDiagram", e.target.checked));
   on("#vg-draw", "change", (e) => handlers.set("showOverlay", e.target.checked));
   on("#vg-reset", "click", () => handlers.reset());
 
@@ -150,7 +142,6 @@ export function createUI(panel, state, handlers) {
     const l = e.target.dataset.lesson; if (l) handlers.lesson(l);
   });
 
-  const diagramSvg = $("#vg-diagram");
   const numbersEl = $("#vg-numbers");
 
   // Push computed numbers into the readout panel.
@@ -177,7 +168,6 @@ export function createUI(panel, state, handlers) {
     $("#vg-dof").checked = s.dofOn;
     $("#vg-draw").checked = s.showOverlay;
     $("#vg-plan").checked = s.showDiagram;
-    $("#vg-plan-block").hidden = !s.showDiagram;
     $("#vg-shift").value = s.shiftNudge; $("#vg-shift-out").textContent = s.shiftNudge.toFixed(2);
     panel.querySelectorAll(".vg-seg button").forEach((b) => {
       const onb = b.dataset.pc === s.perspectiveControl;
@@ -186,5 +176,5 @@ export function createUI(panel, state, handlers) {
     $("#vg-shift-ctl").hidden = s.perspectiveControl !== "shift";
   }
 
-  return { diagramSvg, setReadouts, sync };
+  return { setReadouts, sync };
 }

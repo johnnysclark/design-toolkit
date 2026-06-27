@@ -1,85 +1,108 @@
-// diagram.js — the "why": a top-down plan of the optical setup, drawn to TRUE angles
-// so a wide lens visibly opens a fat cone and a tele lens a thin one. Shows the
-// camera, field-of-view cone, picture plane, focus plane, the depth-of-field band,
-// the subject, and distance ticks. Pure SVG; rebuilt on every change.
+// diagram.js — the camera rig, drawn live next to the perspective view. Two modes
+// share one drawer: a PLAN (top-down, horizontal field of view) and a SIDE elevation
+// (vertical field of view, above a ground line, the cone tilting with the camera's
+// pitch). Both show the view frustum to TRUE angles and shade the "area in focus" —
+// the depth-of-field slab between the near and far limits, clipped to the cone.
 
-const VB_W = 560, VB_H = 240;
-const ORIGIN_X = 72, RIGHT_PAD = 22, Y_CENTER = 120;
-const PLOT_W = VB_W - ORIGIN_X - RIGHT_PAD;
+const CONE = "#1f6feb", DOF = "#159a5c", FOC = "#c2462f", INK = "#111";
 
-function niceMax(...meters) {
-  const need = Math.max(...meters.filter((m) => isFinite(m)), 6) * 1.12;
-  for (const m of [8, 12, 20, 32, 50, 80, 120]) if (m >= need) return m;
+function niceMax(...m) {
+  const need = Math.max(...m.filter((x) => isFinite(x)), 5) * 1.18;
+  for (const v of [6, 8, 12, 20, 32, 50, 80, 120]) if (v >= need) return v;
   return 160;
 }
 const fmt = (m) => (m >= 100 ? Math.round(m) : m >= 10 ? m.toFixed(1) : m.toFixed(2));
+const add = (p, d, s) => [p[0] + d[0] * s, p[1] + d[1] * s];
+const pts = (a) => a.map((q) => `${q[0].toFixed(1)},${q[1].toFixed(1)}`).join(" ");
+const line = (a, b, attr) => `<line x1="${a[0].toFixed(1)}" y1="${a[1].toFixed(1)}" x2="${b[0].toFixed(1)}" y2="${b[1].toFixed(1)}" ${attr}/>`;
+function T(p, str, { anchor = "start", fill = INK, dx = 0, dy = 0 } = {}) {
+  return `<text x="${p[0] + dx}" y="${p[1] + dy}" text-anchor="${anchor}" class="vg-dlabel" `
+    + `style="fill:${fill};paint-order:stroke;stroke:#fff;stroke-width:3px;stroke-linejoin:round">${str}</text>`;
+}
 
-// params: { focalMm, fNumber, focusM, subjectDistanceM, hfovDeg, dofNear, dofFar,
-//           markers:[{distance}], picturePlaneM }
-export function updateDiagram(svg, p) {
+// p: { mode:'plan'|'side', fovDeg, focusM, dofNear, dofFar, subjectDistanceM,
+//      eyeHeightM, pitchDeg, markers:[{distance}] }
+function drawRig(svg, p) {
+  const side = p.mode === "side";
+  const VB_W = 520, VB_H = side ? 250 : 196;
+  const ORIGIN_X = 60, RIGHT_PAD = 16, plotW = VB_W - ORIGIN_X - RIGHT_PAD;
   const maxD = niceMax(p.subjectDistanceM, p.focusM, isFinite(p.dofFar) ? p.dofFar : p.focusM * 1.8);
-  const xScale = PLOT_W / maxD;          // px per metre, shared by both axes (true angles)
-  const X = (d) => ORIGIN_X + Math.min(d, maxD) * xScale;
-  const Y = (lat) => Y_CENTER - lat * xScale;
-  const half = (p.hfovDeg * Math.PI) / 180 / 2;
-  const coneLat = maxD * Math.tan(half);
+  const scale = plotW / maxD;
+  const groundY = VB_H - 20;
+  const camY = side ? Math.max(40, groundY - p.eyeHeightM * scale) : VB_H / 2;
+  const Cs = [ORIGIN_X, camY];
 
-  const farX = isFinite(p.dofFar) ? X(p.dofFar) : ORIGIN_X + PLOT_W;
-  const nearX = X(Math.max(p.dofNear, 0));
-  const focusX = X(p.focusM);
-  const subjX = X(p.subjectDistanceM);
-  const ppX = X(p.picturePlaneM);
+  const pitch = side ? (p.pitchDeg * Math.PI) / 180 : 0;
+  const vHalf = (p.fovDeg * Math.PI) / 180 / 2;
+  const ax = [Math.cos(pitch), -Math.sin(pitch)];
+  const upDir = [Math.cos(pitch + vHalf), -Math.sin(pitch + vHalf)];
+  const dnDir = [Math.cos(pitch - vHalf), -Math.sin(pitch - vHalf)];
+  const onAxis = (d) => add(Cs, ax, d * scale);
+  const coneUp = (d) => add(Cs, upDir, (d / Math.cos(vHalf)) * scale);
+  const coneDn = (d) => add(Cs, dnDir, (d / Math.cos(vHalf)) * scale);
 
-  const ticks = (p.markers || [])
-    .filter((m) => m.distance <= maxD)
-    .map((m) => {
-      const x = X(m.distance);
-      return `<line x1="${x}" y1="${Y_CENTER - 4}" x2="${x}" y2="${Y_CENTER + 4}" stroke="#111" stroke-width="1"/>
-              <text x="${x}" y="${Y_CENTER + 18}" text-anchor="middle" class="vg-dlabel">${m.distance}m</text>`;
-    })
-    .join("");
+  const near = Math.max(0.05, p.dofNear);
+  const far = isFinite(p.dofFar) ? Math.min(p.dofFar, maxD) : maxD;
+  const focus = Math.min(Math.max(p.focusM, 0.05), maxD);
+  const subj = Math.min(Math.max(p.subjectDistanceM, 0.1), maxD);
+  const farOpen = !isFinite(p.dofFar);
+
+  const ticks = (p.markers || []).filter((m) => m.distance <= maxD * 0.99).map((m) => {
+    const a = onAxis(m.distance), perp = [ax[1], -ax[0]];
+    return line(add(a, perp, 4), add(a, perp, -4), `stroke="${INK}" stroke-width="1"`)
+      + T(add(a, [0, 1], 14), m.distance + "m", { anchor: "middle" });
+  }).join("");
+
+  let b = "";
+  b += `<defs><clipPath id="vg-rc-${side ? "s" : "p"}"><rect x="${ORIGIN_X - 2}" y="4" width="${plotW + 4}" height="${VB_H - 8}"/></clipPath></defs>`;
+  b += `<g clip-path="url(#vg-rc-${side ? "s" : "p"})">`;
+
+  // field-of-view cone
+  b += `<polygon points="${pts([Cs, coneUp(maxD), coneDn(maxD)])}" fill="${CONE}" fill-opacity="0.09"/>`;
+  b += line(Cs, coneUp(maxD), `stroke="${CONE}" stroke-width="1.2"`);
+  b += line(Cs, coneDn(maxD), `stroke="${CONE}" stroke-width="1.2"`);
+
+  // the in-focus slab (area of play in focus) — DoF between near & far, clipped to the cone
+  b += `<polygon points="${pts([coneUp(near), coneUp(far), coneDn(far), coneDn(near)])}" fill="${DOF}" fill-opacity="0.22"/>`;
+  b += line(coneUp(near), coneDn(near), `stroke="${DOF}" stroke-width="1.5"`);
+  b += line(coneUp(far), coneDn(far), `stroke="${DOF}" stroke-width="1.5" ${farOpen ? 'stroke-dasharray="5 3"' : ""}`);
+
+  // optical axis + focus plane
+  b += line(Cs, onAxis(maxD), `stroke="${INK}" stroke-width="1" stroke-dasharray="2 3" opacity="0.7"`);
+  b += line(coneUp(focus), coneDn(focus), `stroke="${FOC}" stroke-width="1.6" stroke-dasharray="6 3"`);
+
+  if (side) {
+    // ground + a column down to it from the subject point on the axis
+    b += line([ORIGIN_X - 2, groundY], [VB_W - RIGHT_PAD, groundY], `stroke="${INK}" stroke-width="1.4"`);
+    const sp = onAxis(subj);
+    b += line(sp, [sp[0], groundY], `stroke="${FOC}" stroke-width="1" opacity="0.5" stroke-dasharray="3 2"`);
+  }
+  b += ticks;
+  // subject marker
+  b += `<circle cx="${onAxis(subj)[0].toFixed(1)}" cy="${onAxis(subj)[1].toFixed(1)}" r="4.2" fill="${FOC}"/>`;
+  b += `</g>`;
+
+  // eye-level / horizon line (side) — drawn over the clip so the label reads
+  if (side) {
+    b += line([ORIGIN_X - 2, camY], [VB_W - RIGHT_PAD, camY], `stroke="${INK}" stroke-width="1" stroke-dasharray="7 5" opacity="0.8"`);
+    b += T([VB_W - RIGHT_PAD, camY - 5], "eye level", { anchor: "end" });
+    b += T([ORIGIN_X - 4, groundY + 14], "ground", { anchor: "start" });
+  }
+
+  // camera glyph
+  b += `<circle cx="${Cs[0]}" cy="${Cs[1]}" r="5" fill="${INK}"/>`;
+  b += line(Cs, onAxis(0.7), `stroke="${INK}" stroke-width="3"`);
+  b += T([ORIGIN_X - 6, camY + (side ? -10 : 18)], "camera", { anchor: side ? "end" : "start" });
+
+  // labels
+  b += T(onAxis(maxD * 0.5), `${Math.round(p.fovDeg)}° ${side ? "vertical" : "horizontal"} FOV`, { anchor: "middle", fill: CONE, dy: side ? -8 : -8 });
+  b += T(coneUp(focus), `focus ${fmt(p.focusM)} m`, { anchor: "middle", fill: FOC, dy: -6 });
+  const dofMid = add(coneDn((near + far) / 2), [0, 1], side ? 0 : 0);
+  b += T(dofMid, `in focus${farOpen ? " → ∞" : ""}`, { anchor: "middle", fill: DOF, dy: 14 });
 
   svg.setAttribute("viewBox", `0 0 ${VB_W} ${VB_H}`);
-  svg.innerHTML = `
-    <defs>
-      <clipPath id="vg-plot"><rect x="${ORIGIN_X - 2}" y="6" width="${PLOT_W + 4}" height="${VB_H - 12}"/></clipPath>
-    </defs>
-    <g clip-path="url(#vg-plot)">
-      <!-- FOV cone -->
-      <polygon points="${ORIGIN_X},${Y_CENTER} ${X(maxD)},${Y(coneLat)} ${X(maxD)},${Y(-coneLat)}"
-               fill="#1f6feb" fill-opacity="0.10" stroke="none"/>
-      <line x1="${ORIGIN_X}" y1="${Y_CENTER}" x2="${X(maxD)}" y2="${Y(coneLat)}" stroke="#1f6feb" stroke-width="1.2"/>
-      <line x1="${ORIGIN_X}" y1="${Y_CENTER}" x2="${X(maxD)}" y2="${Y(-coneLat)}" stroke="#1f6feb" stroke-width="1.2"/>
-
-      <!-- depth-of-field band -->
-      <rect x="${nearX}" y="14" width="${Math.max(1, farX - nearX)}" height="${VB_H - 28}"
-            fill="#159a5c" fill-opacity="0.16"/>
-      <line x1="${nearX}" y1="14" x2="${nearX}" y2="${VB_H - 14}" stroke="#159a5c" stroke-width="1.4"/>
-      <line x1="${farX}" y1="14" x2="${farX}" y2="${VB_H - 14}" stroke="#159a5c" stroke-width="1.4" ${isFinite(p.dofFar) ? "" : 'stroke-dasharray="4 3"'}/>
-
-      <!-- optical axis -->
-      <line x1="${ORIGIN_X}" y1="${Y_CENTER}" x2="${ORIGIN_X + PLOT_W}" y2="${Y_CENTER}" stroke="#111" stroke-width="1" stroke-dasharray="2 3"/>
-      ${ticks}
-
-      <!-- picture plane -->
-      <line x1="${ppX}" y1="${Y_CENTER - 26}" x2="${ppX}" y2="${Y_CENTER + 26}" stroke="#111" stroke-width="2"/>
-
-      <!-- focus plane -->
-      <line x1="${focusX}" y1="20" x2="${focusX}" y2="${VB_H - 20}" stroke="#c2462f" stroke-width="1.6" stroke-dasharray="6 3"/>
-
-      <!-- subject -->
-      <circle cx="${subjX}" cy="${Y_CENTER}" r="4.5" fill="#c2462f"/>
-    </g>
-
-    <!-- camera body -->
-    <rect x="${ORIGIN_X - 26}" y="${Y_CENTER - 11}" width="22" height="22" rx="3" fill="#111"/>
-    <polygon points="${ORIGIN_X - 4},${Y_CENTER - 7} ${ORIGIN_X + 4},${Y_CENTER} ${ORIGIN_X - 4},${Y_CENTER + 7}" fill="#111"/>
-
-    <!-- labels -->
-    <text x="${ORIGIN_X - 28}" y="${Y_CENTER + 30}" class="vg-dlabel">camera</text>
-    <text x="${ppX + 4}" y="${Y_CENTER - 30}" class="vg-dlabel">picture plane</text>
-    <text x="${focusX}" y="16" text-anchor="middle" class="vg-dlabel" fill="#c2462f">focus ${fmt(p.focusM)}m</text>
-    <text x="${(nearX + farX) / 2}" y="${VB_H - 4}" text-anchor="middle" class="vg-dlabel" fill="#0f7a48">depth of field${isFinite(p.dofFar) ? "" : " → ∞"}</text>
-    <text x="${ORIGIN_X + 30}" y="${Y_CENTER - 38}" class="vg-dlabel" fill="#1f6feb">${p.hfovDeg.toFixed(0)}° field of view</text>
-  `;
+  svg.innerHTML = b;
 }
+
+export const updatePlan = (svg, p) => drawRig(svg, { ...p, mode: "plan" });
+export const updateSide = (svg, p) => drawRig(svg, { ...p, mode: "side" });

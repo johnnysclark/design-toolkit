@@ -6,7 +6,7 @@ import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { buildScene } from "./scene.js";
 import { createDof } from "./dof.js";
 import { drawOverlay } from "./overlay.js";
-import { updateDiagram } from "./diagram.js";
+import { updatePlan, updateSide } from "./diagram.js";
 import { createUI } from "./ui.js";
 import {
   SENSORS, fovs, dofLimitsM, hyperfocalM, apertureDiameterMm, cropFactor,
@@ -33,6 +33,9 @@ const frameEl = document.getElementById("vg-frame");
 const captionEl = document.getElementById("vg-caption");
 const liveEl = document.getElementById("vg-live");
 const panel = document.getElementById("vg-panel");
+const panes = document.getElementById("vg-panes");
+const sideSvg = document.getElementById("vg-side");
+const planSvg = document.getElementById("vg-plan-svg");
 
 let renderer;
 try {
@@ -70,6 +73,7 @@ const ui = createUI(panel, state, { set, focusOn, reset, lesson });
 
 // ---- sizing: the frame is the sensor's aspect ratio, letterboxed in the stage ---
 const tmp = new THREE.Vector3();
+const tmp2 = new THREE.Vector3();
 function frameSize() {
   const sensor = SENSORS[state.sensorId];
   const ar = sensor.width / sensor.height;
@@ -92,15 +96,21 @@ function resize() {
 window.addEventListener("resize", resize);
 
 // ---- state changes ---------------------------------------------------------------
+function applyRigVisibility() {
+  panes.classList.toggle("vg-panes--solo", !state.showDiagram);
+}
 function set(key, value) {
   if (key === "focalMm" && state.lockSubjectSize && state.perspectiveControl === "free") {
     const ratio = value / state.focalMm;
     state.subjectDistanceM = clamp(state.subjectDistanceM * ratio, 1, 40);
   }
   const sensorChanged = key === "sensorId" && value !== state.sensorId;
+  const rigToggled = key === "showDiagram" && value !== state.showDiagram;
   state[key] = value;
   ui.sync(state);
-  if (sensorChanged) resize(); else requestRender();
+  if (rigToggled) { applyRigVisibility(); resize(); }   // view pane width changed → refit
+  else if (sensorChanged) resize();
+  else requestRender();
 }
 function focusOn(name) {
   const t = S.focusTargets.find((f) => f.name === name);
@@ -206,11 +216,19 @@ function render() {
     subjectDistanceM: state.subjectDistanceM
   });
   if (state.showDiagram) {
-    updateDiagram(ui.diagramSvg, {
-      focalMm: state.focalMm, fNumber: state.fNumber, focusM: state.focusM,
-      subjectDistanceM: state.subjectDistanceM, hfovDeg: fov.h,
-      dofNear: d.near, dofFar: d.far, markers: S.markers, picturePlaneM: 0.5
-    });
+    // Live camera rig: cone from the real FOV, focus plane + in-focus slab from the
+    // real DoF, and (side view) the cone tilting with the camera's actual pitch.
+    const fwd = tmp2.set(0, 0, 0);
+    camera.getWorldDirection(fwd);
+    const pitchDeg = Math.asin(clamp(fwd.y, -1, 1)) * 180 / Math.PI; // + = looking up
+    const eyeHeightM = Math.max(0.1, camera.position.y);
+    const rigDist = clamp(camera.position.distanceTo(controls.target), 0.3, 200);
+    const common = {
+      focusM: state.focusM, dofNear: d.near, dofFar: d.far,
+      subjectDistanceM: rigDist, markers: S.markers
+    };
+    updateSide(sideSvg, { ...common, fovDeg: fov.v, eyeHeightM, pitchDeg });
+    updatePlan(planSvg, { ...common, fovDeg: fov.h });
   }
   liveEl.textContent = composeLive(sensor, fov, d);
 }
@@ -272,6 +290,7 @@ function lesson(id) {
 }
 
 // ---- go --------------------------------------------------------------------------
+applyRigVisibility();
 resize();
 ui.sync(state);
 render();
