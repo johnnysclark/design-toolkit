@@ -38,6 +38,31 @@
 
 ---
 
+## Build status — shipped & in flight (2026-06-27)
+
+- **V1** (original) — unchanged, preserved at `web/index.html`.
+- **V2** (this plan's Phase-1 method spine) — **BUILT** at `web/v2/`: a Force Deck
+  (READ/NAME), a Force→Move→Rule **Charter** with live standing + tension detection
+  (COMMIT/WATCH), MAKE sliders, and a seed-is-truth **Series** genealogy (SPAWN). A
+  version toggle (`web/shell.html`) switches V1/V2 and is built to add v3+. *(PR #41.)*
+- **Benchmark Track (Phase 2.5)** — largely **BUILT** on branch
+  `feat/eco-architect-benchmark`:
+  - EPW weather parser (`web/v2/weather.js`) → real climate + wind rose.
+  - Cumulative sky matrix (`web/v2/sky.js`, Tregenza-145) → real incident **kWh/m²**.
+  - **The parity buy**: occluded per-surface kWh/m² in `web/radiation.js` ↔
+    `python/radiation.py`, proven identical by `test/parity_rad.py` (worst Δ≈6e-14,
+    now in `npm test`). `core.js`/`gable_core.py` left **untouched** — existing
+    parity/sensitivity/occlusion stay green, V1 unaffected.
+  - **Ladybug side-by-side**: `⚖ Compare to Ladybug` (ours vs a pasted Ladybug CSV,
+    with honest divergence notes) + `LADYBUG_RECIPE.md` + a comparison-pack export.
+- **Honest gaps still open**: the diffuse sky is **isotropic** (Perez is the next
+  refinement — a parity-safe `sky.js`-only change); no ground-reflected component;
+  no comfort/`es(T)` yet; the radiation overlay isn't drawn in the (shared)
+  viewport; no `.ghx` auto-generation (a recipe + the Validate tab instead, by
+  choice — an untestable `.ghx` would be fragile).
+
+---
+
 ## North-star thesis
 
 Today the tool lets a student drag sliders and chase a green percentage. The overhaul makes
