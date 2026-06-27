@@ -87,6 +87,10 @@ export, the design-loop "Crit Engine" from `TOOLS/design-thinking-showcase/`.*
 ### T4 · 2D Media Tools — **large** (several sub-tools) · spec: draft fresh
 **Drawing cleanup · live video · fabrication.** Mixed: image/vision passes, WebRTC, export.
 This is really 3+ tools — scope each one separately and ship incrementally. **Spec each first.**
+- **Vantage — ✅ DONE (2026-06-26, branch `tool/vantage`).** Interactive camera / lens /
+  perspective demo (three.js r160, client-only) at `/media-2d/vantage`: focal length → FOV +
+  dolly-zoom, aperture → depth of field, tilt vs. lens-shift verticals, draughtsman overlay +
+  plan diagram + live numbers. Plan: [`plans/vantage.md`](plans/vantage.md). PR pending.
 
 ### T5 · 3D Tools — **large** (several sub-tools) · spec: draft fresh
 **Python · tutorials · Three.js · 3D-print settings.** Mixed content + interactive (some

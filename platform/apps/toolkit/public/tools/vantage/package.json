@@ -1,0 +1,10 @@
+{
+  "name": "vantage",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Vantage — interactive camera, lens & perspective demo (client-only three.js).",
+  "scripts": {
+    "test": "node test/optics.test.mjs"
+  }
+}

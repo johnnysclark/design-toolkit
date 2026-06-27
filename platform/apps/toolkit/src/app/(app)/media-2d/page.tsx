@@ -7,7 +7,7 @@ import ToolHub, { HubCard } from "@/components/ToolHub";
 export const metadata = {
   title: "2D Tooling · Design Toolkit",
   description:
-    "A bench of 2D-media tools — drawing & scan cleanup, with more proposed: halftone, vectorize, live video, fabrication."
+    "A bench of 2D-media tools — drawing & scan cleanup and Vantage (camera, lens & perspective), with more proposed: halftone, vectorize, live video, fabrication."
 };
 
 const CARDS: HubCard[] = [
@@ -26,6 +26,14 @@ const CARDS: HubCard[] = [
     href: "/media-2d/scan-cleaner",
     blurb:
       "The heavier sibling: everything in Drawing Cleaner plus straighten/rotate, crop, a curves editor, denoise, punch-lines / fade-background and resize — for cleaning up full document scans."
+  },
+  {
+    title: "Vantage",
+    source: "New — interactive demo",
+    status: "live",
+    href: "/media-2d/vantage",
+    blurb:
+      "See how a camera makes an image. Change the lens and watch the field of view and perspective shift (with a dolly-zoom that proves perspective comes from distance, not focal length); open the aperture to throw the background out of focus; and use tilt vs. lens-shift to keep a building's verticals straight — with a live plan diagram, a draughtsman overlay (horizon + vanishing points) and the real numbers.",
   },
   {
     title: "Halftone & Riso",
