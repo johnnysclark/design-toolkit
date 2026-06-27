@@ -1,6 +1,7 @@
 // test_sky.mjs — validates the cumulative-sky-matrix radiation engine.
 // Run: node web/v2/test_sky.mjs  (from the gable-studio folder).
-import { PATCHES, buildSkyMatrix, incidentOnSurface } from "./sky.js";
+import { buildSkyMatrix } from "./sky.js";
+import { PATCHES, incidentOnSurface } from "../radiation.js";
 import { sunDirection } from "../core.js";
 
 let pass = 0, fail = 0;

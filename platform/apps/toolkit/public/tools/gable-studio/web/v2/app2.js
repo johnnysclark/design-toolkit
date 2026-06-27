@@ -9,6 +9,7 @@ import { createViewport } from "../viewport.js";
 import { FORCES, draftClause, activeTensions } from "./forces.js";
 import { Series, makeVariation, diffSeeds } from "./series.js";
 import { parseEPW, describeClimate } from "./weather.js";
+import { incidentByModel } from "../radiation.js";
 
 // ---- tiny DOM + math helpers ----------------------------------------------
 const $ = (s) => document.querySelector(s);
@@ -441,12 +442,21 @@ function climateBlock(forceId) {
   const c = state.climate; if (!c) return null;
   if (forceId === "sun") {
     const a = c.annual, mo = c.monthly, r = c.sun && c.sun.reference;
+    const m = state.last && state.last.model, R = c.sun && c.sun.matrix;
+    let occ = null;
+    if (m && R) {
+      const rad = incidentByModel(m, R); // parity-tested (web/radiation.js ↔ python/radiation.py)
+      occ = el("div", { style: "margin-top:3px" }, "this massing, self-shaded: ",
+        el("b", null, `glazing ${Math.round(rad.glazingMean)} · envelope ${Math.round(rad.envelopeMean)}`),
+        " kWh/m²·yr ", el("span", { class: "cl-badge" }, "parity-tested"));
+    }
     return el("div", { class: "climate-read" },
       el("div", null, el("span", { class: "cl-badge" }, "measured"),
         ` GHI ${a.ghiTotalKWh} kWh/m²·yr · Dec ${mo[11].ghiTotalKWh} / Jun ${mo[5].ghiTotalKWh}`),
-      r ? el("div", { style: "margin-top:3px" }, "incident: ",
+      r ? el("div", { style: "margin-top:3px" }, "incident (unshaded): ",
         el("b", null, `horiz ${r.horizontal} · S ${r.south} · E ${r.east} · W ${r.west} · N ${r.north}`),
-        " kWh/m²·yr", el("span", { class: "tiny" }, " — isotropic sky, no self-shading (not yet Perez/Ladybug)")) : null);
+        " kWh/m²·yr", el("span", { class: "tiny" }, " — isotropic sky")) : null,
+      occ);
   }
   if (forceId === "wind") {
     const r = c.windRose;
