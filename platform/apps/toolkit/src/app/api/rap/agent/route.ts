@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { createClient } from "@/lib/supabase/server";
-import { AGENT_SYSTEM, AGENT_SCHEMA, agentUser } from "@/lib/anthropic/rap-agent-prompts";
+import { buildAgentSystem, AGENT_SCHEMA, agentUser } from "@/lib/anthropic/rap-agent-prompts";
 import { resolveModel } from "@/lib/anthropic/models";
 import { applyCommand } from "@/app/(app)/rap/studio/engine/interpreter";
 import type { State } from "@/app/(app)/rap/studio/engine/types";
@@ -78,13 +78,17 @@ export async function POST(req: Request) {
   const stateJson = JSON.stringify(state);
   if (stateJson.length > 200_000) return NextResponse.json({ error: "The model is too large to send to the assistant." }, { status: 413 });
 
+  // The active schema scopes the assistant's command set + examples.
+  const rawMode = (state as State).mode;
+  const mode = rawMode === "massing" || rawMode === "floorplan" ? rawMode : "bays";
+
   try {
     const client = new Anthropic();
     const message: any = await client.messages.create({
       model,
       max_tokens: 6000,
-      // Cache the (large) grammar/system prompt — identical on every request.
-      system: [{ type: "text", text: AGENT_SYSTEM, cache_control: { type: "ephemeral" } }],
+      // Cache the (large) grammar/system prompt — now scoped per modeling schema.
+      system: [{ type: "text", text: buildAgentSystem(mode), cache_control: { type: "ephemeral" } }],
       output_config: { format: { type: "json_schema", schema: AGENT_SCHEMA } },
       messages: [{ role: "user", content: agentUser(instruction, stateJson) }]
     } as any);

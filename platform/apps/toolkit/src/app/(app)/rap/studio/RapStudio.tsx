@@ -13,10 +13,10 @@
 import { useCallback, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 
-import type { CommandResult, State } from "./engine/types";
+import type { CommandResult, SchemaMode, State } from "./engine/types";
 import { makeSeedState, STARTERS, type Starter } from "./engine/seed";
 import { toBraille } from "./engine/braille";
-import { applyCommand, describe } from "./engine/interpreter";
+import { applyCommand, describe, SCHEMA_HINTS, SCHEMA_LABELS } from "./engine/interpreter";
 import { fullStateString } from "./engine/exportState";
 import PlanSvg from "./render/PlanSvg";
 import JsonTree from "./components/JsonTree";
@@ -273,6 +273,8 @@ export default function RapStudio({ signedIn }: { signedIn: boolean }) {
         to begin from an empty model, a structural bay grid, a massing diagram, a single floor plate, or the sample.
       </p>
 
+      <SchemaBar mode={state.mode} onPick={(m) => runCommand(`schema set ${m}`)} />
+
       {/* Row 1 — author (chat, the primary channel) + 3D model beside it */}
       <div className="grid gap-5 lg:grid-cols-2">
         <Panel
@@ -423,6 +425,32 @@ export default function RapStudio({ signedIn }: { signedIn: boolean }) {
       <div aria-live="polite" className="sr-only">
         {live}
       </div>
+    </div>
+  );
+}
+
+// The active modeling schema — a "way of thinking" that scopes the surfaced
+// command set (Console help + Assistant grammar + Forms). Switching is undoable
+// and announced like any edit; other schemas' commands still work if typed.
+function SchemaBar({ mode, onPick }: { mode: SchemaMode; onPick: (m: SchemaMode) => void }) {
+  return (
+    <div className="flex flex-wrap items-center gap-2 rounded-lg border-2 border-neutral-900 px-3 py-2">
+      <span className="display-font text-xs uppercase tracking-tight text-neutral-900">Modeling schema</span>
+      <select
+        value={mode}
+        onChange={(e) => onPick(e.target.value as SchemaMode)}
+        className="rounded border-2 border-neutral-900 px-2 py-1 text-xs font-semibold text-neutral-900"
+        aria-label="Active modeling schema — scopes which commands the console and assistant show"
+      >
+        {(["bays", "massing", "floorplan"] as SchemaMode[]).map((m) => (
+          <option key={m} value={m}>
+            {SCHEMA_LABELS[m]}
+          </option>
+        ))}
+      </select>
+      <span className="text-xs text-neutral-900">
+        — {SCHEMA_HINTS[mode]}. The <b>Console</b> help and the <b>Assistant</b> show this schema&apos;s commands; others still work if you type them.
+      </span>
     </div>
   );
 }
