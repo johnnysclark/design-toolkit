@@ -161,12 +161,85 @@ footer a { color: var(--accent); }
   .grid { grid-template-columns: 1fr; }
   #search { max-width: none; }
 }
+
+/* Full-screen button (header, pushed right) */
+.fsbtn {
+  margin-left: auto;
+  font: inherit; font-size: 12px; font-weight: 700;
+  padding: 7px 12px; border-radius: 20px;
+  border: 1px solid var(--ink); background: #fff; color: var(--ink); cursor: pointer;
+}
+.fsbtn:hover { background: var(--ink); color: #fff; }
+
+/* Per-card action row + "Edit with AI" button */
+.bar-actions { display: flex; gap: 7px; align-items: center; }
+.ai {
+  font: inherit; font-size: 11px; font-weight: 700;
+  padding: 5px 11px; border-radius: 6px;
+  border: 1px solid var(--accent); background: var(--accent); color: #fff; cursor: pointer;
+}
+.ai:hover { filter: brightness(0.92); }
+
+/* ── AI edit chat modal ───────────────────────────────────────────────── */
+.modal {
+  position: fixed; inset: 0; z-index: 100;
+  background: rgba(17,17,17,0.45);
+  display: none; align-items: center; justify-content: center;
+  padding: 20px;
+}
+.modal.open { display: flex; }
+.sheet {
+  background: var(--surface); width: min(820px, 100%); height: min(86vh, 900px);
+  border-radius: 12px; border: 2px solid var(--ink);
+  display: flex; flex-direction: column; overflow: hidden;
+}
+.sheet-head {
+  display: flex; align-items: center; gap: 10px;
+  padding: 12px 14px; border-bottom: 1px solid var(--line); flex-shrink: 0;
+}
+.sheet-head .st { font-weight: 800; font-size: 14px; flex: 1; min-width: 0;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.seg { display: flex; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
+.seg button { font: inherit; font-size: 11px; font-weight: 700; padding: 5px 10px;
+  background: #fff; border: 0; border-right: 1px solid var(--line); cursor: pointer; color: var(--ink); }
+.seg button:last-child { border-right: 0; }
+.seg button.on { background: var(--ink); color: #fff; }
+.x { font-size: 20px; line-height: 1; border: 0; background: transparent; cursor: pointer; color: var(--ink); padding: 0 4px; }
+
+.msgs { flex: 1; overflow-y: auto; padding: 14px; display: flex; flex-direction: column; gap: 12px; }
+.msg { max-width: 92%; font-size: 13.5px; line-height: 1.5; white-space: pre-wrap; word-wrap: break-word; }
+.msg.user { align-self: flex-end; background: var(--ink); color: #fff; padding: 9px 12px; border-radius: 12px 12px 2px 12px; }
+.msg.bot  { align-self: flex-start; color: var(--ink); }
+.msg.bot .seg-code { margin: 8px 0; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.msg.bot .seg-code .bar { display: flex; justify-content: space-between; align-items: center;
+  padding: 5px 10px; background: #fafafa; border-bottom: 1px solid var(--line); }
+.msg.bot .seg-code .bar span { font-size: 11px; font-family: ui-monospace, Menlo, monospace; }
+.msg.bot .seg-code pre { margin: 0; padding: 12px; background: #1a1a1a; overflow-x: auto; }
+.msg.bot .seg-code code { color: #e8e8e8; font-family: ui-monospace, Menlo, monospace; font-size: 12px; white-space: pre; }
+.msg.bot .copyc { font: inherit; font-size: 11px; font-weight: 700; padding: 4px 10px; border-radius: 6px;
+  border: 1px solid var(--ink); background: #fff; color: var(--ink); cursor: pointer; }
+.msg.bot .copyc:hover { background: var(--ink); color: #fff; }
+.msg.bot .copyc.done { background: var(--gh); color: #fff; border-color: var(--gh); }
+.msg.note { align-self: stretch; text-align: center; font-size: 12.5px; background: #fff6f4;
+  border: 1px solid var(--accent); border-radius: 8px; padding: 10px 12px; }
+.msg.note a { color: var(--accent); font-weight: 700; }
+.dots::after { content: "▍"; animation: blink 1s steps(2) infinite; }
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
+
+.composer { display: flex; gap: 8px; padding: 12px 14px; border-top: 1px solid var(--line); flex-shrink: 0; }
+.composer textarea { flex: 1; font: inherit; font-size: 13px; padding: 9px 10px; border: 1px solid var(--line);
+  border-radius: 8px; resize: none; height: 44px; max-height: 140px; color: var(--ink); }
+.composer .send { font: inherit; font-size: 13px; font-weight: 700; padding: 0 16px; border-radius: 8px;
+  border: 1px solid var(--ink); background: var(--ink); color: #fff; cursor: pointer; }
+.composer .send:disabled { opacity: 0.4; cursor: not-allowed; }
+.hintbar { font-size: 11px; padding: 0 14px 10px; }
 </style>
 </head>
 <body>
 <header>
   <h1>Rhino&nbsp;/&nbsp;Grasshopper&nbsp;Python</h1>
   <span class="subtitle">Copy-paste snippets for studio moves</span>
+  <button id="fsBtn" class="fsbtn" type="button" title="Toggle full screen">⛶ Full screen</button>
 </header>
 
 <div class="controls">
@@ -187,6 +260,25 @@ footer a { color: var(--accent); }
   Rhino 7 / 8 IronPython-style <code>rhinoscriptsyntax</code>; for Rhino 8 CPython, prefer the
   <code>rhino3dm</code> / <code>RhinoCommon</code> variants where noted.
 </footer>
+
+<div class="modal" id="aiModal" aria-hidden="true">
+  <div class="sheet" role="dialog" aria-label="Edit snippet with AI">
+    <div class="sheet-head">
+      <span class="st" id="aiTitle">Edit with AI</span>
+      <div class="seg" id="aiTier" title="Deep = Sonnet (best). Fast = Haiku (quick & cheap).">
+        <button type="button" data-tier="deep" class="on">Deep</button>
+        <button type="button" data-tier="fast">Fast</button>
+      </div>
+      <button class="x" id="aiClose" type="button" title="Close" aria-label="Close">×</button>
+    </div>
+    <div class="msgs" id="aiMsgs"></div>
+    <div class="hintbar">Ask for a change (e.g. “make the panels hexagonal”, “add a tolerance input”, “explain line 4”). The full edited script comes back ready to copy. Runs server-side on Claude.</div>
+    <div class="composer">
+      <textarea id="aiInput" placeholder="Describe the change you want…" rows="1"></textarea>
+      <button class="send" id="aiSend" type="button">Send</button>
+    </div>
+  </div>
+</div>
 
 <script>
 // ---------------------------------------------------------------------------
@@ -1576,27 +1668,176 @@ function render() {
       <div class="code-wrap">
         <div class="code-bar">
           <span class="code-meta">${s.env === "rhino" ? "EditPythonScript" : "GhPython component"}</span>
-          <button class="copy">Copy</button>
+          <span class="bar-actions">
+            <button class="ai">✦ Edit with AI</button>
+            <button class="copy">Copy</button>
+          </span>
         </div>
         <pre><code>${highlight(s.code)}</code></pre>
       </div>
       ${io}`;
     const btn = card.querySelector(".copy");
     btn.onclick = async () => {
-      try { await navigator.clipboard.writeText(s.code); }
-      catch {
-        const ta = document.createElement("textarea");
-        ta.value = s.code; document.body.appendChild(ta); ta.select();
-        document.execCommand("copy"); ta.remove();
-      }
+      await copyText(s.code);
       btn.textContent = "Copied ✓"; btn.classList.add("done");
       setTimeout(() => { btn.textContent = "Copy"; btn.classList.remove("done"); }, 1400);
     };
+    card.querySelector(".ai").onclick = () => openAI(s);
     grid.appendChild(card);
   });
 }
 
 document.getElementById("search").addEventListener("input", e => { query = e.target.value; render(); });
+
+// ── full-screen toggle ──────────────────────────────────────────────────
+const fsBtn = document.getElementById("fsBtn");
+fsBtn.onclick = () => {
+  if (document.fullscreenElement) document.exitFullscreen();
+  else if (document.documentElement.requestFullscreen) document.documentElement.requestFullscreen().catch(() => {});
+};
+document.addEventListener("fullscreenchange", () => {
+  fsBtn.textContent = document.fullscreenElement ? "⛶ Exit full screen" : "⛶ Full screen";
+});
+
+// ── clipboard helper (shared by card Copy + chat Copy script) ───────────
+async function copyText(t) {
+  try { await navigator.clipboard.writeText(t); }
+  catch {
+    const ta = document.createElement("textarea");
+    ta.value = t; document.body.appendChild(ta); ta.select();
+    try { document.execCommand("copy"); } catch {}
+    ta.remove();
+  }
+}
+
+// ── "Edit with AI" chat (streams from /api/rhino-python/chat) ────────────
+const aiModal = document.getElementById("aiModal");
+const aiMsgs = document.getElementById("aiMsgs");
+const aiTitleEl = document.getElementById("aiTitle");
+const aiInput = document.getElementById("aiInput");
+const aiSend = document.getElementById("aiSend");
+let aiSnippet = null, aiThread = [], aiTier = "deep", aiBusy = false;
+
+document.querySelectorAll("#aiTier button").forEach(b => {
+  b.onclick = () => {
+    aiTier = b.dataset.tier;
+    document.querySelectorAll("#aiTier button").forEach(x => x.classList.toggle("on", x === b));
+  };
+});
+document.getElementById("aiClose").onclick = closeAI;
+aiModal.addEventListener("click", e => { if (e.target === aiModal) closeAI(); });
+document.addEventListener("keydown", e => { if (e.key === "Escape" && aiModal.classList.contains("open")) closeAI(); });
+
+function openAI(s) {
+  aiSnippet = s; aiThread = []; aiMsgs.innerHTML = "";
+  aiTitleEl.textContent = s.title;
+  addNote(`Editing <strong>${esc(s.title)}</strong> — ${s.env === "rhino" ? "RhinoPython" : "GhPython"}. The original snippet is loaded as context; ask for any change and copy the result.`);
+  aiModal.classList.add("open"); aiModal.setAttribute("aria-hidden", "false");
+  setTimeout(() => aiInput.focus(), 50);
+}
+function closeAI() { aiModal.classList.remove("open"); aiModal.setAttribute("aria-hidden", "true"); }
+
+function bubble(role) {
+  const d = document.createElement("div");
+  d.className = "msg " + role;
+  aiMsgs.appendChild(d); aiMsgs.scrollTop = aiMsgs.scrollHeight;
+  return d;
+}
+function addNote(html) {
+  const d = document.createElement("div"); d.className = "msg note"; d.innerHTML = html;
+  aiMsgs.appendChild(d); aiMsgs.scrollTop = aiMsgs.scrollHeight;
+}
+
+// Render assistant text, splitting ```python fenced blocks into copyable boxes.
+function renderBot(el, text) {
+  el.innerHTML = "";
+  const parts = text.split(/```(?:python|py)?\n?/i); // odd indices = code
+  parts.forEach((part, i) => {
+    if (i % 2 === 1) {
+      const code = part.replace(/```\s*$/, "").replace(/\n+$/, "");
+      const box = document.createElement("div"); box.className = "seg-code";
+      const bar = document.createElement("div"); bar.className = "bar";
+      const lbl = document.createElement("span"); lbl.textContent = "edited script";
+      const cp = document.createElement("button"); cp.className = "copyc"; cp.textContent = "Copy script";
+      cp.onclick = async () => {
+        await copyText(code); cp.textContent = "Copied ✓"; cp.classList.add("done");
+        setTimeout(() => { cp.textContent = "Copy script"; cp.classList.remove("done"); }, 1400);
+      };
+      bar.appendChild(lbl); bar.appendChild(cp);
+      const pre = document.createElement("pre"); const c = document.createElement("code");
+      c.textContent = code; pre.appendChild(c);
+      box.appendChild(bar); box.appendChild(pre); el.appendChild(box);
+    } else if (part.trim()) {
+      const p = document.createElement("div"); p.textContent = part.trim(); el.appendChild(p);
+    }
+  });
+  aiMsgs.scrollTop = aiMsgs.scrollHeight;
+}
+
+async function sendAI() {
+  if (aiBusy) return;
+  const text = aiInput.value.trim();
+  if (!text || !aiSnippet) return;
+  aiInput.value = ""; aiInput.style.height = "44px";
+  aiThread.push({ role: "user", content: text });
+  bubble("user").textContent = text;
+
+  aiBusy = true; aiSend.disabled = true;
+  const bot = bubble("bot"); bot.classList.add("dots");
+  let acc = "", errored = false;
+
+  try {
+    const res = await fetch("/api/rhino-python/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        script: { title: aiSnippet.title, env: aiSnippet.env, code: aiSnippet.code },
+        messages: aiThread,
+        tier: aiTier
+      })
+    });
+
+    if (res.status === 401) {
+      bot.remove(); aiThread.pop();
+      addNote('Sign in to edit snippets with AI — <a href="/login" target="_top">open the sign-in page →</a>. Browsing &amp; copying snippets stays free.');
+      return;
+    }
+    if (!res.ok || !res.body) {
+      bot.classList.remove("dots"); bot.textContent = "Something went wrong (" + res.status + "). Please try again."; aiThread.pop();
+      return;
+    }
+
+    const reader = res.body.getReader(), dec = new TextDecoder();
+    let buf = "";
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buf += dec.decode(value, { stream: true });
+      const frames = buf.split("\n\n"); buf = frames.pop();
+      for (const f of frames) {
+        const ev = (f.match(/^event: (.*)$/m) || [])[1];
+        const dm = f.match(/^data: (.*)$/m);
+        if (!dm) continue;
+        let data; try { data = JSON.parse(dm[1]); } catch { continue; }
+        if (ev === "token") { bot.classList.remove("dots"); acc += data.text || ""; renderBot(bot, acc); }
+        else if (ev === "done") { acc = data.reply || acc; renderBot(bot, acc); }
+        else if (ev === "error") { errored = true; bot.classList.remove("dots"); renderBot(bot, acc || ("Error: " + (data.message || "unknown"))); }
+      }
+    }
+    bot.classList.remove("dots");
+    if (errored && !acc) aiThread.pop();
+    else aiThread.push({ role: "assistant", content: acc });
+  } catch (err) {
+    bot.classList.remove("dots"); bot.textContent = "Network error — please try again."; aiThread.pop();
+  } finally {
+    aiBusy = false; aiSend.disabled = false; aiInput.focus();
+  }
+}
+
+aiSend.onclick = sendAI;
+aiInput.addEventListener("keydown", e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendAI(); } });
+aiInput.addEventListener("input", () => { aiInput.style.height = "44px"; aiInput.style.height = Math.min(aiInput.scrollHeight, 140) + "px"; });
+
 render();
 </script>
 </body>
