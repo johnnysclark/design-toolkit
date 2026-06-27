@@ -14,7 +14,19 @@
 > `app/(app)/media-2d/page.tsx` (status `live`). **`toolkit-nav.ts` untouched** (the `/media-2d`
 > hub is already live). Plan: `plans/vantage.md`. Verified: `build:toolkit` green; optics tests
 > pass; **rendered + screenshotted in headless Chrome (WebGL)** across default / DoF / tilt / shift —
-> all correct. Pending: open a PR (don't merge to `main` without John's OK).
+> all correct. Pushed via PR + merged to `main` → Vercel deploying.
+>
+> **AI ASSISTANTS UNIFIED + LIVE (2026-06-27 · PR #39, squash `81bdb07` → deployed).** All five AI
+> tools (Coach, Surveyor, Librarian, Critic, RAP) now share ONE layer: a **Fast (Haiku) ⇄ Deep
+> (Sonnet) model toggle**, the geometric **Thinking** animation, and **pause-autoscroll +
+> Jump-to-latest** on the streaming chats. Plus `maxDuration` 60→**300** (Vercel Pro),
+> **system-prompt caching**, and effort/adaptive-thinking gated to Deep (Haiku 400s on both). New
+> shared layer: `lib/anthropic/models.ts` + `limits.ts`, `components/{ModelToggle,Thinking}.tsx`,
+> `lib/useStickToBottom.ts`. **Full reference + how-to-add-a-new-AI-tool + gotchas →
+> [`AI-ASSISTANTS.md`](AI-ASSISTANTS.md).** Also removed accidental self-referential `node_modules`
+> symlinks committed on main (they broke `next build` with exit 194). Build + 29/29 pages green;
+> prod 200 on every tool page. **NOT signed-in tested — NEXT SESSION: smoke-test each tool live**
+> (esp. flip Surveyor to Fast → exercises the basic web_search path; re-run Tar Creek).
 >
 > **RAP Studio — overnight code-quality pass (2026-06-26, branch `feat/rap-rhino-bridge`,
 > PR #30, NOT merged — holding for the Vercel 24h build-rate-limit reset).** Ran two multi-agent

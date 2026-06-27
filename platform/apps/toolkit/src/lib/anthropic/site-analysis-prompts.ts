@@ -15,7 +15,7 @@
 
 // Sonnet 4.6 — faster + cheaper than Opus, which keeps the grounded passes under
 // Vercel's 60s function cap. Used by contamination, synthesis, and the follow-up chat.
-export const MODEL = "claude-sonnet-4-6";
+export { MODEL } from "./models";
 
 // Reusable atomic-claim shape — the load-bearing honesty primitive (matches the
 // Librarian's claim tags so the UI chips are shared).

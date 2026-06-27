@@ -44,6 +44,13 @@ Verified: apex + www + `/work` all 200, valid cert. (`www` is canonical — flip
 Resend SMTP in Supabase (built-in email only reaches the owner, 2/hr) + an `@illinois.edu`
 **6-digit OTP** option (campus scanners pre-click & burn magic links).
 
+### I4 · Cheaper Librarian engine (Qwen3-VL via OpenRouter) — A/B vs Claude · **small/medium**
+Cut Librarian vision cost ~16× by adding an opt-in OpenRouter engine (Qwen3-VL-235B,
+$0.20/$0.88 per 1M) behind an env flag; Claude stays default. Librarian-only, additive,
+reversible — **does not touch the shared `models.ts` or `package.json`.** Full step-by-step
+gameplan (files, env setup, A/B method, risks, rollback): [`plans/librarian-openrouter-engine.md`](plans/librarian-openrouter-engine.md).
+First, cheapest test of the broader open-model cost strategy (memory note `open-model-cost-strategy`).
+
 ---
 
 ## 🧰 Tools to build (toolkit stubs, status `"soon"`)

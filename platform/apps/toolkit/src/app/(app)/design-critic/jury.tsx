@@ -4,16 +4,19 @@ import { useState } from "react";
 import { PERSONAS } from "@/lib/anthropic/critic-prompts";
 import WorkIntake from "./work-intake";
 import { ClaimList } from "./claim-tag";
+import Thinking from "@/components/Thinking";
 import { card, primaryBtn, type JuryResult, type WorkInput } from "./types";
 
 const EMPTY: WorkInput = { title: "", thesis: "", brief: "", images: [] };
 
 export default function Jury({
   sessionId,
-  setSessionId
+  setSessionId,
+  tier
 }: {
   sessionId: string | null;
   setSessionId: (id: string | null) => void;
+  tier?: string;
 }) {
   const [work, setWork] = useState<WorkInput>(EMPTY);
   const [adopted, setAdopted] = useState<string[]>(["technical", "theory"]);
@@ -40,6 +43,7 @@ export default function Jury({
         body: JSON.stringify({
           mode: "jury",
           sessionId,
+          tier,
           personas: adopted,
           title: work.title,
           thesis: work.thesis,
@@ -95,6 +99,7 @@ export default function Jury({
           <button className={primaryBtn} onClick={convene} disabled={busy}>
             {busy ? "The jury is deliberating…" : "Convene the jury"}
           </button>
+          {busy && <Thinking />}
           {error && <p className="text-sm text-red-600">{error}</p>}
         </div>
       </section>

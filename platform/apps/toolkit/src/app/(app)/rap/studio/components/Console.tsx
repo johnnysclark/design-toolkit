@@ -5,7 +5,8 @@
 // history. Mirrors the desktop CLI; forms and the AI assistant both compile
 // down to these same commands.
 
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
+import { useStickToBottom } from "@/lib/useStickToBottom";
 
 export interface LogEntry {
   id: number;
@@ -25,11 +26,7 @@ export default function Console({
 }) {
   const [value, setValue] = useState("");
   const [hIdx, setHIdx] = useState(-1); // -1 = current line
-  const logRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (logRef.current) logRef.current.scrollTop = logRef.current.scrollHeight;
-  }, [log]);
+  const { ref: logRef, onScroll, pinned, scrollToBottom } = useStickToBottom<HTMLDivElement>();
 
   const submit = () => {
     const raw = value.trim();
@@ -65,10 +62,11 @@ export default function Console({
 
   return (
     <div className="flex h-full flex-col">
+      <div className="relative flex-1" style={{ minHeight: 200 }}>
       <div
         ref={logRef}
-        className="flex-1 overflow-y-auto rounded-md bg-[#0e0e0e] p-3 font-mono text-[12.5px] leading-relaxed"
-        style={{ minHeight: 200 }}
+        onScroll={onScroll}
+        className="h-full overflow-y-auto rounded-md bg-[#0e0e0e] p-3 font-mono text-[12.5px] leading-relaxed"
         aria-label="Command log"
       >
         {log.length === 0 && <div className="text-[#a3a3a3]">Type a command, or “help”. Try: wall A off</div>}
@@ -83,6 +81,16 @@ export default function Console({
             <div className={e.ok ? "text-[#cfcfcf]" : "text-[#ff7a6c]"}>{e.output}</div>
           </div>
         ))}
+      </div>
+      {!pinned && (
+        <button
+          type="button"
+          onClick={scrollToBottom}
+          className="absolute bottom-2 left-1/2 z-10 -translate-x-1/2 rounded-full border border-neutral-300 bg-white px-3 py-1 text-[11px] font-medium text-neutral-900 shadow-sm hover:bg-neutral-100"
+        >
+          ↓ Jump to latest
+        </button>
+      )}
       </div>
       <div className="mt-2 flex items-center gap-2">
         <span className="font-mono text-sm text-neutral-900" aria-hidden>

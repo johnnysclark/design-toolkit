@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import ModelToggle, { useModelTier, type ModelTier } from "@/components/ModelToggle";
 import Link from "next/link";
 import SiteMap from "./SiteMap";
 import { WindRoseChart, SunPathChart, MonthlyClimate } from "./charts";
@@ -31,6 +32,10 @@ type Candidate = GeoPlace | SiteCandidate;
 
 const PLACE_EXAMPLES = ["Millennium Park, Chicago", "Venice, Italy", "1600 Pennsylvania Ave"];
 const SUPERFUND_EXAMPLES = ["Love Canal", "Times Beach", "Berkeley Pit"];
+
+// Where the picker map opens before a site is chosen — the continental US, since the
+// terrain + flood layers are US-only (climate + basemaps are global).
+const US_CENTER = { lat: 39.5, lon: -98.35 };
 
 // Parse a response defensively: on a timeout/edge error the platform can return a
 // plain-text body (e.g. "An error occurred…") that would otherwise blow up
@@ -63,6 +68,9 @@ export default function SiteAnalysisTool({ signedIn }: { signedIn: boolean }) {
   const [result, setResult] = useState<AnalyzeResult | null>(null);
   const [analyzing, setAnalyzing] = useState(false);
   const [analyzeError, setAnalyzeError] = useState<string | null>(null);
+  // A point dropped on the map (click / geolocation), shown while it analyzes.
+  const [pin, setPin] = useState<{ lat: number; lon: number } | null>(null);
+  const [locating, setLocating] = useState(false);
 
   const [scale, setScale] = useState<Scale>("macro");
 
@@ -71,6 +79,7 @@ export default function SiteAnalysisTool({ signedIn }: { signedIn: boolean }) {
   const [aiLoading, setAiLoading] = useState(false);
   const [aiPhase, setAiPhase] = useState("");
   const [aiError, setAiError] = useState<string | null>(null);
+  const [tier, setTier] = useModelTier("surveyor");
 
   const abortRef = useRef<AbortController | null>(null);
 
@@ -117,13 +126,15 @@ export default function SiteAnalysisTool({ signedIn }: { signedIn: boolean }) {
     setContamination(null);
     setSynthesis(null);
     setScale("macro");
+    setPin(null);
   }
 
-  async function selectCandidate(c: Candidate) {
+  // Shared analyze core — both the typed-search dropdown and a dropped map pin feed
+  // the same POST. `display` is what we echo into the search box.
+  async function analyze(payload: Record<string, unknown>, display: string) {
     setOpen(false);
     setCandidates([]);
-    const label = "epaId" in c && mode === "superfund" ? c.name : (c as GeoPlace).label;
-    setQuery("shortLabel" in c ? (c as GeoPlace).shortLabel : c.name);
+    setQuery(display);
     setContamination(null);
     setSynthesis(null);
     setAiError(null);
@@ -132,15 +143,6 @@ export default function SiteAnalysisTool({ signedIn }: { signedIn: boolean }) {
     setAnalyzeError(null);
     setResult(null);
     try {
-      const payload =
-        mode === "superfund"
-          ? { epaId: (c as SiteCandidate).epaId }
-          : {
-              lat: (c as GeoPlace).lat,
-              lon: (c as GeoPlace).lon,
-              label,
-              category: (c as GeoPlace).category
-            };
       const res = await fetch("/api/site-analysis/analyze", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -149,11 +151,66 @@ export default function SiteAnalysisTool({ signedIn }: { signedIn: boolean }) {
       const data = await readJson(res);
       if (!res.ok) throw new Error(data?.error || "Analysis failed.");
       setResult(data as AnalyzeResult);
+      setPin(null); // the analyzed site marker replaces the pending pin
     } catch (e: any) {
       setAnalyzeError(e.message);
     } finally {
       setAnalyzing(false);
     }
+  }
+
+  // Pick from the typed-search dropdown.
+  function selectCandidate(c: Candidate) {
+    if (mode === "superfund") {
+      const s = c as SiteCandidate;
+      return analyze({ epaId: s.epaId }, s.name);
+    }
+    const p = c as GeoPlace;
+    return analyze({ lat: p.lat, lon: p.lon, label: p.label, category: p.category }, p.shortLabel);
+  }
+
+  // Drop a pin on the map (click / geolocation) → reverse-geocode to a name, then
+  // analyze that coordinate as a Place. Reverse is best-effort; analyze runs either
+  // way (the route accepts a bare lat/lon), so a pin is never a dead end.
+  async function pickPoint(lat: number, lon: number) {
+    if (mode !== "place") setMode("place");
+    setPin({ lat, lon });
+    setOpen(false);
+    setCandidates([]);
+    let label = `${lat.toFixed(5)}, ${lon.toFixed(5)}`;
+    let shortLabel = `${lat.toFixed(4)}, ${lon.toFixed(4)}`;
+    let category: string | null = null;
+    try {
+      const res = await fetch(`/api/site-analysis/search?lat=${lat}&lon=${lon}`);
+      const data = await readJson(res);
+      if (res.ok && data?.place) {
+        label = data.place.label || label;
+        shortLabel = data.place.shortLabel || shortLabel;
+        category = data.place.category ?? null;
+      }
+    } catch {
+      // keep the coordinate label — the pin still analyzes
+    }
+    await analyze({ lat, lon, label, category }, shortLabel);
+  }
+
+  function useMyLocation() {
+    if (!("geolocation" in navigator)) {
+      setAnalyzeError("This browser can't share a location. Search or click the map instead.");
+      return;
+    }
+    setLocating(true);
+    navigator.geolocation.getCurrentPosition(
+      (p) => {
+        setLocating(false);
+        pickPoint(p.coords.latitude, p.coords.longitude);
+      },
+      () => {
+        setLocating(false);
+        setAnalyzeError("Couldn't get your location. Search or click the map instead.");
+      },
+      { enableHighAccuracy: true, timeout: 10000 }
+    );
   }
 
   async function runAI() {
@@ -167,7 +224,7 @@ export default function SiteAnalysisTool({ signedIn }: { signedIn: boolean }) {
         const cr = await fetch("/api/site-analysis/contamination", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ epaId: result.site.epaId, grounded: true })
+          body: JSON.stringify({ epaId: result.site.epaId, grounded: true, tier })
         });
         const cd = await readJson(cr);
         if (cr.status === 401) throw new Error("Sign in to run the AI analysis.");
@@ -179,7 +236,7 @@ export default function SiteAnalysisTool({ signedIn }: { signedIn: boolean }) {
       const sr = await fetch("/api/site-analysis/synthesis", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ bundle: leanBundle(result, contam) })
+        body: JSON.stringify({ bundle: leanBundle(result, contam), tier })
       });
       const sd = await readJson(sr);
       if (sr.status === 401) throw new Error("Sign in to run the AI analysis.");
@@ -287,6 +344,46 @@ export default function SiteAnalysisTool({ signedIn }: { signedIn: boolean }) {
         )}
       </div>
 
+      {/* The map is always live: a picker before a site is chosen (click to drop a
+          pin), the analyzed site after. Layer toggles live in the map's own panel. */}
+      <div>
+        <div className="h-[460px] w-full overflow-hidden rounded-xl border border-neutral-200">
+          <SiteMap
+            centroid={result ? result.site.centroid : US_CENTER}
+            bbox={result?.site.bbox}
+            boundary={result?.site.boundary ?? null}
+            topo={result?.topo ?? null}
+            flood={result?.flood ?? null}
+            scale={scale}
+            picker={!result}
+            pin={pin}
+            onPick={pickPoint}
+          />
+        </div>
+        {result ? (
+          <p className="mt-2 text-center text-xs text-neutral-900">
+            {scale === "macro"
+              ? "Macro — the region around the site (zoomed out)."
+              : "Micro — the immediate surroundings (with the terrain grid)."}{" "}
+            Click anywhere to survey a new spot.
+          </p>
+        ) : (
+          <div className="mt-2 flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-center text-xs text-neutral-900">
+            <span>
+              Click anywhere on the map to drop a pin and survey that spot — or search above.
+            </span>
+            <button
+              onClick={useMyLocation}
+              disabled={locating}
+              className="rounded-md border border-neutral-300 bg-white px-2 py-1 font-medium text-neutral-900 hover:border-neutral-900 disabled:opacity-50"
+            >
+              {locating ? "Locating…" : "⌖ Use my location"}
+            </button>
+            <span>Toggle terrain, water + flood layers in the ▦ panel.</span>
+          </div>
+        )}
+      </div>
+
       {analyzing && (
         <div className="rounded-xl border border-neutral-200 bg-white p-8 text-center text-sm text-neutral-900">
           Pulling the measured ground…
@@ -309,6 +406,8 @@ export default function SiteAnalysisTool({ signedIn }: { signedIn: boolean }) {
         aiPhase={aiPhase}
         aiError={aiError}
         onRunAI={runAI}
+        tier={tier}
+        setTier={setTier}
       />}
 
       {/* The wider toolbox — always available, with or without an active analysis. */}
@@ -329,7 +428,9 @@ function Results({
   aiLoading,
   aiPhase,
   aiError,
-  onRunAI
+  onRunAI,
+  tier,
+  setTier
 }: {
   result: AnalyzeResult;
   scale: Scale;
@@ -341,8 +442,10 @@ function Results({
   aiPhase: string;
   aiError: string | null;
   onRunAI: () => void;
+  tier: ModelTier;
+  setTier: (t: ModelTier) => void;
 }) {
-  const { site, climate, flood, topo, coverage } = result;
+  const { site, topo, coverage } = result;
   const terrain = topo ? terrainReadout(topo) : null;
 
   return (
@@ -361,22 +464,7 @@ function Results({
         <CoverageStrip coverage={coverage} mode={mode} />
       </div>
 
-      {/* map */}
-      <div className="h-[440px] w-full overflow-hidden rounded-xl border border-neutral-200">
-        <SiteMap
-          centroid={site.centroid}
-          bbox={site.bbox}
-          boundary={site.boundary ?? null}
-          topo={topo}
-          flood={flood}
-          scale={scale}
-        />
-      </div>
-      <p className="-mt-3 text-center text-xs text-neutral-900">
-        {scale === "macro"
-          ? "Macro — the region around the site (street map, zoomed out)."
-          : "Micro — the immediate surroundings (aerial, with the terrain grid)."}
-      </p>
+      {/* The map is hoisted to the tool shell (always visible); results pick up below it. */}
 
       {/* scale-dependent hard-data cards */}
       <div key={scale} className="animate-[fadeIn_.35s_ease] space-y-5">
@@ -389,12 +477,19 @@ function Results({
 
       {/* AI band (always visible) */}
       <div className="space-y-5">
+        {signedIn && (
+          <div className="flex flex-wrap items-center gap-2 text-sm">
+            <span className="text-neutral-900">AI depth</span>
+            <ModelToggle value={tier} onChange={setTier} size="sm" disabled={aiLoading} />
+          </div>
+        )}
         {/* Auto first pass — sources appear on their own, no button. */}
         {signedIn && (
           <SiteSources
             key={`src-${site.epaId || site.name}`}
             place={chatContext(result, contamination, synthesis).place}
             context={chatContext(result, contamination, synthesis)}
+            tier={tier}
           />
         )}
         <AiControls
@@ -412,6 +507,7 @@ function Results({
           <SiteChat
             key={site.epaId || site.name}
             context={chatContext(result, contamination, synthesis)}
+            tier={tier}
           />
         )}
       </div>

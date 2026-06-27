@@ -1,9 +1,10 @@
 "use client";
 
-// A small "the model is thinking" indicator — a few black shapes cycling.
-// Shown whenever an LLM call is in flight (analyze, search, conversation).
-// Bold + graphic to match the toolkit (black, geometric). React 19 hoists and
-// dedupes the <style> by `href`, so rendering many of these adds the CSS once.
+// The shared "the model is thinking" indicator — a few black shapes cycling.
+// Used by EVERY AI assistant (Coach, Surveyor, Librarian, Critic, RAP) so they
+// all animate the same way while a call is in flight. Bold + graphic to match
+// the toolkit (black, geometric). React 19 hoists and dedupes the <style> by
+// `href`, so rendering many of these adds the CSS exactly once.
 export default function Thinking({ label }: { label?: string }) {
   return (
     <span className="inline-flex items-center gap-2 text-sm text-neutral-900" role="status">

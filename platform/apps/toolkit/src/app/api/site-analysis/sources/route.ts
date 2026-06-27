@@ -1,16 +1,16 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { createClient } from "@/lib/supabase/server";
-import { MODEL, sourcesSystem, sourcesUser } from "@/lib/anthropic/site-analysis-prompts";
+import { sourcesSystem, sourcesUser } from "@/lib/anthropic/site-analysis-prompts";
+import { resolveModel, webSearchTool } from "@/lib/anthropic/models";
+import { STREAM_SOFT_TIMEOUT_MS } from "@/lib/anthropic/limits";
 
 // Auto first pass: the moment a place is analyzed the client fires this (no button)
 // to surface the authoritative links/documents a studio should start from. Streamed
-// so the links land as soon as the model finds them, and a server-side soft-timeout
-// guarantees a clean finish inside Vercel Hobby's 60s cap. Auth-gated — it spends
-// the studio key, so it must never be reachable anonymously.
+// so the links land as soon as the model finds them; a server-side soft-timeout
+// guarantees a clean finish. Auth-gated — it spends the studio key, so it must never
+// be reachable anonymously. Vercel Pro gives it up to ~300s.
 export const runtime = "nodejs";
-export const maxDuration = 60;
-
-const SOFT_TIMEOUT_MS = 50000;
+export const maxDuration = 300;
 
 export async function POST(req: Request) {
   if (!process.env.ANTHROPIC_API_KEY) {
@@ -41,17 +41,19 @@ export async function POST(req: Request) {
   }
 
   const context = JSON.stringify(body?.context ?? {}, null, 2).slice(0, 24000);
+  const { model, tier } = resolveModel(body?.tier);
 
   const client = new Anthropic();
   const ctrl = new AbortController();
   const stream = client.messages.stream(
     {
-      model: MODEL,
+      model,
       max_tokens: 1600,
-      system: sourcesSystem(context),
+      system: [{ type: "text", text: sourcesSystem(context), cache_control: { type: "ephemeral" } }],
       messages: [{ role: "user", content: sourcesUser(place) }],
       // A first pass — keep it cheap and fast. A handful of searches is plenty.
-      tools: [{ type: "web_search_20260209", name: "web_search", max_uses: 4 }]
+      // Tool version tracks the model — Haiku needs the basic web_search variant.
+      tools: [webSearchTool(tier, 4)]
     } as any,
     { signal: ctrl.signal }
   );
@@ -83,7 +85,7 @@ export async function POST(req: Request) {
       let full = "";
       let searching = false;
       // Stop a few seconds early and finish cleanly rather than let Vercel hard-kill us.
-      const timer = setTimeout(() => ctrl.abort(), SOFT_TIMEOUT_MS);
+      const timer = setTimeout(() => ctrl.abort(), STREAM_SOFT_TIMEOUT_MS);
 
       try {
         try {
@@ -113,7 +115,7 @@ export async function POST(req: Request) {
             owner: user.id,
             tool: "site-analysis:sources",
             input: { place: place?.name },
-            output: { note: full.slice(0, 4000), sources, model: MODEL }
+            output: { note: full.slice(0, 4000), sources, model }
           });
         } catch {
           // never let trace logging break the response

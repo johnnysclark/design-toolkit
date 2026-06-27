@@ -7,6 +7,9 @@ import { LEVELS, type Level, type CoachMeta } from "@/lib/anthropic/skills-coach
 import { latestScript, type CodeBlock } from "@/lib/skills-coach/code";
 import CoachSidebar from "./CoachSidebar";
 import MessageBubble, { type ChatMessage } from "./MessageBubble";
+import Thinking from "@/components/Thinking";
+import ModelToggle, { useModelTier } from "@/components/ModelToggle";
+import { useStickToBottom } from "@/lib/useStickToBottom";
 
 type Upload = { path: string; kind: "image" | "pdf" };
 type Pending = { file: File; name: string; kind: "image" | "pdf"; previewUrl: string | null };
@@ -111,6 +114,7 @@ export default function SkillsCoachChat({
   const [streaming, setStreaming] = useState(false);
   const [streamingText, setStreamingText] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [tier, setTier] = useModelTier("coach");
   const [concept, setConcept] = useState<string | null>(() => {
     for (let i = initialMessages.length - 1; i >= 0; i--) {
       const c = initialMessages[i]?.meta?.concept;
@@ -142,7 +146,9 @@ export default function SkillsCoachChat({
   const abortRef = useRef<AbortController | null>(null);
   const metaRef = useRef<CoachMeta | null>(null);
   const fileRef = useRef<HTMLInputElement | null>(null);
-  const endRef = useRef<HTMLDivElement | null>(null);
+  const accRef = useRef("");
+  const terminalRef = useRef(false);
+  const { ref: scrollRef, onScroll, pinned, scrollToBottom } = useStickToBottom<HTMLDivElement>();
 
   useEffect(() => {
     createClient()
@@ -155,10 +161,6 @@ export default function SkillsCoachChat({
   useEffect(() => {
     setExamples(sampleExamples(EXAMPLE_POOL, EXAMPLE_COUNT));
   }, []);
-
-  useEffect(() => {
-    endRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
-  }, [messages, streamingText]);
 
   function pickFile(e: React.ChangeEvent<HTMLInputElement>) {
     setError(null);
@@ -232,10 +234,13 @@ export default function SkillsCoachChat({
         : null
     };
     setMessages((m) => [...m, userMsg]);
+    scrollToBottom(); // sending re-pins to the bottom; scrolling up then pauses it
     setInput("");
     setPending(null);
     setStreaming(true);
     setStreamingText("");
+    accRef.current = "";
+    terminalRef.current = false;
     metaRef.current = null;
 
     const ctrl = new AbortController();
@@ -250,6 +255,7 @@ export default function SkillsCoachChat({
           message: trimmed,
           level,
           discipline,
+          tier,
           attachment: upload
         }),
         signal: ctrl.signal
@@ -279,6 +285,30 @@ export default function SkillsCoachChat({
         buffer = frames.pop() ?? "";
         for (const frame of frames) handleFrame(frame);
       }
+
+      // Stream closed without a terminal "done"/"error" frame (e.g. the function
+      // hit its time budget). Commit whatever streamed so the bubble never
+      // freezes half-written.
+      if (!terminalRef.current) {
+        const text = accRef.current.trim();
+        if (text) {
+          setMessages((m) => [
+            ...m,
+            {
+              id: crypto.randomUUID(),
+              role: "assistant",
+              content:
+                text +
+                "\n\n_(Connection ended early — this answer may be cut off. Ask me to continue.)_",
+              meta: metaRef.current ?? undefined
+            }
+          ]);
+        } else {
+          setError("The answer didn't come through — please try again.");
+        }
+        setStreaming(false);
+        setStreamingText("");
+      }
     } catch (err: any) {
       if (err?.name !== "AbortError") setError(err?.message || "Connection lost.");
       setStreaming(false);
@@ -302,6 +332,7 @@ export default function SkillsCoachChat({
     }
 
     if (event === "token") {
+      accRef.current += data.text ?? "";
       setStreamingText((t) => t + (data.text ?? ""));
     } else if (event === "meta") {
       metaRef.current = {
@@ -313,6 +344,7 @@ export default function SkillsCoachChat({
       setConcept(data.concept ?? null);
       setIdeas(data.further_ideas ?? []);
     } else if (event === "done") {
+      terminalRef.current = true;
       const assistant: ChatMessage = {
         id: data.messageId || crypto.randomUUID(),
         role: "assistant",
@@ -326,6 +358,7 @@ export default function SkillsCoachChat({
       setStreamingText("");
       setStreaming(false);
     } else if (event === "error") {
+      terminalRef.current = true;
       setError(data.message || "Something went wrong.");
       setStreaming(false);
       setStreamingText("");
@@ -418,6 +451,11 @@ export default function SkillsCoachChat({
           </div>
         </div>
 
+        <div className="flex items-center gap-2 text-sm">
+          <span className="text-neutral-900">Answer</span>
+          <ModelToggle value={tier} onChange={setTier} disabled={streaming} />
+        </div>
+
         <button
           type="button"
           onClick={newChat}
@@ -437,8 +475,10 @@ export default function SkillsCoachChat({
       {/* two-pane */}
       <div className="mt-5 grid grid-cols-1 gap-6 lg:grid-cols-[1fr_18rem]">
         {/* chat column */}
-        <div className="flex h-[68vh] min-h-[28rem] flex-col overflow-hidden rounded-2xl border border-neutral-200 bg-neutral-50">
+        <div className="relative flex h-[68vh] min-h-[28rem] flex-col overflow-hidden rounded-2xl border border-neutral-200 bg-neutral-50">
           <div
+            ref={scrollRef}
+            onScroll={onScroll}
             className="flex-1 space-y-4 overflow-y-auto p-4"
             role="log"
             aria-live="polite"
@@ -475,14 +515,23 @@ export default function SkillsCoachChat({
                   {streamingText ? (
                     <span className="whitespace-pre-wrap">{streamingText}</span>
                   ) : (
-                    <span className="text-neutral-900">Thinking…</span>
+                    <Thinking label="Thinking…" />
                   )}
                 </div>
               </div>
             )}
 
-            <div ref={endRef} />
           </div>
+
+          {!pinned && (messages.length > 0 || streaming) && (
+            <button
+              type="button"
+              onClick={scrollToBottom}
+              className="absolute bottom-24 left-1/2 z-10 -translate-x-1/2 rounded-full border border-neutral-300 bg-white px-3 py-1.5 text-xs font-medium text-neutral-900 shadow-sm hover:bg-neutral-100"
+            >
+              ↓ Jump to latest
+            </button>
+          )}
 
           {/* composer */}
           <div className="border-t border-neutral-200 bg-white p-3">

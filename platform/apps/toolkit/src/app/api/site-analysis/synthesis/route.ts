@@ -4,15 +4,15 @@ import { runStructured } from "@/lib/anthropic/structured";
 import {
   SYNTHESIS_SCHEMA,
   synthesisSystem,
-  synthesisUser,
-  MODEL
+  synthesisUser
 } from "@/lib/anthropic/site-analysis-prompts";
+import { resolveModel } from "@/lib/anthropic/models";
 
 // Cost pass #2 (D2): the design synthesis. Ungrounded — it only reasons over the
 // hard-data bundle the client already has (from /analyze) plus the contamination
 // brief, so the client posts that bundle here. Auth-gated; its own 60s request.
 export const runtime = "nodejs";
-export const maxDuration = 60;
+export const maxDuration = 300;
 
 export async function POST(req: Request) {
   if (!process.env.ANTHROPIC_API_KEY) {
@@ -45,18 +45,21 @@ export async function POST(req: Request) {
     );
   }
 
+  const { model, tier } = resolveModel(body?.tier);
+
   try {
     const synthesis = await runStructured({
       system: synthesisSystem(!!bundle?.contamination),
       user: synthesisUser(bundle),
       schema: SYNTHESIS_SCHEMA,
-      grounded: false
+      grounded: false,
+      tier
     });
 
     const result = {
       meta: {
         epaId: bundle?.site?.epaId ?? null,
-        model: MODEL,
+        model,
         generatedAt: new Date().toISOString()
       },
       synthesis

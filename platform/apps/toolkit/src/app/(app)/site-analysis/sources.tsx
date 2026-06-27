@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Card } from "./ui";
+import Thinking from "@/components/Thinking";
 
 type Source = { title: string; url: string };
 
@@ -16,7 +17,15 @@ function domain(url: string): string {
 // Auto first pass. As soon as a place is analyzed this fires on its own (no button)
 // and streams back a short orientation + the authoritative links a studio should
 // start from — so the student opens to a trail, not a blank chat. Re-keyed per site.
-export default function SiteSources({ place, context }: { place: any; context: any }) {
+export default function SiteSources({
+  place,
+  context,
+  tier
+}: {
+  place: any;
+  context: any;
+  tier?: string;
+}) {
   const [note, setNote] = useState("");
   const [sources, setSources] = useState<Source[]>([]);
   const [status, setStatus] = useState<"loading" | "done" | "error">("loading");
@@ -75,7 +84,7 @@ export default function SiteSources({ place, context }: { place: any; context: a
         const res = await fetch("/api/site-analysis/sources", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ place, context }),
+          body: JSON.stringify({ place, context, tier }),
           signal: ctrl.signal
         });
         if (!res.ok || !res.body) {
@@ -126,7 +135,7 @@ export default function SiteSources({ place, context }: { place: any; context: a
       </p>
 
       {status === "loading" && !note && sources.length === 0 && (
-        <p className="text-sm text-neutral-900">Scanning the web for the best sources on this place…</p>
+        <Thinking label="Scanning the web for the best sources on this place…" />
       )}
 
       {note && (
@@ -154,7 +163,9 @@ export default function SiteSources({ place, context }: { place: any; context: a
       )}
 
       {status === "loading" && (note || sources.length > 0) && (
-        <p className="mt-2 text-[11px] text-neutral-900">Still searching…</p>
+        <div className="mt-2">
+          <Thinking label="Still searching…" />
+        </div>
       )}
 
       {status === "error" && (

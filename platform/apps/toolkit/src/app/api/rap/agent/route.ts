@@ -1,12 +1,13 @@
 import { NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { createClient } from "@/lib/supabase/server";
-import { MODEL, AGENT_SYSTEM, AGENT_SCHEMA, agentUser } from "@/lib/anthropic/rap-agent-prompts";
+import { buildAgentSystem, AGENT_SCHEMA, agentUser } from "@/lib/anthropic/rap-agent-prompts";
+import { resolveModel } from "@/lib/anthropic/models";
 import { applyCommand } from "@/app/(app)/rap/studio/engine/interpreter";
 import type { State } from "@/app/(app)/rap/studio/engine/types";
 
 export const runtime = "nodejs";
-export const maxDuration = 30;
+export const maxDuration = 300;
 
 function parseJson(text: string): { reply?: string; commands?: string[]; question?: string } {
   const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/i);
@@ -59,7 +60,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Sign in to use the assistant." }, { status: 401 });
   }
 
-  let body: { instruction?: string; state?: State };
+  let body: { instruction?: string; state?: State; tier?: unknown };
   try {
     body = await req.json();
   } catch {
@@ -68,6 +69,7 @@ export async function POST(req: Request) {
 
   const instruction = String(body?.instruction || "").trim();
   const state = body?.state;
+  const { model } = resolveModel(body?.tier);
   if (!instruction) return NextResponse.json({ error: "Type a request first." }, { status: 400 });
   if (!state || typeof state !== "object") return NextResponse.json({ error: "Missing model state." }, { status: 400 });
 
@@ -76,12 +78,17 @@ export async function POST(req: Request) {
   const stateJson = JSON.stringify(state);
   if (stateJson.length > 200_000) return NextResponse.json({ error: "The model is too large to send to the assistant." }, { status: 413 });
 
+  // The active schema scopes the assistant's command set + examples.
+  const rawMode = (state as State).mode;
+  const mode = rawMode === "massing" || rawMode === "floorplan" ? rawMode : "bays";
+
   try {
     const client = new Anthropic();
     const message: any = await client.messages.create({
-      model: MODEL,
+      model,
       max_tokens: 6000,
-      system: AGENT_SYSTEM,
+      // Cache the (large) grammar/system prompt — now scoped per modeling schema.
+      system: [{ type: "text", text: buildAgentSystem(mode), cache_control: { type: "ephemeral" } }],
       output_config: { format: { type: "json_schema", schema: AGENT_SCHEMA } },
       messages: [{ role: "user", content: agentUser(instruction, stateJson) }]
     } as any);
@@ -117,7 +124,7 @@ export async function POST(req: Request) {
       } catch {
         /* never let logging break the response */
       }
-      return NextResponse.json({ question, meta: { model: MODEL, generated_at: new Date().toISOString() } });
+      return NextResponse.json({ question, meta: { model, generated_at: new Date().toISOString() } });
     }
 
     const { kept: commands, dropped } = validateCommands(state, Array.isArray(parsed.commands) ? parsed.commands : []);
@@ -137,7 +144,7 @@ export async function POST(req: Request) {
       /* never let logging break the response */
     }
 
-    return NextResponse.json({ reply, commands, dropped, meta: { model: MODEL, generated_at: new Date().toISOString() } });
+    return NextResponse.json({ reply, commands, dropped, meta: { model, generated_at: new Date().toISOString() } });
   } catch (err: unknown) {
     console.error(err);
     return NextResponse.json({ error: err instanceof Error ? err.message : "Internal error" }, { status: 500 });

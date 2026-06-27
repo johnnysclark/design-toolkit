@@ -188,8 +188,15 @@ export interface Tactile3D {
   scale_factor: number;
 }
 
+// The active modeling schema — a "way of thinking" that scopes which commands the
+// console help, the assistant grammar, and the Forms surface. Every command still
+// works if typed (hide-but-allow); the schema just shapes what's shown.
+export type SchemaMode = "bays" | "massing" | "floorplan";
+
 export interface State {
   schema: "rhino_controller_v4.0";
+  /** Active modeling schema (set by the starter or the schema selector). */
+  mode: SchemaMode;
   meta: { created: string; last_saved: string; notes: string };
   site: Site;
   style: Style;

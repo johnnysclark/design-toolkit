@@ -40,6 +40,7 @@ export function defaultLayer(): Layer {
 export function baseState(notes = "Authored in RAP Studio (web)"): State {
   return {
     schema: "rhino_controller_v4.0",
+    mode: "bays",
     meta: { created: "web-studio", last_saved: "web-studio", notes },
     site: { origin: [0, 0], width: 100, height: 100 },
     style: { ...DEFAULT_STYLE },
@@ -104,6 +105,7 @@ export function makeSeedState(): State {
 
   return {
     schema: "rhino_controller_v4.0",
+    mode: "bays",
     meta: {
       created: "web-studio",
       last_saved: "web-studio",
@@ -189,6 +191,7 @@ export function makeMassingStarter(): State {
     { id: "g3", level: 0, kind: "box", origin: [10, 46], size: [70, 18], height: 12, name: "Box 3", layer: "massing" }
   ];
   s.regions = regions;
+  s.mode = "massing";
   return s;
 }
 
@@ -197,6 +200,7 @@ export function makeFloorPlateStarter(): State {
   const s = baseState("Single floor-plate starter.");
   s.layers.slab = { name: "slab", lineweight_mm: 0.25, linetype: "solid" };
   s.regions = [{ id: "g1", level: 0, kind: "plate", origin: [10, 10], size: [60, 40], thickness: 0.5, name: "Plate 1", layer: "slab" }];
+  s.mode = "floorplan";
   return s;
 }
 

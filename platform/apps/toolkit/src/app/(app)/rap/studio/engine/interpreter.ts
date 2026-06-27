@@ -9,7 +9,7 @@
 // COMMAND_GRAMMAR below (which the agent is taught).
 // ─────────────────────────────────────────────────────────────────────────────
 
-import type { ApertureType, Axis, Bay, CommandResult, Layer, LineType, Region, State, TactileKind, TactilePattern, Vec2 } from "./types";
+import type { ApertureType, Axis, Bay, CommandResult, Layer, LineType, Region, SchemaMode, State, TactileKind, TactilePattern, Vec2 } from "./types";
 import { cloneState, defaultLayer, makeSeedState, newBay } from "./seed";
 import { toBraille } from "./braille";
 
@@ -784,6 +784,22 @@ function cmdLevel(state: State, tokens: string[]): CommandResult {
   return ok(next, `Added level "${name}" at z = ${z} ft.`);
 }
 
+function cmdSchema(state: State, tokens: string[]): CommandResult {
+  const sub = tokens[1];
+  if (!sub || sub === "show") {
+    return read(state, `Active schema: ${SCHEMA_LABELS[state.mode]} — ${SCHEMA_HINTS[state.mode]}. Switch with: schema set bays|massing|floorplan. (Other schemas' commands still work if you type them.)`);
+  }
+  if (sub === "set") {
+    const m = tokens[2] as SchemaMode;
+    if (m !== "bays" && m !== "massing" && m !== "floorplan") return err(state, "Usage: schema set bays|massing|floorplan");
+    if (m === state.mode) return read(state, `Already in the ${SCHEMA_LABELS[m]} schema.`);
+    const next = cloneState(state);
+    next.mode = m;
+    return ok(next, `Schema set to ${SCHEMA_LABELS[m]} — ${SCHEMA_HINTS[m]}.`);
+  }
+  return err(state, "Usage: schema | schema set bays|massing|floorplan");
+}
+
 // ─── Read-only verbs ─────────────────────────────────────────────────────────
 
 function listBays(state: State): string {
@@ -903,7 +919,9 @@ export function applyCommand(state: State, raw: string): CommandResult {
     case "help":
     case "h":
     case "?":
-      return read(state, HELP_TEXT);
+      return read(state, helpFor(state.mode));
+    case "schema":
+      return cmdSchema(state, tokens);
     case "describe":
     case "d":
       return read(state, describe(state));
@@ -959,48 +977,102 @@ export function applyCommand(state: State, raw: string): CommandResult {
 
 // ─── Help + grammar (shared with the UI and the agent) ───────────────────────
 
-export const HELP_TEXT = `RAP Studio commands — a literal Rhino/CAD model: layers, regions, geometry.
+export const SCHEMA_LABELS: Record<SchemaMode, string> = {
+  bays: "Structural bays",
+  massing: "Massing",
+  floorplan: "Floor-plan layout"
+};
+export const SCHEMA_HINTS: Record<SchemaMode, string> = {
+  bays: "think in a column grid",
+  massing: "think in extruded volumes",
+  floorplan: "think in plates, walls and openings"
+};
 
-READ
-  describe                              read the model back (Macro / Meso / Micro)
+// Help/grammar split into blocks tagged by which schema(s) surface them. Other
+// schemas' blocks are hidden in help + the assistant grammar, but every command
+// still works if typed (hide-but-allow). `schema set …` switches the active set.
+const HELP_BLOCKS: { schemas: SchemaMode[] | "all"; text: string }[] = [
+  {
+    schemas: "all",
+    text: `READ
+  describe                              read the model back (overview + one block per level)
   list bays · layer list · plate list · box list · wall list · column list · opening list
-  undo · redo                           step backward / forward through your edits
-
-SITE & LEVELS
-  set site width|height <ft>            site extents
+  undo · redo                           step backward / forward through your edits`
+  },
+  {
+    schemas: "all",
+    text: `SITE & LEVELS
+  set site width|height <ft>            site extents (feet)
   set site boundary <x1,y1> <x2,y2> …   irregular infill lot (≥3 pts) · or: clear
-  level add <name> <z>                  add a level (z in ft)
-
-LAYERS (Rhino layers carry lineweight + linetype + tactile texture)
+  level add <name> <z>                  add a level (z in ft)`
+  },
+  {
+    schemas: "all",
+    text: `LAYERS (Rhino layers carry lineweight + linetype + tactile texture)
   layer add <name> [linetype solid|dashed|dotted|center|hidden] [lineweight <mm>]
                    [tactile dots|lines|crosshatch|grid] [spacing <mm>] [angle <deg>] [height <mm>]
-  layer set <name> linetype|lineweight|tactile …   ·   layer remove <name>   ·   layer list
-
-GEOMETRIC REGIONS (placed on a layer, described by feet dimensions)
+  layer set <name> linetype|lineweight|tactile …   ·   layer remove <name>   ·   layer list`
+  },
+  {
+    schemas: ["floorplan"],
+    text: `FLOOR PLATES (slab regions on a layer, feet dimensions)
   floor plate add [id] <x> <y> <w> <h> [thickness <ft>] [layer <name>] [name <text>]
-  plate set <id> origin|size|thickness|layer|level|name|tactile …   ·   plate remove <id> · plate list
+  plate set <id> origin|size|thickness|layer|level|name|tactile …   ·   plate remove <id> · plate list`
+  },
+  {
+    schemas: ["massing"],
+    text: `EXTRUDED BOXES (massing volumes on a layer, feet dimensions)
   extruded box add [id] <x> <y> <w> <h> <height> [layer <name>] [name <text>]
-  box set <id> origin|size|height|layer|level|name|tactile …   ·   box remove <id> · box list
-
-FREE WALLS (interior partitions AND exterior envelope, any angle)
+  box set <id> origin|size|height|layer|level|name|tactile …   ·   box remove <id> · box list`
+  },
+  {
+    schemas: ["floorplan"],
+    text: `FREE WALLS & OPENINGS (interior partitions + exterior envelope, any angle)
   wall add [id] <x1> <y1> <x2> <y2> [thickness] [level] [layer <name>]
   wall move <id> <x1> <y1> <x2> <y2> · wall thickness <id> <ft> · wall remove <id>
-  opening add <wallId> <door|window|portal> <pos 0–1> <width> [height]
-  opening remove <id>
-
-COLUMNS
-  column add [id] <x> <y> [size] [layer <name>] · column remove <id>
-
-STRUCTURAL BAY JIG (the original grid)
+  opening add <wallId> <door|window|portal> <pos 0–1> <width> [height] · opening remove <id>`
+  },
+  {
+    schemas: ["bays", "floorplan"],
+    text: `COLUMNS
+  column add [id] <x> <y> [size] [layer <name>] · column remove <id>`
+  },
+  {
+    schemas: ["bays"],
+    text: `STRUCTURAL BAY JIG (the column grid)
   add bay <name> [at <x> <y>] · remove bay <name>
   set bay <name> origin|bays|spacing|rotation|label|void_center|void_size|void_shape …
   wall <bay> on|off · wall <bay> thickness <ft>
   corridor <bay> on|off · axis x|y · width <ft> · position <gridline>
-  aperture <bay> add <id> <door|window|portal> <x|y> <gridline> <corner> <w> <h>
-
-OUTPUT
+  aperture <bay> add <id> <door|window|portal> <x|y> <gridline> <corner> <w> <h>`
+  },
+  {
+    schemas: "all",
+    text: `OUTPUT
   tactile3d on|off · wall_height|cut_height <ft> · floor on|off
-  reset                                 back to the sample model · clear  (empty model)`;
+  reset                                 back to the sample model · clear  (empty model)`
+  },
+  {
+    schemas: "all",
+    text: `SCHEMA (the active way of thinking — scopes the command set above)
+  schema set bays|massing|floorplan     switch · schema  (show the current one)`
+  }
+];
+
+/** The command help/grammar scoped to one schema (others hidden, still typeable). */
+export function helpFor(mode: SchemaMode): string {
+  const head =
+    `RAP Studio — schema: ${SCHEMA_LABELS[mode]} (${SCHEMA_HINTS[mode]}). ` +
+    `These are this schema's commands; commands from other schemas still work if you type them. Switch with "schema set …".`;
+  const blocks = HELP_BLOCKS.filter((b) => b.schemas === "all" || b.schemas.includes(mode)).map((b) => b.text);
+  return [head, "", ...blocks].join("\n\n");
+}
+/** The grammar handed to the AI assistant — identical to the scoped help. */
+export function commandGrammarFor(mode: SchemaMode): string {
+  return helpFor(mode);
+}
+// Back-compat full-grammar constant (used where no mode is in hand).
+export const HELP_TEXT = helpFor("bays");
 
 /** Compact grammar handed to the agent so it can compile NL → commands. */
 export const COMMAND_GRAMMAR = HELP_TEXT;
