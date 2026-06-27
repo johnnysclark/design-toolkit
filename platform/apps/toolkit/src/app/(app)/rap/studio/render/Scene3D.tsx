@@ -16,7 +16,7 @@ import { memo, useMemo } from "react";
 import * as THREE from "three";
 import { Canvas } from "@react-three/fiber";
 import { OrbitControls, Bounds, Edges, Line, Grid } from "@react-three/drei";
-import { deriveGeometry, type PhaseEmphasis, type PhaseView } from "../engine/geometry";
+import { deriveGeometry, type PhaseEmphasis, type PhaseView, type SceneGeometry } from "../engine/geometry";
 import type { State } from "../engine/types";
 
 const WHITE = "#fff";
@@ -90,41 +90,40 @@ function BWBox({
   );
 }
 
-function Model({ state, levelFilter, view }: { state: State; levelFilter: number | null; view: PhaseView | null }) {
-  const scene = useMemo(() => deriveGeometry(state, levelFilter, view), [state, levelFilter, view]);
+// The ground: a very light 5-ft reference grid centered UNDER the geometry (not the
+// site), so the model always sits centered on the grid. Rendered OUTSIDE <Bounds>
+// (see Scene3D) so it never inflates the zoom-to-fit — the camera fits the geometry.
+function Ground({ scene }: { scene: SceneGeometry }) {
+  const gb = scene.geomBounds;
+  const cx = gb ? (gb.minX + gb.maxX) / 2 : scene.site.ox + (scene.site.w || 100) / 2;
+  const cy = gb ? (gb.minY + gb.maxY) / 2 : scene.site.oy + (scene.site.h || 100) / 2;
+  const span = gb ? Math.max(gb.maxX - gb.minX, gb.maxY - gb.minY, 20) : Math.max(scene.site.w || 100, scene.site.h || 100, 60);
+  const size = span * 2 + 20; // extends past the model so it reads as ground, centered on it
+  return (
+    <Grid
+      position={[cx, 0, cy]}
+      args={[size, size]}
+      cellSize={5}
+      cellThickness={0.6}
+      cellColor="#dcdcdc"
+      sectionSize={25}
+      sectionThickness={0.9}
+      sectionColor="#c2c2c2"
+      infiniteGrid={false}
+      fadeDistance={2000}
+      fadeStrength={0}
+      followCamera={false}
+    />
+  );
+}
+
+// The geometry only (no ground) — what <Bounds> measures to zoom-to-fit + center.
+function Geometry({ state, scene }: { state: State; scene: SceneGeometry }) {
   const wallH = state.tactile3d.wall_height;
   const floorT = state.tactile3d.floor_thickness;
   const levelZ = (lvl: number) => scene.levels[lvl]?.z ?? 0;
-
-  // The ONE ground: a single white plane just below z=0, sized to the site (fall
-  // back to bounds). Nothing else renders at GROUND_Y, so no surface shares a depth.
-  const gw = scene.site.w || scene.bounds.maxX - scene.bounds.minX || 100;
-  const gh = scene.site.h || scene.bounds.maxY - scene.bounds.minY || 100;
-  const gcx = scene.site.ox + gw / 2;
-  const gcy = scene.site.oy + gh / 2;
-
-  // Pad the grid out past the model so it reads as ground, not a tight platter.
-  const gridW = Math.max(gw, 60) + 40;
-  const gridD = Math.max(gh, 60) + 40;
   return (
     <group>
-      {/* Ground: a standard, very light 5-ft reference grid on z=0 — no solid
-          plane and no lot outline, just the grid. Heavier line every 25 ft. */}
-      <Grid
-        position={[gcx, 0, gcy]}
-        args={[gridW, gridD]}
-        cellSize={5}
-        cellThickness={0.6}
-        cellColor="#dcdcdc"
-        sectionSize={25}
-        sectionThickness={0.9}
-        sectionColor="#c2c2c2"
-        infiniteGrid={false}
-        fadeDistance={2000}
-        fadeStrength={0}
-        followCamera={false}
-      />
-
       {/* Atrium voids — outline just above the ground (parity with the 2D plan + read-back) */}
       {scene.voids.map((v, i) => {
         const pts: [number, number, number][] =
@@ -196,15 +195,19 @@ function Model({ state, levelFilter, view }: { state: State; levelFilter: number
 }
 
 function Scene3D({ state, levelFilter = null, view = null }: { state: State; levelFilter?: number | null; view?: PhaseView | null }) {
+  const scene = useMemo(() => deriveGeometry(state, levelFilter, view), [state, levelFilter, view]);
   return (
     <Canvas
       orthographic
       camera={{ position: [80, 90, 120], zoom: 6, near: -2000, far: 4000 }}
       style={{ background: WHITE }}
     >
-      {/* No lights, no shadows: meshBasic is unlit → pure black & white. */}
+      {/* Ground sits OUTSIDE <Bounds> so it never inflates the zoom-to-fit. */}
+      <Ground scene={scene} />
+      {/* No lights, no shadows: meshBasic is unlit → pure black & white. <Bounds>
+          fits + centers the camera on the geometry alone. */}
       <Bounds fit clip observe margin={1.2}>
-        <Model state={state} levelFilter={levelFilter} view={view} />
+        <Geometry state={state} scene={scene} />
       </Bounds>
       <OrbitControls makeDefault enableDamping />
     </Canvas>

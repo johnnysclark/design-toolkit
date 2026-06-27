@@ -308,10 +308,11 @@ export function buildPlanModel(state: State, levelFilter: number | null = null, 
     }
   }
 
-  // Grow bounds to include label/braille glyph boxes — geometry-only bounds
-  // would clip text on south/east-edge or rotated bays, and the braille key is
-  // the primary non-visual deliverable. (Monospace ≈ 0.62 em advance.)
-  let { minX, minY, maxX, maxY } = scene.bounds;
+  // Zoom-to-fit the GEOMETRY (centered), not the whole site — so a small building
+  // in a big lot fills the window. Fall back to the site bounds only when nothing
+  // is placed yet. Then grow to include label/braille glyph boxes (the braille key
+  // is the primary non-visual deliverable; monospace ≈ 0.62 em advance).
+  let { minX, minY, maxX, maxY } = scene.geomBounds ?? scene.bounds;
   for (const p of prims) {
     if (p.kind !== "text") continue;
     const w = p.text.length * p.size * 0.62;
@@ -322,6 +323,7 @@ export function buildPlanModel(state: State, levelFilter: number | null = null, 
     minY = Math.min(minY, p.at.y - p.size);
     maxY = Math.max(maxY, p.at.y + p.size);
   }
-  const pad = 6;
+  // Proportional margin so the fit looks deliberate at any model size (min 4 ft).
+  const pad = Math.max(4, 0.06 * Math.max(maxX - minX, maxY - minY));
   return { prims, bounds: { minX: minX - pad, minY: minY - pad, maxX: maxX + pad, maxY: maxY + pad } };
 }

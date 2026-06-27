@@ -148,8 +148,11 @@ export interface SceneGeometry {
   regions: RegionG[];
   freeColumns: ColG[];
   levels: Level[];
-  /** World-space bounds of everything, for a 2D viewBox. */
+  /** World-space bounds of everything (site + geometry), for a fallback viewBox. */
   bounds: { minX: number; minY: number; maxX: number; maxY: number };
+  /** Bounds of the GEOMETRY only (no site/lot) — what the viewers zoom-to-fit and
+   *  center on. null when nothing is placed (then fall back to `bounds`). */
+  geomBounds: { minX: number; minY: number; maxX: number; maxY: number } | null;
 }
 
 /** Apply a bay transform to a local point → world feet. */
@@ -220,11 +223,24 @@ export function deriveGeometry(state: State, levelFilter: number | null = null, 
   let maxX = state.site.origin[0] + state.site.width;
   let maxY = state.site.origin[1] + state.site.height;
 
+  // Geometry-only bounds (excludes the site rect + lot boundary) so the viewers can
+  // zoom-to-fit the actual geometry, centered, instead of the whole site.
+  let gMinX = Infinity;
+  let gMinY = Infinity;
+  let gMaxX = -Infinity;
+  let gMaxY = -Infinity;
+  let hasGeom = false;
+
   const expand = (p: Pt) => {
     minX = Math.min(minX, p.x);
     minY = Math.min(minY, p.y);
     maxX = Math.max(maxX, p.x);
     maxY = Math.max(maxY, p.y);
+    hasGeom = true;
+    gMinX = Math.min(gMinX, p.x);
+    gMinY = Math.min(gMinY, p.y);
+    gMaxX = Math.max(gMaxX, p.x);
+    gMaxY = Math.max(gMaxY, p.y);
   };
 
   for (const [name, bay] of Object.entries(state.bays)) {
@@ -488,7 +504,15 @@ export function deriveGeometry(state: State, levelFilter: number | null = null, 
   for (const c of freeColumns) expand({ x: c.x, y: c.y });
 
   const boundary = state.site.boundary ? state.site.boundary.map(([x, y]) => ({ x, y })) : null;
-  if (boundary) for (const p of boundary) expand(p);
+  // The lot boundary grows the site-inclusive bounds only — NOT the geometry bounds,
+  // so a small building in a big lot still zooms to the building.
+  if (boundary)
+    for (const p of boundary) {
+      minX = Math.min(minX, p.x);
+      minY = Math.min(minY, p.y);
+      maxX = Math.max(maxX, p.x);
+      maxY = Math.max(maxY, p.y);
+    }
 
   return {
     site: { w: state.site.width, h: state.site.height, ox: state.site.origin[0], oy: state.site.origin[1], boundary },
@@ -498,7 +522,8 @@ export function deriveGeometry(state: State, levelFilter: number | null = null, 
     regions,
     freeColumns,
     levels: state.levels,
-    bounds: { minX, minY, maxX, maxY }
+    bounds: { minX, minY, maxX, maxY },
+    geomBounds: hasGeom ? { minX: gMinX, minY: gMinY, maxX: gMaxX, maxY: gMaxY } : null
   };
 }
 
