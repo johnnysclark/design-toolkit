@@ -31,7 +31,13 @@ export function createViewport(canvas) {
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(0xffffff);
 
-  const camera = new THREE.PerspectiveCamera(42, 1, 0.1, 4000);
+  // Parallel (orthographic) projection — the architectural/CAD convention: no
+  // perspective foreshortening, so equal lengths read equal regardless of depth
+  // (true elevations/sections). FRUST is the world half-height the view frames;
+  // the aspect-driven half-width is set in resize(). OrbitControls drives zoom
+  // through camera.zoom rather than dollying the lens.
+  const FRUST = 15;
+  const camera = new THREE.OrthographicCamera(-FRUST, FRUST, FRUST, -FRUST, 0.1, 4000);
   camera.position.set(20, 16, 24);
   const controls = new OrbitControls(camera, renderer.domElement);
   controls.enableDamping = true; controls.target.set(0, 2, 0);
@@ -62,12 +68,16 @@ export function createViewport(canvas) {
 
   function resize() {
     const w = canvas.parentElement.clientWidth, h = canvas.parentElement.clientHeight;
-    renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix();
+    renderer.setSize(w, h, false);
+    const aspect = (w / h) || 1;            // keep the ortho frustum square-aspect-correct
+    camera.left = -FRUST * aspect; camera.right = FRUST * aspect;
+    camera.top = FRUST; camera.bottom = -FRUST;
+    camera.updateProjectionMatrix();
   }
   new ResizeObserver(resize).observe(canvas.parentElement); resize();
   (function loop() { requestAnimationFrame(loop); controls.update(); renderer.render(scene, camera); })();
 
-  let model = null, display = { mode: "pen", shadowIntensity: 0.6, sunHour: 15, analysisField: "solarNow" };
+  let model = null, display = { mode: "analysis", shadowIntensity: 0.6, sunHour: 15, analysisField: "solarNow" };
   let terrainKey = null, occluders = null, analysisCells = [];
   const faceMeshes = [];   // {mesh, edges, name}
   const apMeshes = [];     // {mesh, id, c, n} aperture glass panels

@@ -78,10 +78,14 @@ export default function AgentPanel({
         value={value}
         onChange={(e) => setValue(e.target.value)}
         onKeyDown={(e) => {
-          if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) run(value);
+          // Enter sends (like Claude Code); Shift+Enter inserts a newline.
+          if (e.key === "Enter" && !e.shiftKey) {
+            e.preventDefault();
+            run(value);
+          }
         }}
         rows={2}
-        placeholder="Describe a change in plain language…  (⌘/Ctrl + Enter to send)"
+        placeholder="Describe a change in plain language…  (Enter to send · Shift+Enter for a new line)"
         className="w-full rounded-md border-2 border-neutral-900 px-3 py-2 text-sm text-neutral-900 outline-none focus:border-[#ff3b21] focus-visible:ring-2 focus-visible:ring-[#ff3b21] focus-visible:ring-offset-1"
       />
       <div className="flex flex-wrap items-center gap-3">

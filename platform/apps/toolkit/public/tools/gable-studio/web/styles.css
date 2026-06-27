@@ -22,7 +22,21 @@ h1 .sub { color: var(--muted); font-weight: 400; font-size: .85rem; }
 .toolbar button.on { background: #f4d58a; border-color: #d8a93f; }
 .toolbar .sep { width: 1px; height: 22px; background: var(--line); margin: 0 .3rem; }
 
-main { flex: 1; min-height: 0; display: grid; grid-template-columns: 290px 1fr 360px; gap: 0; }
+/* Centred 3D viewer with docks ABOVE (top), BELOW (bottom) and to the RIGHT.
+   Collapsing the right dock swaps the column to `auto` (just its toggle bar);
+   collapsing top/bottom shrinks their `auto` rows — the canvas always keeps the
+   space it had plus whatever a collapse frees, and is never overlaid. */
+main {
+  flex: 1; min-height: 0; display: grid; gap: 0;
+  --right-w: 360px;
+  grid-template-columns: minmax(0, 1fr) var(--right-w);
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  grid-template-areas:
+    "top    right"
+    "center right"
+    "bottom right";
+}
+main.right-collapsed { grid-template-columns: minmax(0, 1fr) auto; }
 .panel { overflow-y: auto; padding: .8rem .9rem 2rem; border-right: 1px solid var(--line); }
 .panel.right { border-right: none; border-left: 1px solid var(--line); }
 .panel h3 { font-size: .95rem; margin-bottom: .5rem; }
@@ -97,7 +111,18 @@ input.num { width: 100%; border: 1px solid var(--line); border-radius: 5px; padd
 .modal-scroll .src { color: var(--muted); font-weight: 400; font-size: .72rem; border: 1px solid var(--line); border-radius: 10px; padding: 0 .4rem; margin-left: .3rem; }
 #map { height: 360px; width: 100%; margin-top: .6rem; }
 
-@media (max-width: 1100px) { main { grid-template-columns: 1fr; grid-auto-rows: minmax(260px, auto); } .panel.right, .panel.left { border: none; border-top: 1px solid var(--line); } }
+/* Narrow screens: stack the docks (top → viewer → data → guidance). */
+@media (max-width: 1000px) {
+  main, main.right-collapsed {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto minmax(240px, 1fr) auto auto;
+    grid-template-areas: "top" "center" "right" "bottom";
+  }
+  .dock-right { border-left: none; border-top: 1px solid var(--line); flex-direction: column; }
+  .dock-right .dock-toggle { writing-mode: horizontal-tb; width: 100%; height: auto; border-right: none; border-bottom: 1px solid var(--line); padding: .4rem .9rem; }
+  .dock-right .dock-toggle .dock-title, .dock-right .dock-toggle .dock-chev { transform: none; }
+  .dock-right .dock-body { width: auto; }
+}
 
 /* ============================================================
    Bold-graphic restyle (matches the rest of the platform):
@@ -190,3 +215,74 @@ header h1 .sub,
   text-transform: none;
   letter-spacing: 0;
 }
+
+/* ============================================================
+   Dock layout — collapsible panels around a centred 3D viewer.
+   (Replaces the old left/center/right .panel split + the floating
+   studio window. The .panel rules above are now unused but harmless.)
+   ============================================================ */
+.center { grid-area: center; border-right: 1px solid var(--line); min-width: 0; min-height: 0; }
+.dock-top { grid-area: top; border-bottom: 1px solid var(--line); }
+.dock-bottom { grid-area: bottom; border-top: 1px solid var(--line); }
+.dock-right { grid-area: right; border-left: 1px solid var(--line); display: flex; align-items: stretch; }
+
+.dock { background: var(--card); min-width: 0; min-height: 0; }
+.dock-top, .dock-bottom { display: flex; flex-direction: column; }
+
+/* toggle bar (top/bottom = horizontal across the width) */
+.dock-toggle {
+  display: flex; align-items: center; gap: .5rem; width: 100%; text-align: left;
+  background: #efeae0; border: none; border-bottom: 1px solid var(--line);
+  padding: .4rem .9rem; cursor: pointer; color: var(--ink);
+}
+.dock-bottom .dock-toggle { border-bottom: none; border-top: none; }
+.dock-toggle:hover { background: #e7e0d2; }
+.dock-toggle .dock-chev { font-size: .72rem; transition: transform .15s ease; flex: none; }
+.dock-toggle .dock-title { font-family: var(--display); text-transform: uppercase; letter-spacing: -.01em; font-weight: 400; font-size: .82rem; }
+.dock-toggle .dock-hint { margin-left: auto; color: var(--ink); font-weight: 600; font-size: .72rem; }
+.dock.collapsed .dock-body { display: none; }
+.dock.collapsed .dock-chev { transform: rotate(-90deg); }
+
+/* dock bodies scroll inside a capped height so the viewer stays prominent */
+.dock-top .dock-body { padding: .7rem .9rem 1rem; overflow: auto; max-height: clamp(150px, 34vh, 340px); }
+.dock-bottom .dock-body { padding: .25rem .9rem .8rem; overflow: auto; max-height: clamp(120px, 28vh, 320px); }
+
+/* top dock: control groups flow as wrapping columns (keeps the strip short) */
+.ctl-cols { display: flex; flex-wrap: wrap; gap: .4rem 1.4rem; align-items: flex-start; }
+.ctl-col { flex: 1 1 240px; min-width: 228px; max-width: 360px; }
+.ctl-col-import { flex: 0 1 250px; }
+.ctl-col .importcard { margin: .2rem 0 .4rem; }
+
+/* right dock: a slim vertical toggle bar + the data body. Collapsing hides the
+   body; main.right-collapsed then shrinks the column to just this bar. */
+.dock-right .dock-toggle {
+  writing-mode: vertical-rl; width: 30px; flex: none;
+  border-bottom: none; border-right: 1px solid var(--line);
+  justify-content: flex-start; align-items: center; padding: .9rem .2rem; gap: .6rem;
+}
+.dock-right .dock-toggle .dock-title { transform: rotate(180deg); }
+.dock-right .dock-toggle .dock-chev { transform: rotate(0deg); }
+.dock-right.collapsed .dock-toggle .dock-chev { transform: rotate(180deg); }
+.dock-right .dock-body { flex: 1 1 auto; min-width: 0; padding: .8rem .9rem 2rem; overflow: auto; }
+
+/* dock-body headings reuse the panel/Archivo-Black heading look (the .panel
+   selectors above no longer match the new markup) */
+.dock-body h3 { font-size: .95rem; margin-bottom: .5rem; font-family: var(--display); text-transform: uppercase; letter-spacing: -.01em; font-weight: 400; color: var(--ink); }
+.dock-body h3 .rulesub, .dock-body h3 .proxy { font-family: var(--sys); text-transform: none; letter-spacing: 0; font-weight: 600; }
+.dock-body h4 { font-size: .72rem; text-transform: uppercase; letter-spacing: .03em; margin: .9rem 0 .35rem; font-family: var(--display); font-weight: 400; color: var(--ink); }
+
+/* "How to use this data" explainer (a <details> dropdown in the bottom dock) */
+.howto { margin: .35rem 0 .2rem; border: 2px solid var(--ink); border-radius: 10px; background: var(--card); }
+.howto > summary { cursor: pointer; list-style: none; padding: .5rem .8rem; display: flex; align-items: center; gap: .5rem;
+  font-family: var(--display); text-transform: uppercase; letter-spacing: -.01em; font-weight: 400; font-size: .82rem; color: var(--ink); }
+.howto > summary::-webkit-details-marker { display: none; }
+.howto > summary::before { content: "▸"; font-size: .7rem; }
+.howto[open] > summary::before { content: "▾"; }
+.howto[open] > summary { border-bottom: 2px solid var(--ink); }
+.howto-body { padding: .65rem .9rem 1rem; columns: 2 290px; column-gap: 1.8rem; }
+.howto-body h5 { font-size: .8rem; margin: .7rem 0 .2rem; font-weight: 800; color: var(--ink); break-after: avoid; }
+.howto-body p { margin: .25rem 0; font-size: .82rem; color: var(--ink); font-weight: 500; line-height: 1.5; break-inside: avoid; }
+.howto-body p.lead { break-inside: avoid; margin-bottom: .5rem; }
+.howto-body ol, .howto-body ul { margin: .25rem 0 .45rem; padding-left: 1.15rem; }
+.howto-body li { font-size: .82rem; color: var(--ink); font-weight: 500; line-height: 1.45; margin: .15rem 0; break-inside: avoid; }
+.howto-body code { background: #f0ece2; padding: .03rem .3rem; border-radius: 4px; font-size: .9em; }

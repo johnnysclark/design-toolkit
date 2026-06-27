@@ -37,9 +37,9 @@
   </header>
 
   <nav class="toolbar">
-    <button id="btn-studio" class="tab">⊞ Eco-Architect example</button>
+    <button id="btn-studio" class="tab">⊞ Building &amp; terrain</button>
     <span class="sep"></span>
-    <button id="btn-mode">◫ Pen mode</button>
+    <button id="btn-mode" class="on">☀ Analysis mode</button>
     <button id="btn-map">📍 Location</button>
     <button id="btn-info">ⓘ Sources &amp; math</button>
     <span class="sep"></span>
@@ -58,42 +58,108 @@
     <button id="btn-reset">Reset</button>
   </nav>
 
+  <!-- The 3D viewer is the centre of the layout; collapsible docks sit ABOVE,
+       BELOW and to the RIGHT of it. Each dock collapses to its toggle bar,
+       shrinking its grid track — it never overlays the canvas. -->
   <main>
-    <section class="panel left">
-      <h3>Environmental controls</h3>
-      <div class="importcard">
-        <button id="btn-import-3dm" class="bigimport">⤒ Import Rhino file (.3dm)</button>
-        <input type="file" id="file-3dm" accept=".3dm" style="display:none" />
-        <p class="importhint">Bring your own massing from Rhino&nbsp;8 — or open the built-in example. All dimensions shown in <b>feet</b>.</p>
-        <button id="btn-studio-2" class="tabopen">⊞ Open Eco-Architect example</button>
+    <!-- ABOVE — the controls you shape the design with -->
+    <section class="dock dock-top" id="dock-top">
+      <button class="dock-toggle" type="button" aria-expanded="true" aria-controls="dock-top-body">
+        <span class="dock-chev">▾</span>
+        <span class="dock-title">Controls — shape the design</span>
+        <span class="dock-hint">environment · building · terrain · feet</span>
+      </button>
+      <div class="dock-body" id="dock-top-body">
+        <div class="ctl-cols">
+          <div class="ctl-col ctl-col-import">
+            <div class="importcard">
+              <button id="btn-import-3dm" class="bigimport">⤒ Import Rhino file (.3dm)</button>
+              <input type="file" id="file-3dm" accept=".3dm" style="display:none" />
+              <p class="importhint">Bring your own massing from Rhino&nbsp;8 — or shape the built-in example. All dimensions in <b>feet</b>.</p>
+              <button id="btn-studio-2" class="tabopen">⊞ Jump to building &amp; terrain</button>
+            </div>
+          </div>
+          <div class="ctl-col">
+            <h3>Environmental controls</h3>
+            <div id="env-controls"></div>
+          </div>
+          <div class="ctl-col">
+            <h3>Building &amp; terrain <span class="rulesub">— example massing</span></h3>
+            <div id="massing"></div>
+          </div>
+        </div>
       </div>
-      <div id="env-controls"></div>
     </section>
 
+    <!-- CENTRE — the 3D viewer (parallel / orthographic projection) -->
     <section class="center">
       <div class="viewbox"><canvas id="view"></canvas></div>
-      <div id="status" class="status"></div>
     </section>
 
-    <section class="panel right">
-      <h3>Performance data <span class="proxy" title="Simplified, transparent proxies — not validated simulation. Identical maths in the browser and in Rhino.">proxies ⓘ</span></h3>
-      <div id="dashboard"></div>
-      <h3 class="rulesh">Rules <span class="rulesub">— testable constraints</span></h3>
-      <div id="score" class="score"></div>
-      <div id="rules"></div>
+    <!-- BELOW — live status + how to read & test the data -->
+    <section class="dock dock-bottom" id="dock-bottom">
+      <button class="dock-toggle" type="button" aria-expanded="true" aria-controls="dock-bottom-body">
+        <span class="dock-chev">▾</span>
+        <span class="dock-title">Status &amp; guidance</span>
+        <span class="dock-hint">how to read &amp; test the data</span>
+      </button>
+      <div class="dock-body" id="dock-bottom-body">
+        <div id="status" class="status"></div>
+        <details class="howto">
+          <summary>How to use this data — testing your design decisions</summary>
+          <div class="howto-body">
+            <p class="lead">These read-outs are <b>transparent proxies</b>: simple, deterministic formulas — the <em>same</em> maths runs here and in the exported Rhino/Grasshopper script. Read them as <b>relative signals for comparing options</b>, not certified numbers. For validated results use Ladybug&nbsp;Tools / EnergyPlus (energy), Radiance (daylight) or CFD (wind).</p>
+
+            <h5>The design loop</h5>
+            <ol>
+              <li><b>Shape</b> the massing with the building &amp; terrain controls.</li>
+              <li><b>Read</b> the performance data move as you drag.</li>
+              <li><b>Constrain</b> — write your intent as testable rules.</li>
+              <li><b>Score</b> — watch the pass/fail dots and the % score.</li>
+              <li><b>Export</b> to Rhino 8 + Grasshopper, build it, then <b>re-import</b> the <code>.3dm</code> and re-test against the same rules.</li>
+            </ol>
+
+            <h5>Test one decision at a time</h5>
+            <p>Treat each move as an A/B test: note a metric, change a <em>single</em> control (say roof <code>pitch</code> or the <code>north</code> angle), and compare. The size of the jump tells you how much <em>leverage</em> that variable has over that goal — a flat response means it isn't the lever you thought it was.</p>
+
+            <h5>Turn intent into rules</h5>
+            <p>A rule is a claim you can check, e.g. <code>winter useful sun &gt; 3</code> or <code>overheat ratio &lt; 1</code>. <b>Soft</b> rules add to the score by their <b>weight</b> (say which goals matter most); <b>hard</b> rules <em>must</em> pass for the design to count. Use <code>between</code> / <code>outside</code> for comfort bands. The score is the weighted fraction of soft rules met — one defensible number for “does this massing do what I said it should?”</p>
+
+            <h5>See where, not just how much</h5>
+            <p>Analysis view colours the envelope <b>blue → red</b> (low → high), so you can see <em>where</em> the sun or wind actually lands — the shaded band under the eaves, the windward wall — not just a total. Switch the overlay (sun-now / yearly / wind) and hover any metric for a plain-English definition.</p>
+
+            <h5>Reading the families</h5>
+            <ul>
+              <li><b>Solar</b> — want winter-useful <em>high</em> and overheat ratio <em>below 1</em>.</li>
+              <li><b>Wind</b> — exposure &amp; pressure are loads to resist (pressure grows with speed²).</li>
+              <li><b>Air</b> — stack index/height is the strength of buoyancy-driven natural ventilation (higher = stronger).</li>
+              <li><b>View</b> — openness toward your target azimuth and to the sky.</li>
+              <li><b>Earth</b> — soil contact, thermal mass and buried fraction (earth-coupling).</li>
+              <li><b>Form</b> — volume, glazing ratio and pitch: the geometry behind the rest.</li>
+            </ul>
+
+            <h5>Know the limits</h5>
+            <p>The proxies ignore diffuse/cloud sky, glazing transmittance, fine self-shading, true pressure coefficients and transient heat flow. They’re built for <b>early form-finding and teaching</b> — to rank options and pressure-test intent — not for code compliance.</p>
+          </div>
+        </details>
+      </div>
+    </section>
+
+    <!-- RIGHT — the performance read-out + the rule builder -->
+    <section class="dock dock-right" id="dock-right">
+      <button class="dock-toggle" type="button" aria-expanded="true" aria-controls="dock-right-body">
+        <span class="dock-chev">▸</span>
+        <span class="dock-title">Performance data &amp; rules</span>
+      </button>
+      <div class="dock-body" id="dock-right-body">
+        <h3>Performance data <span class="proxy" title="Simplified, transparent proxies — not validated simulation. Identical maths in the browser and in Rhino.">proxies ⓘ</span></h3>
+        <div id="dashboard"></div>
+        <h3 class="rulesh">Rules <span class="rulesub">— testable constraints</span></h3>
+        <div id="score" class="score"></div>
+        <div id="rules"></div>
+      </div>
     </section>
   </main>
-
-  <!-- Eco-Architect example: building + terrain parameters in a floating window
-       (non-modal, so the 3D view keeps updating live as you drag). -->
-  <aside id="studioWin" class="studiowin" style="display:none">
-    <div class="studiowin-head">
-      <b>⊞ Eco-Architect example</b>
-      <span class="studiowin-sub">building &amp; terrain · feet</span>
-      <button class="modal-x" data-close="studioWin" title="close">✕</button>
-    </div>
-    <div id="massing" class="studiowin-body"></div>
-  </aside>
 
   <!-- Location picker -->
   <div id="mapModal" class="modal" style="display:none">
