@@ -23,7 +23,10 @@ type Boundary = { type: "MultiPolygon"; coordinates: number[][][][] } | null;
 type OverlayKey = "aerial" | "hillshade" | "flood" | "water" | "landcover" | "context";
 
 const VECTOR_STYLE = "https://tiles.openfreemap.org/styles/liberty";
-const TERRAIN_DEM = "https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png";
+// Same-origin DEM proxy: MapLibre's raster-dem must READ tile pixels to compute
+// elevation, which needs CORS that the public AWS terrarium tiles don't send.
+// /api/terrain proxies them same-origin (keyless, edge-cached). See that route.
+const TERRAIN_DEM_PATH = "/api/terrain/{z}/{x}/{y}";
 const ESRI_IMAGERY =
   "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}";
 const FEMA_NFHL = "https://hazards.fema.gov/arcgis/rest/services/public/NFHL/MapServer";
@@ -152,14 +155,15 @@ export default function SiteMapGL({
       if (map.getLayer(id)) map.setLayoutProperty(id, "visibility", on ? "visible" : "none");
     };
     vis("ov-aerial", ov.aerial);
-    vis("ov-hillshade", ov.hillshade);
+    // Hillshade enhances the sense of relief — show it automatically with 3D too.
+    vis("ov-hillshade", ov.hillshade || is3d);
     vis("ov-flood", ov.flood);
     vis("ov-water", ov.water);
     vis("ov-landcover", ov.landcover);
     vis("ctx-fill", ov.context);
     vis("ctx-line", ov.context);
     vis("ctx-roads", ov.context);
-  }, [ov, ready]);
+  }, [ov, is3d, ready]);
 
   // --- 3D terrain: react to exaggeration WITHOUT moving the camera ---------
   useEffect(() => {
@@ -172,7 +176,13 @@ export default function SiteMapGL({
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !loadedRef.current) return;
-    map.easeTo({ pitch: is3d ? 60 : 0, duration: 600 });
+    if (is3d) {
+      // Cap zoom so the camera stays comfortably above the terrain (avoids the
+      // camera clipping below the mesh at very tight zooms / high elevations).
+      map.easeTo({ pitch: 62, zoom: Math.min(map.getZoom(), 15.5), duration: 700 });
+    } else {
+      map.easeTo({ pitch: 0, duration: 600 });
+    }
   }, [is3d, ready]);
 
   // --- redraw site geometry + reframe when the analysis changes ------------
@@ -211,14 +221,24 @@ export default function SiteMapGL({
 
   function addBaseSourcesAndLayers(map: maplibregl.Map) {
     const beforeLabels = firstSymbolId(map);
+    const terrainTiles = window.location.origin + TERRAIN_DEM_PATH;
 
+    // Separate DEM sources for 3D terrain vs. the hillshade layer (MapLibre warns
+    // against sharing one source between the two).
     map.addSource("terrain-dem", {
       type: "raster-dem",
-      tiles: [TERRAIN_DEM],
+      tiles: [terrainTiles],
       tileSize: 256,
       encoding: "terrarium",
       maxzoom: 15,
       attribution: "Elevation: Mapzen/AWS Terrain Tiles"
+    });
+    map.addSource("hillshade-dem", {
+      type: "raster-dem",
+      tiles: [terrainTiles],
+      tileSize: 256,
+      encoding: "terrarium",
+      maxzoom: 15
     });
     map.addSource("esri-imagery", {
       type: "raster",
@@ -256,7 +276,7 @@ export default function SiteMapGL({
       {
         id: "ov-hillshade",
         type: "hillshade",
-        source: "terrain-dem",
+        source: "hillshade-dem",
         layout: { visibility: "none" },
         paint: { "hillshade-exaggeration": 0.5 }
       },
