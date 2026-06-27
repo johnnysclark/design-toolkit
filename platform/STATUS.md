@@ -1,4 +1,21 @@
 <!-- ───────────────────────────── CURRENT STATE (top) ───────────────────────────── -->
+> **Vantage — interactive camera / lens / perspective demo (2026-06-26, branch `tool/vantage`,
+> worktree `design-toolkit-vantage`, NOT merged).** A new client-only tool under the **2D Tooling**
+> hub at `/media-2d/vantage` (image-making) — built fresh as a real **three.js (r160)** scene, no
+> API key / auth / cost. Teaches: lens/focal length → field of view + perspective (with a
+> **dolly-zoom** that proves perspective is distance, not focal length); aperture → depth of field
+> (custom physically-driven post-process bokeh, calibrated to the numbers); and **tilt vs. lens-shift**
+> perspective control (converging vs. parallel verticals) with a **draughtsman overlay**
+> (horizon + vanishing points) and a **plan diagram** of the optics from above. Guided lessons are
+> deep-linkable (`?lesson=dof`, `?pc=shift`). Honest thin-lens model (labelled). Files:
+> `apps/toolkit/public/tools/vantage/web/{index.html,app.js,scene.js,dof.js,optics.js,diagram.js,overlay.js,ui.js,styles.css}`
+> + vendored three/OrbitControls + `test/optics.test.mjs` (15 parity checks, green);
+> route `app/(app)/media-2d/vantage/page.tsx` (via `EmbeddedTool`); card added to
+> `app/(app)/media-2d/page.tsx` (status `live`). **`toolkit-nav.ts` untouched** (the `/media-2d`
+> hub is already live). Plan: `plans/vantage.md`. Verified: `build:toolkit` green; optics tests
+> pass; **rendered + screenshotted in headless Chrome (WebGL)** across default / DoF / tilt / shift —
+> all correct. Pending: open a PR (don't merge to `main` without John's OK).
+>
 > **RAP Studio — overnight code-quality pass (2026-06-26, branch `feat/rap-rhino-bridge`,
 > PR #30, NOT merged — holding for the Vercel 24h build-rate-limit reset).** Ran two multi-agent
 > review workflows over the studio code. Round 1 (8 lenses → adversarial verify → synth): 54
