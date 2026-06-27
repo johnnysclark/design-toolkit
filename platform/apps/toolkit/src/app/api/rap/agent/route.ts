@@ -9,7 +9,7 @@ import type { State } from "@/app/(app)/rap/studio/engine/types";
 export const runtime = "nodejs";
 export const maxDuration = 300;
 
-function parseJson(text: string): { reply?: string; commands?: string[] } {
+function parseJson(text: string): { reply?: string; commands?: string[]; question?: string } {
   const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/i);
   const candidate = fenced ? fenced[1] : text;
   try {
@@ -103,6 +103,26 @@ export async function POST(req: Request) {
       .map((b: any) => b.text)
       .join("");
     const parsed = parseJson(text);
+
+    // ASSISTANT ASKS A QUESTION: when the model needs a missing dimension/position/
+    // layer it returns { question } with no commands. Apply nothing; surface the ask.
+    // This returns BEFORE validateCommands, so even if the model erroneously emits
+    // both, the question wins and no commands are applied.
+    const question = typeof parsed.question === "string" ? parsed.question.trim() : "";
+    if (question) {
+      try {
+        await supabase.from("tool_runs").insert({
+          owner: user.id,
+          tool: "rap-agent",
+          input: { instruction },
+          output: { question }
+        });
+      } catch {
+        /* never let logging break the response */
+      }
+      return NextResponse.json({ question, meta: { model, generated_at: new Date().toISOString() } });
+    }
+
     const { kept: commands, dropped } = validateCommands(state, Array.isArray(parsed.commands) ? parsed.commands : []);
     // Append a parity note so a spoken reply never claims edits that didn't apply.
     const baseReply = typeof parsed.reply === "string" ? parsed.reply : "Done.";

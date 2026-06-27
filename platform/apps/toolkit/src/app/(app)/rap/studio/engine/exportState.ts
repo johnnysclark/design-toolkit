@@ -19,29 +19,8 @@ export function toFullStateJson(state: State): Record<string, unknown> {
     door: { symbol: "arc_swing", label_prefix: "D", show_label: true, label_height: 0.3, tactile_weight_mm: 0.5 },
     window: { symbol: "double_line", label_prefix: "W", show_label: true, label_height: 0.3, tactile_weight_mm: 0.5 },
     portal: { symbol: "open", label_prefix: "P", show_label: true, label_height: 0.3, tactile_weight_mm: 0.5 },
-    room: { symbol: "label", label_prefix: "R", show_label: true, label_height: 0.3, tactile_weight_mm: 0.5 }
+    region: { symbol: "outline", label_prefix: "G", show_label: true, label_height: 0.3, tactile_weight_mm: 0.5 }
   };
-
-  // Project the studio's rooms into the desktop `rooms` dict (keyed by id),
-  // carrying our extra fields so nothing is lost.
-  const rooms: Record<string, unknown> = {};
-  for (const r of state.rooms) {
-    rooms[r.id] = {
-      type: "room",
-      source_bay: null,
-      label: r.name,
-      braille: r.braille,
-      use: r.use,
-      origin: r.origin,
-      size: r.size,
-      level: r.level,
-      // "none" (not "") — the watcher's legend filter keys off the literal
-      // "none"; "" makes every room emit a phantom hatched legend swatch.
-      hatch_image: "none",
-      hatch_scale: 1.0,
-      hatch_rotation: 0.0
-    };
-  }
 
   // Ensure every bay carries the full v4.0 field set.
   const bays: Record<string, unknown> = {};
@@ -94,7 +73,9 @@ export function toFullStateJson(state: State): Record<string, unknown> {
     style: { ...state.style, label_offset: 3.0, background_pad: 2.0, arc_segments: 16 },
     bays,
     blocks,
-    rooms,
+    // First-class CAD layers (name + lineweight + linetype + optional tactile
+    // pattern). Carried whole so a round-trip preserves drafting intent.
+    layers: state.layers,
     legend: {
       enabled: true,
       position: "bottom-right",
@@ -123,14 +104,13 @@ export function toFullStateJson(state: State): Record<string, unknown> {
     section: { axis: "x", offset: 0 },
 
     // ── Studio-native elements the current desktop Watcher does NOT rebuild.
-    // Free walls/columns/openings live under web_* keys. Program rooms ARE
-    // projected into the native `rooms` dict above so they survive a round-trip,
-    // but note the current watcher draws no room boundary/label either — it only
-    // handles bay/void/landscape — so rooms are effectively web-only too (the
-    // Drive panel warns the student). Mirrored here as a reminder.
+    // Free walls/columns/openings and the geometric regions (floor plates /
+    // extruded boxes) live under web_* keys for lossless preservation; the Drive
+    // panel warns the student which elements the Watcher won't rebuild.
     web_walls: state.walls,
     web_columns: state.columns,
-    web_openings: state.openings
+    web_openings: state.openings,
+    web_regions: state.regions
   };
 }
 

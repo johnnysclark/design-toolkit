@@ -36,11 +36,17 @@ export function buildPiafCanvas(state: State, pxWidth = 1700, levelFilter: numbe
 
   for (const p of prims) {
     if (p.kind === "line") {
-      ctx.lineWidth = Math.max(1.5, WEIGHT_FT[p.weight] * scale);
-      ctx.setLineDash(p.dashed ? [3 * scale, 2 * scale] : []);
+      ctx.lineWidth = Math.max(1.5, (p.widthFt ?? WEIGHT_FT[p.weight]) * scale);
+      ctx.setLineDash(p.dash ? p.dash.map((dd) => dd * scale) : p.dashed ? [3 * scale, 2 * scale] : []);
       ctx.beginPath();
       p.pts.forEach((pt, i) => (i === 0 ? ctx.moveTo(X(pt.x), Y(pt.y)) : ctx.lineTo(X(pt.x), Y(pt.y))));
       ctx.stroke();
+    } else if (p.kind === "tactileDot") {
+      // Filled relief dot, floored so a thin pattern dot survives the 1-bit threshold.
+      ctx.setLineDash([]);
+      ctx.beginPath();
+      ctx.arc(X(p.c.x), Y(p.c.y), Math.max(1.5, p.r * scale), 0, Math.PI * 2);
+      ctx.fill();
     } else if (p.kind === "fill") {
       ctx.setLineDash([]);
       ctx.beginPath();
