@@ -93,13 +93,22 @@ export async function soilsAt(lon: number, lat: number): Promise<Soils | null> {
   const data = await postForm(SDA_REST, JSON.stringify({ format: "JSON", query: sql }), "application/json");
   const r = data?.Table?.[0];
   if (!r) return null;
+  const mapUnit = r[0] ?? null;
+  const drainageClass = r[1] ?? null;
+  const hydrologicGroup = r[2] ?? null;
+  const availableWaterStorage = numOrNull(r[5]);
+  // NOTCOM / unsurveyed areas report a placeholder map unit with no real attributes.
+  // Treat that as NO coverage (honest ✕), not a faked soils record — coverage must
+  // never claim data it doesn't have.
+  if (!mapUnit || /no digital data/i.test(mapUnit)) return null;
+  if (!drainageClass && !hydrologicGroup && availableWaterStorage == null && r[3] == null) return null;
   return {
-    mapUnit: r[0] ?? null,
-    drainageClass: r[1] ?? null,
-    hydrologicGroup: r[2] ?? null,
+    mapUnit,
+    drainageClass,
+    hydrologicGroup,
     waterTableCm: numOrNull(r[3]),
     bedrockCm: numOrNull(r[4]),
-    availableWaterStorage: numOrNull(r[5]),
+    availableWaterStorage,
     floodFrequency: r[6] ?? null,
     hydricPct: numOrNull(r[7]),
     slopePct: numOrNull(r[8]),
