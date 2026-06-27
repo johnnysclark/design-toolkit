@@ -4,7 +4,7 @@ import DrawingCleaner from "./DrawingCleaner";
 export const metadata = {
   title: "Drawing Cleaner · Design Toolkit",
   description:
-    "Turn a phone photo or scan of a pen/pencil drawing into clean black-on-white — auto levels, gamma, sharpen, adaptive lighting, straighten/crop, curves, denoise and resize — entirely in the browser."
+    "Turn a phone photo or scan of a pen/pencil drawing into clean black-on-white — one-click auto-enhance, levels, gamma, brightness/contrast, sharpen, denoise, adaptive lighting, straighten/crop, curves, a line-art threshold, invert and tint — entirely in the browser."
 };
 
 // Native in-app tool (no iframe) — the merged Drawing/Scan Cleaner, styled to read
@@ -25,9 +25,11 @@ export default function DrawingCleanerPage() {
           </span>
         </div>
         <p className="mt-2 max-w-3xl text-neutral-900">
-          Drop a photo or scan of a pen/pencil drawing and get clean black-on-white. Auto levels with a live histogram, gamma,
-          sharpening, denoise and adaptive lighting; straighten &amp; crop, a curves editor with presets, a before/after split,
-          and a full-resolution PNG export. Runs entirely in your browser — the image is never uploaded.
+          Drop a photo or scan of a pen/pencil drawing and get clean black-on-white. One-click <b>Auto-enhance</b> (plus
+          Pencil / Pen &amp; ink / Photo presets), a live histogram, levels, gamma, brightness/contrast, sharpen, denoise and
+          adaptive lighting; straighten &amp; crop, a curves editor, a line-art threshold (Otsu + adaptive), invert, and a
+          B&amp;W / colour / tint output — with a before/after split and a resizable PNG export. Every control panel collapses;
+          it all runs in your browser — the image is never uploaded.
         </p>
       </div>
 
