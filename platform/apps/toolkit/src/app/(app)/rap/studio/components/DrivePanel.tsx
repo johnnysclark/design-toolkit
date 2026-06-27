@@ -103,6 +103,49 @@ export default function DrivePanel({ stateText, onDownloadState, webOnly }: { st
         folder the Watcher is watching — three ways below, <b>simplest first</b>. (Set up the Watcher in Rhino once; see the last card.)
       </p>
 
+      {/* Simple flow diagram — how a change here reaches Rhino (explains the live link). */}
+      <figure className="my-1">
+        <svg
+          viewBox="0 0 728 120"
+          role="img"
+          aria-label="Flow diagram: this page in the browser writes state.json into your project folder; the Watcher running in Rhino watches that file and rebuilds the Rhino 3D model. Options A and B put the file in the folder by hand or by connecting it; the live link in Option C pushes it automatically as you edit."
+          className="w-full max-w-3xl"
+          style={{ height: "auto" }}
+        >
+          <defs>
+            <marker id="rapArrow" markerWidth="9" markerHeight="9" refX="6" refY="3" orient="auto">
+              <path d="M0,0 L6,3 L0,6 Z" fill="#111" />
+            </marker>
+          </defs>
+          {[
+            { x: 10, l1: "This page", l2: "(browser)" },
+            { x: 196, l1: "state.json", l2: "in your folder" },
+            { x: 382, l1: "Watcher", l2: "in Rhino" },
+            { x: 568, l1: "Rhino", l2: "3D model" }
+          ].map((b) => (
+            <g key={b.x}>
+              <rect x={b.x} y={36} width={150} height={56} rx={6} fill="#fff" stroke="#111" strokeWidth={2} />
+              <text x={b.x + 75} y={61} textAnchor="middle" fontSize={14} fontWeight={700} fill="#111">{b.l1}</text>
+              <text x={b.x + 75} y={79} textAnchor="middle" fontSize={12} fill="#111">{b.l2}</text>
+            </g>
+          ))}
+          {[
+            { x1: 162, x2: 194, label: "writes" },
+            { x1: 348, x2: 380, label: "watches" },
+            { x1: 534, x2: 566, label: "rebuilds" }
+          ].map((a) => (
+            <g key={a.x1}>
+              <line x1={a.x1} y1={64} x2={a.x2 - 3} y2={64} stroke="#111" strokeWidth={2} markerEnd="url(#rapArrow)" />
+              <text x={(a.x1 + a.x2) / 2} y={26} textAnchor="middle" fontSize={11} fill="#111">{a.label}</text>
+            </g>
+          ))}
+        </svg>
+        <figcaption className="mt-1 text-xs leading-relaxed text-neutral-900">
+          Options <b>A</b> and <b>B</b> put <code className="font-mono">state.json</code> into the folder by hand or by connecting it. The{" "}
+          <b>live link</b> (Option <b>C</b>) pushes it straight from this page the moment you change anything — so Rhino rebuilds as you work.
+        </figcaption>
+      </figure>
+
       {/* Static visual note (NOT a live region): the embedded counts change on
           every add/remove, so role="alert" would re-speak the whole paragraph
           assertively each edit. The edit itself is already announced. */}

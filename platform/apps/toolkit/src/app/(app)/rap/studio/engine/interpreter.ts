@@ -233,13 +233,13 @@ function cmdWall(state: State, tokens: string[]): CommandResult {
   const b = next.bays[name];
   if (arg === "on" || arg === "off") {
     b.walls.enabled = arg === "on";
-    return ok(next, `Bay ${name} walls ${arg.toUpperCase()}, ${(b.walls.thickness * 12).toFixed(0)}-inch thick.`);
+    return ok(next, `Bay ${name} walls ${arg.toUpperCase()}, ${b.walls.thickness} ft thick.`);
   }
   if (arg === "thickness") {
     const t = num(tokens[3]);
     if (t === null || t <= 0) return err(state, "Usage: wall <bay> thickness <feet>");
     b.walls.thickness = t;
-    return ok(next, `Bay ${name} wall thickness = ${t} ft (${(t * 12).toFixed(0)} in).`);
+    return ok(next, `Bay ${name} wall thickness = ${t} ft.`);
   }
   return err(state, "Usage: wall <bay> on|off | wall <bay> thickness <ft>");
 }
@@ -389,7 +389,7 @@ function cmdWallFree(state: State, tokens: string[]): CommandResult {
     const pl = pickLayer(next, tokens, i + 4);
     if (pl.error) return err(state, pl.error);
     next.walls.push({ id, level, a: [x1, y1], b: [x2, y2], thickness: th, layer: pl.layer ?? "Default" });
-    return ok(next, `Added wall ${id} (${x1},${y1})→(${x2},${y2}), ${(th * 12).toFixed(0)}-inch, level ${level}, on layer ${pl.layer ?? "Default"}.`);
+    return ok(next, `Added wall ${id} (${x1},${y1})→(${x2},${y2}), ${th} ft thick, level ${level}, on layer ${pl.layer ?? "Default"}.`);
   }
   if (sub === "remove") {
     const id = tokens[2];
@@ -857,7 +857,7 @@ export function describe(state: State, levelFilter: number | null = null): strin
       for (const r of state.regions.filter((r) => (r.level ?? 0) === li)) lines.push(`  • ${regionLine(state, r)}`);
       for (const n of names.filter((n) => (state.bays[n].level ?? 0) === li)) {
         const b = state.bays[n];
-        const walls = b.walls.enabled ? `, ${(b.walls.thickness * 12).toFixed(0)}-inch perimeter walls` : "";
+        const walls = b.walls.enabled ? `, ${b.walls.thickness} ft perimeter walls` : "";
         const corridor = b.corridor.enabled ? `, ${b.corridor.width}-ft ${b.corridor.axis}-corridor` : "";
         const aps = b.apertures.length ? `, openings: ${b.apertures.map((a) => `${a.type} ${a.id}`).join(", ")}` : "";
         const voids = b.void_center && b.void_size ? `, atrium ${b.void_size[0]}×${b.void_size[1]} ft` : "";
@@ -866,7 +866,7 @@ export function describe(state: State, levelFilter: number | null = null): strin
       for (const w of state.walls.filter((w) => w.level === li)) {
         const ops = state.openings.filter((o) => o.wallId === w.id);
         const opTxt = ops.length ? `, openings: ${ops.map((o) => `${o.type} ${o.id}`).join(", ")}` : "";
-        lines.push(`  • free wall ${w.id}: (${w.a[0]},${w.a[1]})→(${w.b[0]},${w.b[1]}), ${(w.thickness * 12).toFixed(0)} in thick${opTxt}`);
+        lines.push(`  • free wall ${w.id}: (${w.a[0]},${w.a[1]})→(${w.b[0]},${w.b[1]}), ${w.thickness} ft thick${opTxt}`);
       }
       for (const c of state.columns.filter((c) => c.level === li)) lines.push(`  • column ${c.id} at (${c.at[0]},${c.at[1]}), ${c.size} ft`);
       const body = lines.length ? lines.join("\n") : "  • (nothing on this level yet)";
