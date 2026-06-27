@@ -5,15 +5,15 @@ import { runStructured } from "@/lib/anthropic/structured";
 import {
   CONTAMINATION_SCHEMA,
   contaminationSystem,
-  contaminationUser,
-  MODEL
+  contaminationUser
 } from "@/lib/anthropic/site-analysis-prompts";
+import { resolveModel } from "@/lib/anthropic/models";
 
 // Cost pass #1 (D2): the grounded, web-searched contamination brief. Auth-gated —
 // the Anthropic key must never be reachable anonymously. Its own request so the
 // single grounded pass has the full 60s budget.
 export const runtime = "nodejs";
-export const maxDuration = 60;
+export const maxDuration = 300;
 
 export async function POST(req: Request) {
   if (!process.env.ANTHROPIC_API_KEY) {
@@ -44,6 +44,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "An EPA ID is required." }, { status: 400 });
   }
   const grounded = body?.grounded !== false; // default ON (this pass is meant to cite)
+  const { model, tier } = resolveModel(body?.tier);
 
   try {
     // Re-fetch the site server-side rather than trusting client-sent metadata.
@@ -56,11 +57,12 @@ export async function POST(req: Request) {
       system: contaminationSystem(grounded),
       user: contaminationUser(site),
       schema: CONTAMINATION_SCHEMA,
-      grounded
+      grounded,
+      tier
     });
 
     const result = {
-      meta: { epaId, grounded, model: MODEL, generatedAt: new Date().toISOString() },
+      meta: { epaId, grounded, model, generatedAt: new Date().toISOString() },
       contamination
     };
 

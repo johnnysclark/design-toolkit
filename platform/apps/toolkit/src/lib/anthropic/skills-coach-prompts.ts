@@ -15,7 +15,7 @@ import {
 
 // Toolkit-wide policy: AI tool calls run on Sonnet 4.6 (faster + cheaper; keeps
 // streamed/grounded passes under Vercel's 60s cap). Supports vision + structured output.
-export const MODEL = "claude-sonnet-4-6";
+export { MODEL } from "./models";
 
 export type Level = "beginner" | "intermediate" | "advanced";
 

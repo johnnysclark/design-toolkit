@@ -1,12 +1,14 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { createClient } from "@/lib/supabase/server";
-import { MODEL, chatSystem } from "@/lib/anthropic/site-analysis-prompts";
+import { chatSystem } from "@/lib/anthropic/site-analysis-prompts";
+import { resolveModel, webSearchTool } from "@/lib/anthropic/models";
+import { STREAM_SOFT_TIMEOUT_MS } from "@/lib/anthropic/limits";
 
-// Cost pass: the grounded follow-up chat. Sonnet + web search, STREAMED so a slow
-// search never trips an idle timeout and tokens show up live. Auth-gated — the key
-// must never be reachable anonymously. Its own request, ≤60s on Vercel Hobby.
+// Cost pass: the grounded follow-up chat. Web search + STREAMED so a slow search
+// never trips an idle timeout and tokens show up live. Auth-gated — the key must
+// never be reachable anonymously. Vercel Pro gives the function up to ~300s.
 export const runtime = "nodejs";
-export const maxDuration = 60;
+export const maxDuration = 300;
 
 type Msg = { role: "user" | "assistant"; content: string };
 
@@ -45,19 +47,22 @@ export async function POST(req: Request) {
 
   const context = JSON.stringify(body?.context ?? {}, null, 2).slice(0, 60000);
   const system = chatSystem(context);
+  const { model, tier } = resolveModel(body?.tier);
 
   const client = new Anthropic();
   const ctrl = new AbortController();
   // No `thinking` block → fastest path; web search does the heavy lifting here.
   const stream = client.messages.stream(
     {
-      model: MODEL,
+      model,
       max_tokens: 4000,
-      system,
+      // Cache the system prefix — identical across a place's follow-up turns.
+      system: [{ type: "text", text: system, cache_control: { type: "ephemeral" } }],
       messages,
       // Cap searches so a turn can't spiral (cost + the server-tool pause_turn limit).
       // Four is enough to answer well and leaves time to actually write the answer.
-      tools: [{ type: "web_search_20260209", name: "web_search", max_uses: 4 }]
+      // Tool version tracks the model — Haiku needs the basic web_search variant.
+      tools: [webSearchTool(tier, 4)]
     } as any,
     { signal: ctrl.signal }
   );
@@ -88,12 +93,13 @@ export async function POST(req: Request) {
       let stopReason: string | null = null;
       let searching = false;
       let timedOut = false;
-      // Stop ~7s before the function cap and finish cleanly. A hard-kill at 60s would
-      // close the connection with no terminal frame → the UI hangs on a half-answer.
+      // Stop a few seconds before the function cap and finish cleanly. A hard-kill
+      // would close the connection with no terminal frame → the UI hangs on a
+      // half-answer. (Streaming means the user sees tokens long before this fires.)
       const timer = setTimeout(() => {
         timedOut = true;
         ctrl.abort();
-      }, 53000);
+      }, STREAM_SOFT_TIMEOUT_MS);
 
       try {
         try {
@@ -130,7 +136,7 @@ export async function POST(req: Request) {
             owner: user.id,
             tool: "site-analysis:chat",
             input: { question: messages[messages.length - 1].content, turns: messages.length },
-            output: { answer: full.slice(0, 8000), sources, model: MODEL }
+            output: { answer: full.slice(0, 8000), sources, model }
           });
         } catch {
           // never let trace logging break the response

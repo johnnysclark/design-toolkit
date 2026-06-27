@@ -16,7 +16,7 @@
 //   thesis         — defensible-thesis builder
 
 // Toolkit-wide policy: AI tool calls run on Sonnet 4.6 (vision + structured output).
-export const MODEL = "claude-sonnet-4-6";
+export { MODEL } from "./models";
 
 // ---------------------------------------------------------------------------
 // Adoptable critic personas. Each contributes a `system_fragment` that is

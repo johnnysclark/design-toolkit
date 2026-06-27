@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import ModelToggle, { useModelTier, type ModelTier } from "@/components/ModelToggle";
 import Link from "next/link";
 import SiteMap from "./SiteMap";
 import { WindRoseChart, SunPathChart, MonthlyClimate } from "./charts";
@@ -71,6 +72,7 @@ export default function SiteAnalysisTool({ signedIn }: { signedIn: boolean }) {
   const [aiLoading, setAiLoading] = useState(false);
   const [aiPhase, setAiPhase] = useState("");
   const [aiError, setAiError] = useState<string | null>(null);
+  const [tier, setTier] = useModelTier("surveyor");
 
   const abortRef = useRef<AbortController | null>(null);
 
@@ -167,7 +169,7 @@ export default function SiteAnalysisTool({ signedIn }: { signedIn: boolean }) {
         const cr = await fetch("/api/site-analysis/contamination", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ epaId: result.site.epaId, grounded: true })
+          body: JSON.stringify({ epaId: result.site.epaId, grounded: true, tier })
         });
         const cd = await readJson(cr);
         if (cr.status === 401) throw new Error("Sign in to run the AI analysis.");
@@ -179,7 +181,7 @@ export default function SiteAnalysisTool({ signedIn }: { signedIn: boolean }) {
       const sr = await fetch("/api/site-analysis/synthesis", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ bundle: leanBundle(result, contam) })
+        body: JSON.stringify({ bundle: leanBundle(result, contam), tier })
       });
       const sd = await readJson(sr);
       if (sr.status === 401) throw new Error("Sign in to run the AI analysis.");
@@ -309,6 +311,8 @@ export default function SiteAnalysisTool({ signedIn }: { signedIn: boolean }) {
         aiPhase={aiPhase}
         aiError={aiError}
         onRunAI={runAI}
+        tier={tier}
+        setTier={setTier}
       />}
 
       {/* The wider toolbox — always available, with or without an active analysis. */}
@@ -329,7 +333,9 @@ function Results({
   aiLoading,
   aiPhase,
   aiError,
-  onRunAI
+  onRunAI,
+  tier,
+  setTier
 }: {
   result: AnalyzeResult;
   scale: Scale;
@@ -341,6 +347,8 @@ function Results({
   aiPhase: string;
   aiError: string | null;
   onRunAI: () => void;
+  tier: ModelTier;
+  setTier: (t: ModelTier) => void;
 }) {
   const { site, climate, flood, topo, coverage } = result;
   const terrain = topo ? terrainReadout(topo) : null;
@@ -389,12 +397,19 @@ function Results({
 
       {/* AI band (always visible) */}
       <div className="space-y-5">
+        {signedIn && (
+          <div className="flex flex-wrap items-center gap-2 text-sm">
+            <span className="text-neutral-900">AI depth</span>
+            <ModelToggle value={tier} onChange={setTier} size="sm" disabled={aiLoading} />
+          </div>
+        )}
         {/* Auto first pass — sources appear on their own, no button. */}
         {signedIn && (
           <SiteSources
             key={`src-${site.epaId || site.name}`}
             place={chatContext(result, contamination, synthesis).place}
             context={chatContext(result, contamination, synthesis)}
+            tier={tier}
           />
         )}
         <AiControls
@@ -412,6 +427,7 @@ function Results({
           <SiteChat
             key={site.epaId || site.name}
             context={chatContext(result, contamination, synthesis)}
+            tier={tier}
           />
         )}
       </div>

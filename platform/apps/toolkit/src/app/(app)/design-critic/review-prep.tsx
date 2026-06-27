@@ -3,6 +3,7 @@
 import { useState } from "react";
 import WorkIntake from "./work-intake";
 import { ClaimList } from "./claim-tag";
+import Thinking from "@/components/Thinking";
 import {
   card,
   field,
@@ -24,10 +25,12 @@ const CAT: Record<WeatherCategory, string> = {
 
 export default function ReviewPrep({
   sessionId,
-  setSessionId
+  setSessionId,
+  tier
 }: {
   sessionId: string | null;
   setSessionId: (id: string | null) => void;
+  tier?: string;
 }) {
   const [work, setWork] = useState<WorkInput>(EMPTY);
   const [busy, setBusy] = useState(false);
@@ -52,6 +55,7 @@ export default function ReviewPrep({
         body: JSON.stringify({
           mode: "weather",
           sessionId,
+          tier,
           title: work.title,
           thesis: work.thesis,
           brief: work.brief,
@@ -84,6 +88,7 @@ export default function ReviewPrep({
         body: JSON.stringify({
           mode: "rebuttal",
           sessionId,
+          tier,
           title: work.title,
           thesis: work.thesis,
           brief: work.brief,
@@ -117,6 +122,7 @@ export default function ReviewPrep({
           <button className={primaryBtn} onClick={forecast} disabled={busy}>
             {busy ? "Reading the weather…" : "Forecast the review"}
           </button>
+          {busy && <Thinking />}
           {error && <p className="text-sm text-red-600">{error}</p>}
         </div>
       </section>
@@ -184,6 +190,7 @@ export default function ReviewPrep({
             <button className={primaryBtn} onClick={rehearse} disabled={rebutting}>
               {rebutting ? "The critic is thinking…" : "Hear the follow-up"}
             </button>
+            {rebutting && <Thinking />}
             {rebutErr && <p className="text-sm text-red-600">{rebutErr}</p>}
           </div>
         </div>
