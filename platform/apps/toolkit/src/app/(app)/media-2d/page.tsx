@@ -13,19 +13,11 @@ export const metadata = {
 const CARDS: HubCard[] = [
   {
     title: "Drawing Cleaner",
-    source: "Ported from Drawing-Image-Cleaner",
+    source: "Ported from Drawing-Image-Cleaner + scan-cleaner",
     status: "live",
     href: "/media-2d/drawing-cleaner",
     blurb:
-      "Turn a phone photo or scan of a pen/pencil drawing into clean black-on-white. Auto levels, gamma, sharpening and adaptive lighting, with a live before/after split and a full-resolution PNG export."
-  },
-  {
-    title: "Scan Cleaner",
-    source: "Ported from scan-cleaner",
-    status: "live",
-    href: "/media-2d/scan-cleaner",
-    blurb:
-      "The heavier sibling: everything in Drawing Cleaner plus straighten/rotate, crop, a curves editor, denoise, punch-lines / fade-background and resize — for cleaning up full document scans."
+      "Turn a phone photo or scan of a pen/pencil drawing into clean black-on-white. Auto levels with a live histogram, gamma, sharpen, denoise and adaptive lighting, plus straighten/crop, a curves editor with presets, a before/after split, and a full-resolution (resizable) PNG export."
   },
   {
     title: "Halftone & Riso",
@@ -58,7 +50,7 @@ export default function Media2DPage() {
     <ToolHub
       title="2D Tooling"
       subtitle="Drawing & Fabrication"
-      intro="Single-purpose widgets for 2D studio production — the jobs that usually mean opening Photoshop and remembering a workflow. Each runs entirely in your browser; nothing is uploaded. Two are ready now; the rest are proposals."
+      intro="Single-purpose widgets for 2D studio production — the jobs that usually mean opening Photoshop and remembering a workflow. Each runs entirely in your browser; nothing is uploaded. Drawing Cleaner is ready now; the rest are proposals."
       cards={CARDS}
     />
   );
