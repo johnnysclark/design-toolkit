@@ -1,23 +1,17 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import dynamic from "next/dynamic";
 import ModelToggle, { useModelTier, type ModelTier } from "@/components/ModelToggle";
 import Link from "next/link";
-import SiteMap from "./SiteMap";
-import { WindRoseChart, SunPathChart, MonthlyClimate } from "./charts";
-import { Card, Stat, Pill, CoverageStrip, Read } from "./ui";
+import { Card, Stat, CoverageStrip } from "./ui";
+import { ClimateSection, TerrainSection, GroundSection, HazardsSection, ContextSection } from "./cards";
 import { SynthesisStrip, ContaminationPanel } from "./ai";
 import SiteChat from "./chat";
 import SiteSources from "./sources";
+import BlindVsGrounded from "./blind-grounded";
 import FurtherResources from "./resources";
-import {
-  buildExportList,
-  download,
-  dossierJSON,
-  dossierMarkdown,
-  slug
-} from "./exports";
-import { makeProjector } from "@/lib/site-analysis/geo";
+import { buildExportList, download, dossierJSON, dossierMarkdown, metricsCSV, slug } from "./exports";
 import type {
   Mode,
   Scale,
@@ -25,33 +19,32 @@ import type {
   Contamination,
   Synthesis,
   GeoPlace,
-  SiteCandidate
+  SiteCandidate,
+  SiteContext
 } from "./types";
+
+// MapLibre touches WebGL/window — load it client-only so it never hits the server.
+const SiteMapGL = dynamic(() => import("./SiteMapGL"), {
+  ssr: false,
+  loading: () => (
+    <div className="flex h-full items-center justify-center bg-neutral-100 text-sm text-neutral-900">Loading map…</div>
+  )
+});
 
 type Candidate = GeoPlace | SiteCandidate;
 
 const PLACE_EXAMPLES = ["Millennium Park, Chicago", "Venice, Italy", "1600 Pennsylvania Ave"];
 const SUPERFUND_EXAMPLES = ["Love Canal", "Times Beach", "Berkeley Pit"];
-
-// Where the picker map opens before a site is chosen — the continental US, since the
-// terrain + flood layers are US-only (climate + basemaps are global).
 const US_CENTER = { lat: 39.5, lon: -98.35 };
 
-// Parse a response defensively: on a timeout/edge error the platform can return a
-// plain-text body (e.g. "An error occurred…") that would otherwise blow up
-// res.json() with a cryptic "Unexpected token" — turn that into a clear message.
+// Parse a response defensively (a timeout can return a non-JSON body).
 async function readJson(res: Response): Promise<any> {
   const text = await res.text();
   try {
     return text ? JSON.parse(text) : {};
   } catch {
-    if (
-      res.status === 504 ||
-      /timed out|timeout|FUNCTION_INVOCATION_TIMEOUT|took too long|an error occurred/i.test(text)
-    ) {
-      throw new Error(
-        "That site took too long and the request timed out. Try again — very large sites can be slow."
-      );
+    if (res.status === 504 || /timed out|timeout|FUNCTION_INVOCATION_TIMEOUT|took too long|an error occurred/i.test(text)) {
+      throw new Error("That site took too long and the request timed out. Try again — very large sites can be slow.");
     }
     throw new Error(`The server returned an unexpected response (HTTP ${res.status}). Please try again.`);
   }
@@ -68,11 +61,15 @@ export default function SiteAnalysisTool({ signedIn }: { signedIn: boolean }) {
   const [result, setResult] = useState<AnalyzeResult | null>(null);
   const [analyzing, setAnalyzing] = useState(false);
   const [analyzeError, setAnalyzeError] = useState<string | null>(null);
-  // A point dropped on the map (click / geolocation), shown while it analyzes.
   const [pin, setPin] = useState<{ lat: number; lon: number } | null>(null);
   const [locating, setLocating] = useState(false);
 
-  const [scale, setScale] = useState<Scale>("macro");
+  // Map frame only (Region ⇄ Site) — the DATA always shows; this just reframes the
+  // map and toggles the on-map elevation grid. Land on the Site after an analysis.
+  const [scale, setScale] = useState<Scale>("micro");
+  // OSM context geometry — loaded on demand, shared between the map overlay and the
+  // Surroundings card.
+  const [context, setContext] = useState<SiteContext | null>(null);
 
   const [contamination, setContamination] = useState<Contamination | null>(null);
   const [synthesis, setSynthesis] = useState<Synthesis | null>(null);
@@ -83,7 +80,6 @@ export default function SiteAnalysisTool({ signedIn }: { signedIn: boolean }) {
 
   const abortRef = useRef<AbortController | null>(null);
 
-  // Debounced search.
   useEffect(() => {
     if (!open || query.trim().length < 2) {
       setCandidates([]);
@@ -96,10 +92,7 @@ export default function SiteAnalysisTool({ signedIn }: { signedIn: boolean }) {
       setSearching(true);
       setSearchError(null);
       try {
-        const res = await fetch(
-          `/api/site-analysis/search?mode=${mode}&q=${encodeURIComponent(query.trim())}`,
-          { signal: ctrl.signal }
-        );
+        const res = await fetch(`/api/site-analysis/search?mode=${mode}&q=${encodeURIComponent(query.trim())}`, { signal: ctrl.signal });
         const data = await readJson(res);
         if (!res.ok) throw new Error(data?.error || "Search failed.");
         setCandidates(data.results || []);
@@ -119,26 +112,24 @@ export default function SiteAnalysisTool({ signedIn }: { signedIn: boolean }) {
     setCandidates([]);
     setOpen(false);
     setSearchError(null);
-    // Drop the prior result so the cards never show one mode's data under the
-    // other mode's label.
     setResult(null);
     setAnalyzeError(null);
     setContamination(null);
     setSynthesis(null);
-    setScale("macro");
+    setContext(null);
+    setScale("micro");
     setPin(null);
   }
 
-  // Shared analyze core — both the typed-search dropdown and a dropped map pin feed
-  // the same POST. `display` is what we echo into the search box.
   async function analyze(payload: Record<string, unknown>, display: string) {
     setOpen(false);
     setCandidates([]);
     setQuery(display);
     setContamination(null);
     setSynthesis(null);
+    setContext(null);
     setAiError(null);
-    setScale("macro");
+    setScale("micro");
     setAnalyzing(true);
     setAnalyzeError(null);
     setResult(null);
@@ -151,7 +142,7 @@ export default function SiteAnalysisTool({ signedIn }: { signedIn: boolean }) {
       const data = await readJson(res);
       if (!res.ok) throw new Error(data?.error || "Analysis failed.");
       setResult(data as AnalyzeResult);
-      setPin(null); // the analyzed site marker replaces the pending pin
+      setPin(null);
     } catch (e: any) {
       setAnalyzeError(e.message);
     } finally {
@@ -159,7 +150,6 @@ export default function SiteAnalysisTool({ signedIn }: { signedIn: boolean }) {
     }
   }
 
-  // Pick from the typed-search dropdown.
   function selectCandidate(c: Candidate) {
     if (mode === "superfund") {
       const s = c as SiteCandidate;
@@ -169,9 +159,6 @@ export default function SiteAnalysisTool({ signedIn }: { signedIn: boolean }) {
     return analyze({ lat: p.lat, lon: p.lon, label: p.label, category: p.category }, p.shortLabel);
   }
 
-  // Drop a pin on the map (click / geolocation) → reverse-geocode to a name, then
-  // analyze that coordinate as a Place. Reverse is best-effort; analyze runs either
-  // way (the route accepts a bare lat/lon), so a pin is never a dead end.
   async function pickPoint(lat: number, lon: number) {
     if (mode !== "place") setMode("place");
     setPin({ lat, lon });
@@ -189,7 +176,7 @@ export default function SiteAnalysisTool({ signedIn }: { signedIn: boolean }) {
         category = data.place.category ?? null;
       }
     } catch {
-      // keep the coordinate label — the pin still analyzes
+      /* keep the coordinate label */
     }
     await analyze({ lat, lon, label, category }, shortLabel);
   }
@@ -253,13 +240,12 @@ export default function SiteAnalysisTool({ signedIn }: { signedIn: boolean }) {
   return (
     <div className="space-y-6">
       <header>
-        <h1 className="text-3xl font-semibold tracking-tight">
-          Surveyor{" "}
-          <span className="font-sans text-lg font-normal normal-case text-neutral-900">— Site Analysis</span>
+        <h1 className="text-3xl font-semibold tracking-tight text-neutral-900">
+          Surveyor <span className="font-sans text-lg font-normal normal-case text-neutral-900">— Site Analysis</span>
         </h1>
         <p className="mt-2 max-w-2xl text-neutral-900">
-          The measured ground of a physical place — climate, terrain, water — with Rhino-ready
-          exports. Hard data is free and sourced; AI judgment is tagged for you to verify.
+          The measured ground of a real place — climate &amp; comfort, terrain, soils, land cover, water, hazards and
+          surroundings — with Rhino-ready exports. Hard data is free and sourced; AI judgment is tagged for you to verify.
         </p>
       </header>
 
@@ -282,30 +268,27 @@ export default function SiteAnalysisTool({ signedIn }: { signedIn: boolean }) {
                 setOpen(true);
               }}
               onFocus={() => query.trim().length >= 2 && setOpen(true)}
-              placeholder={
-                mode === "superfund"
-                  ? "Search an EPA Superfund site by name…"
-                  : "Search any address, city, or landmark…"
-              }
-              className="w-full rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm outline-none focus:border-neutral-900"
+              role="combobox"
+              aria-expanded={open && candidates.length > 0}
+              aria-controls="surveyor-search-results"
+              aria-autocomplete="list"
+              placeholder={mode === "superfund" ? "Search an EPA Superfund site by name…" : "Search any address, city, or landmark…"}
+              className="w-full rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm text-neutral-900 outline-none focus:border-neutral-900"
             />
-            {searching && (
-              <span className="absolute right-3 top-2.5 text-xs text-neutral-900">…</span>
-            )}
+            <span className="sr-only" role="status" aria-live="polite">
+              {searching ? "Searching…" : candidates.length ? `${candidates.length} results` : ""}
+            </span>
+            {searching && <span aria-hidden className="absolute right-3 top-2.5 text-xs text-neutral-900">…</span>}
             {open && candidates.length > 0 && (
-              <ul className="absolute z-30 mt-1 max-h-80 w-full overflow-auto rounded-lg border border-neutral-200 bg-white shadow-lg">
+              <ul id="surveyor-search-results" role="listbox" className="absolute z-30 mt-1 max-h-80 w-full overflow-auto rounded-lg border border-neutral-200 bg-white shadow-lg">
                 {candidates.map((c, i) => (
-                  <li key={i}>
+                  <li key={i} role="option" aria-selected={false}>
                     <button
                       onClick={() => selectCandidate(c)}
                       className="flex w-full flex-col items-start gap-0.5 border-b border-neutral-100 px-3 py-2 text-left last:border-0 hover:bg-neutral-50"
                     >
-                      <span className="text-sm font-medium text-neutral-900">
-                        {"shortLabel" in c ? (c as GeoPlace).shortLabel : c.name}
-                      </span>
-                      <span className="line-clamp-1 text-xs text-neutral-900">
-                        {candidateSub(c, mode)}
-                      </span>
+                      <span className="text-sm font-medium text-neutral-900">{"shortLabel" in c ? (c as GeoPlace).shortLabel : c.name}</span>
+                      <span className="line-clamp-1 text-xs text-neutral-900">{candidateSub(c, mode)}</span>
                     </button>
                   </li>
                 ))}
@@ -318,24 +301,18 @@ export default function SiteAnalysisTool({ signedIn }: { signedIn: boolean }) {
               value={scale}
               onChange={(v) => setScale(v as Scale)}
               options={[
-                { value: "macro", label: "◍ Macro · Region" },
-                { value: "micro", label: "⌖ Micro · Site" }
+                { value: "macro", label: "◍ Region" },
+                { value: "micro", label: "⌖ Site" }
               ]}
             />
           )}
         </div>
-        {searchError && <p className="mt-2 text-xs text-red-600">{searchError}</p>}
+        {searchError && <p className="mt-2 text-xs text-neutral-900">{searchError}</p>}
         {!result && !analyzing && (
           <p className="mt-2 text-xs text-neutral-900">
-            Try {(mode === "superfund" ? SUPERFUND_EXAMPLES : PLACE_EXAMPLES).map((ex, i) => (
-              <button
-                key={ex}
-                onClick={() => {
-                  setQuery(ex);
-                  setOpen(true);
-                }}
-                className="underline decoration-dotted underline-offset-2 hover:text-neutral-700"
-              >
+            Try{" "}
+            {(mode === "superfund" ? SUPERFUND_EXAMPLES : PLACE_EXAMPLES).map((ex, i) => (
+              <button key={ex} onClick={() => analyzeExample(ex)} className="underline decoration-dotted underline-offset-2 hover:text-neutral-700">
                 {ex}
                 {i < 2 ? ", " : ""}
               </button>
@@ -344,11 +321,10 @@ export default function SiteAnalysisTool({ signedIn }: { signedIn: boolean }) {
         )}
       </div>
 
-      {/* The map is always live: a picker before a site is chosen (click to drop a
-          pin), the analyzed site after. Layer toggles live in the map's own panel. */}
+      {/* the map — always live; a picker before a site is chosen, the analyzed site after */}
       <div>
-        <div className="h-[460px] w-full overflow-hidden rounded-xl border border-neutral-200">
-          <SiteMap
+        <div className="h-[480px] w-full overflow-hidden rounded-xl border border-neutral-200">
+          <SiteMapGL
             centroid={result ? result.site.centroid : US_CENTER}
             bbox={result?.site.bbox}
             boundary={result?.site.boundary ?? null}
@@ -357,21 +333,17 @@ export default function SiteAnalysisTool({ signedIn }: { signedIn: boolean }) {
             scale={scale}
             picker={!result}
             pin={pin}
+            context={context}
             onPick={pickPoint}
           />
         </div>
         {result ? (
           <p className="mt-2 text-center text-xs text-neutral-900">
-            {scale === "macro"
-              ? "Macro — the region around the site (zoomed out)."
-              : "Micro — the immediate surroundings (with the terrain grid)."}{" "}
-            Click anywhere to survey a new spot.
+            {scale === "macro" ? "Region view." : "Site view — with the terrain grid."} Pan/zoom or tilt to 3D in the ▦ panel. Click anywhere to survey a new spot.
           </p>
         ) : (
           <div className="mt-2 flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-center text-xs text-neutral-900">
-            <span>
-              Click anywhere on the map to drop a pin and survey that spot — or search above.
-            </span>
+            <span>Click anywhere on the map to drop a pin and survey that spot — or search above.</span>
             <button
               onClick={useMyLocation}
               disabled={locating}
@@ -379,48 +351,53 @@ export default function SiteAnalysisTool({ signedIn }: { signedIn: boolean }) {
             >
               {locating ? "Locating…" : "⌖ Use my location"}
             </button>
-            <span>Toggle terrain, water + flood layers in the ▦ panel.</span>
+            <span>Toggle aerial, terrain, land cover + flood layers in the ▦ panel.</span>
           </div>
         )}
       </div>
 
       {analyzing && (
-        <div className="rounded-xl border border-neutral-200 bg-white p-8 text-center text-sm text-neutral-900">
-          Pulling the measured ground…
+        <div role="status" aria-live="polite" className="rounded-xl border border-neutral-200 bg-white p-8 text-center text-sm text-neutral-900">
+          Pulling the measured ground — climate, terrain, soils, land cover, water, hazards…
         </div>
       )}
       {analyzeError && (
-        <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+        <div role="alert" className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-neutral-900">
           {analyzeError}
         </div>
       )}
 
-      {result && <Results
-        result={result}
-        scale={scale}
-        mode={mode}
-        signedIn={signedIn}
-        contamination={contamination}
-        synthesis={synthesis}
-        aiLoading={aiLoading}
-        aiPhase={aiPhase}
-        aiError={aiError}
-        onRunAI={runAI}
-        tier={tier}
-        setTier={setTier}
-      />}
+      {result && (
+        <Results
+          result={result}
+          mode={mode}
+          signedIn={signedIn}
+          contamination={contamination}
+          synthesis={synthesis}
+          aiLoading={aiLoading}
+          aiPhase={aiPhase}
+          aiError={aiError}
+          onRunAI={runAI}
+          tier={tier}
+          setTier={setTier}
+          onContext={setContext}
+        />
+      )}
 
-      {/* The wider toolbox — always available, with or without an active analysis. */}
       <FurtherResources />
     </div>
   );
+
+  function analyzeExample(ex: string) {
+    setQuery(ex);
+    setOpen(true);
+  }
 }
 
 // ---------------------------------------------------------------------------
 
 function Results({
   result,
-  scale,
   mode,
   signedIn,
   contamination,
@@ -430,10 +407,10 @@ function Results({
   aiError,
   onRunAI,
   tier,
-  setTier
+  setTier,
+  onContext
 }: {
   result: AnalyzeResult;
-  scale: Scale;
   mode: Mode;
   signedIn: boolean;
   contamination: Contamination | null;
@@ -444,18 +421,16 @@ function Results({
   onRunAI: () => void;
   tier: ModelTier;
   setTier: (t: ModelTier) => void;
+  onContext: (c: SiteContext | null) => void;
 }) {
-  const { site, topo, coverage } = result;
-  const terrain = topo ? terrainReadout(topo) : null;
+  const { site, coverage } = result;
+  const siteKey = site.epaId || `${site.centroid.lat},${site.centroid.lon}`;
 
   return (
     <div className="space-y-5">
-      {/* result header */}
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h2 className="display-font text-2xl uppercase leading-tight tracking-tight text-neutral-900">
-            {site.name}
-          </h2>
+          <h2 className="display-font text-2xl uppercase leading-tight tracking-tight text-neutral-900">{site.name}</h2>
           <p className="text-sm text-neutral-900">
             {site.address || `${site.centroid.lat.toFixed(4)}, ${site.centroid.lon.toFixed(4)}`}
             {site.status ? ` · ${site.status}` : ""}
@@ -464,18 +439,14 @@ function Results({
         <CoverageStrip coverage={coverage} mode={mode} />
       </div>
 
-      {/* The map is hoisted to the tool shell (always visible); results pick up below it. */}
+      <OverviewSection result={result} mode={mode} />
+      <ClimateSection result={result} synthesis={synthesis} />
+      <TerrainSection result={result} synthesis={synthesis} />
+      <GroundSection result={result} />
+      <HazardsSection result={result} synthesis={synthesis} />
+      <ContextSection key={siteKey} centroid={site.centroid} onContext={onContext} />
 
-      {/* scale-dependent hard-data cards */}
-      <div key={scale} className="animate-[fadeIn_.35s_ease] space-y-5">
-        {scale === "macro" ? (
-          <MacroCards result={result} synthesis={synthesis} />
-        ) : (
-          <MicroCards result={result} terrain={terrain} synthesis={synthesis} />
-        )}
-      </div>
-
-      {/* AI band (always visible) */}
+      {/* AI band */}
       <div className="space-y-5">
         {signedIn && (
           <div className="flex flex-wrap items-center gap-2 text-sm">
@@ -483,337 +454,67 @@ function Results({
             <ModelToggle value={tier} onChange={setTier} size="sm" disabled={aiLoading} />
           </div>
         )}
-        {/* Auto first pass — sources appear on their own, no button. */}
         {signedIn && (
           <SiteSources
-            key={`src-${site.epaId || site.name}`}
+            key={`src-${siteKey}`}
             place={chatContext(result, contamination, synthesis).place}
             context={chatContext(result, contamination, synthesis)}
             tier={tier}
           />
         )}
-        <AiControls
-          mode={mode}
-          signedIn={signedIn}
-          hasSynthesis={!!synthesis}
-          aiLoading={aiLoading}
-          aiPhase={aiPhase}
-          aiError={aiError}
-          onRunAI={onRunAI}
-        />
+        <AiControls mode={mode} signedIn={signedIn} hasSynthesis={!!synthesis} aiLoading={aiLoading} aiPhase={aiPhase} aiError={aiError} onRunAI={onRunAI} />
         {contamination && <ContaminationPanel contamination={contamination} />}
         {synthesis && <SynthesisStrip synthesis={synthesis} />}
-        {signedIn && (
-          <SiteChat
-            key={site.epaId || site.name}
-            context={chatContext(result, contamination, synthesis)}
-            tier={tier}
-          />
-        )}
+        {signedIn && <BlindVsGrounded key={`bvg-${siteKey}`} place={chatContext(result, contamination, synthesis).place} tier={tier} />}
+        {signedIn && <SiteChat key={`chat-${siteKey}`} context={chatContext(result, contamination, synthesis)} tier={tier} />}
       </div>
 
-      {/* exports */}
       <Exports result={result} contamination={contamination} synthesis={synthesis} />
     </div>
   );
 }
 
-// --- Macro: climate + regional position ------------------------------------
+// --- Overview / regional position ------------------------------------------
 
-function MacroCards({
-  result,
-  synthesis
-}: {
-  result: AnalyzeResult;
-  synthesis: Synthesis | null;
-}) {
-  const { site, climate, coverage } = result;
-  const c = climate?.summary;
-  return (
-    <>
-      <Card
-        title="Climate — the regional read (~25 km cell)"
-        source={
-          c
-            ? `Open-Meteo ERA5 reanalysis (~25 km cell), ${c.year} · ${c.timezone} — a regional model, not a local weather station.`
-            : "Open-Meteo ERA5 reanalysis"
-        }
-      >
-        {c ? (
-          <>
-            <div className="grid gap-6 sm:grid-cols-3">
-              <div>
-                <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-neutral-900">
-                  Wind rose
-                </div>
-                <WindRoseChart rose={c.windRose} />
-              </div>
-              <div>
-                <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-neutral-900">
-                  Sun path
-                </div>
-                <SunPathChart paths={c.sunPaths} />
-              </div>
-              <div>
-                <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-neutral-900">
-                  Temp + humidity
-                </div>
-                <MonthlyClimate temp={c.temp} rh={c.rh} tempUnit={c.units?.temperature_2m || "°C"} />
-              </div>
-            </div>
-            <div className="mt-4 flex flex-wrap gap-x-6 gap-y-2 border-t border-neutral-100 pt-3">
-              <Stat
-                label="Prevailing wind"
-                value={c.prevailingWind.dir}
-                hint="The compass direction the wind most often blows FROM, across the 2023 hourly record."
-              />
-              <Stat
-                label="Annual temp"
-                value={`${fmt(c.annual.tempMean)}°`}
-                sub={`${fmt(c.annual.tempMin)}–${fmt(c.annual.tempMax)}°C`}
-                hint="Mean (and minimum–maximum) dry-bulb air temperature over 2023."
-              />
-              <Stat
-                label="Mean RH"
-                value={`${fmt(c.annual.rhMean)}%`}
-                hint="Mean relative humidity over 2023 — drives comfort + condensation risk."
-              />
-              <Stat
-                label="Mean wind"
-                value={`${fmt(c.annual.windMean)} m/s`}
-                hint="Mean wind speed at 10 m above ground over 2023."
-              />
-              <Stat
-                label="Solar (GHI)"
-                value={`${fmt(c.annual.ghiAnnualKwh)} kWh/m²·yr`}
-                sub={c.annual.peakSunHours != null ? `~${fmt(c.annual.peakSunHours)} peak sun hrs/day` : undefined}
-                hint="Annual global horizontal solar energy — sizes PV potential and passive-solar gain."
-              />
-              <Stat
-                label="Degree-days (18°C)"
-                value={`${fmt(c.annual.hdd18)} HDD · ${fmt(c.annual.cdd18)} CDD`}
-                hint="Heating vs cooling degree-days, base 18°C — how much the climate demands heating vs cooling over the year."
-              />
-              <Stat
-                label="Diurnal swing"
-                value={`${fmt(c.annual.diurnalSwingC)}°C`}
-                hint="Average day–night temperature range. A large swing rewards thermal mass + night flushing."
-              />
-            </div>
-            {synthesis && (
-              <div className="mt-3 border-t border-neutral-100 pt-3">
-                <Read label="Climate read (AI)">{synthesis.climate_read}</Read>
-              </div>
-            )}
-          </>
-        ) : (
-          <Missing label="climate" />
-        )}
-      </Card>
-
-      <Card
-        title="Regional position"
-        source={
-          site.mode === "superfund"
-            ? "US EPA National Priorities List (Superfund) site record."
-            : "Geocoded via OpenStreetMap / Nominatim."
-        }
-      >
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
-          <Stat
-            label="Coordinates"
-            value={`${site.centroid.lat.toFixed(4)}, ${site.centroid.lon.toFixed(4)}`}
-            hint="Latitude, longitude (WGS84) of the site point."
-          />
-          {climate && (
-            <Stat
-              label="Elevation"
-              value={`${Math.round(climate.summary.elevation)} m`}
-              hint="Ground elevation at the point, from the Open-Meteo model."
-            />
-          )}
-          {climate && <Stat label="Timezone" value={climate.summary.timezone} />}
-          {site.mode === "superfund" ? (
-            <>
-              <Stat label="EPA Region" value={site.region ?? "—"} />
-              <Stat
-                label="State / county"
-                value={[site.state, site.county].filter(Boolean).join(" · ") || "—"}
-              />
-              <Stat label="NPL status" value={site.status ?? "—"} />
-              {site.score != null && <Stat label="Site score" value={site.score} />}
-            </>
-          ) : (
-            <>
-              {site.category && <Stat label="Type" value={site.category.replace("/", " · ")} />}
-              <Stat label="Full address" value={site.address ?? "—"} />
-            </>
-          )}
-        </div>
-        {!coverage.terrain && site.mode === "place" && (
-          <p className="mt-3 text-xs text-neutral-900">
-            Terrain + flood layers are US-only — outside the US they read ✕ (climate + map are global).
-          </p>
-        )}
-      </Card>
-    </>
-  );
-}
-
-// --- Micro: site identity, terrain, flood ----------------------------------
-
-function MicroCards({
-  result,
-  terrain,
-  synthesis
-}: {
-  result: AnalyzeResult;
-  terrain: ReturnType<typeof terrainReadout> | null;
-  synthesis: Synthesis | null;
-}) {
-  const { site, flood, topo } = result;
+function OverviewSection({ result, mode }: { result: AnalyzeResult; mode: Mode }) {
+  const { site, climate } = result;
   const docs = site.documents || {};
   return (
-    <div className="grid gap-5 md:grid-cols-2">
-      <Card
-        title="Site identity"
-        source={
-          site.mode === "superfund"
-            ? "US EPA Superfund — NPL record + published site-boundary layer."
-            : "Geocoded place via OpenStreetMap / Nominatim."
-        }
-      >
-        <div className="grid grid-cols-2 gap-4">
-          {site.mode === "superfund" ? (
-            <>
-              <Stat label="EPA ID" value={site.epaId ?? "—"} />
-              <Stat label="Area" value={site.areaAcres != null ? `${fmt(site.areaAcres)} ac` : "—"} />
-              <Stat label="NPL status" value={site.status ?? "—"} />
-              <Stat label="Listed" value={asDate(site.dates?.listed) ?? "—"} />
-            </>
-          ) : (
-            <>
-              <Stat label="Place" value={site.name} />
-              {site.category && <Stat label="Type" value={site.category.replace("/", " · ")} />}
-              <Stat
-                label="Coordinates"
-                value={`${site.centroid.lat.toFixed(5)}, ${site.centroid.lon.toFixed(5)}`}
-              />
-            </>
+    <Card
+      title="Site overview"
+      source={mode === "superfund" ? "US EPA National Priorities List (Superfund) record." : "Geocoded via OpenStreetMap / Nominatim."}
+    >
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+        <Stat label="Coordinates" value={`${site.centroid.lat.toFixed(4)}, ${site.centroid.lon.toFixed(4)}`} hint="Latitude, longitude (WGS84)." />
+        {climate && <Stat label="Elevation" value={`${Math.round(climate.summary.elevation)} m`} hint="From the Open-Meteo model." />}
+        {climate && <Stat label="Timezone" value={climate.summary.timezone} />}
+        {mode === "superfund" ? (
+          <>
+            <Stat label="EPA Region" value={site.region ?? "—"} />
+            <Stat label="State / county" value={[site.state, site.county].filter(Boolean).join(" · ") || "—"} />
+            <Stat label="NPL status" value={site.status ?? "—"} />
+            <Stat label="EPA ID" value={site.epaId ?? "—"} />
+            <Stat label="Area" value={site.areaAcres != null ? `${fmt(site.areaAcres)} ac` : "—"} hint="From the EPA boundary layer (unit-converted)." />
+          </>
+        ) : (
+          <>
+            {site.category && <Stat label="Type" value={site.category.replace("/", " · ")} />}
+            <Stat label="Address" value={site.address ?? "—"} />
+          </>
+        )}
+      </div>
+      {mode === "superfund" && (
+        <div className="mt-3 flex flex-wrap gap-2 border-t border-neutral-100 pt-3">
+          {Object.entries(docs).map(([k, v]) =>
+            v?.url ? (
+              <a key={k} href={v.url} target="_blank" rel="noreferrer" className="rounded-md bg-neutral-100 px-2 py-1 text-xs text-neutral-900 hover:bg-neutral-200">
+                {docLabel(k)} ↗
+              </a>
+            ) : null
           )}
         </div>
-        {site.mode === "superfund" && (
-          <div className="mt-3 flex flex-wrap gap-2 border-t border-neutral-100 pt-3">
-            {Object.entries(docs).map(([k, v]) =>
-              v?.url ? (
-                <a
-                  key={k}
-                  href={v.url}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="rounded-md bg-neutral-100 px-2 py-1 text-xs text-neutral-900 hover:bg-neutral-200"
-                >
-                  {docLabel(k)} ↗
-                </a>
-              ) : null
-            )}
-          </div>
-        )}
-        {site.mode === "superfund" && !site.boundary && (
-          <p className="mt-2 text-xs text-neutral-900">No EPA boundary polygon published for this site.</p>
-        )}
-      </Card>
-
-      <Card
-        title="Terrain (USGS 3DEP)"
-        source="USGS 3DEP elevation, sampled as a coarse grid (getSamples). US only."
-      >
-        {terrain ? (
-          <>
-            <div className="grid grid-cols-2 gap-4">
-              <Stat
-                label="Elevation"
-                value={`${fmt(terrain.min)}–${fmt(terrain.max)} m`}
-                hint="Lowest to highest sampled ground elevation across the study box."
-              />
-              <Stat
-                label="Relief"
-                value={`${fmt(terrain.range)} m`}
-                hint="Highest minus lowest elevation — the vertical range across the site."
-              />
-              <Stat
-                label="Mean slope"
-                value={`~${fmt(terrain.slopePct)}%`}
-                sub="coarse grid estimate"
-                hint="Average ground steepness from the elevation grid. Coarse — confirm with a survey before grading."
-              />
-              <Stat
-                label="Grid"
-                value={`${topo!.n}×${topo!.n} · ${fmt(terrain.resMeters)} m`}
-                hint="Sample resolution: number of points per side and the spacing between them."
-              />
-            </div>
-            {terrain.missing > 0 && (
-              <p className="mt-2 text-xs text-amber-700">
-                {terrain.missing}/{terrain.total} cells were outside coverage and estimated from the
-                grid mean — flagged, not measured.
-              </p>
-            )}
-            {synthesis && (
-              <div className="mt-3 border-t border-neutral-100 pt-3">
-                <Read label="Topography read (AI)">{synthesis.topography_read}</Read>
-              </div>
-            )}
-          </>
-        ) : (
-          <Missing label="terrain (USGS is US-only)" />
-        )}
-      </Card>
-
-      <Card
-        title="Water / flood (FEMA NFHL)"
-        source="FEMA National Flood Hazard Layer — single-point lookup. US only."
-      >
-        {flood && flood.mapped !== false ? (
-          <>
-            <div className="flex flex-wrap items-center gap-2">
-              {flood.inFloodZone ? (
-                <Pill tone="info">In SFHA · zone {flood.zone}</Pill>
-              ) : (
-                <Pill tone="good">Outside SFHA · zone {flood.zone}</Pill>
-              )}
-              {flood.subtype && <Pill tone="neutral">{flood.subtype}</Pill>}
-              {flood.baseFloodElevation != null && (
-                <Pill tone="neutral">BFE {flood.baseFloodElevation} ft</Pill>
-              )}
-            </div>
-            {flood.note && <p className="mt-2 text-sm text-neutral-900">{flood.note}</p>}
-            {synthesis && (
-              <div className="mt-3 border-t border-neutral-100 pt-3">
-                <Read label="Water & flood read (AI)">{synthesis.water_and_flood_read}</Read>
-              </div>
-            )}
-          </>
-        ) : (
-          <Missing label="flood (FEMA is US-only / unmapped here)" />
-        )}
-      </Card>
-
-      <Card title="Immediate surroundings">
-        <p className="text-sm leading-relaxed text-neutral-900">
-          The aerial map above shows the {result.site.bbox ? "~1.8 km" : ""} study area. The colored
-          dots are the {topo ? `${topo.n}×${topo.n}` : ""} USGS elevation samples (blue low → brown
-          high). Switch to <span className="font-medium">Macro</span> for the regional climate read.
-        </p>
-        {synthesis?.contamination_implications && (
-          <div className="mt-3 border-t border-neutral-100 pt-3">
-            <Read label="Contamination implications (AI)">
-              {synthesis.contamination_implications}
-            </Read>
-          </div>
-        )}
-      </Card>
-    </div>
+      )}
+    </Card>
   );
 }
 
@@ -836,39 +537,28 @@ function AiControls({
   aiError: string | null;
   onRunAI: () => void;
 }) {
-  const runLabel =
-    mode === "superfund" ? "Run contamination + design synthesis" : "Run design synthesis";
+  const runLabel = mode === "superfund" ? "Run contamination + design synthesis" : "Run design synthesis";
   return (
     <Card accent title="AI reading (spends the studio's key)">
       {!signedIn ? (
         <div className="flex flex-col items-start gap-2">
           <p className="text-sm text-neutral-900">
-            The map, data, charts and every export above are free and need no account. The two AI
-            passes{mode === "superfund" ? " (contamination brief + design synthesis)" : " (design synthesis)"} are
-            for signed-in studio members — they spend the Anthropic key.
+            The map, all data, charts and every export above are free and need no account. The AI passes
+            {mode === "superfund" ? " (contamination brief + design synthesis)" : " (design synthesis)"} are for signed-in studio members — they spend the Anthropic key.
           </p>
-          <Link
-            href="/login"
-            className="rounded-lg bg-neutral-900 px-4 py-2 text-sm font-medium text-white hover:bg-neutral-800"
-          >
+          <Link href="/login" className="rounded-lg bg-neutral-900 px-4 py-2 text-sm font-medium text-white hover:bg-neutral-800">
             Sign in to run the AI
           </Link>
         </div>
       ) : (
         <div className="flex flex-col items-start gap-2">
-          <button
-            onClick={onRunAI}
-            disabled={aiLoading}
-            className="rounded-lg bg-neutral-900 px-4 py-2 text-sm font-medium text-white hover:bg-neutral-800 disabled:opacity-50"
-          >
+          <button onClick={onRunAI} disabled={aiLoading} className="rounded-lg bg-neutral-900 px-4 py-2 text-sm font-medium text-white hover:bg-neutral-800 disabled:opacity-50">
             {aiLoading ? aiPhase || "Working…" : hasSynthesis ? "Re-run AI reading" : runLabel}
           </button>
           <p className="text-xs text-neutral-900">
-            Reasons only over the hard data above
-            {mode === "superfund" ? " + a web-cited EPA contamination brief" : ""}. Every claim is
-            tagged for you to verify.
+            Reasons only over the hard data above{mode === "superfund" ? " + a web-cited EPA contamination brief" : ""}. Every claim is tagged for you to verify.
           </p>
-          {aiError && <p className="text-sm text-red-600">{aiError}</p>}
+          {aiError && <p role="alert" className="text-sm text-neutral-900">{aiError}</p>}
         </div>
       )}
     </Card>
@@ -877,15 +567,7 @@ function AiControls({
 
 // --- Exports ---------------------------------------------------------------
 
-function Exports({
-  result,
-  contamination,
-  synthesis
-}: {
-  result: AnalyzeResult;
-  contamination: Contamination | null;
-  synthesis: Synthesis | null;
-}) {
+function Exports({ result, contamination, synthesis }: { result: AnalyzeResult; contamination: Contamination | null; synthesis: Synthesis | null }) {
   const [busy, setBusy] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const items = buildExportList(result);
@@ -913,39 +595,41 @@ function Exports({
             disabled={!it.available || busy === it.id}
             title={it.available ? it.blurb : "Not available for this site"}
             onClick={() => run(it.id, it.filename, it.make, it.id === "3dm" ? "model/vnd.3dm" : "text/plain")}
-            className="rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm font-medium hover:border-neutral-900 disabled:cursor-not-allowed disabled:opacity-40"
+            className="rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm font-medium text-neutral-900 hover:border-neutral-900 disabled:cursor-not-allowed disabled:opacity-40"
           >
             {busy === it.id ? "…" : it.label}
           </button>
         ))}
         <span className="mx-1 self-center text-neutral-300">|</span>
         <button
-          onClick={() =>
-            download(`${base}-dossier.json`, dossierJSON(result, contamination, synthesis), "application/json")
-          }
-          className="rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm font-medium hover:border-neutral-900"
+          onClick={() => download(`${base}-dossier.json`, dossierJSON(result, contamination, synthesis), "application/json")}
+          className="rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm font-medium text-neutral-900 hover:border-neutral-900"
         >
           dossier.json
         </button>
         <button
-          onClick={() =>
-            download(`${base}-dossier.md`, dossierMarkdown(result, contamination, synthesis), "text/markdown")
-          }
-          className="rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm font-medium hover:border-neutral-900"
+          onClick={() => download(`${base}-dossier.md`, dossierMarkdown(result, contamination, synthesis), "text/markdown")}
+          className="rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm font-medium text-neutral-900 hover:border-neutral-900"
         >
           dossier.md
         </button>
+        <button
+          onClick={() => download(`${base}-metrics.csv`, metricsCSV(result), "text/csv")}
+          className="rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm font-medium text-neutral-900 hover:border-neutral-900"
+        >
+          metrics.csv
+        </button>
       </div>
-      {err && <p className="mt-2 text-xs text-red-600">{err}</p>}
+      {err && <p className="mt-2 text-xs text-neutral-900">{err}</p>}
       <p className="mt-2 text-xs text-neutral-900">
-        Terrain, contours and boundary share one local-metre origin, so they line up when imported
-        together. The .3dm also carries sun path + wind rose + flood plane.
+        Terrain, contours and boundary share one local-metre origin, so they line up when imported together. The .3dm also carries
+        sun path + wind rose + flood plane. The map’s ▦ panel exports a PNG for your pinup.
       </p>
     </Card>
   );
 }
 
-// --- little helpers --------------------------------------------------------
+// --- helpers ---------------------------------------------------------------
 
 function Segmented({
   value,
@@ -959,31 +643,23 @@ function Segmented({
   big?: boolean;
 }) {
   return (
-    <div className={`inline-flex rounded-lg border border-neutral-300 bg-white p-0.5 ${big ? "" : ""}`}>
+    <div role="radiogroup" className="inline-flex rounded-lg border border-neutral-300 bg-white p-0.5">
       {options.map((o) => (
         <button
           key={o.value}
+          role="radio"
+          aria-checked={value === o.value}
           onClick={() => onChange(o.value)}
           className={[
             "display-font rounded-md uppercase tracking-tight transition",
             big ? "px-4 py-1.5 text-sm" : "px-3 py-1.5 text-xs",
-            value === o.value
-              ? "bg-neutral-900 text-white"
-              : "text-neutral-900 hover:text-neutral-900"
+            value === o.value ? "bg-neutral-900 text-white" : "text-neutral-900 hover:text-neutral-900"
           ].join(" ")}
         >
           {o.label}
         </button>
       ))}
     </div>
-  );
-}
-
-function Missing({ label }: { label: string }) {
-  return (
-    <p className="rounded-md bg-neutral-50 px-3 py-2 text-sm text-neutral-900">
-      No {label} data for this location.
-    </p>
   );
 }
 
@@ -995,8 +671,12 @@ function candidateSub(c: Candidate, mode: Mode): string {
   return (c as GeoPlace).label;
 }
 
+// Compact bundle handed to the synthesis pass — now includes the new domains so
+// the AI reasons over soils/landcover/watershed/seismic + the deep climate/terrain
+// metrics, not just the four original layers.
 function leanBundle(result: AnalyzeResult, contamination: Contamination | null) {
-  const { site, climate, flood, topo, meta } = result;
+  const { site, climate, flood, topo, terrainDeep, soils, landcover, watershed, seismic, meta } = result;
+  const deep = climate?.deep;
   return {
     mode: meta.mode,
     site: {
@@ -1011,23 +691,32 @@ function leanBundle(result: AnalyzeResult, contamination: Contamination | null) 
       category: site.category,
       centroid: site.centroid,
       areaAcres: site.areaAcres,
-      hasBoundary: !!site.boundary,
-      dates: site.dates
+      hasBoundary: !!site.boundary
     },
     climate: climate?.summary ?? null,
+    climateDeep: deep
+      ? {
+          comfort: deep.comfort,
+          designDays: deep.designDays,
+          facadeSolar: deep.facadeSolar,
+          topStrategies: deep.strategies.slice(0, 4),
+          seasonalWind: deep.seasonalWind,
+          water: deep.water
+        }
+      : null,
     flood,
-    topo: topo ? { n: topo.n, bbox: topo.bbox, stats: topo.stats } : null,
+    terrain: topo ? { stats: topo.stats } : null,
+    terrainDeep,
+    soils,
+    landcover,
+    watershed,
+    seismic,
     contamination
   };
 }
 
-// Compact dossier handed to the follow-up chat as context (no hourly arrays / grid).
-function chatContext(
-  result: AnalyzeResult,
-  contamination: Contamination | null,
-  synthesis: Synthesis | null
-) {
-  const { site, climate, flood, topo, meta } = result;
+function chatContext(result: AnalyzeResult, contamination: Contamination | null, synthesis: Synthesis | null) {
+  const { site, climate, flood, topo, terrainDeep, soils, landcover, watershed, seismic, meta } = result;
   return {
     mode: meta.mode,
     place: {
@@ -1048,12 +737,18 @@ function chatContext(
           source: climate.summary.source,
           prevailingWind: climate.summary.prevailingWind,
           annual: climate.summary.annual,
+          comfort: climate.deep.comfort,
+          designDays: climate.deep.designDays,
           timezone: climate.summary.timezone,
           elevation: climate.summary.elevation
         }
       : null,
-    terrain: topo ? { stats: topo.stats } : null,
+    terrain: topo ? { stats: topo.stats, deep: terrainDeep } : null,
     flood,
+    soils,
+    landcover,
+    watershed,
+    seismic,
     aiReading: synthesis
       ? {
           site_in_a_sentence: synthesis.site_in_a_sentence,
@@ -1062,58 +757,13 @@ function chatContext(
         }
       : null,
     contamination: contamination
-      ? {
-          summary: contamination.summary,
-          contaminants: contamination.contaminants_of_concern?.map((c) => c.name),
-          remediation: contamination.remediation_status
-        }
+      ? { summary: contamination.summary, contaminants: contamination.contaminants_of_concern?.map((c) => c.name), remediation: contamination.remediation_status }
       : null
-  };
-}
-
-function terrainReadout(topo: NonNullable<AnalyzeResult["topo"]>) {
-  const { stats, grid, n, bbox } = topo;
-  const min = stats.min ?? 0;
-  const max = stats.max ?? 0;
-  const [w, s, e, nth] = bbox;
-  const proj = makeProjector(s, w);
-  const [spanX, spanY] = proj.toLocal(e, nth);
-  const dx = spanX / (n - 1);
-  const dy = spanY / (n - 1);
-  // Mean gradient magnitude across interior cells (rise/run → %).
-  let sum = 0;
-  let count = 0;
-  for (let r = 1; r < n - 1; r++) {
-    for (let c = 1; c < n - 1; c++) {
-      const gx = (grid[r][c + 1] - grid[r][c - 1]) / (2 * dx || 1);
-      const gy = (grid[r + 1][c] - grid[r - 1][c]) / (2 * dy || 1);
-      sum += Math.sqrt(gx * gx + gy * gy);
-      count++;
-    }
-  }
-  const slopePct = count ? (sum / count) * 100 : 0;
-  const resMeters = (Math.abs(dx) + Math.abs(dy)) / 2;
-  return {
-    min,
-    max,
-    range: max - min,
-    slopePct,
-    resMeters,
-    missing: stats.missing,
-    total: stats.total
   };
 }
 
 function fmt(v: number | null | undefined): string {
   return v == null ? "—" : (Math.round(v * 10) / 10).toString();
-}
-
-function asDate(v: unknown): string | null {
-  if (!v) return null;
-  const n = Number(v);
-  // EPA ships epoch-millis for dates.
-  if (Number.isFinite(n) && n > 1e11) return new Date(n).toISOString().slice(0, 10);
-  return String(v);
 }
 
 function docLabel(k: string): string {

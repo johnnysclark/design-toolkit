@@ -9,15 +9,19 @@ import {
   type ClimateRaw
 } from "@/lib/site-analysis/datasources";
 import { windRose, monthlyStats, sunPaths } from "@/lib/site-analysis/geo";
+import { deriveClimate } from "@/lib/site-analysis/climate";
+import { deriveTerrain } from "@/lib/site-analysis/terrain";
+import { soilsAt, landCoverAt, watershedAt, seismicAt } from "@/lib/site-analysis/layers";
 
 // Public, hard-data-only (D0). Pulls climate (Open-Meteo, global) + terrain (USGS,
 // US) + flood (FEMA, US) for a point — no model, no key, no auth. Two ways in:
 //   { epaId }            → Superfund mode: resolve the EPA site + its boundary first
 //   { lat, lon, label }  → Place mode: analyse any geocoded point
 // The two cost passes (contamination, synthesis) live in their own auth-gated
-// routes so neither this request nor those approach Vercel Hobby's 60s cap.
+// routes, so this stays a quick, key-free hard-data request. The added soils/
+// landcover/watershed/seismic fetchers run in parallel with climate/terrain/flood.
 export const runtime = "nodejs";
-export const maxDuration = 60;
+export const maxDuration = 120;
 
 const CLIMATE_YEAR = 2023;
 
@@ -83,7 +87,8 @@ function climateExtras(climate: ClimateRaw) {
 function summarizeClimate(climate: ClimateRaw) {
   const wr = windRose(climate.windSpeed, climate.windDir);
   const totals = wr.matrix.map((row) => row.reduce((a, b) => a + b, 0));
-  const prevailingIdx = totals.indexOf(Math.max(...totals));
+  const maxTotal = Math.max(...totals);
+  const prevailingIdx = totals.indexOf(maxTotal);
   const mean = (arr: number[]) => {
     const v = arr.filter((x) => x != null && !Number.isNaN(x));
     return v.length ? v.reduce((a, b) => a + b, 0) / v.length : null;
@@ -97,7 +102,12 @@ function summarizeClimate(climate: ClimateRaw) {
     elevation: climate.elevation,
     units: climate.units,
     windRose: wr,
-    prevailingWind: { dir: wr.dirs[prevailingIdx], fraction: totals[prevailingIdx] },
+    // Don't fabricate a prevailing direction when there's no wind data (all-zero
+    // totals would otherwise always read "N").
+    prevailingWind:
+      maxTotal > 0
+        ? { dir: wr.dirs[prevailingIdx], fraction: totals[prevailingIdx] }
+        : { dir: null, fraction: 0 },
     temp: monthlyStats(climate.time, climate.tempC),
     rh: monthlyStats(climate.time, climate.rh),
     annual: {
@@ -175,29 +185,43 @@ export async function POST(req: Request) {
       };
     }
 
-    // Hard-data layers in parallel. Each degrades to null on failure (USGS + FEMA
-    // are US-only — outside the US they simply come back empty, never faked).
-    const [climateRaw, flood, topo] = await Promise.all([
-      climateYear(site.centroid.lat, site.centroid.lon, CLIMATE_YEAR).catch((e) => {
+    // Hard-data layers in parallel. Each degrades to null on failure (these
+    // sources are US-only — outside the US they simply come back empty, never
+    // faked). The four point-fetchers (soils/landcover/watershed/seismic) are
+    // single fast queries, so they ride along here; the heavy Overpass context
+    // geometry is its own lazy endpoint.
+    const { lat, lon } = site.centroid;
+    const [climateRaw, flood, topo, soils, landcover, watershed, seismic] = await Promise.all([
+      climateYear(lat, lon, CLIMATE_YEAR).catch((e) => {
         console.error("climate:", e.message);
         return null;
       }),
-      floodAt(site.centroid.lon, site.centroid.lat).catch(() => null),
+      floodAt(lon, lat).catch(() => null),
       site.bbox
         ? elevationGrid(terrainBox(site.bbox, site.centroid), gridN).catch((e) => {
             console.error("topo:", e.message);
             return null;
           })
-        : Promise.resolve(null)
+        : Promise.resolve(null),
+      soilsAt(lon, lat).catch(() => null),
+      landCoverAt(lon, lat).catch(() => null),
+      watershedAt(lon, lat).catch(() => null),
+      seismicAt(lat, lon).catch(() => null)
     ]);
 
     const climate = climateRaw ? summarizeClimate(climateRaw) : null;
+    const climateDeep = climateRaw ? deriveClimate(climateRaw) : null;
+    const terrainDeep = topo ? deriveTerrain(topo) : null;
 
     const coverage = {
       boundary: !!site.boundary,
       climate: !!climate,
       terrain: !!topo,
-      flood: !!flood && flood.mapped !== false
+      flood: !!flood && flood.mapped !== false,
+      soils: !!soils,
+      landcover: !!landcover,
+      watershed: !!watershed,
+      seismic: !!seismic
     };
 
     const result = {
@@ -211,10 +235,16 @@ export async function POST(req: Request) {
       },
       site,
       // `summary` drives the UI + exports; `raw` (hourly) lets the browser build
-      // the EPW and the .3dm wind rose with no extra server round-trip.
-      climate: climate ? { summary: climate, raw: climateRaw } : null,
+      // the EPW and the .3dm wind rose with no extra server round-trip; `deep`
+      // carries the comfort/degree-day/solar-by-orientation derivations.
+      climate: climate && climateDeep ? { summary: climate, raw: climateRaw, deep: climateDeep } : null,
       flood,
       topo,
+      terrainDeep,
+      soils,
+      landcover,
+      watershed,
+      seismic,
       coverage
     };
 

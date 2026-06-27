@@ -101,7 +101,11 @@ export function CoverageStrip({ coverage, mode }: { coverage: Coverage; mode: "p
     { key: "boundary", label: "Boundary", show: mode === "superfund" },
     { key: "climate", label: "Climate", show: true },
     { key: "terrain", label: "Terrain", show: true },
-    { key: "flood", label: "Flood", show: true }
+    { key: "soils", label: "Soils", show: true },
+    { key: "landcover", label: "Land cover", show: true },
+    { key: "flood", label: "Flood", show: true },
+    { key: "watershed", label: "Watershed", show: true },
+    { key: "seismic", label: "Seismic", show: true }
   ];
   return (
     <div className="flex flex-wrap items-center gap-2 text-xs">
@@ -119,6 +123,7 @@ export function CoverageStrip({ coverage, mode }: { coverage: Coverage; mode: "p
             >
               <span aria-hidden>{ok ? "✓" : "✕"}</span>
               {l.label}
+              <span className="sr-only">{ok ? "available" : "not available"}</span>
             </span>
           );
         })}
@@ -150,7 +155,7 @@ export function ClaimRow({ claim }: { claim: Claim }) {
   return (
     <li className="flex flex-col gap-1 border-l-2 border-neutral-200 py-1.5 pl-3">
       <div className="flex items-start justify-between gap-2">
-        <span className="text-sm text-neutral-800">{claim.claim}</span>
+        <span className="text-sm text-neutral-900">{claim.claim}</span>
         <ClaimChip status={claim.status} />
       </div>
       {claim.reason && <span className="text-xs text-neutral-900">{claim.reason}</span>}

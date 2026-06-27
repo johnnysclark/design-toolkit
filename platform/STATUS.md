@@ -125,9 +125,47 @@
 > Librarian** so the Anthropic key is never reachable publicly — re-add auth before sharing
 > widely. Repo is being **trimmed to build-essential docs**.
 >
-> **Site Analysis / "Surveyor" — BUILT + MERGED + LIVE (branch `site-analysis`, worktree
+> **Surveyor — FULL REBUILD (2026-06-27, branch `site-analysis`, worktree
+> `design-toolkit-site-analysis`).** Deep multi-agent audit (72 verified findings) →
+> ground-up enrich. Typechecks (0 errors), `npm run build` green (31 routes), engine +
+> exporters + the assembled `/analyze` response live-tested. Scope (John's call): full
+> rebuild + enrich · US-focused/deeper · all 4 data domains · MapLibre GL. Analysis +
+> plan: `(app)/site-analysis/REBUILD-ANALYSIS.md` + `REBUILD-PLAN.md`.
+>
+> - **Engine bug fixes** (`lib/site-analysis/datasources.ts`): boundary now exact-match +
+>   empty-id guard + unit-aware acreage (was: substring-merge fused sites / 640× acres);
+>   flood distinguishes *unmapped* from *no-hazard* via FEMA FIRM-panel layer 3; terrain
+>   returns a `missingMask` so back-filled cells stop reading as measured; +precip/snow.
+> - **New keyless data layers** (`lib/site-analysis/layers.ts`, all probed live, degrade to
+>   null): USDA **SSURGO soils** (drainage/HSG/water-table/bearing), USGS/MRLC **NLCD land
+>   cover** + impervious + canopy, USGS **WBD watershed** (HUC12), USGS **ASCE7 seismic**
+>   (Ss/S1/SDC), OSM **Overpass context geometry** (buildings/roads/water/green — needs a
+>   real **User-Agent** or Overpass 406s; lazy `/api/site-analysis/context`).
+> - **Deep derivations**: `climate.ts` (comfort hours [ASHRAE-55 adaptive], degree-days/mo,
+>   ASHRAE design days, solar by 8 façades+roof, Givoni strategies, seasonal wind, daylight,
+>   precip) + `terrain.ts` (aspect, slope bands, buildable %, cut/fill, high/low pts).
+> - **Map** → **MapLibre GL 4.7.1** (`SiteMapGL.tsx`, replaces Leaflet `SiteMap.tsx`,
+>   deleted): OpenFreeMap vector base + AWS terrarium **3D terrain/hillshade** + Esri aerial +
+>   FEMA/NHD/NLCD raster overlays (`{bbox-epsg-3857}`) + OSM context + **PNG export**; loaded
+>   `next/dynamic ssr:false`.
+> - **IA**: Macro/Micro-hides-data is GONE — `cards.tsx` shows every domain always (the
+>   toggle now only reframes the map Region⇄Site). Full **all-black-text + a11y** sweep.
+> - **Exports**: contours now **joined LWPOLYLINEs** (was disjoint segments), OBJ omits
+>   fabricated faces + georef header, DXF `$INSUNITS`, EPW real start-weekday, **`.3dm`**
+>   getRhino no longer caches a failed CDN load + greys fabricated cells, new **`metrics.csv`**,
+>   dossier enriched with all domains.
+> - **AI**: synthesis bundle reasons over all new data; ungrounded pass can't tag "verified";
+>   NEW **blind-vs-grounded** hallucination lesson (`/api/site-analysis/blind-vs-grounded` +
+>   `blind-grounded.tsx`) — same profile prompt run blind vs. web-searched, side by side.
+> - **Adversarial self-review** (Phase 6): 7 findings, all low/med, all fixed (adaptive-comfort
+>   running-mean day-index, Givoni evaporative-cooling ordering, rhino3dm retry-after-fail,
+>   2 MapLibre effect/prop nits, context param validation, stale comment). **Not yet:** browser
+>   screenshot test of the live map; signed-in AI streaming on prod; not merged to `main`.
+> - Deferred to v2: wildfire/SLR point layers, ACS demographics, global (non-US) coverage.
+>
+> **(Prior state, pre-rebuild)** Site Analysis / "Surveyor" — BUILT + MERGED + LIVE (branch `site-analysis`, worktree
 > `design-toolkit-site-analysis`; the in-app title is now _Surveyor_ but the route/folder/nav
-> key all stay `site-analysis`).** The ported engine
+> key all stay `site-analysis`). The ported engine
 > (`lib/site-analysis/*`) now has a full React UI at `(app)/site-analysis/`. Two new things vs.
 > the original spec: (1) it's **general-purpose** — a **Place mode** geocodes *any* address
 > (OSM Nominatim, keyless) plus a **Superfund mode** tuned for the class (EPA NPL search +

@@ -1,5 +1,13 @@
 # Site Analysis — Build Plan & Feature Spec
 
+> **⚡⚡ FULL REBUILD 2026-06-27 — see [`REBUILD-ANALYSIS.md`](./REBUILD-ANALYSIS.md) (72-finding
+> audit) + [`REBUILD-PLAN.md`](./REBUILD-PLAN.md) + the Surveyor rebuild entry in
+> [`platform/STATUS.md`](../../../../../../STATUS.md). New: SSURGO soils · NLCD land cover ·
+> WBD watershed · ASCE7 seismic · OSM context geometry · deep climate (comfort/design-days/
+> solar-by-façade/Givoni) + terrain (aspect/buildable/cut-fill) derivations · MapLibre GL 3D
+> map · always-visible dashboard · joined-polyline contours + metrics.csv · blind-vs-grounded
+> AI. The notes below predate the rebuild.**
+
 > **⚡ CURRENT STATE (2026-06-26): BUILT + MERGED + LIVE, in-app title is now "Surveyor"
 > (route/folder/nav key stay `site-analysis`).** For the authoritative, up-to-date handoff —
 > incl. the 60s-cap reliability fixes, the auto source-finder, the Further-resources section,

@@ -72,7 +72,7 @@ export function WindRoseChart({ rose }: { rose: WindRose }) {
                 y={ly}
                 textAnchor="middle"
                 dominantBaseline="middle"
-                className="fill-neutral-500"
+                className="fill-neutral-900"
                 fontSize={11}
                 fontWeight={700}
               >
@@ -183,7 +183,7 @@ export function SunPathChart({ paths }: { paths: SunPath[] }) {
                 y={ly}
                 textAnchor="middle"
                 dominantBaseline="middle"
-                className="fill-neutral-500"
+                className="fill-neutral-900"
                 fontSize={11}
                 fontWeight={700}
               >
@@ -293,7 +293,7 @@ export function MonthlyClimate({
             y={y(v)}
             textAnchor="end"
             dominantBaseline="middle"
-            className="fill-neutral-400"
+            className="fill-neutral-900"
             fontSize={9}
           >
             {Math.round(v)}
@@ -329,7 +329,7 @@ export function MonthlyClimate({
             x={x(i)}
             y={h - 5}
             textAnchor="middle"
-            className="fill-neutral-400"
+            className="fill-neutral-900"
             fontSize={9}
           >
             {mlabel}

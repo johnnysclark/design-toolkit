@@ -203,7 +203,7 @@ export default function SiteChat({ context, tier }: { context: any; tier?: strin
                     "max-w-[92%] whitespace-pre-wrap rounded-2xl px-3 py-2 text-sm leading-relaxed",
                     m.role === "user"
                       ? "rounded-br-sm bg-neutral-900 text-white"
-                      : "rounded-bl-sm border border-neutral-200 bg-white text-neutral-800"
+                      : "rounded-bl-sm border border-neutral-200 bg-white text-neutral-900"
                   ].join(" ")}
                 >
                   {m.content}
@@ -212,7 +212,7 @@ export default function SiteChat({ context, tier }: { context: any; tier?: strin
             ))}
             {streaming && (
               <div className="flex justify-start">
-                <div className="max-w-[92%] rounded-2xl rounded-bl-sm border border-neutral-200 bg-white px-3 py-2 text-sm leading-relaxed text-neutral-800">
+                <div className="max-w-[92%] rounded-2xl rounded-bl-sm border border-neutral-200 bg-white px-3 py-2 text-sm leading-relaxed text-neutral-900">
                   {streamingText ? (
                     <span className="whitespace-pre-wrap">{streamingText}</span>
                   ) : (
@@ -284,7 +284,7 @@ export default function SiteChat({ context, tier }: { context: any; tier?: strin
                     rel="noreferrer"
                     className="block rounded-md border border-neutral-200 bg-white p-2 hover:border-neutral-400"
                   >
-                    <div className="line-clamp-2 text-xs font-medium text-neutral-800">
+                    <div className="line-clamp-2 text-xs font-medium text-neutral-900">
                       {i + 1}. {s.title}
                     </div>
                     <div className="mt-0.5 truncate text-[11px] text-sky-700">{domain(s.url)}</div>

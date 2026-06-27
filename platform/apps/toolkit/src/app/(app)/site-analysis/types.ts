@@ -9,11 +9,30 @@ import type {
   GeoPlace,
   ClimateRaw
 } from "@/lib/site-analysis/datasources";
+import type { ClimateDeep } from "@/lib/site-analysis/climate";
+import type { TerrainDeep } from "@/lib/site-analysis/terrain";
+import type { Soils, LandCover, Watershed, Seismic, SiteContext } from "@/lib/site-analysis/layers";
 
 export type Mode = "place" | "superfund";
 export type Scale = "macro" | "micro";
 
-export type { WindRose, SunPath, MonthStat, Flood, Topo, SiteCandidate, GeoPlace, ClimateRaw };
+export type {
+  WindRose,
+  SunPath,
+  MonthStat,
+  Flood,
+  Topo,
+  SiteCandidate,
+  GeoPlace,
+  ClimateRaw,
+  ClimateDeep,
+  TerrainDeep,
+  Soils,
+  LandCover,
+  Watershed,
+  Seismic,
+  SiteContext
+};
 
 // The unified site shape the analyze route returns for either mode.
 export interface AnalyzedSite {
@@ -45,7 +64,7 @@ export interface ClimateSummary {
   elevation: number;
   units: Record<string, string>;
   windRose: WindRose;
-  prevailingWind: { dir: string; fraction: number };
+  prevailingWind: { dir: string | null; fraction: number };
   temp: MonthStat[];
   rh: MonthStat[];
   annual: {
@@ -68,6 +87,10 @@ export interface Coverage {
   climate: boolean;
   terrain: boolean;
   flood: boolean;
+  soils: boolean;
+  landcover: boolean;
+  watershed: boolean;
+  seismic: boolean;
 }
 
 export interface AnalyzeResult {
@@ -80,9 +103,14 @@ export interface AnalyzeResult {
     climateYear: number;
   };
   site: AnalyzedSite;
-  climate: { summary: ClimateSummary; raw: ClimateRaw } | null;
+  climate: { summary: ClimateSummary; raw: ClimateRaw; deep: ClimateDeep } | null;
   flood: Flood | null;
   topo: Topo | null;
+  terrainDeep: TerrainDeep | null;
+  soils: Soils | null;
+  landcover: LandCover | null;
+  watershed: Watershed | null;
+  seismic: Seismic | null;
   coverage: Coverage;
 }
 

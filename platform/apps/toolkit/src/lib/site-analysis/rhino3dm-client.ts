@@ -33,9 +33,11 @@ function loadScript(src: string): Promise<void> {
     const existing = document.querySelector<HTMLScriptElement>(`script[data-rhino3dm]`);
     if (existing) {
       if (existing.dataset.loaded === "true") return resolve();
-      existing.addEventListener("load", () => resolve());
-      existing.addEventListener("error", () => reject(new Error("Failed to load rhino3dm.")));
-      return;
+      // A leftover tag that never finished loading is from a prior FAILED attempt
+      // (a success caches _rhinoPromise and never re-enters here; an in-flight load
+      // is guarded by _rhinoPromise). An inert errored <script> never re-fires
+      // load/error, so attaching listeners would hang forever — drop it and re-fetch.
+      existing.remove();
     }
     const s = document.createElement("script");
     s.src = src;
@@ -45,7 +47,10 @@ function loadScript(src: string): Promise<void> {
       s.dataset.loaded = "true";
       resolve();
     });
-    s.addEventListener("error", () => reject(new Error("Failed to load rhino3dm from the CDN.")));
+    s.addEventListener("error", () => {
+      s.remove(); // don't leave a dead tag that defeats the next retry
+      reject(new Error("Failed to load rhino3dm from the CDN."));
+    });
     document.head.appendChild(s);
   });
 }
@@ -58,7 +63,12 @@ async function getRhino(): Promise<any> {
       throw new Error("rhino3dm did not load.");
     }
     return window.rhino3dm();
-  })();
+  })().catch((e) => {
+    // Never cache a FAILED load — otherwise one CDN hiccup permanently disables
+    // the .3dm export for the whole session. Clearing it lets the next click retry.
+    _rhinoPromise = null;
+    throw e;
+  });
   return _rhinoPromise;
 }
 
@@ -141,10 +151,16 @@ export async function buildAnalysis3dm(bundle: any): Promise<Uint8Array> {
 
 function addTerrain(doc: any, rhino: any, topo: any, proj: any) {
   const attr = makeLayer(doc, rhino, "Terrain", [150, 130, 100]);
-  const { grid, n, bbox } = topo;
+  const { grid, n, bbox, missingMask } = topo;
   const [w, s, e, nth] = bbox;
   let min = Infinity, max = -Infinity;
-  for (const row of grid) for (const v of row) { if (v < min) min = v; if (v > max) max = v; }
+  for (let r = 0; r < n; r++)
+    for (let c = 0; c < n; c++) {
+      if (missingMask?.[r]?.[c]) continue; // measured cells only set the colour range
+      const v = grid[r][c];
+      if (v < min) min = v;
+      if (v > max) max = v;
+    }
   const span = max - min || 1;
 
   const mesh = new rhino.Mesh();
@@ -157,7 +173,9 @@ function addTerrain(doc: any, rhino: any, topo: any, proj: any) {
       const [x, y] = proj.toLocal(lon, lat);
       const z = grid[r][c];
       verts.add(x, y, z);
-      const [cr, cg, cb] = elevColor((z - min) / span);
+      // Fabricated (out-of-coverage, back-filled) cells are flagged grey rather
+      // than coloured as if they were measured ground.
+      const [cr, cg, cb] = missingMask?.[r]?.[c] ? [190, 190, 190] : elevColor((z - min) / span);
       vcol.add(cr, cg, cb);
     }
   }

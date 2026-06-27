@@ -21,7 +21,9 @@ const EPQS = "https://epqs.nationalmap.gov/v1/json";
 // cap on big sites). EPQS stays as the single-point fallback below.
 const DEP_GETSAMPLES =
   "https://elevation.nationalmap.gov/arcgis/rest/services/3DEPElevation/ImageServer/getSamples";
-const FEMA_FLOOD = "https://hazards.fema.gov/arcgis/rest/services/public/NFHL/MapServer/28/query";
+const FEMA_NFHL = "https://hazards.fema.gov/arcgis/rest/services/public/NFHL/MapServer";
+const FEMA_FLOOD = `${FEMA_NFHL}/28/query`; // Flood Hazard Zones (S_Fld_Haz_Ar)
+const FEMA_PANELS = `${FEMA_NFHL}/3/query`; // FIRM Panels — the mapped-coverage footprint
 const OPEN_METEO = "https://archive-api.open-meteo.com/v1/archive";
 const NOMINATIM = "https://nominatim.openstreetmap.org/search";
 const NOMINATIM_REVERSE = "https://nominatim.openstreetmap.org/reverse";
@@ -58,6 +60,10 @@ export interface Topo {
   n: number;
   bbox: [number, number, number, number];
   grid: number[][];
+  // true where the cell was OUT of 3DEP coverage and back-filled with the grid
+  // mean (so the mesh stays closed). Lets downstream code flag/exclude fabricated
+  // ground instead of presenting it as measured.
+  missingMask: boolean[][];
   stats: {
     min: number | null;
     max: number | null;
@@ -85,7 +91,7 @@ export interface GeoPlace {
   importance: number | null;
 }
 
-async function fetchJson(url: string, { timeout = 30000 } = {}): Promise<any> {
+async function fetchJson(url: string, { timeout = 18000 } = {}): Promise<any> {
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), timeout);
   try {
@@ -156,8 +162,8 @@ export async function getSite(epaId: string): Promise<Site | null> {
   const a = f.attributes;
   const base = normalizeNpl(a);
 
-  const boundary = await getBoundary(epaId, base.name).catch(() => null);
   const centroid = base.centroid || (f.geometry ? { lat: f.geometry.y, lon: f.geometry.x } : null);
+  const boundary = await getBoundary(epaId, base.name, centroid).catch(() => null);
 
   // bbox from boundary if present, else a default ~1.2km box around the point.
   let bbox: [number, number, number, number] | undefined;
@@ -188,34 +194,36 @@ export async function getSite(epaId: string): Promise<Site | null> {
   };
 }
 
-// Boundary polygon for a site. Matches on EPA_ID first, name as a fallback.
-export async function getBoundary(epaId: string, name?: string): Promise<Boundary | null> {
-  const safeId = (epaId || "").replace(/'/g, "''");
-  const where = `EPA_ID LIKE '%${safeId}%'`;
-  let data = await arcgis(BOUNDARY_LAYER, {
-    where,
-    outFields: "EPA_ID,SITE_NAME,SITE_FEATURE_TYPE,GIS_AREA,GIS_AREA_UNITS",
-    returnGeometry: "true",
-    outSR: "4326"
-  });
-  if ((!data.features || !data.features.length) && name) {
-    const safeName = name.replace(/'/g, "''");
-    data = await arcgis(BOUNDARY_LAYER, {
-      where: `UPPER(SITE_NAME) LIKE UPPER('%${safeName}%')`,
-      outFields: "EPA_ID,SITE_NAME,SITE_FEATURE_TYPE,GIS_AREA,GIS_AREA_UNITS",
-      returnGeometry: "true",
-      outSR: "4326"
-    });
-  }
-  const feats = data.features || [];
-  if (!feats.length) return null;
+// Convert a GIS_AREA value to acres using its reported unit. The EPA boundary
+// layer mixes units (Acres, Square Miles, and linear units for line features) —
+// blindly trusting the number as acres is wrong by up to 640×, so we only return
+// a number when the unit is a recognised AREAL one.
+function gisAreaToAcres(area: unknown, units: unknown): number | null {
+  const a = Number(area);
+  if (!Number.isFinite(a)) return null;
+  const u = String(units || "").toLowerCase();
+  if (u.includes("acre")) return a;
+  if (u.includes("square mile") || u === "sq mi") return a * 640;
+  if (u.includes("hectare")) return a * 2.4710538;
+  if (u.includes("square kilom")) return a * 247.10538;
+  if (u.includes("square meter") || u.includes("square metre")) return a * 0.00024710538;
+  // Linear ('Miles'), 'None', or unknown → not an area we can honestly call acres.
+  return null;
+}
 
-  // Merge all matching rings into one MultiPolygon and compute a bbox.
+// Merge the boundary features of ONE site (multiple operable units / feature
+// types of the same EPA_ID legitimately union) into a single MultiPolygon.
+function mergeBoundaryFeatures(feats: any[]): Boundary | null {
   const polygons: number[][][][] = [];
   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-  let area = 0;
+  let acres = 0;
+  let anyArea = false;
   for (const f of feats) {
-    area += f.attributes.GIS_AREA || 0;
+    const a = gisAreaToAcres(f.attributes?.GIS_AREA, f.attributes?.GIS_AREA_UNITS);
+    if (a != null) {
+      acres += a;
+      anyArea = true;
+    }
     for (const ring of f.geometry?.rings || []) {
       polygons.push([ring]);
       for (const [x, y] of ring) {
@@ -228,10 +236,86 @@ export async function getBoundary(epaId: string, name?: string): Promise<Boundar
   }
   if (!polygons.length) return null;
   return {
-    areaAcres: area || null,
+    areaAcres: anyArea ? acres : null,
     bbox: [minX, minY, maxX, maxY],
     geojson: { type: "MultiPolygon", coordinates: polygons }
   };
+}
+
+// A name LIKE-match can return several DISTINCT sites. Never merge across them —
+// group by EPA_ID and keep only the group nearest the known centroid.
+function pickNearestSite(feats: any[], centroid?: { lat: number; lon: number } | null): any[] {
+  if (feats.length <= 1) return feats;
+  const groups = new Map<string, any[]>();
+  for (const f of feats) {
+    const id = String(f.attributes?.EPA_ID || f.attributes?.SITE_NAME || "?");
+    const g = groups.get(id) || [];
+    g.push(f);
+    groups.set(id, g);
+  }
+  const all = [...groups.values()];
+  if (all.length <= 1) return feats;
+  if (!centroid) return all[0];
+  let best = all[0];
+  let bestD = Infinity;
+  for (const g of all) {
+    let sx = 0, sy = 0, nn = 0;
+    for (const f of g) {
+      const ring = f.geometry?.rings?.[0];
+      if (ring?.length) {
+        sx += ring[0][0];
+        sy += ring[0][1];
+        nn++;
+      }
+    }
+    if (!nn) continue;
+    const dx = sx / nn - centroid.lon;
+    const dy = sy / nn - centroid.lat;
+    const d = dx * dx + dy * dy;
+    if (d < bestD) {
+      bestD = d;
+      best = g;
+    }
+  }
+  return best;
+}
+
+// Boundary polygon for a site. EXACT match on EPA_ID first (mirrors getSite); a
+// name LIKE fallback only if that finds nothing, disambiguated by centroid. We
+// never fall through to `LIKE '%%'` — an empty id there would match and merge the
+// entire national boundary dataset.
+export async function getBoundary(
+  epaId: string,
+  name?: string,
+  centroid?: { lat: number; lon: number } | null
+): Promise<Boundary | null> {
+  const safeId = (epaId || "").trim().replace(/'/g, "''");
+  const outFields = "EPA_ID,SITE_NAME,SITE_FEATURE_TYPE,GIS_AREA,GIS_AREA_UNITS";
+
+  let feats: any[] = [];
+  if (safeId) {
+    const data = await arcgis(BOUNDARY_LAYER, {
+      where: `EPA_ID = '${safeId}'`,
+      outFields,
+      returnGeometry: "true",
+      outSR: "4326"
+    });
+    feats = data.features || [];
+  }
+
+  if (!feats.length && name) {
+    const safeName = name.replace(/'/g, "''");
+    const data = await arcgis(BOUNDARY_LAYER, {
+      where: `UPPER(SITE_NAME) LIKE UPPER('%${safeName}%')`,
+      outFields,
+      returnGeometry: "true",
+      outSR: "4326"
+    });
+    feats = pickNearestSite(data.features || [], centroid);
+  }
+
+  if (!feats.length) return null;
+  return mergeBoundaryFeatures(feats);
 }
 
 // --- Geocoding (Place mode) ------------------------------------------------
@@ -414,13 +498,18 @@ export async function elevationGrid(
   // rather than inventing a flat plane.
   if (!flat.length) throw new Error("No 3DEP elevation coverage for this area.");
 
-  // Fill any gaps (out-of-coverage cells) with the grid mean so the mesh stays closed.
+  // Fill any gaps (out-of-coverage cells) with the grid mean so the mesh stays
+  // closed — but record exactly WHICH cells were fabricated, so stats, slope,
+  // contours, meshes and the .3dm can flag/exclude them instead of treating the
+  // back-fill as measured ground.
   const mean = flat.reduce((a, b) => a + b, 0) / flat.length;
+  const missingMask: boolean[][] = Array.from({ length: n }, () => new Array(n).fill(false));
   let missing = 0;
   for (let r = 0; r < n; r++)
     for (let c = 0; c < n; c++)
       if (grid[r][c] == null) {
         grid[r][c] = mean;
+        missingMask[r][c] = true;
         missing++;
       }
 
@@ -428,6 +517,7 @@ export async function elevationGrid(
     n,
     bbox,
     grid: grid as number[][],
+    missingMask,
     stats: { min: Math.min(...flat), max: Math.max(...flat), mean, missing, total: n * n }
   };
 }
@@ -435,31 +525,49 @@ export async function elevationGrid(
 // --- FEMA flood ------------------------------------------------------------
 
 export async function floodAt(lon: number, lat: number): Promise<Flood> {
-  try {
-    const qs = new URLSearchParams({
+  const pointParams = (outFields: string) =>
+    new URLSearchParams({
       geometry: `${lon},${lat}`,
       geometryType: "esriGeometryPoint",
       inSR: "4326",
       spatialRel: "esriSpatialRelIntersects",
-      outFields: "FLD_ZONE,ZONE_SUBTY,SFHA_TF,STATIC_BFE",
+      outFields,
       returnGeometry: "false",
       f: "json"
     });
-    const data = await fetchJson(`${FEMA_FLOOD}?${qs}`, { timeout: 20000 });
+  try {
+    const data = await fetchJson(`${FEMA_FLOOD}?${pointParams("FLD_ZONE,ZONE_SUBTY,SFHA_TF,STATIC_BFE")}`, {
+      timeout: 18000
+    });
     const a = (data.features || [])[0]?.attributes;
-    if (!a)
+    if (a) {
+      return {
+        mapped: true,
+        inFloodZone: a.SFHA_TF === "T",
+        zone: a.FLD_ZONE,
+        subtype: a.ZONE_SUBTY || null,
+        baseFloodElevation: a.STATIC_BFE && a.STATIC_BFE > -9999 ? a.STATIC_BFE : null
+      };
+    }
+    // No flood-hazard polygon here. Crucial distinction: is the point inside a
+    // mapped FIRM panel (→ genuinely Zone X, minimal hazard) or outside any panel
+    // (→ UNMAPPED — we truly don't know, which is NOT the same as "no risk")?
+    const panel = await fetchJson(`${FEMA_PANELS}?${pointParams("FIRM_PAN,PANEL_TYP")}`, {
+      timeout: 14000
+    }).catch(() => null);
+    if (panel?.features?.length) {
       return {
         mapped: true,
         inFloodZone: false,
-        zone: "X (or unmapped here)",
-        note: "No special flood hazard area at this point."
+        zone: "X",
+        subtype: null,
+        baseFloodElevation: null,
+        note: "Inside a mapped FEMA FIRM panel but outside any Special Flood Hazard Area — Zone X (minimal flood hazard)."
       };
+    }
     return {
-      mapped: true,
-      inFloodZone: a.SFHA_TF === "T",
-      zone: a.FLD_ZONE,
-      subtype: a.ZONE_SUBTY || null,
-      baseFloodElevation: a.STATIC_BFE && a.STATIC_BFE > -9999 ? a.STATIC_BFE : null
+      mapped: false,
+      note: "Not within a mapped FEMA FIRM panel — FEMA flood risk is unknown here (which is not the same as 'no risk')."
     };
   } catch {
     return { mapped: false, note: "FEMA NFHL did not return data for this location." };
@@ -487,6 +595,8 @@ export interface ClimateRaw {
   dni: number[];
   dhi: number[];
   cloud: number[];
+  precip: number[]; // mm/h
+  snow: number[]; // cm/h
 }
 
 // A full year of hourly climate for the site. Drives wind rose, humidity/temp
@@ -498,7 +608,7 @@ export async function climateYear(lat: number, lon: number, year = 2023): Promis
     start_date: `${year}-01-01`,
     end_date: `${year}-12-31`,
     hourly:
-      "temperature_2m,relative_humidity_2m,dew_point_2m,wind_speed_10m,wind_direction_10m,surface_pressure,shortwave_radiation,direct_normal_irradiance,diffuse_radiation,cloud_cover",
+      "temperature_2m,relative_humidity_2m,dew_point_2m,wind_speed_10m,wind_direction_10m,surface_pressure,shortwave_radiation,direct_normal_irradiance,diffuse_radiation,cloud_cover,precipitation,snowfall",
     wind_speed_unit: "ms",
     timezone: "auto"
   });
@@ -522,7 +632,9 @@ export async function climateYear(lat: number, lon: number, year = 2023): Promis
     ghi: h.shortwave_radiation || [],
     dni: h.direct_normal_irradiance || [],
     dhi: h.diffuse_radiation || [],
-    cloud: h.cloud_cover || []
+    cloud: h.cloud_cover || [],
+    precip: h.precipitation || [],
+    snow: h.snowfall || []
   };
 }
 
