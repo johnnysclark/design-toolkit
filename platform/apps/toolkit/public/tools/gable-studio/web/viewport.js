@@ -117,21 +117,56 @@ export function createViewport(canvas) {
     // plinth slab
     const Pl = P.plinth; box(Pl.W, Pl.L, -Pl.t, 0, Pl.R, Pl.cx, Pl.cy, n, "plinth");
 
-    // walls: 4 slabs (tube, no floor/ceiling)
+    // roof geometry (defined before the walls so the walls can clip to it)
+    const Rf = P.roof, G = model.roofGeom;
+    const tanL = Math.tan(Rf.pitchL * Math.PI / 180), tanR = Math.tan(Rf.pitchR * Math.PI / 180);
+    // underside Z of the roof slab at a world (x,y) — the height the walls rise to.
+    // Transforms the point into the roof's own (rotated/offset) frame first.
+    const roofUnderZ = (wx, wy) => {
+      const a = rotZ([wx, wy, 0], -n);
+      const rl = rotZ([a[0] - Rf.cx, a[1] - Rf.cy, 0], -Rf.R);
+      const slope = rl[0] <= G.ridgeX ? tanL : tanR;
+      const topZ = rl[0] <= G.ridgeX ? G.zRidge - (G.ridgeX - rl[0]) * slope : G.zRidge - (rl[0] - G.ridgeX) * slope;
+      return topZ - Rf.t * Math.sqrt(1 + slope * slope);
+    };
+
+    // walls: 4 slabs EXTENDED UP and CLIPPED by the roof planes, so the building
+    // is fully enclosed (gable ends close into triangles; eave walls meet the roof
+    // underside). Sampled along each wall's run so any roof rotation/pitch works;
+    // a constant-slope run stays a clean plane (only the ridge shows a hard edge).
     const W = P.walls;
-    const wallSlab = (x0, x1, y0, y1, name) => {
-      const c = [[x0, y0], [x1, y0], [x1, y1], [x0, y1]];
-      const b = [...c.map(([x, y]) => tf(x, y, 0, W.R, W.cx, W.cy, n)), ...c.map(([x, y]) => tf(x, y, W.h, W.R, W.cx, W.cy, n))];
-      solid(boxQuads(b), name);
+    const NSAMP = 64;
+    const clippedWallSlab = (x0, x1, y0, y1, name) => {
+      const longX = Math.abs(x1 - x0) >= Math.abs(y1 - y0);
+      const rowAt = (s) => {
+        const po = longX ? [x0 + (x1 - x0) * s, y1] : [x1, y0 + (y1 - y0) * s];
+        const pi = longX ? [x0 + (x1 - x0) * s, y0] : [x0, y0 + (y1 - y0) * s];
+        const oB = tf(po[0], po[1], 0, W.R, W.cx, W.cy, n), iB = tf(pi[0], pi[1], 0, W.R, W.cx, W.cy, n);
+        return { oB, iB,
+          oT: tf(po[0], po[1], roofUnderZ(oB[0], oB[1]), W.R, W.cx, W.cy, n),
+          iT: tf(pi[0], pi[1], roofUnderZ(iB[0], iB[1]), W.R, W.cx, W.cy, n) };
+      };
+      const quads = [];
+      let prev = rowAt(0); const first = prev;
+      for (let i = 1; i <= NSAMP; i++) {
+        const row = rowAt(i / NSAMP);
+        quads.push([prev.oB, row.oB, row.oT, prev.oT]);  // outer face
+        quads.push([prev.iB, prev.iT, row.iT, row.iB]);  // inner face
+        quads.push([prev.oT, prev.iT, row.iT, row.oT]);  // top (under the roof)
+        quads.push([prev.oB, prev.iB, row.iB, row.oB]);  // bottom (z = 0)
+        prev = row;
+      }
+      quads.push([first.oB, first.oT, first.iT, first.iB]); // start cap
+      quads.push([prev.oB, prev.iB, prev.iT, prev.oT]);     // end cap
+      solid(quads, name);
     };
     const hw = W.W / 2, hl = W.L / 2, t = W.wt;
-    wallSlab(hw - t, hw, -hl, hl, "wall_px");
-    wallSlab(-hw, -hw + t, -hl, hl, "wall_nx");
-    wallSlab(-hw, hw, hl - t, hl, "wall_py");
-    wallSlab(-hw, hw, -hl, -hl + t, "wall_ny");
+    clippedWallSlab(hw - t, hw, -hl, hl, "wall_px");
+    clippedWallSlab(-hw, -hw + t, -hl, hl, "wall_nx");
+    clippedWallSlab(-hw, hw, hl - t, hl, "wall_py");
+    clippedWallSlab(-hw, hw, -hl, -hl + t, "wall_ny");
 
     // roof: two slope slabs with independent pitch + thickness
-    const Rf = P.roof, G = model.roofGeom;
     const slope = (eaveX, ridgeX, eaveZ, nLocal, name) => {
       const top = [[eaveX, -Rf.L / 2, eaveZ], [ridgeX, -Rf.L / 2, G.zRidge], [ridgeX, Rf.L / 2, G.zRidge], [eaveX, Rf.L / 2, eaveZ]];
       const off = [nLocal[0] * Rf.t, 0, nLocal[2] * Rf.t];
