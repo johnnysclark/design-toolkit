@@ -2,17 +2,18 @@
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Drawing Cleaner — turn a phone photo or scan of a pen/pencil drawing into clean
-// black-on-white, entirely in the browser (nothing is uploaded). This is the
-// merged tool: it folds in the old "Scan Cleaner" sibling, so it carries the best
-// of both — auto levels + live histogram, gamma, sharpen and adaptive lighting,
-// PLUS straighten/crop, a draggable histogram, a curves editor with presets,
-// denoise, keep-colour, and resize-on-export. Styled in the toolkit's language
-// (white, Archivo-Black headers, black 2px-border panels, all-black text) so it
-// reads as part of the site, like RAP Studio — not a foreign embedded app.
+// black-on-white, entirely in the browser (nothing is uploaded). The merged tool
+// (folds in the old "Scan Cleaner"): auto levels + live histogram, gamma,
+// brightness/contrast, sharpen, denoise, adaptive lighting, straighten/crop, a
+// curves editor, a line-art threshold (global Otsu + adaptive), invert, and a
+// B&W / keep-colour / tint output — plus resize-on-export.
 //
-// The heavy pixel math (levels, adaptive levels, unsharp mask, median denoise,
-// spline curves, auto-detect) is ported verbatim from the proven standalone
-// tools; only the chrome and the React data-flow are new.
+// Every control section is a collapsible disclosure. The prominent "Auto-enhance"
+// reproduces the proven standalone recipe (auto levels) that read pencil and pen
+// well; the material presets layer a few enhancements on top.
+//
+// Styled in the toolkit's language (white, Archivo-Black headers, black 2px-border
+// panels, all-black text) so it reads as part of the site, like RAP Studio.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -25,6 +26,8 @@ const CURVE = "#ff3b21";
 
 type Pt = { x: number; y: number };
 type ViewMode = "split" | "before" | "after";
+type ThreshMode = "off" | "global" | "adaptive";
+type OutputMode = "bw" | "color" | "tint";
 
 // ════════════════════════════ PURE PIXEL MATH ═══════════════════════════════
 // (module scope — no React, no DOM; safe to reuse and easy to reason about)
@@ -67,6 +70,21 @@ function applyLevels(gray: Uint8Array, wp: number, bp: number, gamma: number): U
   const lut = buildLevelsLUT(wp, bp, gamma);
   const out = new Uint8Array(gray.length);
   for (let i = 0; i < gray.length; i++) out[i] = lut[gray[i]];
+  return out;
+}
+
+// Brightness (−100..100, additive) + contrast (−100..100, classic factor).
+function applyBrightnessContrast(p: Uint8Array, brightness: number, contrast: number): Uint8Array {
+  if (!brightness && !contrast) return p;
+  const c = Math.max(-100, Math.min(100, contrast));
+  const factor = (259 * (c + 255)) / (255 * (259 - c));
+  const lut = new Uint8Array(256);
+  for (let i = 0; i < 256; i++) {
+    const v = factor * (i - 128) + 128 + brightness;
+    lut[i] = v < 0 ? 0 : v > 255 ? 255 : Math.round(v);
+  }
+  const out = new Uint8Array(p.length);
+  for (let i = 0; i < p.length; i++) out[i] = lut[p[i]];
   return out;
 }
 
@@ -182,6 +200,83 @@ function medianFilter(px: Uint8Array, w: number, h: number, radius: number): Uin
   return out;
 }
 
+// Otsu — the threshold that best separates ink from paper, from a histogram.
+function otsuThreshold(p: Uint8Array): number {
+  const hist = new Uint32Array(256);
+  for (let i = 0; i < p.length; i++) hist[p[i]]++;
+  const total = p.length;
+  let sum = 0;
+  for (let i = 0; i < 256; i++) sum += i * hist[i];
+  let sumB = 0;
+  let wB = 0;
+  let varMax = 0;
+  let th = 127;
+  for (let t = 0; t < 256; t++) {
+    wB += hist[t];
+    if (!wB) continue;
+    const wF = total - wB;
+    if (!wF) break;
+    sumB += t * hist[t];
+    const mB = sumB / wB;
+    const mF = (sum - sumB) / wF;
+    const between = wB * wF * (mB - mF) * (mB - mF);
+    if (between > varMax) {
+      varMax = between;
+      th = t;
+    }
+  }
+  return th;
+}
+
+function globalThreshold(p: Uint8Array, th: number): Uint8Array {
+  const out = new Uint8Array(p.length);
+  for (let i = 0; i < p.length; i++) out[i] = p[i] > th ? 255 : 0;
+  return out;
+}
+
+// Adaptive (local-mean) threshold — crisp line art under uneven lighting.
+function adaptiveThreshold(p: Uint8Array, w: number, h: number, block: number, offset: number): Uint8Array {
+  const out = new Uint8Array(w * h);
+  const hb = block >> 1;
+  const stride = w + 1;
+  const integ = new Float64Array(stride * (h + 1));
+  for (let y = 0; y < h; y++) {
+    let rs = 0;
+    const ro = y * w;
+    const r1 = (y + 1) * stride;
+    const r0 = y * stride;
+    for (let x = 0; x < w; x++) {
+      rs += p[ro + x];
+      integ[r1 + x + 1] = integ[r0 + x + 1] + rs;
+    }
+  }
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const idx = y * w + x;
+      const x0 = Math.max(0, x - hb);
+      const y0 = Math.max(0, y - hb);
+      const x1 = Math.min(w, x + hb);
+      const y1 = Math.min(h, y + hb);
+      const area = (x1 - x0) * (y1 - y0);
+      const sum = integ[y1 * stride + x1] - integ[y0 * stride + x1] - integ[y1 * stride + x0] + integ[y0 * stride + x0];
+      const mean = sum / area;
+      out[idx] = p[idx] < mean - offset ? 0 : 255;
+    }
+  }
+  return out;
+}
+
+function invertPixels(p: Uint8Array): Uint8Array {
+  const out = new Uint8Array(p.length);
+  for (let i = 0; i < p.length; i++) out[i] = 255 - p[i];
+  return out;
+}
+
+function hexToRgb(h: string): [number, number, number] {
+  const m = h.replace("#", "");
+  return [parseInt(m.slice(0, 2), 16), parseInt(m.slice(2, 4), 16), parseInt(m.slice(4, 6), 16)];
+}
+
 const cl8 = (v: number) => (v < 0 ? 0 : v > 255 ? 255 : Math.round(v));
 
 // Natural cubic-spline LUT through the curve points (returns null for identity).
@@ -250,7 +345,8 @@ function computeCurveLUT(pts: Pt[]): Uint8Array | null {
 }
 
 // Auto-detect white/black/gamma from the histogram — finds the paper tone and the
-// line tone and sets levels that push paper to white and lines to black.
+// line tone and sets levels that push paper to white and lines to black. This is
+// the proven standalone recipe that read pencil and pen well.
 function autoDetect(hist: Uint32Array, total: number): { white: number; black: number; gamma: number } {
   const smooth = new Float64Array(256);
   const radius = 7;
@@ -327,6 +423,8 @@ const CURVE_PRESETS: Record<string, Pt[]> = {
 
 const RESIZE_OPTIONS = [0, 6000, 5000, 4000, 3000, 2000, 1500, 1000];
 
+type SectionKey = "image" | "straighten" | "levels" | "tone" | "lineart" | "curves" | "output";
+
 // ════════════════════════════════ COMPONENT ═════════════════════════════════
 
 export default function DrawingCleaner() {
@@ -352,17 +450,26 @@ export default function DrawingCleaner() {
   const [wp, setWp] = useState(200);
   const [bp, setBp] = useState(60);
   const [gam, setGam] = useState(100); // gamma × 100
+  const [brightness, setBrightness] = useState(0);
+  const [contrast, setContrast] = useState(0);
   const [sharpen, setSharpen] = useState(false);
   const [sharpenAmt, setSharpenAmt] = useState(50);
   const [denoise, setDenoise] = useState(false);
   const [denoiseR, setDenoiseR] = useState(1);
   const [adaptive, setAdaptive] = useState(false);
   const [block, setBlock] = useState(64);
-  const [desat, setDesat] = useState(true);
+  const [threshMode, setThreshMode] = useState<ThreshMode>("off");
+  const [threshAuto, setThreshAuto] = useState(true);
+  const [threshold, setThreshold] = useState(128);
+  const [threshBlock, setThreshBlock] = useState(31);
+  const [threshOffset, setThreshOffset] = useState(8);
+  const [invert, setInvert] = useState(false);
+  const [outputMode, setOutputMode] = useState<OutputMode>("bw");
+  const [inkColor, setInkColor] = useState("#111111");
+  const [paperColor, setPaperColor] = useState("#ffffff");
   const [rotateTenths, setRotateTenths] = useState(0); // deg × 10
   const [resize, setResize] = useState(0);
   const [curvePts, setCurvePts] = useState<Pt[]>([{ x: 0, y: 0 }, { x: 255, y: 255 }]);
-  const [showCurves, setShowCurves] = useState(false);
   const [manual, setManual] = useState(false);
   const [cropMode, setCropMode] = useState(false);
   const [cropReady, setCropReady] = useState(false);
@@ -370,6 +477,18 @@ export default function DrawingCleaner() {
   const [meta, setMeta] = useState("");
   const [zoom, setZoom] = useState("");
   const [processing, setProcessing] = useState(false);
+
+  // Collapsible section open/closed state.
+  const [open, setOpen] = useState<Record<SectionKey, boolean>>({
+    image: true,
+    straighten: false,
+    levels: true,
+    tone: true,
+    lineart: false,
+    curves: false,
+    output: true
+  });
+  const toggle = useCallback((k: SectionKey) => setOpen((o) => ({ ...o, [k]: !o[k] })), []);
 
   // Version counters force the imperative redraws.
   const [geomVersion, setGeomVersion] = useState(0);
@@ -440,6 +559,7 @@ export default function DrawingCleaner() {
         try {
           const gamma = gam / 100;
           let p = adaptive ? adaptiveLevels(gray, w, h, wp, bp, gamma, block) : applyLevels(gray, wp, bp, gamma);
+          p = applyBrightnessContrast(p, brightness, contrast);
           const curveLUT = computeCurveLUT(curvePts);
           if (curveLUT) {
             const o = new Uint8Array(p.length);
@@ -448,19 +568,20 @@ export default function DrawingCleaner() {
           }
           if (denoise) p = medianFilter(p, w, h, denoiseR);
           if (sharpen) p = unsharpMask(p, w, h, sharpenAmt / 100);
+          let threshNote = "";
+          if (threshMode === "global") {
+            const t = threshAuto ? otsuThreshold(p) : threshold;
+            p = globalThreshold(p, t);
+            threshNote = ` · threshold ${t}`;
+          } else if (threshMode === "adaptive") {
+            p = adaptiveThreshold(p, w, h, threshBlock | 1, threshOffset);
+            threshNote = " · adaptive threshold";
+          }
+          if (invert) p = invertPixels(p);
 
           const out = new ImageData(w, h);
           const od = out.data;
-          if (desat) {
-            for (let i = 0, len = p.length; i < len; i++) {
-              const v = p[i];
-              const o = i << 2;
-              od[o] = v;
-              od[o | 1] = v;
-              od[o | 2] = v;
-              od[o | 3] = 255;
-            }
-          } else {
+          if (outputMode === "color") {
             const sd = srcRef.current!.data;
             for (let i = 0, len = p.length; i < len; i++) {
               const o = i << 2;
@@ -478,11 +599,31 @@ export default function DrawingCleaner() {
               }
               od[o | 3] = 255;
             }
+          } else if (outputMode === "tint") {
+            const ink = hexToRgb(inkColor);
+            const paper = hexToRgb(paperColor);
+            for (let i = 0, len = p.length; i < len; i++) {
+              const o = i << 2;
+              const t = p[i] / 255;
+              od[o] = Math.round(ink[0] + (paper[0] - ink[0]) * t);
+              od[o | 1] = Math.round(ink[1] + (paper[1] - ink[1]) * t);
+              od[o | 2] = Math.round(ink[2] + (paper[2] - ink[2]) * t);
+              od[o | 3] = 255;
+            }
+          } else {
+            for (let i = 0, len = p.length; i < len; i++) {
+              const v = p[i];
+              const o = i << 2;
+              od[o] = v;
+              od[o | 1] = v;
+              od[o | 2] = v;
+              od[o | 3] = 255;
+            }
           }
           outRef.current = out;
           setOutVersion((v) => v + 1);
           const mp = ((w * h) / 1e6).toFixed(1);
-          setStatus(`Done — ${w}×${h} (${mp} MP)`);
+          setStatus(`Done — ${w}×${h} (${mp} MP)${threshNote}`);
         } catch (err) {
           setStatus("Error: " + (err as Error).message);
         } finally {
@@ -490,7 +631,10 @@ export default function DrawingCleaner() {
         }
       }, 20);
     });
-  }, [adaptive, wp, bp, gam, block, curvePts, denoise, denoiseR, sharpen, sharpenAmt, desat]);
+  }, [
+    adaptive, wp, bp, gam, block, brightness, contrast, curvePts, denoise, denoiseR, sharpen, sharpenAmt,
+    threshMode, threshAuto, threshold, threshBlock, threshOffset, invert, outputMode, inkColor, paperColor
+  ]);
 
   // Debounced processing whenever an input or the geometry changes.
   useEffect(() => {
@@ -522,14 +666,18 @@ export default function DrawingCleaner() {
           applyGeometry(0);
           const a = autoDetect(histRef.current, dimsRef.current.w * dimsRef.current.h);
           autoRef.current = a;
-          // Reset sliders to auto, clear enhancements + curves.
+          // Reset everything to the proven auto recipe.
           setWp(a.white);
           setBp(a.black);
           setGam(a.gamma);
+          setBrightness(0);
+          setContrast(0);
           setSharpen(false);
-          setAdaptive(false);
           setDenoise(false);
-          setDesat(true);
+          setAdaptive(false);
+          setThreshMode("off");
+          setInvert(false);
+          setOutputMode("bw");
           setCurvePts([{ x: 0, y: 0 }, { x: 255, y: 255 }]);
           setManual(false);
           setView("split");
@@ -574,18 +722,60 @@ export default function DrawingCleaner() {
     return () => ro.disconnect();
   }, []);
 
-  // ── reset to auto / clear ────────────────────────────────────────────────
-  const resetToAuto = useCallback(() => {
+  // ── auto-enhance / presets / clear ─────────────────────────────────────────
+  // The prominent one-click — the proven standalone recipe (auto levels only).
+  const autoEnhance = useCallback(() => {
     const a = autoRef.current;
     setWp(a.white);
     setBp(a.black);
     setGam(a.gamma);
+    setBrightness(0);
+    setContrast(0);
     setSharpen(false);
-    setAdaptive(false);
     setDenoise(false);
-    setDesat(true);
+    setAdaptive(false);
+    setThreshMode("off");
+    setInvert(false);
+    setOutputMode("bw");
     setCurvePts([{ x: 0, y: 0 }, { x: 255, y: 255 }]);
     setManual(false);
+  }, []);
+
+  // Material presets — auto levels plus a few enhancements tuned per medium.
+  const applyPreset = useCallback((name: "pencil" | "pen" | "photo") => {
+    const a = autoRef.current;
+    setWp(a.white);
+    setBp(a.black);
+    setGam(a.gamma);
+    setBrightness(0);
+    setContrast(0);
+    setCurvePts([{ x: 0, y: 0 }, { x: 255, y: 255 }]);
+    setInvert(false);
+    setOutputMode("bw");
+    if (name === "pencil") {
+      setAdaptive(true);
+      setBlock(96);
+      setSharpen(true);
+      setSharpenAmt(40);
+      setDenoise(false);
+      setThreshMode("off");
+    } else if (name === "pen") {
+      setAdaptive(false);
+      setSharpen(true);
+      setSharpenAmt(60);
+      setDenoise(true);
+      setDenoiseR(1);
+      setThreshMode("global");
+      setThreshAuto(true);
+    } else {
+      setAdaptive(true);
+      setBlock(64);
+      setSharpen(false);
+      setDenoise(true);
+      setDenoiseR(1);
+      setThreshMode("off");
+    }
+    setManual(true);
   }, []);
 
   const clearAll = useCallback(() => {
@@ -649,6 +839,7 @@ export default function DrawingCleaner() {
 
   // ════════════════════════════ HISTOGRAM DRAW ══════════════════════════════
   useEffect(() => {
+    if (!open.levels) return;
     const canvas = histCanvasRef.current;
     if (!canvas) return;
     const parent = canvas.parentElement!;
@@ -750,7 +941,7 @@ export default function DrawingCleaner() {
     ctx.fillText("0", 2 * dpr, H - 2 * dpr);
     ctx.textAlign = "right";
     ctx.fillText("255", W - 2 * dpr, H - 2 * dpr);
-  }, [wp, bp, gam, curvePts, geomVersion, loaded, sizeVersion]);
+  }, [wp, bp, gam, curvePts, geomVersion, loaded, sizeVersion, open.levels]);
 
   // Draggable histogram white/black handles.
   const histValueAt = (clientX: number) => {
@@ -802,7 +993,7 @@ export default function DrawingCleaner() {
 
   // ════════════════════════════ CURVES DRAW ═════════════════════════════════
   useEffect(() => {
-    if (!showCurves) return;
+    if (!open.curves) return;
     const canvas = curvesCanvasRef.current;
     if (!canvas) return;
     const wrap = canvas.parentElement!;
@@ -890,7 +1081,7 @@ export default function DrawingCleaner() {
       ctx.fillStyle = i === 0 || i === curvePts.length - 1 ? CURVE : "#fff";
       ctx.fill();
     }
-  }, [showCurves, curvePts, wp, bp, gam, geomVersion, loaded, sizeVersion]);
+  }, [open.curves, curvePts, wp, bp, gam, geomVersion, loaded, sizeVersion]);
 
   const curvesCoord = (clientX: number, clientY: number): Pt => {
     const wrap = curvesCanvasRef.current!.parentElement!;
@@ -939,7 +1130,7 @@ export default function DrawingCleaner() {
     }
   };
   useEffect(() => {
-    if (!showCurves) return;
+    if (!open.curves) return;
     const onMove = (e: MouseEvent) => {
       if (curvesDragIdx.current < 0) return;
       const c = curvesCoord(e.clientX, e.clientY);
@@ -967,7 +1158,7 @@ export default function DrawingCleaner() {
       document.removeEventListener("mouseup", onUp);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [showCurves, markManual]);
+  }, [open.curves, markManual]);
   const onCurvesDouble = (e: React.MouseEvent) => {
     e.preventDefault();
     const c = curvesCoord(e.clientX, e.clientY);
@@ -1202,30 +1393,40 @@ export default function DrawingCleaner() {
       />
 
       {/* ── Controls column ── */}
-      <div className="w-full shrink-0 space-y-4 lg:w-[340px]">
-        <Panel
-          title="Image"
-          right={
-            <button type="button" onClick={clearAll} disabled={!loaded} className={btnSm}>
-              Clear
-            </button>
-          }
-        >
+      <div className="w-full shrink-0 space-y-3 lg:w-[340px]">
+        <Section title="Image" open={open.image} onToggle={() => toggle("image")}>
           <div className="flex gap-2">
             <button type="button" onClick={() => fileInputRef.current?.click()} className={btn}>
               Load image
             </button>
-            <button type="button" onClick={resetToAuto} disabled={!manual} className={btn}>
-              Reset to auto
+            <button type="button" onClick={clearAll} disabled={!loaded} className={btn}>
+              Clear
             </button>
           </div>
+          <button type="button" onClick={autoEnhance} disabled={!loaded} className={`${btnPrimary} mt-2`}>
+            ✦ Auto-enhance
+          </button>
+          <div className="mt-2">
+            <div className="mb-1.5 text-xs font-semibold text-neutral-900">Presets</div>
+            <div className="grid grid-cols-3 gap-1.5">
+              <button type="button" onClick={() => applyPreset("pencil")} disabled={!loaded} className={btnSm}>
+                Pencil
+              </button>
+              <button type="button" onClick={() => applyPreset("pen")} disabled={!loaded} className={btnSm}>
+                Pen &amp; ink
+              </button>
+              <button type="button" onClick={() => applyPreset("photo")} disabled={!loaded} className={btnSm}>
+                Photo
+              </button>
+            </div>
+          </div>
           <p className="mt-2 text-xs text-neutral-900">
-            Drop a photo or scan onto the preview, click Load, or paste with <b>Ctrl/Cmd+V</b>. Nothing is uploaded — it all
-            runs in your browser.
+            Drop a photo or scan onto the preview, click Load, or paste with <b>Ctrl/Cmd+V</b>. Nothing is uploaded.{" "}
+            <b>Auto-enhance</b> is the proven one-click; presets layer a few tweaks per medium.
           </p>
-        </Panel>
+        </Section>
 
-        <Panel title="Straighten & crop">
+        <Section title="Straighten & crop" open={open.straighten} onToggle={() => toggle("straighten")}>
           <SliderRow
             label="Rotate"
             value={(rotateTenths / 10).toFixed(1) + "°"}
@@ -1263,9 +1464,9 @@ export default function DrawingCleaner() {
             </button>
           </div>
           {cropMode && <p className="mt-2 text-xs text-neutral-900">Drag a rectangle on the image, then Apply.</p>}
-        </Panel>
+        </Section>
 
-        <Panel title="Levels">
+        <Section title="Levels" open={open.levels} onToggle={() => toggle("levels")}>
           <div
             className="relative h-36 overflow-hidden rounded-md border-2 border-neutral-900 bg-white"
             onMouseDown={(e) => {
@@ -1321,11 +1522,14 @@ export default function DrawingCleaner() {
               }}
             />
           </div>
-        </Panel>
+        </Section>
 
-        <Panel title="Enhancements">
-          <div className="space-y-2.5">
-            <CheckRow label="Desaturate (black & white)" checked={desat} disabled={!loaded} onChange={(c) => { setDesat(c); markManual(); }} />
+        <Section title="Tone & detail" open={open.tone} onToggle={() => toggle("tone")}>
+          <div className="space-y-3">
+            <SliderRow label="Brightness" value={(brightness > 0 ? "+" : "") + brightness} min={-100} max={100} raw={brightness} disabled={!loaded} onChange={(v) => { setBrightness(v); markManual(); }} />
+            <SliderRow label="Contrast" value={(contrast > 0 ? "+" : "") + contrast} min={-100} max={100} raw={contrast} disabled={!loaded} onChange={(v) => { setContrast(v); markManual(); }} />
+          </div>
+          <div className="mt-3 space-y-2.5">
             <CheckRow label="Sharpen lines" checked={sharpen} disabled={!loaded} onChange={(c) => { setSharpen(c); markManual(); }} />
             {sharpen && (
               <SliderRow label="Strength" value={String(sharpenAmt)} min={10} max={100} raw={sharpenAmt} disabled={!loaded} onChange={(v) => { setSharpenAmt(v); markManual(); }} />
@@ -1339,62 +1543,90 @@ export default function DrawingCleaner() {
               <SliderRow label="Block size" value={String(block)} min={16} max={256} step={16} raw={block} disabled={!loaded} onChange={(v) => { setBlock(v); markManual(); }} />
             )}
           </div>
-        </Panel>
+        </Section>
 
-        <Panel
-          title="Curves (advanced)"
-          right={
-            <button type="button" onClick={() => setShowCurves((s) => !s)} className={btnSm}>
-              {showCurves ? "Hide" : "Show"}
-            </button>
-          }
-        >
-          {showCurves ? (
-            <div>
-              <div
-                className="relative aspect-square w-full overflow-hidden rounded-md border-2 border-neutral-900 bg-white"
-                style={{ cursor: "crosshair" }}
-                onMouseDown={onCurvesDown}
-                onDoubleClick={onCurvesDouble}
-              >
-                <canvas ref={curvesCanvasRef} className="absolute inset-0 h-full w-full" />
-              </div>
-              <div className="mt-2 grid grid-cols-2 gap-1.5">
-                {(["scurve", "punch", "fade", "highcon"] as const).map((k) => (
-                  <button
-                    key={k}
-                    type="button"
-                    className={btnSm}
-                    onClick={() => {
-                      setCurvePts(CURVE_PRESETS[k].map((p) => ({ ...p })));
-                      markManual();
-                    }}
-                  >
-                    {k === "scurve" ? "S-Curve" : k === "punch" ? "Punch lines" : k === "fade" ? "Fade BG" : "Hi-contrast"}
-                  </button>
-                ))}
-                <button
-                  type="button"
-                  className={`${btnSm} col-span-2`}
-                  onClick={() => {
-                    setCurvePts([{ x: 0, y: 0 }, { x: 255, y: 255 }]);
-                    markManual();
-                  }}
-                >
-                  Reset curve
-                </button>
-              </div>
-              <p className="mt-2 text-xs text-neutral-900">Click to add a point, drag to move, double-click to remove.</p>
+        <Section title="Line-art & threshold" open={open.lineart} onToggle={() => toggle("lineart")}>
+          <SelectRow
+            label="Threshold"
+            value={threshMode}
+            disabled={!loaded}
+            options={[["off", "Off (grayscale)"], ["global", "Global (pure B&W)"], ["adaptive", "Adaptive (uneven light)"]]}
+            onChange={(v) => { setThreshMode(v as ThreshMode); markManual(); }}
+          />
+          {threshMode === "global" && (
+            <div className="mt-2.5 space-y-2.5">
+              <CheckRow label="Auto (Otsu)" checked={threshAuto} disabled={!loaded} onChange={(c) => { setThreshAuto(c); markManual(); }} />
+              {!threshAuto && (
+                <SliderRow label="Threshold" value={String(threshold)} min={1} max={254} raw={threshold} disabled={!loaded} onChange={(v) => { setThreshold(v); markManual(); }} />
+              )}
             </div>
-          ) : (
-            <p className="text-xs text-neutral-900">A hand-drawn tone curve on top of the levels — for fine contrast control.</p>
           )}
-        </Panel>
+          {threshMode === "adaptive" && (
+            <div className="mt-2.5 space-y-2.5">
+              <SliderRow label="Block size" value={String(threshBlock)} min={9} max={151} step={2} raw={threshBlock} disabled={!loaded} onChange={(v) => { setThreshBlock(v); markManual(); }} />
+              <SliderRow label="Offset" value={String(threshOffset)} min={0} max={40} raw={threshOffset} disabled={!loaded} onChange={(v) => { setThreshOffset(v); markManual(); }} />
+            </div>
+          )}
+          <div className="mt-3">
+            <CheckRow label="Invert (white on black)" checked={invert} disabled={!loaded} onChange={(c) => { setInvert(c); markManual(); }} />
+          </div>
+          <p className="mt-2 text-xs text-neutral-900">Threshold makes crisp pure-black line art — great for pen &amp; ink. Adaptive handles photos with uneven lighting.</p>
+        </Section>
 
-        <Panel title="Export">
-          <label className="flex items-center justify-between text-xs font-semibold text-neutral-900">
+        <Section title="Curves (advanced)" open={open.curves} onToggle={() => toggle("curves")}>
+          <div
+            className="relative aspect-square w-full overflow-hidden rounded-md border-2 border-neutral-900 bg-white"
+            style={{ cursor: "crosshair" }}
+            onMouseDown={onCurvesDown}
+            onDoubleClick={onCurvesDouble}
+          >
+            <canvas ref={curvesCanvasRef} className="absolute inset-0 h-full w-full" />
+          </div>
+          <div className="mt-2 grid grid-cols-2 gap-1.5">
+            {(["scurve", "punch", "fade", "highcon"] as const).map((k) => (
+              <button
+                key={k}
+                type="button"
+                className={btnSm}
+                onClick={() => {
+                  setCurvePts(CURVE_PRESETS[k].map((p) => ({ ...p })));
+                  markManual();
+                }}
+              >
+                {k === "scurve" ? "S-Curve" : k === "punch" ? "Punch lines" : k === "fade" ? "Fade BG" : "Hi-contrast"}
+              </button>
+            ))}
+            <button
+              type="button"
+              className={`${btnSm} col-span-2`}
+              onClick={() => {
+                setCurvePts([{ x: 0, y: 0 }, { x: 255, y: 255 }]);
+                markManual();
+              }}
+            >
+              Reset curve
+            </button>
+          </div>
+          <p className="mt-2 text-xs text-neutral-900">Click to add a point, drag to move, double-click to remove.</p>
+        </Section>
+
+        <Section title="Output & export" open={open.output} onToggle={() => toggle("output")}>
+          <SelectRow
+            label="Colour"
+            value={outputMode}
+            disabled={!loaded}
+            options={[["bw", "Black & white"], ["color", "Keep colour"], ["tint", "Tint (duotone)"]]}
+            onChange={(v) => { setOutputMode(v as OutputMode); markManual(); }}
+          />
+          {outputMode === "tint" && (
+            <div className="mt-2.5 flex gap-4">
+              <ColorRow label="Ink" value={inkColor} onChange={(v) => { setInkColor(v); markManual(); }} />
+              <ColorRow label="Paper" value={paperColor} onChange={(v) => { setPaperColor(v); markManual(); }} />
+            </div>
+          )}
+          <label className="mt-3 flex items-center justify-between text-xs font-semibold text-neutral-900">
             <span>Resize (long edge)</span>
-            <span>{resizeLabel}</span>
+            <span className="tabular-nums">{resizeLabel}</span>
           </label>
           <select
             value={resize}
@@ -1411,7 +1643,7 @@ export default function DrawingCleaner() {
           <button type="button" onClick={exportPng} disabled={!loaded} className={`${btnPrimary} mt-3`}>
             Export full-resolution PNG
           </button>
-        </Panel>
+        </Section>
       </div>
 
       {/* ── Preview column ── */}
@@ -1490,14 +1722,32 @@ const btnSm =
   "rounded border-2 border-neutral-900 px-2.5 py-1 text-xs font-semibold text-neutral-900 hover:bg-neutral-900 hover:text-white disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-neutral-900";
 const btnSmActive = "rounded border-2 border-[#ff3b21] bg-[#ff3b21] px-2.5 py-1 text-xs font-semibold text-white";
 
-function Panel({ title, right, children }: { title: string; right?: React.ReactNode; children: React.ReactNode }) {
+// Collapsible disclosure — header toggles, body unmounts when closed.
+function Section({
+  title,
+  open,
+  onToggle,
+  children
+}: {
+  title: string;
+  open: boolean;
+  onToggle: () => void;
+  children: React.ReactNode;
+}) {
   return (
-    <section className="rounded-lg border-2 border-neutral-900 p-3">
-      <div className="mb-2.5 flex items-center justify-between gap-2">
-        <h2 className="display-font text-sm uppercase tracking-tight text-neutral-900">{title}</h2>
-        {right}
-      </div>
-      {children}
+    <section className="overflow-hidden rounded-lg border-2 border-neutral-900">
+      <button
+        type="button"
+        onClick={onToggle}
+        aria-expanded={open}
+        className="flex w-full items-center justify-between gap-2 px-3 py-2.5 text-left hover:bg-neutral-50"
+      >
+        <span className="display-font text-sm uppercase tracking-tight text-neutral-900">{title}</span>
+        <span aria-hidden="true" className={`text-xs text-neutral-900 transition-transform ${open ? "rotate-90" : ""}`}>
+          ▸
+        </span>
+      </button>
+      {open && <div className="border-t-2 border-neutral-900 px-3 py-3">{children}</div>}
     </section>
   );
 }
@@ -1561,6 +1811,52 @@ function CheckRow({
         disabled={disabled}
         onChange={(e) => onChange(e.target.checked)}
         className="h-4 w-4 accent-[#ff3b21] disabled:opacity-40"
+      />
+    </label>
+  );
+}
+
+function SelectRow({
+  label,
+  value,
+  options,
+  disabled,
+  onChange
+}: {
+  label: string;
+  value: string;
+  options: string[][];
+  disabled?: boolean;
+  onChange: (v: string) => void;
+}) {
+  return (
+    <label className="block">
+      <span className="text-xs font-semibold text-neutral-900">{label}</span>
+      <select
+        value={value}
+        disabled={disabled}
+        onChange={(e) => onChange(e.target.value)}
+        className="mt-1.5 w-full rounded border-2 border-neutral-900 px-2 py-1.5 text-xs font-semibold text-neutral-900 disabled:opacity-40"
+      >
+        {options.map(([v, l]) => (
+          <option key={v} value={v}>
+            {l}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+}
+
+function ColorRow({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
+  return (
+    <label className="flex items-center gap-2 text-xs font-semibold text-neutral-900">
+      <span>{label}</span>
+      <input
+        type="color"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="h-7 w-9 cursor-pointer rounded border-2 border-neutral-900 bg-white p-0.5"
       />
     </label>
   );
