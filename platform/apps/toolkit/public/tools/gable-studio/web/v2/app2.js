@@ -4,13 +4,14 @@
 // The loop the UI enacts: READ the site (force deck) → NAME the forces (govern
 // toggle) → COMMIT a move (drafts a rule into the charter) → MAKE the move
 // (geometry sliders) → WATCH the standing → SPAWN the next fork (series).
-import { DEFAULTS, run, VARIABLE_DEFS } from "../core.js";
+import { DEFAULTS, run, VARIABLE_DEFS, HOST_LABELS, WALL_HOSTS, ROOF_HOSTS, rotZ } from "../core.js";
 import { createViewport } from "../viewport.js";
 import { FORCES, draftClause, activeTensions } from "./forces.js";
 import { Series, makeVariation, diffSeeds } from "./series.js";
 import { parseEPW, describeClimate } from "./weather.js";
 import { incidentByModel } from "../radiation.js";
 import { oursReference, parseLadybugCSV, compareRows, WHY_GENERAL, comparisonPack } from "./compare.js";
+import { feetInches, imp, fmtMetricImp, sliderUnit, impConv, cToF, MPH } from "./units.js";
 
 // ---- tiny DOM + math helpers ----------------------------------------------
 const $ = (s) => document.querySelector(s);
@@ -36,12 +37,8 @@ function setPath(o, p, v) { const ks = p.split("."); let a = o; for (let i = 0; 
 const VDEF = Object.fromEntries(VARIABLE_DEFS.map((d) => [d.key, d]));
 const labelOf = (k) => (VDEF[k] ? VDEF[k].label : k);
 const unitOf = (k) => (VDEF[k] ? VDEF[k].unit : "");
-function fmtMetric(k, v) {
-  if (v == null || Number.isNaN(v)) return "—";
-  const u = unitOf(k);
-  const val = Math.abs(v) >= 100 ? Math.round(v) : round2(v);
-  return `${val}${u && u !== "0–1" ? " " + u : ""}`;
-}
+// metric readout in IMPERIAL (lengths → feet-inches, areas → ft², etc.)
+const fmtMetric = (k, v) => fmtMetricImp(unitOf(k), v);
 
 // ---- state ----------------------------------------------------------------
 const state = {
@@ -78,21 +75,20 @@ const MAKE_SPEC = [
   { path: "plinth.cy", label: "Plinth shift Y", min: -3, max: 3, step: 0.1, unit: "m" },
   { path: "plinth.W", label: "Plinth width", min: 6, max: 16, step: 0.5, unit: "m" },
   { path: "plinth.L", label: "Plinth length", min: 6, max: 18, step: 0.5, unit: "m" },
-  { path: "apertures.0.w", label: "South window width", min: 0.4, max: 6, step: 0.1, unit: "m" },
-  { path: "apertures.0.h", label: "South window height", min: 0.4, max: 2.6, step: 0.1, unit: "m" },
 ];
 
-// generic slider bound to an object path
+// generic slider bound to an object path. Operates in DISPLAY units (feet for
+// lengths) and stores SI; the value label reads feet-and-inches.
 function makeSlider(rootObj, spec, onChange) {
-  const val = getPath(rootObj, spec.path);
-  const valEl = el("span", { class: "slval" }, fmtNum(val, spec.unit));
+  const U = sliderUnit(spec);
+  const si = getPath(rootObj, spec.path);
+  const valEl = el("span", { class: "slval" }, U.label(si));
   const input = el("input", {
-    type: "range", min: spec.min, max: spec.max, step: spec.step, value: val,
-    oninput: (e) => { const v = parseFloat(e.target.value); setPath(rootObj, spec.path, v); valEl.textContent = fmtNum(v, spec.unit); onChange(); },
+    type: "range", min: U.dmin, max: U.dmax, step: U.dstep, value: U.toDisp(si),
+    oninput: (e) => { const v = U.fromDisp(parseFloat(e.target.value)); setPath(rootObj, spec.path, v); valEl.textContent = U.label(v); onChange(); },
   });
   return el("div", { class: "sl" }, el("label", null, spec.label), valEl, input);
 }
-const fmtNum = (v, u) => `${round2(v)}${u ? " " + u : ""}`;
 
 // ---- references kept across live updates ----------------------------------
 let metricReadEls = [];                  // [{key, el}]
@@ -150,6 +146,64 @@ function buildMake() {
   for (const sp of MAKE_SPEC) host.append(makeSlider(state.seed.params, sp, liveUpdate));
 }
 
+// ---- aperture editor (openings) -------------------------------------------
+function buildApertures() {
+  const host = $("#apertures"); if (!host) return; host.replaceChildren();
+  const aps = state.seed.params.apertures || [];
+  if (!aps.length) host.append(el("div", { class: "ap-empty" }, "No openings. Add one below."));
+  aps.forEach((ap, i) => host.append(apertureRow(ap, i)));
+  host.append(el("button", { class: "ap-add", onclick: addAperture }, "+ add opening"));
+}
+function apertureRow(ap, i) {
+  const hostSel = el("select", { class: "ap-host", title: "Which face this opening cuts into",
+    onchange: (e) => { ap.host = e.target.value; rebuild(); } },
+    [...WALL_HOSTS, ...ROOF_HOSTS].map((h) => el("option", { value: h, selected: h === ap.host ? true : null }, HOST_LABELS[h])));
+  const mini = (key, label, spec) => makeSlider(ap, Object.assign({ path: key, label }, spec), liveUpdate);
+  return el("div", { class: "ap-row" },
+    el("div", { class: "ap-head" },
+      el("b", null, ap.id || ("A" + (i + 1))), hostSel,
+      el("button", { class: "ap-del", title: "Remove this opening", onclick: () => removeAperture(i) }, "✕")),
+    el("div", { class: "ap-grid" },
+      mini("w", "width", { unit: "m", min: 0.2, max: 6, step: 0.1 }),
+      mini("h", "height", { unit: "m", min: 0.2, max: 3, step: 0.1 }),
+      mini("u", "across (0–1)", { unit: "", min: 0, max: 1, step: 0.02 }),
+      mini("v", "up (0–1)", { unit: "", min: 0, max: 1, step: 0.02 })));
+}
+function addAperture() {
+  const aps = state.seed.params.apertures;
+  let n = aps.length + 1, id = "A" + n;
+  while (aps.some((a) => a.id === id)) { n++; id = "A" + n; }
+  aps.push({ id, host: "wall_ny", u: 0.5, v: 0.5, w: 1.2, h: 1.2 });
+  rebuild(); setStatus(`Added opening ${id}.`);
+}
+function removeAperture(i) {
+  state.seed.params.apertures.splice(i, 1);
+  rebuild(); setStatus("Removed an opening.");
+}
+
+// ---- enclosure warning (walls must sit within the roof footprint) ---------
+function wallsOverRoof() {
+  const P = state.seed.params, north = state.seed.site.northAngle || 0;
+  const W = P.walls, Rf = P.roof;
+  let over = 0;
+  for (const [lx, ly] of [[W.W / 2, W.L / 2], [-W.W / 2, W.L / 2], [W.W / 2, -W.L / 2], [-W.W / 2, -W.L / 2]]) {
+    const p = rotZ([lx, ly, 0], W.R);
+    const world = rotZ([p[0] + W.cx, p[1] + W.cy, 0], north);   // wall corner → world
+    const a = rotZ([world[0], world[1], 0], -north);
+    const rl = rotZ([a[0] - Rf.cx, a[1] - Rf.cy, 0], -Rf.R);    // world → roof-local
+    over = Math.max(over, Math.abs(rl[0]) - Rf.W / 2, Math.abs(rl[1]) - Rf.L / 2);
+  }
+  return over; // metres past the roof edge (>0 = the room pokes out)
+}
+function updateWarning() {
+  const w = $("#geo-warning"); if (!w) return;
+  const over = wallsOverRoof();
+  if (over > 0.02) {
+    w.style.display = "block";
+    w.textContent = `⚠ The room extends ${feetInches(over)} past the roof edge — it won't be fully enclosed by the gable. Shrink the room (width/length) or enlarge the roof overhang.`;
+  } else { w.style.display = "none"; }
+}
+
 function buildCharter() {
   const host = $("#charter-clauses"); host.replaceChildren(); clauseRefs.clear();
   const rules = state.seed.ruleset.rules, notes = state.seed.ruleset.notes;
@@ -172,9 +226,9 @@ function buildCharter() {
       el("div", { class: "cl-test" },
         statusEl,
         el("span", null, labelOf(c.lhs), " ", c.op, " ",
-          el("input", { class: "cl-edit", type: "number", step: "0.01", value: c.rhs,
-            onchange: (e) => { c.rhs = parseFloat(e.target.value); liveUpdate(); } }),
-          " ", unitOf(c.lhs) === "0–1" ? "" : unitOf(c.lhs)),
+          el("input", { class: "cl-edit", type: "number", step: "0.01", value: round2(c.rhs * impConv(unitOf(c.lhs)).f),
+            onchange: (e) => { c.rhs = parseFloat(e.target.value) / impConv(unitOf(c.lhs)).f; liveUpdate(); } }),
+          " ", impConv(unitOf(c.lhs)).u === "0–1" ? "" : impConv(unitOf(c.lhs)).u),
         el("span", { style: "margin-left:auto" }, "now ", valEl),
       ),
       el("div", { class: "cl-bar" }, barEl),
@@ -204,6 +258,7 @@ function liveUpdate() {
   for (const r of metricReadEls) r.el.textContent = fmtMetric(r.key, metrics[r.key]);
   updateCharter(evaluation);
   syncOverlayLabel();
+  updateWarning();
 }
 // run() only sees real rules; notes are inert hand-judgments.
 const rulesetForRun = () => ({ name: state.seed.ruleset.name, rules: state.seed.ruleset.rules });
@@ -220,7 +275,8 @@ function updateCharter(evaluation) {
     const ref = clauseRefs.get(res.rule.id); if (!ref) continue;
     ref.statusEl.className = "cl-status " + st;
     ref.statusEl.textContent = st === "ok" ? "met" : st === "near" ? "near" : "fighting";
-    ref.valEl.textContent = fmtMetric(res.rule.lhs, res.value);
+    const Cv = impConv(unitOf(res.rule.lhs));
+    ref.valEl.textContent = (res.value == null || Number.isNaN(res.value)) ? "—" : `${round2(res.value * Cv.f)}${Cv.u && Cv.u !== "0–1" ? " " + Cv.u : ""}`;
     const scale = Math.max(Math.abs(res.rule.rhs ?? 1), 1) * 0.5;
     const w = Math.min(50, (Math.abs(res.margin ?? 0) / scale) * 50);
     ref.barEl.parentElement.classList.toggle("met", res.ok);
@@ -505,14 +561,14 @@ function climateBlock(forceId) {
     const r = c.windRose;
     return el("div", { class: "climate-read" },
       el("div", null, el("span", { class: "cl-badge" }, "measured"),
-        ` prevailing ${r.prevailingAz}° · mean ${r.meanSpeed} m/s · calm ${r.calmPct}%`),
+        ` prevailing ${r.prevailingAz}° · mean ${round2(r.meanSpeed * MPH)} mph · calm ${r.calmPct}%`),
       windRoseSVG(r));
   }
   if (forceId === "humidity") {
     const a = c.annual, rhs = c.monthly.map((m) => m.rhMean).filter(Number.isFinite);
     const lo = rhs.length ? round2(Math.min(...rhs)) : "—", hi = rhs.length ? round2(Math.max(...rhs)) : "—";
     return el("div", { class: "climate-read" }, el("span", { class: "cl-badge" }, "measured"),
-      ` RH mean ${a.rhMean}% (monthly ${lo}–${hi}%) · air ${a.dbtMean}°C. The es(T) comfort metric is the next increment.`);
+      ` RH mean ${a.rhMean}% (monthly ${lo}–${hi}%) · air ${round2(cToF(a.dbtMean))}°F. The es(T) comfort metric is the next increment.`);
   }
   return null;
 }
@@ -533,7 +589,7 @@ function renderClimateStrip() {
     const c = state.climate;
     host.append(
       el("div", { class: "cs-row" }, el("span", { class: "cl-badge" }, "climate · measured"),
-        ` ${c.location.city || "EPW"} — ${c.annual.dbtMean}°C, RH ${c.annual.rhMean}%, GHI ${c.annual.ghiTotalKWh} kWh/m²·yr, wind ${c.windRose.prevailingAz}°`),
+        ` ${c.location.city || "EPW"} — ${round2(cToF(c.annual.dbtMean))}°F, RH ${c.annual.rhMean}%, GHI ${c.annual.ghiTotalKWh} kWh/m²·yr, wind ${c.windRose.prevailingAz}°`),
       el("button", { class: "cs-clear", title: "Remove the weather file", onclick: clearClimate }, "latitude-only ✕"),
     );
   } else {
@@ -555,7 +611,7 @@ function loadClimate() {
       if (Number.isFinite(c.windRose.prevailingAz)) state.seed.site.windFromAz = Math.round(c.windRose.prevailingAz);
       if (Number.isFinite(c.windRose.meanSpeed)) state.seed.site.windSpeed = Math.round(c.windRose.meanSpeed * 10) / 10;
       syncOverlay(); rebuild();
-      setStatus(describeClimate(c));
+      setStatus(`${c.location.city || "EPW"} loaded — ${round2(cToF(c.annual.dbtMean))}°F mean, GHI ${c.annual.ghiTotalKWh} kWh/m²·yr, wind from ${c.windRose.prevailingAz}° at ${round2(c.windRose.meanSpeed * MPH)} mph.`);
     } catch (err) { setStatus("Couldn't read EPW: " + err.message); }
     input.remove();
   });
@@ -574,7 +630,7 @@ $("#v2-compare").addEventListener("click", openCompare);
 const setStatus = (msg) => { $("#v2-status").textContent = msg; };
 
 // ---- rebuild = structural render + a live pass ----------------------------
-function rebuild() { renderClimateStrip(); buildForceDeck(); buildMake(); buildCharter(); liveUpdate(); renderSeries(); }
+function rebuild() { renderClimateStrip(); buildForceDeck(); buildMake(); buildApertures(); buildCharter(); liveUpdate(); renderSeries(); }
 
 // ---- boot -----------------------------------------------------------------
 Series.load();

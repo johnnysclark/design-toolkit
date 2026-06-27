@@ -62,9 +62,28 @@ button { font-family: inherit; color: var(--ink); }
 .vb-range { display: flex; align-items: center; gap: 6px; font-size: 11px; }
 .vb-range input { width: 110px; }
 .vb-overlay { margin-left: auto; font-size: 11px; opacity: .7; }
-.make { flex: none; max-height: 244px; display: flex; flex-direction: column; min-height: 0; }
-.makegrid { overflow: auto; padding: 8px 12px; display: grid;
+.make { flex: none; max-height: 340px; display: flex; flex-direction: column; min-height: 0; }
+.make-scroll { flex: 1; min-height: 0; overflow: auto; }
+.makegrid { padding: 8px 12px 4px; display: grid;
   grid-template-columns: repeat(auto-fill, minmax(168px, 1fr)); gap: 4px 16px; }
+.make-sub { font-family: var(--font-display); text-transform: uppercase; font-size: 10.5px; letter-spacing: -.01em;
+  padding: 5px 12px; border-top: 1px dashed #1113; }
+.geo-warning { margin: 6px 12px; padding: 7px 9px; font-size: 11.5px; background: #fae3e0;
+  border: 1.5px solid var(--bad); border-radius: 6px; color: var(--bad); }
+
+/* openings / aperture editor */
+.apertures { padding: 4px 12px 10px; }
+.ap-empty { font-size: 11px; opacity: .7; padding: 4px 0; }
+.ap-row { border: 1px solid var(--line); border-radius: 7px; padding: 6px 8px; margin-bottom: 7px; }
+.ap-head { display: flex; align-items: center; gap: 7px; margin-bottom: 4px; }
+.ap-head b { font-family: var(--font-display); font-weight: normal; font-size: 11px; }
+.ap-host { flex: 1; font-family: inherit; font-size: 11px; padding: 2px 4px; border: 1px solid var(--line); border-radius: 5px; }
+.ap-del { border: none; background: none; cursor: pointer; opacity: .5; font-size: 12px; }
+.ap-del:hover { opacity: 1; }
+.ap-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0 14px; }
+.ap-add { font-family: var(--font-display); text-transform: uppercase; font-size: 10px; letter-spacing: -.01em;
+  border: 1.5px solid var(--line); border-radius: 999px; background: var(--paper); padding: 5px 10px; cursor: pointer; }
+.ap-add:hover { background: var(--soft); }
 
 /* compact slider rows (MAKE + force-card inputs) */
 .sl { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 2px 8px; padding: 2px 0; }
