@@ -27,16 +27,30 @@
         <p class="vg-sub">Camera, lens &amp; perspective — a live demo</p>
       </header>
 
-      <div id="vg-frame-wrap" class="vg-frame-wrap">
-        <div id="vg-frame" class="vg-frame">
-          <canvas id="vg-canvas"></canvas>
-          <canvas id="vg-overlay" class="vg-overlay" aria-hidden="true"></canvas>
+      <div class="vg-panes" id="vg-panes">
+        <div class="vg-pane vg-pane--view">
+          <div id="vg-frame-wrap" class="vg-frame-wrap">
+            <div id="vg-frame" class="vg-frame">
+              <canvas id="vg-canvas"></canvas>
+              <canvas id="vg-overlay" class="vg-overlay" aria-hidden="true"></canvas>
+            </div>
+          </div>
         </div>
+        <aside class="vg-pane vg-pane--rig" id="vg-rig" aria-label="Camera rig — side and plan views">
+          <figure class="vg-rigfig">
+            <figcaption class="vg-rigcap">Side — elevation</figcaption>
+            <svg id="vg-side" class="vg-diagram" role="img" aria-label="Side elevation of the camera above the ground, showing the view frustum tilting with the camera, the focus plane, and the in-focus depth-of-field zone."></svg>
+          </figure>
+          <figure class="vg-rigfig">
+            <figcaption class="vg-rigcap">Plan — from above</figcaption>
+            <svg id="vg-plan-svg" class="vg-diagram" role="img" aria-label="Top-down plan of the camera showing the view frustum, focus plane, and the in-focus depth-of-field zone."></svg>
+          </figure>
+        </aside>
       </div>
 
       <p id="vg-caption" class="vg-caption"></p>
       <p id="vg-live" class="vg-live" aria-live="polite"></p>
-      <p class="vg-tip">Drag to orbit · scroll to dolly in/out · double-click the scene to focus there.</p>
+      <p class="vg-tip">Drag to orbit · scroll to dolly · double-click to focus. The side &amp; plan panes show the live frustum and the in-focus zone.</p>
     </section>
 
     <aside id="vg-panel" class="vg-panel" aria-label="Camera controls"></aside>
