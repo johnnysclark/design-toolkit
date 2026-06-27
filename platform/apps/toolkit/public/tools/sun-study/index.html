@@ -118,6 +118,11 @@ input[type="number"], select {
 
     <div class="group">
       <div class="label">Massing</div>
+      <div class="two">
+        <button class="btn" id="importBtn">Import model</button>
+        <button class="btn" id="demoBtn" disabled>Demo</button>
+      </div>
+      <input type="file" id="file" accept=".stl,.obj,.ply,.3dm" hidden>
       <div class="seg" id="massing">
         <button data-m="tower" class="on">Tower</button>
         <button data-m="court">Courtyard</button>
@@ -125,6 +130,7 @@ input[type="number"], select {
       </div>
       <div class="row"><label for="height">Main height</label><span class="val" id="heightVal">30 m</span></div>
       <input type="range" id="height" min="6" max="80" value="30">
+      <div class="hint" id="modelInfo">Built-in massings, or import your own — STL / OBJ / PLY / 3DM (drop a file on the view too). Nothing is uploaded.</div>
       <label class="check"><input type="checkbox" id="sunpath" checked> Sun-path arc</label>
       <label class="check"><input type="checkbox" id="grid" checked> Ground grid</label>
     </div>
@@ -307,8 +313,92 @@ function buildMassing(kind, mainH) {
   }
 }
 
+// ── import a 3D model as the massing ─────────────────────────────────────────
+function collectGeoms(root) {
+  root.updateMatrixWorld(true);
+  const out = [];
+  root.traverse((c) => {
+    const mesh = c;
+    if (!mesh.isMesh || !mesh.geometry) return;
+    const base = mesh.geometry;
+    const pos = base.getAttribute("position");
+    if (!pos || pos.count === 0) return;
+    const bake = (world) => {
+      const g = base.clone(); g.applyMatrix4(world);
+      if (!g.getAttribute("normal")) g.computeVertexNormals();
+      out.push(g);
+    };
+    if (mesh.isInstancedMesh && mesh.getMatrixAt && mesh.count) {
+      const m = mesh.matrixWorld.clone();
+      for (let i = 0; i < mesh.count; i++) { mesh.getMatrixAt(i, m); bake(mesh.matrixWorld.clone().multiply(m)); }
+    } else bake(mesh.matrixWorld);
+  });
+  return out;
+}
+async function parseModel(file) {
+  const name = file.name.toLowerCase();
+  if (name.endsWith(".obj")) {
+    const { OBJLoader } = await import("three/addons/loaders/OBJLoader.js");
+    return collectGeoms(new OBJLoader().parse(await file.text()));
+  }
+  if (name.endsWith(".3dm")) {
+    const buf3dm = await file.arrayBuffer();
+    const { Rhino3dmLoader } = await import("three/addons/loaders/3DMLoader.js");
+    const loader = new Rhino3dmLoader(); loader.setLibraryPath("/vendor/rhino3dm/");
+    const obj = await new Promise((res, rej) => loader.parse(buf3dm, res, rej));
+    obj.rotation.x = -Math.PI / 2; // Rhino Z-up → three Y-up
+    const out = collectGeoms(obj); loader.dispose?.(); return out;
+  }
+  const buf = await file.arrayBuffer();
+  if (name.endsWith(".ply")) {
+    const { PLYLoader } = await import("three/addons/loaders/PLYLoader.js");
+    const g = new PLYLoader().parse(buf);
+    if (!g.getAttribute("normal")) g.computeVertexNormals();
+    const p = g.getAttribute("position"); return p && p.count ? [g] : [];
+  }
+  const { STLLoader } = await import("three/addons/loaders/STLLoader.js");
+  const g = new STLLoader().parse(buf);
+  if (!g.getAttribute("normal")) g.computeVertexNormals();
+  const p = g.getAttribute("position"); return p && p.count ? [g] : [];
+}
+// Center the model on the ground (min-Y = 0), scaled so its footprint ≈ FIT metres.
+const FIT = 60;
+function useImported(geos, label) {
+  massGroup.clear();
+  const group = new THREE.Group();
+  for (const g of geos) {
+    const mesh = new THREE.Mesh(g, faceMat());
+    mesh.castShadow = true; mesh.receiveShadow = true;
+    mesh.add(new THREE.LineSegments(new THREE.EdgesGeometry(g, 30),
+      new THREE.LineBasicMaterial({ color: 0x44443f })));
+    group.add(mesh);
+  }
+  const box = new THREE.Box3().setFromObject(group);
+  const size = new THREE.Vector3(); box.getSize(size);
+  const center = new THREE.Vector3(); box.getCenter(center);
+  const footprint = Math.max(size.x, size.z) || 1;
+  const s = FIT / footprint;
+  group.scale.setScalar(s);
+  group.position.set(-center.x * s, -box.min.y * s, -center.z * s); // sit on ground, centred
+  massGroup.add(group);
+  state.imported = true;
+  $("demoBtn").disabled = false; $("height").disabled = true;
+  $("massing").querySelectorAll("button").forEach(b => b.classList.remove("on"));
+  $("modelInfo").textContent = `${label} — ${Math.round(size.x)}×${Math.round(size.z)}×${Math.round(size.y)} (model units), shown ~${FIT} m wide.`;
+}
+async function loadFile(file) {
+  if (!/\.(stl|obj|ply|3dm)$/i.test(file.name)) { $("modelInfo").textContent = "Use STL, OBJ, PLY or 3DM."; return; }
+  $("modelInfo").textContent = "Loading " + file.name + "…";
+  try {
+    const geos = await parseModel(file);
+    if (!geos.length) { $("modelInfo").textContent = /\.3dm$/i.test(file.name)
+      ? "No render meshes in that .3dm — shade the Rhino view before saving." : "No geometry found."; return; }
+    useImported(geos, file.name);
+  } catch (e) { $("modelInfo").textContent = "Couldn't load that file: " + (e.message || e); }
+}
+
 // ── state + update ─────────────────────────────────────────────────────────
-const state = { lat: 40, lon: -88, tz: -6, month: 6, day: 21, time: 720, massing: "tower", height: 30, showPath: true, showGrid: true };
+const state = { lat: 40, lon: -88, tz: -6, month: 6, day: 21, time: 720, massing: "tower", height: 30, imported: false, showPath: true, showGrid: true };
 const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 const DAYS = [31,29,31,30,31,30,31,30,31,30,31,31];
 const YEAR = 2025;
@@ -395,9 +485,25 @@ $("solstices").querySelectorAll("button").forEach(b => {
     setDateLabel(); seg("solstices", b); buildPath(); update();
   };
 });
+function toDemo(kind) {
+  state.imported = false; state.massing = kind;
+  $("demoBtn").disabled = true; $("height").disabled = false;
+  $("modelInfo").textContent = "Built-in massings, or import your own — STL / OBJ / PLY / 3DM (drop a file on the view too). Nothing is uploaded.";
+  buildMassing(kind, state.height);
+}
 $("massing").querySelectorAll("button").forEach(b => {
-  b.onclick = () => { state.massing = b.dataset.m; seg("massing", b); buildMassing(state.massing, state.height); };
+  b.onclick = () => { seg("massing", b); toDemo(b.dataset.m); };
 });
+// import / demo / drop
+$("importBtn").onclick = () => $("file").click();
+$("demoBtn").onclick = () => {
+  const btn = $("massing").querySelector(`button[data-m="${state.massing}"]`);
+  seg("massing", btn);
+  toDemo(state.massing);
+};
+$("file").onchange = e => { if (e.target.files[0]) loadFile(e.target.files[0]); };
+["dragover", "dragenter"].forEach(ev => stage.addEventListener(ev, e => { e.preventDefault(); }));
+stage.addEventListener("drop", e => { e.preventDefault(); if (e.dataTransfer.files[0]) loadFile(e.dataTransfer.files[0]); });
 
 let animId = null;
 $("animBtn").onclick = () => {

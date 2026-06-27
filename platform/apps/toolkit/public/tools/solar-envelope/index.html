@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Solar Envelope</title>
+<!--
+  Solar Envelope — the largest buildable volume on a site whose shadows stay
+  WITHIN the site during a chosen sun window, so neighbours keep their light.
+  (Knowles' solar envelope, simplified to ground-shadow containment.) Real solar
+  geometry (NOAA), a heightfield envelope you can orbit, and an OBJ export for
+  Rhino. Client-side; three.js vendored (r160); nothing uploaded.
+
+  Part of the All Means Works design toolkit (3D Tooling).
+-->
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root { --bg:#f5f5f3; --surface:#fff; --line:#e4e4e0; --ink:#111; --accent:#ff3b21; }
+html, body { height: 100%; }
+body { font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  background: var(--bg); color: var(--ink); display: flex; flex-direction: column; overflow: hidden; }
+header { padding: 10px 18px; background: var(--surface); border-bottom: 2px solid var(--ink);
+  display: flex; align-items: baseline; gap: 14px; flex-shrink: 0; }
+header h1 { font-size: 18px; font-weight: 800; letter-spacing: -0.01em; text-transform: uppercase; }
+header .subtitle { font-size: 12px; }
+.app { display: flex; flex: 1; overflow: hidden; min-height: 0; }
+.sidebar { width: 300px; flex-shrink: 0; background: var(--surface); border-right: 1px solid var(--line);
+  overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 16px; }
+.group { display: flex; flex-direction: column; gap: 9px; }
+.group > .label { font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.06em;
+  border-bottom: 1px solid var(--line); padding-bottom: 5px; }
+.row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.row label { font-size: 13px; }
+.row .val { font-size: 12px; font-variant-numeric: tabular-nums; min-width: 60px; text-align: right; }
+input[type="range"] { width: 100%; accent-color: var(--accent); }
+input[type="number"], select { width: 100%; font: inherit; font-size: 13px; padding: 7px 8px;
+  border: 1px solid var(--line); border-radius: 6px; color: var(--ink); background: #fff; }
+.two { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.seg { display: flex; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
+.seg button { flex: 1; font: inherit; font-size: 12px; font-weight: 600; padding: 7px 4px;
+  background: #fff; border: 0; border-right: 1px solid var(--line); cursor: pointer; color: var(--ink); }
+.seg button:last-child { border-right: 0; }
+.seg button.on { background: var(--ink); color: #fff; }
+.btn { font: inherit; font-size: 13px; font-weight: 700; padding: 9px 12px; border-radius: 6px;
+  border: 1px solid var(--ink); background: #fff; color: var(--ink); cursor: pointer; text-align: center; }
+.btn:hover { background: #f0f0ee; }
+.btn.accent { background: var(--accent); color: #fff; border-color: var(--accent); }
+.check { display: flex; align-items: center; gap: 8px; font-size: 13px; cursor: pointer; }
+.check input { accent-color: var(--accent); width: 15px; height: 15px; }
+.hint { font-size: 11px; line-height: 1.45; }
+.stage { position: relative; flex: 1; min-width: 0; }
+#canvas { display: block; width: 100%; height: 100%; }
+.readout { position: absolute; top: 12px; left: 12px; background: rgba(255,255,255,0.92); border: 1px solid var(--line);
+  border-radius: 8px; padding: 9px 12px; backdrop-filter: blur(4px); font-size: 12px; line-height: 1.55; }
+.readout .big { font-size: 14px; font-weight: 800; }
+@media (max-width: 720px) { .app { flex-direction: column; } .sidebar { width: 100%; max-height: 46vh; } }
+</style>
+</head>
+<body>
+<header>
+  <h1>Solar&nbsp;Envelope</h1>
+  <span class="subtitle">The volume you can build without shadowing the neighbours</span>
+</header>
+
+<div class="app">
+  <aside class="sidebar">
+    <div class="group">
+      <div class="label">Site</div>
+      <div class="two">
+        <div><div class="hint">Width E–W (m)</div><input type="number" id="sx" value="60" min="10" max="300" step="5"></div>
+        <div><div class="hint">Depth N–S (m)</div><input type="number" id="sz" value="60" min="10" max="300" step="5"></div>
+      </div>
+      <div class="row"><label for="lat">Latitude</label><span class="val" id="latV">40°</span></div>
+      <input type="range" id="lat" min="-60" max="70" value="40">
+      <div class="row"><label for="cap">Max height</label><span class="val" id="capV">60 m</span></div>
+      <input type="range" id="cap" min="10" max="200" value="60">
+    </div>
+
+    <div class="group">
+      <div class="label">Sun window (access to protect)</div>
+      <div class="seg" id="season">
+        <button data-d="12-21" class="on">Winter</button>
+        <button data-d="3-20">Equinox</button>
+        <button data-d="6-21">Summer</button>
+      </div>
+      <div class="row"><label>From</label><span class="val" id="startV">09:00</span></div>
+      <input type="range" id="start" min="240" max="780" step="15" value="540">
+      <div class="row"><label>To</label><span class="val" id="endV">15:00</span></div>
+      <input type="range" id="end" min="660" max="1200" step="15" value="900">
+      <div class="hint" id="winHint"></div>
+    </div>
+
+    <div class="group">
+      <div class="label">Resolution</div>
+      <div class="row"><label>Grid</label><span class="val" id="resV">40</span></div>
+      <input type="range" id="res" min="12" max="70" value="40">
+      <label class="check"><input type="checkbox" id="surf"> Smooth surface (vs. stepped)</label>
+    </div>
+
+    <div class="group">
+      <div class="label">Export</div>
+      <div class="two">
+        <button class="btn accent" id="objBtn">OBJ</button>
+        <button class="btn" id="shot">PNG</button>
+      </div>
+      <p class="hint">A teaching envelope: height at each point is limited so its shadow never leaves the site during the window. Tallest in the interior, sloping down to the edges. OBJ imports into Rhino as a mesh.</p>
+    </div>
+  </aside>
+
+  <div class="stage" id="stage">
+    <canvas id="canvas"></canvas>
+    <div class="readout" id="readout"></div>
+  </div>
+</div>
+
+<script type="importmap">
+{ "imports": { "three": "./vendor/three.module.js", "three/addons/": "./vendor/addons/" } }
+</script>
+
+<script type="module">
+import * as THREE from "three";
+import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+
+const $ = id => document.getElementById(id);
+const D2R = Math.PI / 180, R2D = 180 / Math.PI, mod = (a, n) => ((a % n) + n) % n;
+
+// NOAA solar position (altitude/azimuth) — longitude/tz cancel for shape, but we
+// keep true geometry: use lon 0, tz 0, so local time == solar time at that meridian.
+function solar(lat, year, month, day, h) {
+  const utcMs = Date.UTC(year, month - 1, day) + h * 3600 * 1000;
+  const JD = utcMs / 86400000 + 2440587.5, T = (JD - 2451545.0) / 36525.0;
+  const L0 = mod(280.46646 + T * (36000.76983 + T * 0.0003032), 360);
+  const M = 357.52911 + T * (35999.05029 - 0.0001537 * T);
+  const e = 0.016708634 - T * (0.000042037 + 0.0000001267 * T), Mr = M * D2R;
+  const C = Math.sin(Mr) * (1.914602 - T * (0.004817 + 0.000014 * T)) + Math.sin(2 * Mr) * (0.019993 - 0.000101 * T) + Math.sin(3 * Mr) * 0.000289;
+  const omega = 125.04 - 1934.136 * T, appLong = L0 + C - 0.00569 - 0.00478 * Math.sin(omega * D2R);
+  const e0 = 23 + (26 + (21.448 - T * (46.815 + T * (0.00059 - T * 0.001813))) / 60) / 60;
+  const obliq = e0 + 0.00256 * Math.cos(omega * D2R);
+  const declR = Math.asin(Math.sin(obliq * D2R) * Math.sin(appLong * D2R));
+  const y = Math.tan(obliq / 2 * D2R) ** 2;
+  const eqT = 4 * R2D * (y * Math.sin(2 * L0 * D2R) - 2 * e * Math.sin(Mr) + 4 * e * y * Math.sin(Mr) * Math.cos(2 * L0 * D2R) - 0.5 * y * y * Math.sin(4 * L0 * D2R) - 1.25 * e * e * Math.sin(2 * Mr));
+  const tst = mod(h * 60 + eqT, 1440); let ha = tst / 4 - 180; if (ha < -180) ha += 360;
+  const latR = lat * D2R, haR = ha * D2R;
+  let cz = Math.sin(latR) * Math.sin(declR) + Math.cos(latR) * Math.cos(declR) * Math.cos(haR);
+  cz = Math.min(1, Math.max(-1, cz)); const zen = Math.acos(cz), alt = 90 - zen * R2D;
+  let az; const den = Math.cos(latR) * Math.sin(zen);
+  if (Math.abs(den) > 1e-9) { let c = (Math.sin(latR) * Math.cos(zen) - Math.sin(declR)) / den; c = Math.min(1, Math.max(-1, c)); az = Math.acos(c) * R2D; az = ha > 0 ? mod(az + 180, 360) : mod(540 - az, 360); }
+  else az = alt > 0 ? 180 : 0;
+  return { alt, az };
+}
+
+// distance from (px,pz) along unit dir (dx,dz) to the exit of the [0,W]×[0,Dp] rect
+function exitDist(px, pz, dx, dz, W, Dp) {
+  let t = Infinity;
+  if (dx > 1e-9) t = Math.min(t, (W - px) / dx); else if (dx < -1e-9) t = Math.min(t, (0 - px) / dx);
+  if (dz > 1e-9) t = Math.min(t, (Dp - pz) / dz); else if (dz < -1e-9) t = Math.min(t, (0 - pz) / dz);
+  return Math.max(0, t);
+}
+
+// ── envelope heightfield ─────────────────────────────────────────────────
+const S = { sx: 60, sz: 60, lat: 40, cap: 60, month: 12, day: 21, start: 540, end: 900, res: 40, surf: false };
+let field = null, fieldN = 0, fieldM = 0, fieldMax = 0;
+
+function computeEnvelope() {
+  const W = S.sx, Dp = S.sz;
+  // sun samples across the window with altitude > 3°
+  const samples = [];
+  for (let t = S.start; t <= S.end; t += 15) {
+    const { alt, az } = solar(S.lat, 2025, S.month, S.day, t / 60);
+    if (alt <= 3) continue;
+    // shadow falls opposite the sun's horizontal bearing. East=+X, North=-Z.
+    const sunHx = Math.sin(az * D2R), sunHz = -Math.cos(az * D2R);
+    const len = Math.hypot(sunHx, sunHz) || 1;
+    samples.push({ dx: -sunHx / len, dz: -sunHz / len, tan: Math.tan(alt * D2R) });
+  }
+  const N = S.res, M = Math.max(8, Math.round(N * Dp / W));
+  field = new Float32Array(N * M); fieldN = N; fieldM = M; fieldMax = 0;
+  for (let j = 0; j < M; j++) for (let i = 0; i < N; i++) {
+    const px = (i + 0.5) / N * W, pz = (j + 0.5) / M * Dp;
+    let h = S.cap;
+    if (!samples.length) h = 0;
+    for (const s of samples) {
+      const d = exitDist(px, pz, s.dx, s.dz, W, Dp);   // m the shadow can travel inside the site
+      h = Math.min(h, d * s.tan);                        // height whose shadow tip just reaches the edge
+    }
+    h = Math.min(h, S.cap);
+    field[j * N + i] = h; if (h > fieldMax) fieldMax = h;
+  }
+}
+
+// ── three.js ───────────────────────────────────────────────────────────────
+const canvas = $("canvas"), stage = $("stage");
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, preserveDrawingBuffer: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+const scene = new THREE.Scene(); scene.background = new THREE.Color("#eef1f4");
+const camera = new THREE.PerspectiveCamera(45, 1, 0.5, 5000);
+camera.position.set(90, 80, 120);
+const controls = new OrbitControls(camera, canvas); controls.enableDamping = true; controls.target.set(0, 10, 0);
+controls.maxPolarAngle = Math.PI / 2 - 0.02;
+scene.add(new THREE.HemisphereLight(0xffffff, 0x96968c, 1.0));
+const dir = new THREE.DirectionalLight(0xffffff, 1.4); dir.position.set(60, 120, 40); scene.add(dir);
+
+const root = new THREE.Group(); scene.add(root); // centred on site
+let envMesh = null, siteMesh = null;
+const grid = new THREE.GridHelper(400, 40, 0xc6c9c2, 0xdadcd6);
+grid.material.transparent = true; grid.material.opacity = 0.6; scene.add(grid);
+// compass
+function label(t, x, z) { const c = document.createElement("canvas"); c.width = c.height = 128;
+  const g = c.getContext("2d"); g.fillStyle = "#111"; g.font = "bold 90px sans-serif"; g.textAlign = "center"; g.textBaseline = "middle"; g.fillText(t, 64, 70);
+  const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(c), transparent: true })); sp.scale.set(12, 12, 1); sp.position.set(x, 5, z); scene.add(sp); }
+label("N", 0, -120); label("S", 0, 120); label("E", 120, 0); label("W", -120, 0);
+
+function disposeMesh(m) { if (!m) return; root.remove(m); m.geometry.dispose(); if (m.material.map) m.material.map.dispose(); m.material.dispose(); }
+
+// Build geometry from the heightfield. Stepped = one box per cell; smooth = a
+// vertex-grid surface (top) + skirt. Origin at site corner; we offset to centre.
+function buildMesh() {
+  disposeMesh(envMesh); if (siteMesh) { root.remove(siteMesh); siteMesh.geometry.dispose(); siteMesh.material.dispose(); }
+  const W = S.sx, Dp = S.sz, N = fieldN, M = fieldM, cw = W / N, cd = Dp / M;
+  root.position.set(-W / 2, 0, -Dp / 2);
+
+  // site plate
+  const plate = new THREE.Mesh(new THREE.BoxGeometry(W, 0.4, Dp), new THREE.MeshStandardMaterial({ color: "#d6d8d2" }));
+  plate.position.set(W / 2, -0.2, Dp / 2); root.add(plate); siteMesh = plate;
+
+  const mat = new THREE.MeshStandardMaterial({ color: "#e7b24a", roughness: 0.85, metalness: 0, flatShading: true, side: THREE.DoubleSide });
+  let geo;
+  if (S.surf) {
+    // top surface grid (N+1 × M+1 sampled from cell centres, clamped at edges)
+    const nx = N, nz = M, pos = [], idx = [];
+    const hAt = (i, j) => field[Math.min(M - 1, Math.max(0, j)) * N + Math.min(N - 1, Math.max(0, i))];
+    for (let j = 0; j <= nz; j++) for (let i = 0; i <= nx; i++) {
+      const x = i * cw, z = j * cd;
+      const h = (hAt(i - 1, j - 1) + hAt(i, j - 1) + hAt(i - 1, j) + hAt(i, j)) / 4;
+      pos.push(x, h, z);
+    }
+    const I = (i, j) => j * (nx + 1) + i;
+    for (let j = 0; j < nz; j++) for (let i = 0; i < nx; i++) { idx.push(I(i, j), I(i + 1, j), I(i + 1, j + 1), I(i, j), I(i + 1, j + 1), I(i, j + 1)); }
+    geo = new THREE.BufferGeometry();
+    geo.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3)); geo.setIndex(idx); geo.computeVertexNormals();
+  } else {
+    // merged boxes (stepped)
+    const boxes = [];
+    for (let j = 0; j < M; j++) for (let i = 0; i < N; i++) {
+      const h = field[j * N + i]; if (h < 0.3) continue;
+      const g = new THREE.BoxGeometry(cw, h, cd); g.translate((i + 0.5) * cw, h / 2, (j + 0.5) * cd); boxes.push(g);
+    }
+    geo = boxes.length ? mergeGeoms(boxes) : new THREE.BufferGeometry();
+  }
+  envMesh = new THREE.Mesh(geo, mat); root.add(envMesh);
+}
+// minimal geometry merge (positions only → recompute normals)
+function mergeGeoms(list) {
+  let total = 0; for (const g of list) total += g.attributes.position.count;
+  const pos = new Float32Array(total * 3); let o = 0;
+  for (const g of list) { const p = g.attributes.position.array; const idx = g.index ? g.index.array : null;
+    if (idx) { for (let k = 0; k < idx.length; k++) { const v = idx[k] * 3; pos[o++] = p[v]; pos[o++] = p[v + 1]; pos[o++] = p[v + 2]; } }
+    else { pos.set(p, o); o += p.length; } g.dispose(); }
+  const merged = new THREE.BufferGeometry(); merged.setAttribute("position", new THREE.BufferAttribute(pos.subarray(0, o), 3)); merged.computeVertexNormals(); return merged;
+}
+
+function update() {
+  computeEnvelope(); buildMesh();
+  const r = $("readout");
+  r.innerHTML = `<div class="big">Peak ${fieldMax.toFixed(1)} m</div>` +
+    `Site ${S.sx}×${S.sz} m · lat ${S.lat}°<br>` +
+    `${SEAS[S.season]} window ${hhmm(S.start/60)}–${hhmm(S.end/60)}<br>` +
+    `<span style="opacity:.7">capped at ${S.cap} m</span>`;
+}
+const hhmm = h => String(Math.floor(h)).padStart(2,"0") + ":" + String(Math.round((h%1)*60)).padStart(2,"0");
+const SEAS = { "12-21": "Winter", "3-20": "Equinox", "6-21": "Summer" };
+S.season = "12-21";
+
+// ── OBJ export (envelope mesh) ─────────────────────────────────────────────
+function exportOBJ() {
+  if (!envMesh) return;
+  const p = envMesh.geometry.attributes.position.array;
+  const idx = envMesh.geometry.index ? envMesh.geometry.index.array : null;
+  // bake root offset so coordinates match the site corner at origin
+  const ox = root.position.x, oz = root.position.z;
+  let s = "# Solar envelope — All Means Works toolkit\n";
+  for (let i = 0; i < p.length; i += 3) s += `v ${(p[i]+ox).toFixed(3)} ${p[i+1].toFixed(3)} ${(p[i+2]+oz).toFixed(3)}\n`;
+  if (idx) for (let i = 0; i < idx.length; i += 3) s += `f ${idx[i]+1} ${idx[i+1]+1} ${idx[i+2]+1}\n`;
+  else for (let i = 0; i < p.length/3; i += 3) s += `f ${i+1} ${i+2} ${i+3}\n`;
+  const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([s], { type: "text/plain" }));
+  a.download = "solar-envelope.obj"; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+}
+
+// ── UI ─────────────────────────────────────────────────────────────────────
+$("sx").oninput = e => { S.sx = Math.max(10, +e.target.value || 10); update(); };
+$("sz").oninput = e => { S.sz = Math.max(10, +e.target.value || 10); update(); };
+$("lat").oninput = e => { S.lat = +e.target.value; $("latV").textContent = S.lat + "°"; update(); };
+$("cap").oninput = e => { S.cap = +e.target.value; $("capV").textContent = S.cap + " m"; update(); };
+$("start").oninput = e => { S.start = Math.min(+e.target.value, S.end - 30); $("start").value = S.start; $("startV").textContent = hhmm(S.start/60); winHint(); update(); };
+$("end").oninput = e => { S.end = Math.max(+e.target.value, S.start + 30); $("end").value = S.end; $("endV").textContent = hhmm(S.end/60); winHint(); update(); };
+$("res").oninput = e => { S.res = +e.target.value; $("resV").textContent = S.res; update(); };
+$("surf").onchange = e => { S.surf = e.target.checked; update(); };
+$("season").querySelectorAll("button").forEach(b => {
+  b.onclick = () => { S.season = b.dataset.d; const [m, d] = b.dataset.d.split("-").map(Number); S.month = m; S.day = d;
+    $("season").querySelectorAll("button").forEach(x => x.classList.toggle("on", x === b)); winHint(); update(); };
+});
+function winHint() { const a = solar(S.lat, 2025, S.month, S.day, S.start/60), b = solar(S.lat, 2025, S.month, S.day, S.end/60);
+  $("winHint").textContent = `Sun ${a.alt.toFixed(0)}°→${Math.max(a.alt,b.alt).toFixed(0)}° during the window; shadows must stay on-site then.`; }
+$("objBtn").onclick = exportOBJ;
+$("shot").onclick = () => { renderer.render(scene, camera); canvas.toBlob(b => { const a = document.createElement("a");
+  a.href = URL.createObjectURL(b); a.download = "solar-envelope.png"; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1000); }, "image/png"); };
+
+function resize() { const w = stage.clientWidth, h = stage.clientHeight; renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix(); }
+addEventListener("resize", resize);
+
+$("latV").textContent = S.lat + "°"; $("capV").textContent = S.cap + " m";
+$("startV").textContent = hhmm(S.start/60); $("endV").textContent = hhmm(S.end/60); $("resV").textContent = S.res;
+winHint(); resize(); update();
+(function loop() { controls.update(); renderer.render(scene, camera); requestAnimationFrame(loop); })();
+</script>
+</body>
+</html>

@@ -60,10 +60,12 @@ const CARDS: HubCard[] = [
       "Prep geometry for the laser cutter: map stroke colours to cut / score / engrave, set kerf, tile to bed size, and export clean SVG/DXF — the boring step before fabrication, made quick."
   },
   {
-    title: "Scale & Scale-Bar",
-    status: "proposed",
+    title: "Scale Bar & North",
+    source: "Graphic scale bar + north arrow",
+    status: "live",
+    href: "/media-2d/scale-bar",
     blurb:
-      "The drawing-scale companion: convert between ratios (1:50) and imperial (¼\"=1'-0\"), size a drawing to a sheet, and drop a clean graphic scale bar + north arrow as SVG for your layout."
+      "Make a correct graphic scale bar and a north arrow for a sheet: pick a scale (metric ratio or imperial architect's scale), set length + divisions, choose a north-arrow style, and export an SVG sized in real millimetres (prints true at 100%) or a PNG."
   }
 ];
 

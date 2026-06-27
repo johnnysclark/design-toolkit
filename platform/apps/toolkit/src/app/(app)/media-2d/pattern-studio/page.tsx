@@ -11,7 +11,7 @@ export default function PatternStudioPage() {
     <EmbeddedTool
       title="Pattern Studio"
       subtitle="Parametric screens & tilings"
-      blurb="Generate a parametric screen, facade, or tiling: a grid of cells whose size and rotation are driven by an attractor you drag. Pick the cell shape (square, circle, diamond, triangle, louver, cross) and the grid (square / brick / hex), tune the field, then export — SVG and PNG for drawings, or DXF with real millimetre coordinates straight into Rhino / AutoCAD or a laser cutter."
+      blurb="Generate a parametric screen, facade, or tiling: a grid of cells whose size and rotation are driven by an attractor — a single point you drag, or a multi-point path you draw on the canvas. Pick the cell shape (square, circle, diamond, triangle, louver, cross) and the grid (square / brick / hex), tune the field, then export — SVG and PNG for drawings, or DXF with real millimetre coordinates straight into Rhino / AutoCAD or a laser cutter."
       src="/tools/pattern-studio/index.html"
       backHref="/media-2d"
       backLabel="2D Tooling"

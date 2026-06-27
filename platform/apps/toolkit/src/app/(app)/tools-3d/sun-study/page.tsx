@@ -11,7 +11,7 @@ export default function SunStudyPage() {
     <EmbeddedTool
       title="Sun & Shadow Study"
       subtitle="Solar geometry & cast shadows"
-      blurb="Pick a place (latitude / longitude) and a date and time, and watch where the sun sits and how shadows fall across a massing. Real solar geometry (the NOAA solar-position algorithm) drives real cast shadows; a sun-path arc shows the whole day, and one click animates sunrise → sunset. Switch massings, set the main height, read altitude / azimuth / sunrise / sunset, and export a PNG."
+      blurb="Pick a place (latitude / longitude) and a date and time, and watch where the sun sits and how shadows fall across a massing. Real solar geometry (the NOAA solar-position algorithm) drives real cast shadows; a sun-path arc shows the whole day, and one click animates sunrise → sunset. Use a built-in massing or import your own model (STL / OBJ / PLY / 3DM), set the height, read altitude / azimuth / sunrise / sunset, and export a PNG."
       src="/tools/sun-study/index.html"
       backHref="/tools-3d"
       backLabel="3D Tooling"

@@ -104,6 +104,11 @@ input[type="color"] { width: 36px; height: 28px; border: 1px solid var(--line); 
 
     <div class="group">
       <div class="label">Attractor field</div>
+      <div class="grid3" id="mode" style="grid-template-columns:1fr 1fr;">
+        <button class="opt on" data-m="point">Point</button>
+        <button class="opt" data-m="path">Path</button>
+      </div>
+      <button class="btn" id="clearPath" hidden>Clear path</button>
       <div class="row"><label>Min size</label><span class="val" id="minV">10%</span></div>
       <input type="range" id="min" min="0" max="100" value="10">
       <div class="row"><label>Max size</label><span class="val" id="maxV">95%</span></div>
@@ -112,7 +117,7 @@ input[type="color"] { width: 36px; height: 28px; border: 1px solid var(--line); 
       <input type="range" id="pow" min="20" max="400" value="140">
       <label class="check"><input type="checkbox" id="invert"> Invert (near = small)</label>
       <label class="check"><input type="checkbox" id="rotate"> Rotate toward attractor</label>
-      <p class="hint">Drag the red dot on the canvas to move the attractor.</p>
+      <p class="hint" id="modeHint">Drag the red dot on the canvas to move the attractor.</p>
     </div>
 
     <div class="group">
@@ -148,8 +153,42 @@ const S = {
   gridType: "square", cols: 18, rows: 12, cell: 40, shape: "square",
   min: 10, max: 95, pow: 1.4, invert: false, rotate: false,
   fill: "#111111", stroke: "#111111", outline: false, bg: "#ffffff",
-  ax: 0.5, ay: 0.5 // attractor in normalized [0,1] of the drawing box
+  mode: "point",       // "point" | "path"
+  ax: 0.5, ay: 0.5,    // point attractor, normalized [0,1] of the drawing box
+  path: []             // path attractor: [{x,y}] in mm
 };
+
+// point-to-segment distance (mm)
+function distToSeg(px, py, ax, ay, bx, by) {
+  const dx = bx - ax, dy = by - ay, L2 = dx * dx + dy * dy;
+  let t = L2 ? ((px - ax) * dx + (py - ay) * dy) / L2 : 0;
+  t = Math.max(0, Math.min(1, t));
+  return Math.hypot(px - (ax + t * dx), py - (ay + t * dy));
+}
+// nearest point on the path, for "rotate toward attractor"
+function nearestOnPath(px, py) {
+  if (S.path.length === 1) return S.path[0];
+  let best = null, bd = Infinity;
+  for (let i = 0; i < S.path.length - 1; i++) {
+    const a = S.path[i], b = S.path[i + 1];
+    const dx = b.x - a.x, dy = b.y - a.y, L2 = dx * dx + dy * dy;
+    let t = L2 ? ((px - a.x) * dx + (py - a.y) * dy) / L2 : 0; t = Math.max(0, Math.min(1, t));
+    const qx = a.x + t * dx, qy = a.y + t * dy, d = Math.hypot(px - qx, py - qy);
+    if (d < bd) { bd = d; best = { x: qx, y: qy }; }
+  }
+  return best;
+}
+function fieldDist(cx, cy) {
+  if (S.mode === "path" && S.path.length >= 2) {
+    let m = Infinity;
+    for (let i = 0; i < S.path.length - 1; i++)
+      m = Math.min(m, distToSeg(cx, cy, S.path[i].x, S.path[i].y, S.path[i + 1].x, S.path[i + 1].y));
+    return m;
+  }
+  if (S.mode === "path" && S.path.length === 1)
+    return Math.hypot(cx - S.path[0].x, cy - S.path[0].y);
+  return Math.hypot(cx - S.ax * W, cy - S.ay * H);
+}
 
 const art = $("art");
 let W = 0, H = 0; // drawing size in mm
@@ -168,21 +207,23 @@ function build() {
   const dx = c, dy = S.gridType === "hex" ? c * Math.sqrt(3) / 2 : c;
   W = S.cols * c + (S.gridType !== "square" ? c / 2 : 0);
   H = (S.rows - 1) * dy + c;
-  const ax = S.ax * W, ay = S.ay * H;
   // normalising distance: half the diagonal
   const diag = Math.hypot(W, H) / 2 || 1;
+  const usePath = S.mode === "path" && S.path.length >= 1;
   cells = [];
   for (let j = 0; j < S.rows; j++) {
     const offset = (S.gridType !== "square" && j % 2) ? c / 2 : 0;
     for (let i = 0; i < S.cols; i++) {
       const cx = c / 2 + i * dx + offset;
       const cy = c / 2 + j * dy;
-      const d = Math.hypot(cx - ax, cy - ay) / diag;     // 0 (near) .. ~1 (far)
-      const scale = remap(1 - d);                         // near attractor → large
-      const size = scale * (c - 2);                       // leave a hairline gap
+      const d = fieldDist(cx, cy) / diag;                  // 0 (near) .. ~1 (far)
+      const scale = remap(1 - d);                          // near attractor → large
+      const size = scale * (c - 2);                        // leave a hairline gap
       let rot = 0;
-      if (S.rotate) rot = Math.atan2(ay - cy, ax - cx);
-      else if (S.shape === "diamond") rot = Math.PI / 4;
+      if (S.rotate) {
+        const t = usePath ? nearestOnPath(cx, cy) : { x: S.ax * W, y: S.ay * H };
+        rot = Math.atan2(t.y - cy, t.x - cx);
+      } else if (S.shape === "diamond") rot = Math.PI / 4;
       if (size > 0.2) cells.push({ cx, cy, size, rot });
     }
   }
@@ -228,12 +269,19 @@ function render() {
       body += `<polygon points="${p.map(([x,y]) => f(x)+","+f(y)).join(" ")}" fill="${fill}" stroke="${stroke}" stroke-width="${sw}"/>`;
     }
   }
-  // attractor handle (screen only — excluded from exports)
-  const hr = Math.max(W,H) * 0.012;
-  body += `<g class="attractor" id="att"><circle cx="${f(S.ax*W)}" cy="${f(S.ay*H)}" r="${f(hr)}" fill="#ff3b21" stroke="#fff" stroke-width="${f(hr*0.3)}"/></g>`;
+  // attractor handles (screen only — never part of an export)
+  const hr = Math.max(W, H) * 0.012;
+  if (S.mode === "path") {
+    if (S.path.length >= 2)
+      body += `<polyline points="${S.path.map(p => f(p.x) + "," + f(p.y)).join(" ")}" fill="none" stroke="#ff3b21" stroke-width="${f(hr * 0.5)}" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="${f(hr)} ${f(hr * 0.8)}"/>`;
+    S.path.forEach((p, i) => {
+      body += `<circle class="phandle" data-i="${i}" cx="${f(p.x)}" cy="${f(p.y)}" r="${f(hr)}" fill="#ff3b21" stroke="#fff" stroke-width="${f(hr * 0.3)}"/>`;
+    });
+  } else {
+    body += `<circle class="phandle" data-i="pt" cx="${f(S.ax * W)}" cy="${f(S.ay * H)}" r="${f(hr)}" fill="#ff3b21" stroke="#fff" stroke-width="${f(hr * 0.3)}"/>`;
+  }
   art.innerHTML = body;
-  $("count").textContent = `${cells.length} cells · ${Math.round(W)}×${Math.round(H)} mm`;
-  wireDrag();
+  $("count").textContent = `${cells.length} cells · ${Math.round(W)}×${Math.round(H)} mm` + (S.mode === "path" ? ` · ${S.path.length}-pt path` : "");
 }
 const f = n => Math.round(n * 100) / 100;
 
@@ -244,25 +292,25 @@ function ptToMM(evt) {
   const y = (evt.clientY - r.top) / r.height * H;
   return { x, y };
 }
-let dragging = false;
-function wireDrag() {
-  const att = $("att");
-  if (att) att.addEventListener("pointerdown", e => { dragging = true; art.setPointerCapture(e.pointerId); e.preventDefault(); });
-}
-art.addEventListener("pointermove", e => {
-  if (!dragging) return;
-  const { x, y } = ptToMM(e);
-  S.ax = Math.min(1, Math.max(0, x / W)); S.ay = Math.min(1, Math.max(0, y / H));
-  render();
-});
-addEventListener("pointerup", () => { dragging = false; });
-// click anywhere on the canvas (not the handle) to move the attractor there
+// drag = null | "pt" (point attractor) | a path-point index (number)
+let drag = null;
+const clamp = v => Math.min(1, Math.max(0, v));
 art.addEventListener("pointerdown", e => {
-  if (e.target.closest("#att")) return;
+  const h = e.target.closest(".phandle");
+  if (h) { drag = h.dataset.i === "pt" ? "pt" : +h.dataset.i; art.setPointerCapture(e.pointerId); e.preventDefault(); return; }
+  // empty canvas: path mode adds a point; point mode moves the attractor
   const { x, y } = ptToMM(e);
-  S.ax = Math.min(1, Math.max(0, x / W)); S.ay = Math.min(1, Math.max(0, y / H));
+  if (S.mode === "path") { S.path.push({ x: Math.max(0, Math.min(W, x)), y: Math.max(0, Math.min(H, y)) }); drag = S.path.length - 1; render(); }
+  else { S.ax = clamp(x / W); S.ay = clamp(y / H); render(); }
+});
+art.addEventListener("pointermove", e => {
+  if (drag === null) return;
+  const { x, y } = ptToMM(e), cx = Math.max(0, Math.min(W, x)), cy = Math.max(0, Math.min(H, y));
+  if (drag === "pt") { S.ax = clamp(x / W); S.ay = clamp(y / H); }
+  else if (typeof drag === "number" && S.path[drag]) S.path[drag] = { x: cx, y: cy };
   render();
 });
+addEventListener("pointerup", () => { drag = null; });
 
 // ── exports ────────────────────────────────────────────────────────────
 function exportSVG() {
@@ -337,6 +385,24 @@ $("stroke").oninput = e => { S.stroke = e.target.value; render(); };
 $("outline").onchange = e => { S.outline = e.target.checked; render(); };
 $("bg").oninput = e => { S.bg = e.target.value; render(); };
 addEventListener("resize", render);
+
+// attractor mode (point / path)
+$("mode").querySelectorAll("button").forEach(b => {
+  b.onclick = () => {
+    S.mode = b.dataset.m;
+    $("mode").querySelectorAll("button").forEach(x => x.classList.toggle("on", x === b));
+    $("clearPath").hidden = S.mode !== "path";
+    $("modeHint").textContent = S.mode === "path"
+      ? "Click on the canvas to add path points; drag a point to move it. The field follows the whole path."
+      : "Drag the red dot on the canvas to move the attractor.";
+    if (S.mode === "path" && S.path.length === 0) {
+      // seed a gentle diagonal path so there's instant feedback
+      S.path = [{ x: W * 0.2, y: H * 0.3 }, { x: W * 0.5, y: H * 0.65 }, { x: W * 0.8, y: H * 0.35 }];
+    }
+    render();
+  };
+});
+$("clearPath").onclick = () => { S.path = []; render(); };
 
 render();
 </script>

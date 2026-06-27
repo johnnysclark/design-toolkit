@@ -55,9 +55,11 @@ const CARDS: HubCard[] = [
   },
   {
     title: "Solar Envelope",
-    status: "proposed",
+    source: "Zoning by sunlight",
+    status: "live",
+    href: "/tools-3d/solar-envelope",
     blurb:
-      "Set a site boundary and the neighbours' right-to-light hours, and carve the maximum buildable volume that never shadows them beyond the limit — the zoning 'solar envelope', exportable to Rhino. Builds on the Sun & Shadow engine."
+      "Carve the largest volume you can build on a site without shadowing the neighbours — the 'solar envelope' (after Knowles). Set site size + latitude, pick the sun window to protect (e.g. winter 9–3), and height is capped everywhere so shadows stay on-site: tallest in the middle, sloping to the edges. Orbit it, export OBJ to Rhino. Client-side."
   }
 ];
 
