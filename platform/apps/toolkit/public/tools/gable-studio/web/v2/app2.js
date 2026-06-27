@@ -10,6 +10,7 @@ import { FORCES, draftClause, activeTensions } from "./forces.js";
 import { Series, makeVariation, diffSeeds } from "./series.js";
 import { parseEPW, describeClimate } from "./weather.js";
 import { incidentByModel } from "../radiation.js";
+import { oursReference, parseLadybugCSV, compareRows, WHY_GENERAL, comparisonPack } from "./compare.js";
 
 // ---- tiny DOM + math helpers ----------------------------------------------
 const $ = (s) => document.querySelector(s);
@@ -400,6 +401,48 @@ function saveFork(decision) {
   setStatus(`Forked “${v.title || "variation " + v.id.replace("var-", "")}” into the series (${Series.list.length} total).`);
 }
 
+// ---- Ladybug side-by-side (instructor demo) -------------------------------
+function openCompare() {
+  const body = $("#compare-body"); body.replaceChildren();
+  if (!state.climate) {
+    body.append(el("p", null, "Load a climate (.epw) first — the comparison needs real weather to reproduce in Ladybug."),
+      el("div", { class: "ff-actions" }, el("button", { class: "btn", onclick: () => hideModal("compareModal") }, "OK")));
+    return showModal("compareModal");
+  }
+  const c = state.climate, ours = oursReference(c);
+  const ourTable = el("table", { class: "cmp-table" },
+    el("tr", null, el("th", null, "surface"), el("th", null, "ours (kWh/m²·yr)")),
+    ...ours.map((o) => el("tr", null, el("td", null, o.label), el("td", null, o.ours == null ? "—" : o.ours))));
+  const ta = el("textarea", { class: "cmp-paste", placeholder: "Paste Ladybug results as key,value rows:\nhorizontal,1610\nsouth,1240\neast,980\nwest,990\nnorth,560" });
+  const result = el("div", { class: "cmp-result" });
+
+  const runCompare = () => {
+    const lb = parseLadybugCSV(ta.value);
+    if (!Object.keys(lb).length) { result.replaceChildren(el("p", { class: "tiny" }, "No rows parsed — use lines like “horizontal,1600”.")); return; }
+    const rows = compareRows(ours, lb);
+    result.replaceChildren(
+      el("table", { class: "cmp-table" },
+        el("tr", null, el("th", null, "surface"), el("th", null, "ours"), el("th", null, "Ladybug"), el("th", null, "Δ"), el("th", null, "%"), el("th", null, "verdict")),
+        ...rows.map((r) => el("tr", { class: "cmp-" + r.status },
+          el("td", null, r.label), el("td", null, r.ours == null ? "—" : r.ours), el("td", null, r.lb == null ? "—" : r.lb),
+          el("td", null, r.delta == null ? "—" : r.delta), el("td", null, r.pct == null ? "—" : r.pct + "%"),
+          el("td", null, r.status === "na" ? "no LB value" : r.status === "ok" ? "reproduces" : r.status === "near" ? "close" : "diverges")))),
+      el("div", { class: "cmp-why" }, el("b", null, "Why they differ — and why that IS the lesson:"),
+        el("ul", null, ...WHY_GENERAL.map((w) => el("li", null, w)))));
+  };
+
+  body.append(
+    el("p", { class: "tiny" }, `Same EPW + Tregenza-145 required. Loaded: ${c.location.city || "EPW"} (${c.location.lat}°, ${c.location.lon}°), GHI ${c.annual.ghiTotalKWh} kWh/m²·yr. Our sky is isotropic — “reproduces” means we match Ladybug's METHOD within a few %, not absolute accuracy.`),
+    el("h4", { class: "cmp-h" }, "Our incidence — unshaded unit surfaces"), ourTable,
+    el("div", { class: "ff-actions" },
+      el("button", { class: "btn", onclick: () => downloadJSON(comparisonPack(state, new Date().toISOString().slice(0, 10)), "eco-architect-comparison.json") }, "⤓ Comparison pack"),
+      el("a", { class: "btn", href: "../../LADYBUG_RECIPE.md", target: "_blank", rel: "noopener" }, "Recipe ↗")),
+    el("h4", { class: "cmp-h" }, "Paste Ladybug's results"), ta,
+    el("div", { class: "ff-actions" }, el("button", { class: "btn primary", onclick: runCompare }, "Compare")),
+    result);
+  showModal("compareModal");
+}
+
 // ---- save / load the whole series -----------------------------------------
 function downloadJSON(obj, name) {
   const blob = new Blob([JSON.stringify(obj, null, 2)], { type: "application/json" });
@@ -527,6 +570,7 @@ $("#v2-reset").addEventListener("click", resetDesign);
 $("#v2-fork").addEventListener("click", openFork);
 $("#v2-save-series").addEventListener("click", saveSeries);
 $("#v2-load-series").addEventListener("click", loadSeries);
+$("#v2-compare").addEventListener("click", openCompare);
 const setStatus = (msg) => { $("#v2-status").textContent = msg; };
 
 // ---- rebuild = structural render + a live pass ----------------------------

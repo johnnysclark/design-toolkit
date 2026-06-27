@@ -27,6 +27,7 @@
     </div>
     <div class="v2head-r">
       <button id="v2-climate" class="btn">☁ Load climate (.epw)</button>
+      <button id="v2-compare" class="btn">⚖ Compare to Ladybug</button>
       <button id="v2-propose" class="btn">✶ Propose a charter from this site</button>
       <button id="v2-save-series" class="btn">Save series</button>
       <button id="v2-load-series" class="btn">Load series</button>
@@ -81,6 +82,14 @@
     <div class="modal-box">
       <div class="modal-head"><b>Record this variation</b><button class="modal-x" data-close="forkModal">✕</button></div>
       <div class="modal-body" id="fork-form"></div>
+    </div>
+  </div>
+
+  <!-- Side-by-side with Ladybug (instructor demo) -->
+  <div id="compareModal" class="modal" style="display:none">
+    <div class="modal-box" style="width:min(580px,94vw)">
+      <div class="modal-head"><b>Compare to Ladybug</b><button class="modal-x" data-close="compareModal">✕</button></div>
+      <div class="modal-body" id="compare-body"></div>
     </div>
   </div>
 

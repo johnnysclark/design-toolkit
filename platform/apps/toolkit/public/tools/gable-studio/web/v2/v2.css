@@ -191,3 +191,17 @@ button { font-family: inherit; color: var(--ink); }
 .windrose { margin-top: 4px; }
 .windrose svg { display: block; }
 .climate-read .tiny { opacity: .6; font-style: italic; }
+
+/* ---- Ladybug compare modal --------------------------------------------- */
+.cmp-h { font-family: var(--font-display); text-transform: uppercase; font-size: 11px; margin: 4px 0 2px; }
+.tiny { font-size: 10.5px; opacity: .7; }
+.cmp-table { width: 100%; border-collapse: collapse; font-size: 11.5px; font-variant-numeric: tabular-nums; margin: 2px 0; }
+.cmp-table th, .cmp-table td { border: 1px solid var(--line); padding: 3px 6px; text-align: left; }
+.cmp-table th { font-family: var(--font-display); text-transform: uppercase; font-size: 9.5px; background: var(--soft); }
+.cmp-paste { width: 100%; min-height: 80px; font-family: ui-monospace, Menlo, monospace; font-size: 11px; padding: 6px; border: 1.5px solid var(--line); border-radius: 6px; }
+.cmp-row { } /* status colors on rows */
+tr.cmp-ok td { background: #eef5ee; } tr.cmp-near td { background: #faf3e2; } tr.cmp-bad td { background: #f9e6e3; } tr.cmp-na td { opacity: .6; }
+.cmp-why { margin-top: 8px; font-size: 11px; background: var(--soft); border: 1px solid var(--line); border-radius: 6px; padding: 8px; }
+.cmp-why b { font-family: var(--font-display); font-weight: normal; text-transform: uppercase; font-size: 10px; }
+.cmp-why ul { margin: 6px 0 0; padding-left: 18px; } .cmp-why li { margin-bottom: 4px; }
+a.btn { text-decoration: none; display: inline-block; }
