@@ -828,16 +828,16 @@ export function describe(state: State, levelFilter: number | null = null): strin
   const boxes = state.regions.filter((r) => r.kind === "box");
   const layerNames = Object.keys(state.layers);
 
-  const macro =
-    `MACRO — ${cap(siteDesc)}. ` +
-    `${state.levels.length} level${state.levels.length === 1 ? "" : "s"}, ` +
-    `${names.length} structural bay${names.length === 1 ? "" : "s"}, ` +
-    `${plates.length} floor plate${plates.length === 1 ? "" : "s"}, ` +
-    `${boxes.length} extruded box${boxes.length === 1 ? "" : "es"}, ` +
-    `${state.walls.length} free wall${state.walls.length === 1 ? "" : "s"}, ` +
-    `${layerNames.length} layer${layerNames.length === 1 ? "" : "s"}.`;
+  const count = (n: number, one: string, many = one + "s") => `${n} ${n === 1 ? one : many}`;
 
-  // Layers — name, lineweight, linetype, and any tactile texture.
+  // OVERVIEW — one plain sentence of what the whole model holds.
+  const overview =
+    `OVERVIEW — ${cap(siteDesc)}; ${count(state.levels.length, "level")}. ` +
+    `Holds ${count(names.length, "structural bay")}, ${count(plates.length, "floor plate")}, ` +
+    `${count(boxes.length, "extruded box", "extruded boxes")}, ${count(state.walls.length, "free wall")}, ` +
+    `${count(state.columns.length, "column")}, on ${count(layerNames.length, "layer")}.`;
+
+  // LAYERS — name, linetype, lineweight, and any tactile texture.
   const layerBlock = `LAYERS — ${layerNames
     .map((n) => {
       const l = state.layers[n];
@@ -846,51 +846,44 @@ export function describe(state: State, levelFilter: number | null = null): strin
     })
     .join("; ")}.`;
 
-  // Meso — one block per level, listing its regions (scoped if a level is active).
-  const meso = state.levels
+  // One block per level: EVERYTHING that sits on it (regions, bays, free walls,
+  // columns) in one place — no separate meso/micro tiers. Scoped when a level is active.
+  const oob = (lvl: number) => lvl < 0 || lvl >= state.levels.length;
+  const levelBlocks = state.levels
     .map((lvl, li) => ({ lvl, li }))
     .filter(({ li }) => levelFilter === null || li === levelFilter)
     .map(({ lvl, li }) => {
-      const regions = state.regions.filter((r) => (r.level ?? 0) === li);
-      const regionTxt = regions.length ? regions.map((r) => regionLine(state, r)).join(" ") : "no regions";
-      return `MESO — Level ${li} (${lvl.label}, z=${lvl.z} ft): ${regionTxt}`;
-    })
-    .join("\n");
+      const lines: string[] = [];
+      for (const r of state.regions.filter((r) => (r.level ?? 0) === li)) lines.push(`  • ${regionLine(state, r)}`);
+      for (const n of names.filter((n) => (state.bays[n].level ?? 0) === li)) {
+        const b = state.bays[n];
+        const walls = b.walls.enabled ? `, ${(b.walls.thickness * 12).toFixed(0)}-inch perimeter walls` : "";
+        const corridor = b.corridor.enabled ? `, ${b.corridor.width}-ft ${b.corridor.axis}-corridor` : "";
+        const aps = b.apertures.length ? `, openings: ${b.apertures.map((a) => `${a.type} ${a.id}`).join(", ")}` : "";
+        const voids = b.void_center && b.void_size ? `, atrium ${b.void_size[0]}×${b.void_size[1]} ft` : "";
+        lines.push(`  • bay ${b.label}: ${b.bays[0]}×${b.bays[1]} grid @ ${b.spacing[0]}×${b.spacing[1]} ft, origin (${b.origin[0]},${b.origin[1]})${walls}${corridor}${aps}${voids}`);
+      }
+      for (const w of state.walls.filter((w) => w.level === li)) {
+        const ops = state.openings.filter((o) => o.wallId === w.id);
+        const opTxt = ops.length ? `, openings: ${ops.map((o) => `${o.type} ${o.id}`).join(", ")}` : "";
+        lines.push(`  • free wall ${w.id}: (${w.a[0]},${w.a[1]})→(${w.b[0]},${w.b[1]}), ${(w.thickness * 12).toFixed(0)} in thick${opTxt}`);
+      }
+      for (const c of state.columns.filter((c) => c.level === li)) lines.push(`  • column ${c.id} at (${c.at[0]},${c.at[1]}), ${c.size} ft`);
+      const body = lines.length ? lines.join("\n") : "  • (nothing on this level yet)";
+      return `LEVEL ${li} — ${lvl.label} (z=${lvl.z} ft):\n${body}`;
+    });
 
-  // Regions/walls/columns on an out-of-range level still count in MACRO — surface
-  // them so the spoken read-back always reconciles with the count (e.g. after an import).
-  const oob = (lvl: number) => lvl < 0 || lvl >= state.levels.length;
+  // Anything stranded on an out-of-range level still reconciles with the counts.
   const orphans = [
     ...state.regions.filter((r) => oob(r.level ?? 0)).map((r) => `${r.kind === "plate" ? "floor plate" : "extruded box"} ${r.name} (L${r.level ?? 0})`),
     ...state.walls.filter((w) => oob(w.level)).map((w) => `wall ${w.id} (L${w.level})`),
     ...state.columns.filter((c) => oob(c.level)).map((c) => `column ${c.id} (L${c.level})`)
   ];
-  const orphanBlock = orphans.length
-    ? [`UNPLACED — ${orphans.length} element(s) on an out-of-range level: ${orphans.join(", ")}.`]
-    : [];
+  const orphanBlock = orphans.length ? ["", `UNPLACED — ${orphans.length} element(s) on an out-of-range level: ${orphans.join(", ")}.`] : [];
 
-  // Micro — bay detail + free walls + openings.
-  const bayMicro = names.map((n) => {
-    const b = state.bays[n];
-    const corridor = b.corridor.enabled ? `a ${b.corridor.width}-ft ${b.corridor.axis}-corridor; ` : "";
-    const walls = b.walls.enabled ? `${(b.walls.thickness * 12).toFixed(0)}-inch perimeter walls; ` : "";
-    const aps = b.apertures.length ? b.apertures.map((a) => `${a.type} ${a.id}`).join(", ") : "no openings";
-    return `MICRO — ${b.label}: ${b.bays[0]}×${b.bays[1]} grid @ ${b.spacing[0]}×${b.spacing[1]} ft, origin (${b.origin[0]},${b.origin[1]}); ${walls}${corridor}${aps}.`;
-  });
-  const wallMicro = state.walls.length
-    ? [`MICRO — Free walls: ${state.walls.map((w) => `${w.id} (${w.a[0]},${w.a[1]})→(${w.b[0]},${w.b[1]})`).join(", ")}.`]
-    : [];
-  const openMicro = state.openings.length
-    ? [`MICRO — Wall openings: ${state.openings.map((o) => `${o.type} ${o.id} on ${o.wallId}`).join(", ")}.`]
-    : [];
-  // Atria/voids exist in the 2D plan — surface them in the read-back too.
-  const atria = Object.values(state.bays).filter((b) => b.void_center && b.void_size);
-  const voidMicro = atria.length
-    ? [`MICRO — Atria/voids: ${atria.map((b) => `${b.void_size![0]}×${b.void_size![1]} ft at (${b.void_center![0]}, ${b.void_center![1]})`).join(", ")}.`]
-    : [];
   const scope = levelFilter === null ? [] : [`SCOPE — Level ${levelFilter} only (matches the filtered PIAF / STL export).`, ""];
 
-  return [...scope, macro, layerBlock, "", meso, ...orphanBlock, "", ...bayMicro, ...wallMicro, ...openMicro, ...voidMicro].join("\n");
+  return [...scope, overview, layerBlock, "", ...levelBlocks, ...orphanBlock].join("\n");
 }
 
 // ─── Dispatcher ──────────────────────────────────────────────────────────────

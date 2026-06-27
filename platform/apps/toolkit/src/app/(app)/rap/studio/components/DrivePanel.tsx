@@ -98,8 +98,9 @@ export default function DrivePanel({ stateText, onDownloadState, webOnly }: { st
   return (
     <div className="space-y-4 text-neutral-900">
       <p className="text-sm leading-relaxed text-neutral-900">
-        Send this model to your desktop Rhino. The studio emits a complete{" "}
-        <code className="font-mono">state.json</code>; the existing Watcher rebuilds the <b>bay-based</b> geometry (grids, walls, corridors, apertures) and levels when that file changes.
+        <b>How it works:</b> your model is one <code className="font-mono">state.json</code> file. A small <b>Watcher</b> running inside Rhino
+        rebuilds the geometry every time that file changes. So the whole job is getting <code className="font-mono">state.json</code> into the
+        folder the Watcher is watching — three ways below, <b>simplest first</b>. (Set up the Watcher in Rhino once; see the last card.)
       </p>
 
       {/* Static visual note (NOT a live region): the embedded counts change on
@@ -120,11 +121,19 @@ export default function DrivePanel({ stateText, onDownloadState, webOnly }: { st
         </p>
       )}
 
-      {/* 1 — Direct folder write */}
+      {/* Option A — download (simplest, any browser) */}
       <div className={card}>
-        <h3 className="display-font text-xs uppercase tracking-tight">1 · Write to a folder (Chrome / Edge)</h3>
+        <h3 className="display-font text-xs uppercase tracking-tight">Option A · Download the file (any browser, no setup)</h3>
+        <button type="button" className={btn} onClick={onDownloadState}>Download state.json</button>
+        <p className="text-xs leading-relaxed text-neutral-900">Save it into your Rhino project folder — the one the Watcher is watching. Re-download to replace it whenever you want Rhino to rebuild.</p>
+      </div>
+
+      {/* Option B — auto folder write (Chrome / Edge) */}
+      <div className={card}>
+        <h3 className="display-font text-xs uppercase tracking-tight">Option B · Auto-write to that folder (Chrome or Edge)</h3>
         {supported ? (
           <>
+            <p className="text-xs leading-relaxed text-neutral-900">Skip the downloads: connect your Rhino project folder once, then push <code className="font-mono">state.json</code> straight into it.</p>
             <div className="flex flex-wrap items-center gap-2">
               <button type="button" className={btn} onClick={connectFolder}>
                 {dir ? "Reconnect folder" : "Connect Rhino folder"}
@@ -134,79 +143,64 @@ export default function DrivePanel({ stateText, onDownloadState, webOnly }: { st
               </button>
               <label className="flex items-center gap-1.5 text-xs font-semibold">
                 <input type="checkbox" checked={autoFolder} onChange={(e) => setAutoFolder(e.target.checked)} disabled={!dir} aria-label="Auto-push to the connected folder on change" />
-                Auto-push on change
+                Auto-push on every change
               </label>
             </div>
             <p className="min-h-[1rem] text-xs text-neutral-900" aria-live="polite">{folderMsg}</p>
           </>
         ) : (
-          <p className="text-xs text-neutral-900">This browser can&rsquo;t write files directly. Use Chrome or Edge, or use the companion bridge below.</p>
+          <p className="text-xs text-neutral-900">This browser can&rsquo;t write files directly — use Chrome or Edge, or use Option C below.</p>
         )}
       </div>
 
-      {/* 2 — Companion bridge */}
+      {/* Option C — live bridge, set up once with numbered steps */}
       <div className={card}>
-        <h3 className="display-font text-xs uppercase tracking-tight">2 · Companion bridge (any browser, + live Watcher)</h3>
-        <div className="flex flex-wrap items-center gap-3">
-          <a
-            href="/rap-bridge/rap_bridge.py"
-            download
-            className="display-font inline-block rounded border-2 border-neutral-900 bg-neutral-900 px-3 py-1.5 text-xs uppercase text-white hover:bg-[#ff3b21] hover:border-[#ff3b21]"
-          >
-            Download Watcher (rap_bridge.py)
-          </a>
-          <a href="/rap-bridge/README.md" download className="text-xs underline underline-offset-2 hover:text-[#ff3b21]">
-            readme
-          </a>
-        </div>
-        <div className="flex flex-wrap items-end gap-2">
-          <label className="flex flex-col gap-1 text-xs font-semibold">
-            Bridge URL
-            <input className={field} value={url} onChange={(e) => setUrl(e.target.value)} spellCheck={false} />
-          </label>
-          <label className="flex flex-col gap-1 text-xs font-semibold">
-            Token
-            <input className={field} value={token} onChange={(e) => setToken(e.target.value)} placeholder="paste from rap_bridge.py" spellCheck={false} />
-          </label>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <button type="button" className={btn} onClick={testBridge}>Test connection</button>
-          <button type="button" className={btn} onClick={() => pushBridge(stateText)}>Push to Rhino</button>
-          <button type="button" className={btn} onClick={pingWatcher} title="Optional live query link (advanced; off by default)">Check live link</button>
-          <label className="flex items-center gap-1.5 text-xs font-semibold">
-            <input type="checkbox" checked={autoBridge} onChange={(e) => setAutoBridge(e.target.checked)} aria-label="Auto-push to the bridge on change" />
-            Auto-push on change
-          </label>
-        </div>
+        <h3 className="display-font text-xs uppercase tracking-tight">Option C · Live bridge (any browser)</h3>
+        <p className="text-xs leading-relaxed text-neutral-900">For any browser, or a live link to Rhino: a tiny helper runs on your machine and this page pushes to it. Set it up once:</p>
+        <ol className="list-decimal space-y-2 pl-5 text-sm text-neutral-900">
+          <li>
+            Download the helper and save it next to your Rhino project folder:
+            <div className="mt-1 flex flex-wrap items-center gap-3">
+              <a href="/rap-bridge/rap_bridge.py" download className="display-font inline-block rounded border-2 border-neutral-900 bg-neutral-900 px-3 py-1.5 text-xs uppercase text-white hover:border-[#ff3b21] hover:bg-[#ff3b21]">Download Watcher (rap_bridge.py)</a>
+              <a href="/rap-bridge/README.md" download className="text-xs underline underline-offset-2 hover:text-[#ff3b21]">readme</a>
+            </div>
+          </li>
+          <li>
+            In a terminal, run it pointed at that folder:
+            <pre className="mt-1 overflow-x-auto rounded bg-[#0e0e0e] p-2 font-mono text-[11px] text-[#e8e8e8]">python3 rap_bridge.py --folder /path/to/your/rap-project</pre>
+          </li>
+          <li>
+            It prints a <b>URL</b> and a <b>token</b> — paste them here and test:
+            <div className="mt-1 flex flex-wrap items-end gap-2">
+              <label className="flex flex-col gap-1 text-xs font-semibold">Bridge URL<input className={field} value={url} onChange={(e) => setUrl(e.target.value)} spellCheck={false} /></label>
+              <label className="flex flex-col gap-1 text-xs font-semibold">Token<input className={field} value={token} onChange={(e) => setToken(e.target.value)} placeholder="paste from rap_bridge.py" spellCheck={false} /></label>
+              <button type="button" className={btn} onClick={testBridge}>Test connection</button>
+            </div>
+          </li>
+          <li>
+            Push the model — now, or automatically on every change:
+            <div className="mt-1 flex flex-wrap items-center gap-2">
+              <button type="button" className={btn} onClick={() => pushBridge(stateText)}>Push to Rhino</button>
+              <label className="flex items-center gap-1.5 text-xs font-semibold"><input type="checkbox" checked={autoBridge} onChange={(e) => setAutoBridge(e.target.checked)} aria-label="Auto-push to the bridge on change" />Auto-push on every change</label>
+              <button type="button" className={btn} onClick={pingWatcher} title="Optional live query link (advanced; off by default)">Check live link</button>
+            </div>
+          </li>
+        </ol>
         <p className="min-h-[1rem] text-xs text-neutral-900" aria-live="polite">{bridgeMsg}</p>
         {info?.watcher?.reachable && (
-          <p className="text-xs text-neutral-900">
-            Optional live link: <b>on</b> (Rhino is answering on port {info.watcher.port}).
-          </p>
+          <p className="text-xs text-neutral-900">Live link: <b>on</b> (Rhino is answering on port {info.watcher.port}).</p>
         )}
-        <p className="text-xs leading-relaxed text-neutral-900">Run the bridge with the file you downloaded above, then:</p>
-        <pre className="overflow-x-auto rounded bg-[#0e0e0e] p-2 font-mono text-[11px] text-[#e8e8e8]">python3 rap_bridge.py --folder /path/to/your/rap-project</pre>
-        <p className="text-xs text-neutral-900">It prints a URL and token — paste them above.</p>
       </div>
 
-      {/* 2.5 — Numbered "start watching in Rhino" walkthrough */}
+      {/* In Rhino — the other half, needed for every option */}
       <div className={card}>
-        <h3 className="display-font text-xs uppercase tracking-tight">Start watching in Rhino — step by step</h3>
-        <ol className="list-decimal space-y-1.5 pl-5 text-sm text-neutral-900">
-          <li>Click <b>Download Watcher (rap_bridge.py)</b> above and save it next to your RAP project folder.</li>
-          <li>Open a terminal. Run <code className="font-mono">python3 rap_bridge.py --folder /path/to/your/rap-project</code>.</li>
-          <li>It prints a <b>URL</b> and a <b>token</b>. Paste both into the fields below and click <b>Test connection</b>.</li>
-          <li>In Rhino, open the RAP Watcher script and point it at the <b>same project folder</b>; press play so it watches <code className="font-mono">state.json</code>.</li>
-          <li>Back here, click <b>Push to Rhino</b> (or tick <b>Auto-push on change</b>). Rhino rebuilds the geometry on every file change.</li>
-          <li>Optional: <b>Check live link</b> confirms Rhino&rsquo;s query port — off is normal; pushes still rebuild via the file watcher.</li>
-        </ol>
-      </div>
-
-      {/* 3 — Always-available fallback */}
-      <div className={card}>
-        <h3 className="display-font text-xs uppercase tracking-tight">3 · Manual (works everywhere)</h3>
-        <button type="button" className={btn} onClick={onDownloadState}>Download state.json</button>
-        <p className="text-xs text-neutral-900">Save it into your RAP project folder by hand; the Watcher rebuilds on the file change.</p>
+        <h3 className="display-font text-xs uppercase tracking-tight">In Rhino (once)</h3>
+        <p className="text-xs leading-relaxed text-neutral-900">
+          Open the RAP <b>Watcher</b> script in Rhino, point it at the <b>same folder</b>, and press play. It rebuilds the bay geometry,
+          walls, corridors, apertures and levels whenever <code className="font-mono">state.json</code> changes. Floor plates, extruded
+          boxes and free walls travel in the file under <code className="font-mono">web_*</code> keys, but the current Watcher doesn&rsquo;t
+          rebuild those yet.
+        </p>
       </div>
     </div>
   );

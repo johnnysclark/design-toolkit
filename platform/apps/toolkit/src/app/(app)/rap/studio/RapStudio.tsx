@@ -265,26 +265,6 @@ export default function RapStudio({ signedIn }: { signedIn: boolean }) {
 
   return (
     <div className="space-y-5">
-      {/* Toolbar */}
-      <div className="flex flex-wrap items-center gap-2 rounded-lg border-2 border-neutral-900 p-2.5">
-        <ToolbarBtn onClick={exportState}>Download state.json</ToolbarBtn>
-        <ToolbarBtn onClick={exportPiaf}>Export PIAF PNG{activeLevel !== null ? ` · L${activeLevel}` : ""}</ToolbarBtn>
-        <ToolbarBtn onClick={exportStl}>Export STL{activeLevel !== null ? ` · L${activeLevel}` : ""}</ToolbarBtn>
-        <ToolbarBtn onClick={exportLog}>Save command log</ToolbarBtn>
-        <span className="flex-1" />
-        <ToolbarBtn onClick={() => runCommand("undo")} disabled={histLen.undo === 0}>
-          Undo
-        </ToolbarBtn>
-        <ToolbarBtn onClick={() => runCommand("redo")} disabled={histLen.redo === 0}>
-          Redo
-        </ToolbarBtn>
-        <label className="flex items-center gap-1.5 text-xs font-semibold text-neutral-900">
-          <input type="checkbox" checked={speak} onChange={(e) => setSpeak(e.target.checked)} />
-          Speak confirmations
-        </label>
-        <StarterSelect onPick={loadStarter} />
-      </div>
-
       <p className="text-sm text-neutral-900">
         Loaded with a <b>sample model</b> (one structural bay, a partition wall, two floor plates on a slab layer, two levels) so you can see
         what the tool does. The <b>Assistant</b> is the main way to author: describe what you want in plain language and it writes the
@@ -293,8 +273,40 @@ export default function RapStudio({ signedIn }: { signedIn: boolean }) {
         to begin from an empty model, a structural bay grid, a massing diagram, a single floor plate, or the sample.
       </p>
 
-      {/* Row 1 — visual model + canonical state */}
+      {/* Row 1 — author (chat, the primary channel) + 3D model beside it */}
       <div className="grid gap-5 lg:grid-cols-2">
+        <Panel
+          title="Author"
+          right={<Tabs label="Choose an authoring channel" tabs={[["assistant", "Assistant"], ["console", "Console"], ["forms", "Forms"]]} active={authorTab} onPick={(t) => setAuthorTab(t as AuthorTab)} />}
+        >
+          <div className="min-h-[20rem]">
+            {authorTab === "console" && <Console log={log} history={history} onCommand={runCommand} />}
+            {authorTab === "forms" && <Forms state={state} onCommand={runCommand} />}
+            {authorTab === "assistant" &&
+              (signedIn ? (
+                <div className="space-y-2">
+                  <p className="text-xs text-neutral-900">
+                    Ask in plain language; the assistant replies and shows the exact <b>commands it ran</b> — nothing happens you can&apos;t see.
+                    This models directing <b>Claude Code</b> in a terminal: you describe intent, it writes the precise edits.
+                  </p>
+                  <AgentPanel onSubmit={runAgent} />
+                </div>
+              ) : (
+                // AI is behind a password (it spends the studio's API budget). The
+                // deterministic Console/Forms + every view + exports stay public.
+                <div className="flex min-h-[18rem] flex-col items-start justify-center gap-3 rounded-md border-2 border-dashed border-neutral-400 p-5">
+                  <div className="display-font text-sm uppercase text-neutral-900">Sign in to use the AI assistant</div>
+                  <p className="max-w-md text-sm text-neutral-900">
+                    The assistant spends the studio&apos;s API budget, so it&apos;s behind a password. The <b>Console</b> and <b>Forms</b> tabs, every view, and all exports work without signing in.
+                  </p>
+                  <a href="/login" className="display-font inline-block rounded-md border-2 border-neutral-900 bg-neutral-900 px-4 py-2 text-sm uppercase text-white hover:border-[#ff3b21] hover:bg-[#ff3b21]">
+                    Sign in →
+                  </a>
+                </div>
+              ))}
+          </div>
+        </Panel>
+
         <Panel
           title="Model — visual test"
           right={
@@ -314,37 +326,13 @@ export default function RapStudio({ signedIn }: { signedIn: boolean }) {
             The 3D view is an orthographic (parallel) black-and-white aid for sighted testing — hidden from screen readers. Solid black edges are visible; dotted black edges are hidden lines. The model is fully readable in the tactile plan, the read-back text, and the state tree.
           </p>
         </Panel>
+      </div>
 
+      {/* Row 2 — canonical state + read-back */}
+      <div className="grid gap-5 lg:grid-cols-2">
         <Panel title="Canonical state.json">
           <div className="h-80 overflow-auto rounded-md border border-neutral-300 bg-white p-2">
             <JsonTree data={state} changed={changed} />
-          </div>
-        </Panel>
-      </div>
-
-      {/* Row 2 — authoring + read-back */}
-      <div className="grid gap-5 lg:grid-cols-2">
-        <Panel
-          title="Author"
-          right={<Tabs label="Choose an authoring channel" tabs={[["assistant", "Assistant"], ["console", "Console"], ["forms", "Forms"]]} active={authorTab} onPick={(t) => setAuthorTab(t as AuthorTab)} />}
-        >
-          <div className="min-h-[20rem]">
-            {authorTab === "console" && <Console log={log} history={history} onCommand={runCommand} />}
-            {authorTab === "forms" && <Forms state={state} onCommand={runCommand} />}
-            {authorTab === "assistant" && (
-              <div className="space-y-2">
-                <p className="text-xs text-neutral-900">
-                  Ask in plain language; the assistant replies and shows the exact <b>commands it ran</b> — nothing happens you can&apos;t see.
-                  This models directing <b>Claude Code</b> in a terminal: you describe intent, it writes the precise edits.
-                </p>
-                {!signedIn && (
-                  <p className="rounded-md bg-[#fff2f0] px-3 py-2 text-xs text-neutral-900">
-                    The AI assistant needs sign-in (it spends the studio&apos;s API budget). The console, forms, and exports all work signed-out.
-                  </p>
-                )}
-                <AgentPanel onSubmit={runAgent} />
-              </div>
-            )}
           </div>
         </Panel>
 
@@ -366,7 +354,27 @@ export default function RapStudio({ signedIn }: { signedIn: boolean }) {
         </Panel>
       </div>
 
-      {/* Row 3 — drive real Rhino */}
+      {/* Toolbar — exports, history, starter (below the four windows) */}
+      <div className="flex flex-wrap items-center gap-2 rounded-lg border-2 border-neutral-900 p-2.5">
+        <ToolbarBtn onClick={exportState}>Download state.json</ToolbarBtn>
+        <ToolbarBtn onClick={exportPiaf}>Export PIAF PNG{activeLevel !== null ? ` · L${activeLevel}` : ""}</ToolbarBtn>
+        <ToolbarBtn onClick={exportStl}>Export STL{activeLevel !== null ? ` · L${activeLevel}` : ""}</ToolbarBtn>
+        <ToolbarBtn onClick={exportLog}>Save command log</ToolbarBtn>
+        <span className="flex-1" />
+        <ToolbarBtn onClick={() => runCommand("undo")} disabled={histLen.undo === 0}>
+          Undo
+        </ToolbarBtn>
+        <ToolbarBtn onClick={() => runCommand("redo")} disabled={histLen.redo === 0}>
+          Redo
+        </ToolbarBtn>
+        <label className="flex items-center gap-1.5 text-xs font-semibold text-neutral-900">
+          <input type="checkbox" checked={speak} onChange={(e) => setSpeak(e.target.checked)} />
+          Speak confirmations
+        </label>
+        <StarterSelect onPick={loadStarter} />
+      </div>
+
+      {/* Drive real Rhino */}
       <Panel title="Drive Rhino — talk to state.json + the Watcher">
         <DrivePanel
           stateText={fullState}
