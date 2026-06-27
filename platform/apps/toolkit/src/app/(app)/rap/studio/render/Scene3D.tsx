@@ -15,13 +15,12 @@
 import { memo, useMemo } from "react";
 import * as THREE from "three";
 import { Canvas } from "@react-three/fiber";
-import { OrbitControls, Bounds, Edges, Line } from "@react-three/drei";
+import { OrbitControls, Bounds, Edges, Line, Grid } from "@react-three/drei";
 import { deriveGeometry } from "../engine/geometry";
 import type { State } from "../engine/types";
 
 const WHITE = "#fff";
 const INK = "#111";
-const GROUND_Y = -0.05; // the one ground sits here, just below z=0
 const HIDDEN = { dashSize: 0.6, gapSize: 0.5 }; // feet — dotted hidden-edge cadence
 
 // Hidden-edge pass: EdgesGeometry + explicit lineSegments so we can call
@@ -80,18 +79,27 @@ function Model({ state, levelFilter }: { state: State; levelFilter: number | nul
   const gcx = scene.site.ox + gw / 2;
   const gcy = scene.site.oy + gh / 2;
 
+  // Pad the grid out past the model so it reads as ground, not a tight platter.
+  const gridW = Math.max(gw, 60) + 40;
+  const gridD = Math.max(gh, 60) + 40;
   return (
     <group>
-      {/* The single ground plane (below z=0). */}
-      <mesh position={[gcx, GROUND_Y, gcy]} rotation={[-Math.PI / 2, 0, 0]}>
-        <planeGeometry args={[gw, gh]} />
-        <meshBasicMaterial color={WHITE} polygonOffset polygonOffsetFactor={2} polygonOffsetUnits={2} />
-      </mesh>
-
-      {/* Site boundary (infill lot) — the single black ground outline, riding on z=0 */}
-      {scene.site.boundary && scene.site.boundary.length >= 3 && (
-        <Line points={[...scene.site.boundary, scene.site.boundary[0]].map((p) => [p.x, 0, p.y] as [number, number, number])} color={INK} lineWidth={1.5} />
-      )}
+      {/* Ground: a standard, very light 5-ft reference grid on z=0 — no solid
+          plane and no lot outline, just the grid. Heavier line every 25 ft. */}
+      <Grid
+        position={[gcx, 0, gcy]}
+        args={[gridW, gridD]}
+        cellSize={5}
+        cellThickness={0.6}
+        cellColor="#dcdcdc"
+        sectionSize={25}
+        sectionThickness={0.9}
+        sectionColor="#c2c2c2"
+        infiniteGrid={false}
+        fadeDistance={2000}
+        fadeStrength={0}
+        followCamera={false}
+      />
 
       {/* Atrium voids — outline just above the ground (parity with the 2D plan + read-back) */}
       {scene.voids.map((v, i) => {

@@ -7,9 +7,13 @@
 // auto-collapses out from under someone reading), and highlight lookup is O(1)
 // via a precomputed ancestor-prefix set.
 
-import { memo, useEffect, useMemo, useState } from "react";
+import { memo, useEffect, useMemo, useRef, useState } from "react";
 
 type Json = unknown;
+
+// Noisy, rarely-edited top-level keys — collapsed by default so the geometry you
+// actually author (layers, bays, walls, regions, columns, levels) is in view.
+const STATIC_KEYS = new Set(["schema", "meta", "style", "tactile3d"]);
 
 function isObj(v: Json): v is Record<string, Json> {
   return typeof v === "object" && v !== null && !Array.isArray(v);
@@ -28,6 +32,7 @@ function Node({ name, value, path, exact, onPath, depth }: { name: string; value
   const accent = exact.has(path);
   return (
     <div
+      data-changed={accent ? "1" : undefined}
       style={{
         marginLeft: 12 + depth * 12,
         padding: "1px 4px",
@@ -44,7 +49,9 @@ function Node({ name, value, path, exact, onPath, depth }: { name: string; value
 function Branch({ name, value, path, exact, onPath, depth }: { name: string; value: Record<string, Json> | Json[]; path: string; exact: Set<string>; onPath: Set<string>; depth: number }) {
   const accent = exact.has(path);
   const hit = onPath.has(path); // this node or a descendant changed
-  const [open, setOpen] = useState(depth < 2 || hit);
+  // Open by default for shallow, non-static branches; always open when a change
+  // lands inside. Static keys (schema/meta/style/tactile3d) start collapsed.
+  const [open, setOpen] = useState(hit || (depth < 2 && !STATIC_KEYS.has(name)));
   // Auto-open when a change lands here; never auto-close (user stays in control).
   // Depend on the per-edit onPath identity (fresh each diff) so two consecutive
   // edits to the same subtree both re-open it, even if collapsed in between.
@@ -60,6 +67,7 @@ function Branch({ name, value, path, exact, onPath, depth }: { name: string; val
       style={{ marginLeft: depth ? 12 : 0 }}
     >
       <summary
+        data-changed={accent ? "1" : undefined}
         style={{
           cursor: "pointer",
           color: "#111",
@@ -96,8 +104,17 @@ function JsonTree({ data, changed }: { data: Json; changed?: Set<string> }) {
     return { exact, onPath };
   }, [changed]);
 
+  // After an edit, scroll the first changed node into view inside the panel, so a
+  // deep add (e.g. a new regions[] entry below the fold) is actually seen.
+  const containerRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!exact.size) return;
+    const el = containerRef.current?.querySelector("[data-changed='1']") as HTMLElement | null;
+    el?.scrollIntoView({ block: "nearest" });
+  }, [exact]);
+
   return (
-    <div style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 12, lineHeight: 1.55, color: "#111" }}>
+    <div ref={containerRef} style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 12, lineHeight: 1.55, color: "#111" }}>
       <Node name="state" value={data} path="state" exact={exact} onPath={onPath} depth={0} />
     </div>
   );
