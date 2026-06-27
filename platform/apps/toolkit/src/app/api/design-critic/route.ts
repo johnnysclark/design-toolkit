@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { createClient } from "@/lib/supabase/server";
+import { resolveModel } from "@/lib/anthropic/models";
+import { SOFT_TIMEOUT_MS } from "@/lib/anthropic/limits";
 import {
-  MODEL,
   PERSONA_IDS,
   JURY_SCHEMA,
   WEATHER_SCHEMA,
@@ -25,7 +26,7 @@ import {
 } from "@/lib/anthropic/critic-prompts";
 
 export const runtime = "nodejs";
-export const maxDuration = 60;
+export const maxDuration = 300;
 
 const BUCKET = "critic";
 const MAX_BYTES = 4_500_000; // keep base64 well under the vision API per-image limit
@@ -104,18 +105,30 @@ async function runStructured(opts: {
   schema: unknown;
   maxTokens?: number;
   thinking?: boolean;
+  tier?: unknown;
   timeoutMs?: number;
 }): Promise<any> {
-  const { system, content, schema, maxTokens = 4000, thinking = false, timeoutMs = 54000 } = opts;
+  const {
+    system,
+    content,
+    schema,
+    maxTokens = 4000,
+    thinking = false,
+    tier,
+    timeoutMs = SOFT_TIMEOUT_MS
+  } = opts;
+  const { model, reasoning } = resolveModel(tier);
   const client = new Anthropic();
   const params: any = {
-    model: MODEL,
+    model,
     max_tokens: maxTokens,
-    system,
+    // Cache the (large) persona/system prompt — reused across critiques.
+    system: [{ type: "text", text: system, cache_control: { type: "ephemeral" } }],
     output_config: { format: { type: "json_schema", schema } },
     messages: [{ role: "user", content }]
   };
-  if (thinking) params.thinking = { type: "adaptive" };
+  // Adaptive thinking is Sonnet-only — never send it on the fast (Haiku) tier.
+  if (thinking && reasoning) params.thinking = { type: "adaptive" };
 
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), timeoutMs);
@@ -229,6 +242,8 @@ export async function POST(req: Request) {
   const paths = strArr(body?.imagePaths);
   const urls = strArr(body?.imageUrls);
   const sessionId: string | null = body?.sessionId || null;
+  // Shared Fast ⇄ Deep toggle (Haiku vs Sonnet) — reported in each trace's meta.
+  const { model } = resolveModel(body?.tier);
 
   try {
     // ── Ensure a session exists for the work (jury/weather group under it) ──
@@ -268,7 +283,8 @@ export async function POST(req: Request) {
         content,
         schema: JURY_SCHEMA,
         maxTokens: 5000,
-        thinking: body?.effort === "deep"
+        thinking: body?.effort === "deep",
+        tier: body?.tier
       });
 
       const sid = await ensureSession();
@@ -281,7 +297,7 @@ export async function POST(req: Request) {
         claims: flattenClaims(result)
       });
       await logRun({ sessionId: sid, personas, imageCount: blocks.length }, { result });
-      return NextResponse.json({ mode, sessionId: sid, result, meta: { model: MODEL, generated_at: new Date().toISOString() } });
+      return NextResponse.json({ mode, sessionId: sid, result, meta: { model, generated_at: new Date().toISOString() } });
     }
 
     // ── Mode: weather (crit weather report) ────────────────────────────────
@@ -294,7 +310,7 @@ export async function POST(req: Request) {
       const content = blocks.length
         ? [...blocks, { type: "text", text: weatherUser({ title, thesis, brief, imageCount: blocks.length }) }]
         : weatherUser({ title, thesis, brief });
-      const result = await runStructured({ system: WEATHER_SYSTEM, content, schema: WEATHER_SCHEMA });
+      const result = await runStructured({ system: WEATHER_SYSTEM, content, schema: WEATHER_SCHEMA, tier: body?.tier });
 
       const sid = await ensureSession();
       await supabase.from("critic_critiques").insert({
@@ -305,7 +321,7 @@ export async function POST(req: Request) {
         claims: flattenClaims(result)
       });
       await logRun({ sessionId: sid, imageCount: blocks.length }, { result });
-      return NextResponse.json({ mode, sessionId: sid, result, meta: { model: MODEL, generated_at: new Date().toISOString() } });
+      return NextResponse.json({ mode, sessionId: sid, result, meta: { model, generated_at: new Date().toISOString() } });
     }
 
     // ── Mode: rebuttal rehearsal ───────────────────────────────────────────
@@ -318,14 +334,15 @@ export async function POST(req: Request) {
       const result = await runStructured({
         system: REBUTTAL_SYSTEM,
         content: rebuttalUser({ title, thesis, brief, question, answer }),
-        schema: REBUTTAL_SCHEMA
+        schema: REBUTTAL_SCHEMA,
+        tier: body?.tier
       });
       const sid = await ensureSession();
       await supabase
         .from("critic_rebuttals")
         .insert({ owner: user.id, session_id: sid, question, student_answer: answer, follow_up: result });
       await logRun({ sessionId: sid, question }, { result });
-      return NextResponse.json({ mode, sessionId: sid, result, meta: { model: MODEL, generated_at: new Date().toISOString() } });
+      return NextResponse.json({ mode, sessionId: sid, result, meta: { model, generated_at: new Date().toISOString() } });
     }
 
     // ── Mode: portfolio-draft (a disposable scaffold) ──────────────────────
@@ -336,7 +353,8 @@ export async function POST(req: Request) {
       const result = await runStructured({
         system: PORTFOLIO_DRAFT_SYSTEM,
         content: portfolioDraftUser({ title, thesis, brief }),
-        schema: PORTFOLIO_DRAFT_SCHEMA
+        schema: PORTFOLIO_DRAFT_SCHEMA,
+        tier: body?.tier
       });
       const sid = await ensureSession();
       const { data: row } = await supabase
@@ -350,7 +368,7 @@ export async function POST(req: Request) {
         sessionId: sid,
         portfolioId: row?.id ?? null,
         result,
-        meta: { model: MODEL, generated_at: new Date().toISOString() }
+        meta: { model, generated_at: new Date().toISOString() }
       });
     }
 
@@ -366,7 +384,8 @@ export async function POST(req: Request) {
         system: SELF_ATTACK_SYSTEM,
         content: selfAttackUser({ title, thesis, brief, studentText }),
         schema: SELF_ATTACK_SCHEMA,
-        thinking: true
+        thinking: true,
+        tier: body?.tier
       });
       const portfolioId: string | null = body?.portfolioId || null;
       if (portfolioId) {
@@ -377,7 +396,7 @@ export async function POST(req: Request) {
           .eq("owner", user.id);
       }
       await logRun({ portfolioId }, { result });
-      return NextResponse.json({ mode, portfolioId, result, meta: { model: MODEL, generated_at: new Date().toISOString() } });
+      return NextResponse.json({ mode, portfolioId, result, meta: { model, generated_at: new Date().toISOString() } });
     }
 
     // ── Mode: thesis (defensible-thesis builder) ───────────────────────────
@@ -388,14 +407,15 @@ export async function POST(req: Request) {
       const result = await runStructured({
         system: THESIS_SYSTEM,
         content: thesisUser({ title, thesis, brief }),
-        schema: THESIS_SCHEMA
+        schema: THESIS_SCHEMA,
+        tier: body?.tier
       });
       const portfolioId: string | null = body?.portfolioId || null;
       if (portfolioId) {
         await supabase.from("critic_portfolio").update({ thesis: result }).eq("id", portfolioId).eq("owner", user.id);
       }
       await logRun({ portfolioId }, { result });
-      return NextResponse.json({ mode, portfolioId, result, meta: { model: MODEL, generated_at: new Date().toISOString() } });
+      return NextResponse.json({ mode, portfolioId, result, meta: { model, generated_at: new Date().toISOString() } });
     }
 
     return NextResponse.json({ error: "Unknown mode." }, { status: 400 });

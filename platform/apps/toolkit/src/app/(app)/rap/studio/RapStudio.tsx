@@ -148,13 +148,13 @@ export default function RapStudio({ signedIn }: { signedIn: boolean }) {
   );
 
   const runAgent = useCallback(
-    async (instruction: string): Promise<AgentResult> => {
+    async (instruction: string, tier: string): Promise<AgentResult> => {
       let res: Response;
       try {
         res = await fetch("/api/rap/agent", {
           method: "POST",
           headers: { "content-type": "application/json" },
-          body: JSON.stringify({ instruction, state: stateRef.current })
+          body: JSON.stringify({ instruction, state: stateRef.current, tier })
         });
       } catch {
         const msg = "Couldn't reach the assistant. Check your connection.";

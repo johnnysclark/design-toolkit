@@ -2,15 +2,16 @@ import { NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { createClient } from "@/lib/supabase/server";
 import {
-  MODEL,
   IMAGE_ANALYSIS_SCHEMA,
   IMAGE_ANALYSIS_SYSTEM,
   analysisUser
 } from "@/lib/anthropic/library-prompts";
+import { resolveModel } from "@/lib/anthropic/models";
 import { enrich } from "@/lib/library/enrich";
 
 export const runtime = "nodejs";
-export const maxDuration = 60;
+// Vercel Pro lets the vision read run past the old 60s cap.
+export const maxDuration = 300;
 
 const BUCKET = "library";
 const MAX_BYTES = 4_500_000; // keep base64 well under the vision API per-image limit
@@ -181,7 +182,10 @@ export async function POST(req: Request) {
     const note: string | null = body?.note ? String(body.note).trim() : null;
     const userContext: string | null = body?.userContext ? String(body.userContext).trim() : null;
     const incomingSearchId: string | null = body?.searchId || null;
-    // Effort tunes speed vs. depth of the vision pass (the "quick answer" slider).
+    // Fast ⇄ Deep model toggle (Haiku vs Sonnet) — the shared cost lever.
+    const { model, tier, reasoning } = resolveModel(body?.tier);
+    // Legacy effort knob (low/med/high) is Sonnet-only — Haiku rejects
+    // output_config.effort, so it's dropped on the Fast tier below.
     const effort: string | undefined = EFFORTS.has(body?.effort) ? body.effort : undefined;
 
     const paths: string[] = Array.isArray(body?.imagePaths)
@@ -257,17 +261,19 @@ export async function POST(req: Request) {
       );
     }
 
-    // Vision pass — structured output; effort tunes depth (lives inside output_config).
+    // Vision pass — structured output. Effort (depth) is Sonnet-only; it lives
+    // inside output_config and is omitted on the fast (Haiku) tier.
     const outputConfig: any = {
       format: { type: "json_schema", schema: IMAGE_ANALYSIS_SCHEMA }
     };
-    if (effort) outputConfig.effort = effort;
+    if (effort && reasoning) outputConfig.effort = effort;
 
     const client = new Anthropic();
     const message: any = await client.messages.create({
-      model: MODEL,
+      model,
       max_tokens: 4000,
-      system: IMAGE_ANALYSIS_SYSTEM,
+      // Cache the vision system prompt — identical across every analysis.
+      system: [{ type: "text", text: IMAGE_ANALYSIS_SYSTEM, cache_control: { type: "ephemeral" } }],
       output_config: outputConfig,
       messages: [
         {
@@ -333,6 +339,7 @@ export async function POST(req: Request) {
           urls,
           note,
           userContext,
+          tier,
           effort,
           refine: !!incomingSearchId
         },
@@ -346,7 +353,7 @@ export async function POST(req: Request) {
       mode,
       searchId,
       analysis,
-      meta: { model: MODEL, generated_at: new Date().toISOString() }
+      meta: { model, generated_at: new Date().toISOString() }
     });
   } catch (err: any) {
     console.error(err);

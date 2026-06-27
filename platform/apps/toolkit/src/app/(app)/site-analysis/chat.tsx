@@ -1,7 +1,9 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { Card } from "./ui";
+import Thinking from "@/components/Thinking";
+import { useStickToBottom } from "@/lib/useStickToBottom";
 
 type Msg = { id: string; role: "user" | "assistant"; content: string };
 type Source = { title: string; url: string };
@@ -22,7 +24,7 @@ function domain(url: string): string {
 
 // Grounded follow-up chat. Streams Sonnet + web search; every source the model
 // looks at lands in the rail so students can verify and follow the trail.
-export default function SiteChat({ context }: { context: any }) {
+export default function SiteChat({ context, tier }: { context: any; tier?: string }) {
   const [messages, setMessages] = useState<Msg[]>([]);
   const [input, setInput] = useState("");
   const [streaming, setStreaming] = useState(false);
@@ -31,11 +33,7 @@ export default function SiteChat({ context }: { context: any }) {
   const [sources, setSources] = useState<Source[]>([]);
   const [error, setError] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
-  const endRef = useRef<HTMLDivElement | null>(null);
-
-  useEffect(() => {
-    endRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
-  }, [messages, streamingText]);
+  const { ref: scrollRef, onScroll, pinned, scrollToBottom } = useStickToBottom<HTMLDivElement>();
 
   function mergeSources(incoming: Source[]) {
     if (!incoming?.length) return;
@@ -53,6 +51,7 @@ export default function SiteChat({ context }: { context: any }) {
     const userMsg: Msg = { id: crypto.randomUUID(), role: "user", content: q };
     const history = [...messages, userMsg];
     setMessages(history);
+    scrollToBottom(); // sending re-pins to the bottom; scrolling up then pauses it
     setInput("");
     setStreaming(true);
     setStreamingText("");
@@ -69,7 +68,8 @@ export default function SiteChat({ context }: { context: any }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           messages: history.map((m) => ({ role: m.role, content: m.content })),
-          context
+          context,
+          tier
         }),
         signal: ctrl.signal
       });
@@ -173,7 +173,12 @@ export default function SiteChat({ context }: { context: any }) {
       <div className="grid gap-4 lg:grid-cols-[1fr_15rem]">
         {/* chat */}
         <div className="flex flex-col">
-          <div className="max-h-[22rem] min-h-[8rem] flex-1 space-y-3 overflow-y-auto rounded-lg border border-neutral-200 bg-neutral-50 p-3">
+          <div className="relative">
+          <div
+            ref={scrollRef}
+            onScroll={onScroll}
+            className="max-h-[22rem] min-h-[8rem] flex-1 space-y-3 overflow-y-auto rounded-lg border border-neutral-200 bg-neutral-50 p-3"
+          >
             {empty && (
               <div className="space-y-2">
                 <p className="text-xs text-neutral-900">
@@ -208,18 +213,25 @@ export default function SiteChat({ context }: { context: any }) {
             {streaming && (
               <div className="flex justify-start">
                 <div className="max-w-[92%] rounded-2xl rounded-bl-sm border border-neutral-200 bg-white px-3 py-2 text-sm leading-relaxed text-neutral-800">
-                  {searching && !streamingText && (
-                    <span className="text-neutral-900">Searching the web…</span>
-                  )}
                   {streamingText ? (
                     <span className="whitespace-pre-wrap">{streamingText}</span>
                   ) : (
-                    !searching && <span className="text-neutral-900">Thinking…</span>
+                    <Thinking label={searching ? "Searching the web…" : "Thinking…"} />
                   )}
                 </div>
               </div>
             )}
-            <div ref={endRef} />
+          </div>
+
+          {!pinned && (messages.length > 0 || streaming) && (
+            <button
+              type="button"
+              onClick={scrollToBottom}
+              className="absolute bottom-2 left-1/2 z-10 -translate-x-1/2 rounded-full border border-neutral-300 bg-white px-3 py-1 text-[11px] font-medium text-neutral-900 shadow-sm hover:bg-neutral-100"
+            >
+              ↓ Jump to latest
+            </button>
+          )}
           </div>
 
           {error && <p className="mt-2 text-xs text-red-600">{error}</p>}

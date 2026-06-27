@@ -8,7 +8,7 @@
 
 // Toolkit-wide policy: AI tool calls run on Sonnet 4.6 (faster + cheaper). Supports
 // vision + structured output, which is all this perception pass needs.
-export const MODEL = "claude-sonnet-4-6";
+export { MODEL } from "./models";
 
 export const IMAGE_ANALYSIS_SCHEMA = {
   type: "object",

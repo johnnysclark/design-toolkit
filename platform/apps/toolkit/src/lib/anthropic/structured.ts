@@ -11,7 +11,8 @@
 // (which ships a non-JSON error page → the "Unexpected token 'A'" crash).
 
 import Anthropic from "@anthropic-ai/sdk";
-import { MODEL } from "./site-analysis-prompts";
+import { resolveModel, webSearchTool } from "./models";
+import { SOFT_TIMEOUT_MS } from "./limits";
 
 export async function runStructured({
   system,
@@ -20,8 +21,9 @@ export async function runStructured({
   grounded,
   maxTokens = 6000,
   thinking = false,
+  tier,
   maxUses = 5,
-  timeoutMs = 54000
+  timeoutMs = SOFT_TIMEOUT_MS
 }: {
   system: string;
   user: string;
@@ -29,23 +31,29 @@ export async function runStructured({
   grounded: boolean;
   maxTokens?: number;
   thinking?: boolean;
+  tier?: unknown;
   maxUses?: number;
   timeoutMs?: number;
 }) {
   const client = new Anthropic();
+  const { model, reasoning, tier: tierResolved } = resolveModel(tier);
 
   const params: any = {
-    model: MODEL,
+    model,
     max_tokens: maxTokens,
-    system,
+    // Cache the system prefix — it's reused across analyses of the same kind.
+    // Below the model's min cacheable size it silently no-ops, so it's safe.
+    system: [{ type: "text", text: system, cache_control: { type: "ephemeral" } }],
     messages: [{ role: "user", content: user }]
   };
 
-  if (thinking) params.thinking = { type: "adaptive" };
+  // Adaptive thinking is Sonnet-only — never send it on the fast (Haiku) tier.
+  if (thinking && reasoning) params.thinking = { type: "adaptive" };
 
   if (grounded) {
     // Cap searches so a grounded pass can't spiral past the function budget.
-    params.tools = [{ type: "web_search_20260209", name: "web_search", max_uses: maxUses }];
+    // Tool version tracks the model — Haiku needs the basic web_search variant.
+    params.tools = [webSearchTool(tierResolved, maxUses)];
     params.messages[0].content +=
       "\n\nReturn your answer as a single JSON object matching the agreed schema, " +
       "inside a ```json code block. Do not include any other prose outside the block.";

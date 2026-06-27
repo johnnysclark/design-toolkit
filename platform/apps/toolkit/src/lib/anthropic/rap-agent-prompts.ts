@@ -10,7 +10,7 @@ import { COMMAND_GRAMMAR } from "@/app/(app)/rap/studio/engine/interpreter";
 
 // Toolkit policy: AI tool calls run on Sonnet 4.6 (fast + cheap). This is a
 // constrained translation task — no vision, no extended thinking needed.
-export const MODEL = "claude-sonnet-4-6";
+export { MODEL } from "./models";
 
 export const AGENT_SYSTEM = `You are the RAP Studio Digital Assistant — the "coder" role from the Radical Accessibility Project. A student (often blind or low-vision, authoring architecture non-visually) describes a change in plain language. You translate it into a list of RAP Controller commands.
 

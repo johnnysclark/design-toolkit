@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { ClaimList } from "./claim-tag";
+import Thinking from "@/components/Thinking";
 import {
   card,
   field,
@@ -21,10 +22,12 @@ const EXPORT_THRESHOLD = 60;
 
 export default function Portfolio({
   sessionId,
-  setSessionId
+  setSessionId,
+  tier
 }: {
   sessionId: string | null;
   setSessionId: (id: string | null) => void;
+  tier?: string;
 }) {
   const [title, setTitle] = useState("");
   const [thesis, setThesis] = useState("");
@@ -43,7 +46,7 @@ export default function Portfolio({
   const canExport = studentText.trim().length > 0 && pct >= EXPORT_THRESHOLD;
 
   function ctx() {
-    return { title, thesis, brief, sessionId };
+    return { title, thesis, brief, sessionId, tier };
   }
 
   async function generateDraft() {
@@ -161,6 +164,7 @@ export default function Portfolio({
             <button className={ghostBtn} onClick={buildThesis} disabled={busy !== null}>
               {busy === "thesis" ? "Building…" : "Build defensible theses"}
             </button>
+            {(busy === "draft" || busy === "thesis") && <Thinking />}
             {error && <p className="text-sm text-red-600">{error}</p>}
           </div>
         </div>
@@ -251,6 +255,7 @@ export default function Portfolio({
             <button className={ghostBtn} onClick={exportStatement} disabled={!canExport} title={canExport ? "" : "Make it yours first"}>
               Export statement
             </button>
+            {busy === "attack" && <Thinking />}
           </div>
         </section>
       )}

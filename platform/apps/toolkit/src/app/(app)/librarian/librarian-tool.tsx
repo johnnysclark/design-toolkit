@@ -4,7 +4,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { prepareImage } from "./image";
 import ProjectGallery from "./project-gallery";
-import Thinking from "./Thinking";
+import Thinking from "@/components/Thinking";
+import ModelToggle, { useModelTier } from "@/components/ModelToggle";
 import {
   type Analysis,
   type AnalyzeResult,
@@ -49,7 +50,7 @@ export default function LibrarianTool() {
   const [srcLink, setSrcLink] = useState("");
   const [urlInput, setUrlInput] = useState("");
   const [queryInput, setQueryInput] = useState("");
-  const [effort, setEffort] = useState(0); // 0 Quick · 1 Balanced · 2 Deep
+  const [tier, setTier] = useModelTier("librarian");
 
   const [busy, setBusy] = useState<null | "analyze" | "search">(null);
   const [error, setError] = useState<string | null>(null);
@@ -183,10 +184,6 @@ export default function LibrarianTool() {
     setMessages(json.analysis?.reply ? [{ role: "librarian", text: json.analysis.reply }] : []);
   }
 
-  function effortValue(): "low" | "medium" | "high" {
-    return effort === 0 ? "low" : effort === 2 ? "high" : "medium";
-  }
-
   async function postAnalyze(extra: Record<string, unknown>): Promise<AnalyzeResult> {
     const res = await fetch("/api/librarian", {
       method: "POST",
@@ -194,7 +191,7 @@ export default function LibrarianTool() {
       body: JSON.stringify({
         mode: "analyze",
         projectId: projectId || null,
-        effort: effortValue(),
+        tier,
         ...extra
       })
     });
@@ -357,7 +354,7 @@ export default function LibrarianTool() {
         body: JSON.stringify({
           mode: "analyze",
           projectId: projectId || null,
-          effort: effortValue(),
+          tier,
           ...ref,
           userContext: facts,
           searchId: result.searchId
@@ -623,27 +620,11 @@ export default function LibrarianTool() {
         {tab !== "search" && (
           <div className="mt-3 flex flex-wrap items-center gap-3">
             <span className="display-font text-xs uppercase tracking-wide text-neutral-900">
-              Effort
+              Depth
             </span>
-            <input
-              type="range"
-              min={0}
-              max={2}
-              step={1}
-              value={effort}
-              onChange={(e) => setEffort(Number(e.target.value))}
-              className="w-40 accent-neutral-900"
-              aria-label="Analysis effort"
-            />
-            <span className="text-xs font-medium text-neutral-900">
-              {effort === 0 ? "Quick" : effort === 1 ? "Balanced" : "Deep"}
-            </span>
+            <ModelToggle value={tier} onChange={setTier} size="sm" disabled={!!busy} />
             <span className="text-xs text-neutral-900">
-              {effort === 0
-                ? "— fastest read"
-                : effort === 1
-                  ? "— more thorough"
-                  : "— hardest IDs, slower"}
+              Fast reads in a flash; Deep works the hardest IDs.
             </span>
           </div>
         )}

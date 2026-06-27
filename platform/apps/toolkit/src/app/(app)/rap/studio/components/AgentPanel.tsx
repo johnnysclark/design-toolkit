@@ -7,6 +7,8 @@
 // members (the real guard is a 401 in /api/rap/agent).
 
 import { useState } from "react";
+import Thinking from "@/components/Thinking";
+import ModelToggle, { useModelTier } from "@/components/ModelToggle";
 
 export interface AgentResult {
   ok: boolean;
@@ -23,10 +25,15 @@ const EXAMPLES = [
   "trace the exterior envelope along the site boundary"
 ];
 
-export default function AgentPanel({ onSubmit }: { onSubmit: (instruction: string) => Promise<AgentResult> }) {
+export default function AgentPanel({
+  onSubmit
+}: {
+  onSubmit: (instruction: string, tier: string) => Promise<AgentResult>;
+}) {
   const [value, setValue] = useState("");
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<AgentResult | null>(null);
+  const [tier, setTier] = useModelTier("rap");
 
   const run = async (text: string) => {
     const instruction = text.trim();
@@ -34,7 +41,7 @@ export default function AgentPanel({ onSubmit }: { onSubmit: (instruction: strin
     setBusy(true);
     setResult(null);
     try {
-      const r = await onSubmit(instruction);
+      const r = await onSubmit(instruction, tier);
       setResult(r);
     } catch (e: unknown) {
       setResult({ ok: false, error: e instanceof Error ? e.message : "Something went wrong." });
@@ -71,14 +78,21 @@ export default function AgentPanel({ onSubmit }: { onSubmit: (instruction: strin
         placeholder="Describe a change in plain language…  (⌘/Ctrl + Enter to send)"
         className="w-full rounded-md border-2 border-neutral-900 px-3 py-2 text-sm text-neutral-900 outline-none focus:border-[#ff3b21] focus-visible:ring-2 focus-visible:ring-[#ff3b21] focus-visible:ring-offset-1"
       />
-      <button
-        type="button"
-        onClick={() => run(value)}
-        disabled={busy}
-        className="display-font rounded-md border-2 border-neutral-900 bg-neutral-900 px-4 py-2 text-sm uppercase text-white hover:bg-[#ff3b21] hover:border-[#ff3b21] disabled:opacity-50"
-      >
-        {busy ? "Thinking…" : "Ask the assistant"}
-      </button>
+      <div className="flex flex-wrap items-center gap-3">
+        <button
+          type="button"
+          onClick={() => run(value)}
+          disabled={busy}
+          className="display-font rounded-md border-2 border-neutral-900 bg-neutral-900 px-4 py-2 text-sm uppercase text-white hover:bg-[#ff3b21] hover:border-[#ff3b21] disabled:opacity-50"
+        >
+          {busy ? "Thinking…" : "Ask the assistant"}
+        </button>
+        {busy && <Thinking />}
+        <div className="ml-auto flex items-center gap-2 text-sm">
+          <span className="text-neutral-900">Depth</span>
+          <ModelToggle value={tier} onChange={setTier} size="sm" disabled={busy} />
+        </div>
+      </div>
 
       {result && (
         <div className="rounded-md border border-neutral-300 p-3 text-sm">

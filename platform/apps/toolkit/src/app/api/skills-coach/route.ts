@@ -1,18 +1,18 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { createClient } from "@/lib/supabase/server";
 import {
-  MODEL,
   META_SENTINEL,
   splitMeta,
   buildSystem,
   type Level
 } from "@/lib/anthropic/skills-coach-prompts";
+import { resolveModel } from "@/lib/anthropic/models";
 import { DISCIPLINES, type Discipline } from "@/lib/skills-coach/concepts";
 
 export const runtime = "nodejs";
-// Streaming gives instant first-token, but the Hobby plan still caps the whole
-// function at 60s. Raise on Vercel Pro (up to 300) if answers run long.
-export const maxDuration = 60;
+// Streaming gives instant first-token. On Vercel Pro the function can run up to
+// ~300s, so long answers finish instead of getting cut off mid-thought.
+export const maxDuration = 300;
 
 const LEVELS: Level[] = ["beginner", "intermediate", "advanced"];
 const DISC_IDS = DISCIPLINES.map((d) => d.id) as Discipline[];
@@ -100,6 +100,8 @@ export async function POST(req: Request) {
   const discipline: Discipline = DISC_IDS.includes(body?.discipline)
     ? body.discipline
     : "general";
+  // Shared Fast ⇄ Deep toggle (Haiku vs Sonnet) — the toolkit-wide cost lever.
+  const { model } = resolveModel(body?.tier);
 
   // Resolve / create the conversation (RLS scopes selects to the owner, so a
   // foreign conversationId simply isn't found and we start a fresh thread).
@@ -171,9 +173,11 @@ export async function POST(req: Request) {
   const system = buildSystem(level, discipline);
   const client = new Anthropic();
   const anthropicStream = client.messages.stream({
-    model: MODEL,
+    model,
     max_tokens: 4000,
-    system,
+    // Cache the (large) system prompt — it's identical across a conversation's
+    // turns at a fixed level + tool, so every turn after the first reads it cheaply.
+    system: [{ type: "text", text: system, cache_control: { type: "ephemeral" } }],
     messages
   });
 
@@ -249,7 +253,7 @@ export async function POST(req: Request) {
             owner: user.id,
             tool: "skills-coach",
             input: { conversationId, level, discipline, message, attachment: att },
-            output: { prose: finalProse, meta, model: MODEL }
+            output: { prose: finalProse, meta, model }
           });
         } catch {
           // never let trace logging break the response
