@@ -94,11 +94,11 @@ function drawRig(svg, p) {
   b += line(Cs, onAxis(0.7), `stroke="${INK}" stroke-width="3"`);
   b += T([ORIGIN_X - 6, camY + (side ? -10 : 18)], "camera", { anchor: side ? "end" : "start" });
 
-  // labels
-  b += T(onAxis(maxD * 0.5), `${Math.round(p.fovDeg)}° ${side ? "vertical" : "horizontal"} FOV`, { anchor: "middle", fill: CONE, dy: side ? -8 : -8 });
-  b += T(coneUp(focus), `focus ${fmt(p.focusM)} m`, { anchor: "middle", fill: FOC, dy: -6 });
-  const dofMid = add(coneDn((near + far) / 2), [0, 1], side ? 0 : 0);
-  b += T(dofMid, `in focus${farOpen ? " → ∞" : ""}`, { anchor: "middle", fill: DOF, dy: 14 });
+  // labels — all text is BLACK (house rule); the colour-coding lives in the lines.
+  b += T(onAxis(maxD * 0.5), `${Math.round(p.fovDeg)}° ${side ? "vertical" : "horizontal"} FOV`, { anchor: "middle", dy: -8 });
+  b += T(coneUp(focus), `focus ${fmt(p.focusM)} m`, { anchor: "middle", dy: -6 });
+  const dofMid = coneDn((near + far) / 2);
+  b += T(dofMid, `in focus${farOpen ? " → ∞" : ""}`, { anchor: "middle", dy: 14 });
 
   svg.setAttribute("viewBox", `0 0 ${VB_W} ${VB_H}`);
   svg.innerHTML = b;

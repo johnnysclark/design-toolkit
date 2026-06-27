@@ -45,12 +45,14 @@ body {
 }
 .vg-sub { margin: 0; font-size: 14px; color: var(--ink); }
 
-/* two-pane camera window: perspective | side+plan rig */
+/* two-pane camera window: perspective | side+plan rig.
+   Both columns are fractional, so the side & plan scale up with the window
+   (and with the perspective) — they carry just-as-important information. */
 .vg-panes {
   flex: 1 1 auto;
   min-height: 0;
   display: grid;
-  grid-template-columns: 1fr 320px;
+  grid-template-columns: minmax(0, 1.7fr) minmax(300px, 1fr);
   gap: 10px;
 }
 .vg-panes--solo { grid-template-columns: 1fr; }
@@ -61,18 +63,27 @@ body {
 .vg-pane--rig {
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  overflow-y: auto;
+  gap: 12px;
+  overflow: hidden;
   background: #fbfaf7;
   border: 1px solid var(--line);
   border-radius: 12px;
-  padding: 10px 12px;
+  padding: 12px 14px;
 }
-.vg-rigfig { margin: 0; }
+/* each figure splits the rig height; its SVG fills the box (meet-scaled) so the
+   diagrams grow in BOTH dimensions as the window gets bigger. */
+.vg-rigfig {
+  margin: 0;
+  flex: 1 1 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
 .vg-rigcap {
+  flex: 0 0 auto;
   font-family: var(--display);
-  font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em;
-  color: var(--ink); margin: 0 0 5px;
+  font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em;
+  color: var(--ink); margin: 0 0 6px;
 }
 
 .vg-frame-wrap {
@@ -175,7 +186,10 @@ select {
 .vg-hint, .vg-note { font-size: 12px; line-height: 1.45; color: var(--ink); margin: 8px 0 0; }
 .vg-note { opacity: 0.85; }
 
-.vg-diagram { width: 100%; height: auto; background: #fbfaf7; border: 1px solid var(--line); border-radius: 8px; }
+.vg-diagram {
+  flex: 1 1 0; min-height: 0; width: 100%; height: 100%;
+  background: #fff; border: 1px solid var(--line); border-radius: 8px;
+}
 .vg-dlabel { font: 700 10px var(--sans); fill: var(--ink); }
 
 .vg-num { margin: 0; display: grid; gap: 6px; }
