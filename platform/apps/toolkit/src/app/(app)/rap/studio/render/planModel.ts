@@ -9,7 +9,7 @@
 // renderer only needs a flat world→screen map (with a Y-flip for plan north-up).
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { applyTransform, deriveGeometry, type Pt, type Transform } from "../engine/geometry";
+import { applyTransform, deriveGeometry, type PhaseEmphasis, type PhaseView, type Pt, type Transform } from "../engine/geometry";
 import type { LineType, State, TactilePattern } from "../engine/types";
 
 export type DrawPrim =
@@ -50,6 +50,33 @@ export const LINE_DASH: Record<LineType, number[] | undefined> = {
 
 // Lineweight mm → plan stroke ft, clamped to the light pen.
 export const weightToFt = (lineweight_mm: number) => Math.max(PLAN_WEIGHTS.light, lineweight_mm * 0.04);
+
+// A reserved dash a finger reads as "reference / context" — distinct from the
+// linetype dashes (dashed 3,2 · dotted 0.6,1.2 · hidden 1.5,1). A reference phase
+// is NEVER dimmed or shrunk in relief (PIAF is 1-bit; STL relief = real height);
+// instead its FILLS become hollow outlines and its lines take this dash, so the
+// focus phase reads as solid figure and the others as hollow ground.
+export const REF_DASH = [1.0, 1.0];
+
+/** Push an element's primitives with its phase emphasis applied. Focus → as-is.
+ *  Reference → fills become dashed outlines, lines take the reference dash, and
+ *  tactile dots + text labels are dropped (hollow context, no false relief). */
+function pushEmph(out: DrawPrim[], local: DrawPrim[], emphasis: PhaseEmphasis) {
+  if (emphasis === "focus") {
+    out.push(...local);
+    return;
+  }
+  for (const p of local) {
+    if (p.kind === "fill") {
+      out.push({ kind: "line", weight: "light", dash: REF_DASH, pts: [...p.pts, p.pts[0]] });
+    } else if (p.kind === "line") {
+      out.push({ ...p, weight: "light", dashed: undefined, dash: REF_DASH });
+    } else if (p.kind === "circle") {
+      out.push({ ...p, fill: false });
+    }
+    // tactileDot + text are intentionally dropped for reference geometry.
+  }
+}
 
 function rectCorners(x: number, y: number, w: number, h: number, t: Transform): Pt[] {
   return [
@@ -137,8 +164,8 @@ function emitTactile(prims: DrawPrim[], r: { x: number; y: number; w: number; h:
   }
 }
 
-export function buildPlanModel(state: State, levelFilter: number | null = null): PlanModel {
-  const scene = deriveGeometry(state, levelFilter);
+export function buildPlanModel(state: State, levelFilter: number | null = null, view: PhaseView | null = null): PlanModel {
+  const scene = deriveGeometry(state, levelFilter, view);
   const prims: DrawPrim[] = [];
 
   // Site boundary — irregular infill lot polygon if present, else the rectangle.
@@ -152,39 +179,40 @@ export function buildPlanModel(state: State, levelFilter: number | null = null):
 
   for (const bay of scene.bays) {
     const t = bay.transform;
+    const bp: DrawPrim[] = []; // collect this bay's prims, then apply its phase emphasis
 
     // Grid (light).
     for (const g of bay.grid) {
-      prims.push({ kind: "line", pts: [applyTransform(g.a, t), applyTransform(g.b, t)], weight: "light" });
+      bp.push({ kind: "line", pts: [applyTransform(g.a, t), applyTransform(g.b, t)], weight: "light" });
     }
 
     // Corridor — dashed band edges (corridor weight).
     if (bay.corridor) {
       const c = bay.corridor.rect;
       if (bay.corridor.axis === "x") {
-        prims.push({ kind: "line", pts: [applyTransform({ x: c.x, y: c.y }, t), applyTransform({ x: c.x + c.w, y: c.y }, t)], weight: "corridor", dashed: true });
-        prims.push({ kind: "line", pts: [applyTransform({ x: c.x, y: c.y + c.h }, t), applyTransform({ x: c.x + c.w, y: c.y + c.h }, t)], weight: "corridor", dashed: true });
+        bp.push({ kind: "line", pts: [applyTransform({ x: c.x, y: c.y }, t), applyTransform({ x: c.x + c.w, y: c.y }, t)], weight: "corridor", dashed: true });
+        bp.push({ kind: "line", pts: [applyTransform({ x: c.x, y: c.y + c.h }, t), applyTransform({ x: c.x + c.w, y: c.y + c.h }, t)], weight: "corridor", dashed: true });
       } else {
-        prims.push({ kind: "line", pts: [applyTransform({ x: c.x, y: c.y }, t), applyTransform({ x: c.x, y: c.y + c.h }, t)], weight: "corridor", dashed: true });
-        prims.push({ kind: "line", pts: [applyTransform({ x: c.x + c.w, y: c.y }, t), applyTransform({ x: c.x + c.w, y: c.y + c.h }, t)], weight: "corridor", dashed: true });
+        bp.push({ kind: "line", pts: [applyTransform({ x: c.x, y: c.y }, t), applyTransform({ x: c.x, y: c.y + c.h }, t)], weight: "corridor", dashed: true });
+        bp.push({ kind: "line", pts: [applyTransform({ x: c.x + c.w, y: c.y }, t), applyTransform({ x: c.x + c.w, y: c.y + c.h }, t)], weight: "corridor", dashed: true });
       }
     }
 
     // Walls (filled black polygons).
     for (const wRect of bay.walls) {
-      prims.push({ kind: "fill", pts: rectCorners(wRect.x, wRect.y, wRect.w, wRect.h, t) });
+      bp.push({ kind: "fill", pts: rectCorners(wRect.x, wRect.y, wRect.w, wRect.h, t) });
     }
 
     // Columns (filled squares — matches the 3D + STL box footprint, so a reader
     // feels the same shape on swell paper and in the print).
     for (const col of bay.columns) {
-      prims.push({ kind: "fill", pts: rectCorners(col.x - col.r, col.y - col.r, col.r * 2, col.r * 2, t) });
+      bp.push({ kind: "fill", pts: rectCorners(col.x - col.r, col.y - col.r, col.r * 2, col.r * 2, t) });
     }
 
     // Door swings (leaf + arc).
     for (const d of bay.doors) {
-      prims.push({ kind: "line", pts: [applyTransform(d.hinge, t), applyTransform(d.leafEnd, t)], weight: "heavy" });
-      prims.push({ kind: "line", pts: arcPolyline(d.hinge, d.radius, d.a0, d.a1, t), weight: "light" });
+      bp.push({ kind: "line", pts: [applyTransform(d.hinge, t), applyTransform(d.leafEnd, t)], weight: "heavy" });
+      bp.push({ kind: "line", pts: arcPolyline(d.hinge, d.radius, d.a0, d.a1, t), weight: "light" });
     }
 
     // Window / portal marks across the opening.
@@ -192,27 +220,30 @@ export function buildPlanModel(state: State, levelFilter: number | null = null):
       if (o.kind === "window") {
         // double line to read as glazing
         const mid = { x: (o.a.x + o.b.x) / 2, y: (o.a.y + o.b.y) / 2 };
-        prims.push({ kind: "line", pts: [applyTransform(o.a, t), applyTransform(o.b, t)], weight: "heavy" });
-        prims.push({ kind: "circle", c: applyTransform(mid, t), r: 0.6, fill: false });
+        bp.push({ kind: "line", pts: [applyTransform(o.a, t), applyTransform(o.b, t)], weight: "heavy" });
+        bp.push({ kind: "circle", c: applyTransform(mid, t), r: 0.6, fill: false });
       }
       // portals are left fully open (no mark)
     }
 
     // Label + braille, just below the bay.
     const lp = applyTransform({ x: bay.label.x, y: bay.label.y }, t);
-    prims.push({ kind: "text", at: lp, text: bay.label.text, size: 2.4 });
-    prims.push({ kind: "text", at: { x: lp.x, y: lp.y - 3 }, text: bay.label.braille, size: 3.2, braille: true });
+    bp.push({ kind: "text", at: lp, text: bay.label.text, size: 2.4 });
+    bp.push({ kind: "text", at: { x: lp.x, y: lp.y - 3 }, text: bay.label.braille, size: 3.2, braille: true });
+
+    pushEmph(prims, bp, bay.emphasis);
   }
 
   // Geometric regions — footprint outline (linetype/lineweight from the layer),
   // box gets an inset double-outline to read as a solid volume, plus any tactile
   // pattern clipped to the footprint.
   for (const rg of scene.regions) {
+    const rp: DrawPrim[] = [];
     const dash = LINE_DASH[rg.style.linetype];
     const widthFt = weightToFt(rg.style.lineweight_mm);
     const rect = { x: rg.x, y: rg.y, w: rg.w, h: rg.h };
     const outline = (rr: { x: number; y: number; w: number; h: number }) =>
-      prims.push({
+      rp.push({
         kind: "line",
         widthFt,
         dash,
@@ -230,31 +261,37 @@ export function buildPlanModel(state: State, levelFilter: number | null = null):
       const ins = Math.min(2, rg.w / 6, rg.h / 6);
       outline({ x: rg.x + ins, y: rg.y + ins, w: rg.w - 2 * ins, h: rg.h - 2 * ins });
     }
-    if (rg.style.tactile) emitTactile(prims, rect, rg.style.tactile, rg.style.lineweight_mm);
+    // Tactile texture only reads on the focused (figure) phase; a reference ghost
+    // carries no relief (it would lie about depth on PIAF/STL).
+    if (rg.emphasis === "focus" && rg.style.tactile) emitTactile(rp, rect, rg.style.tactile, rg.style.lineweight_mm);
+    pushEmph(prims, rp, rg.emphasis);
   }
 
   // Free walls — solid black chunks + door/window symbols.
   for (const fw of scene.freeWalls) {
-    for (const s of fw.solids) prims.push({ kind: "fill", pts: s.quad });
+    const wp: DrawPrim[] = [];
+    for (const s of fw.solids) wp.push({ kind: "fill", pts: s.quad });
     for (const d of fw.doors) {
-      prims.push({ kind: "line", pts: [d.hinge, d.leafEnd], weight: "heavy" });
-      prims.push({ kind: "line", pts: arcPolyline(d.hinge, d.radius, d.a0, d.a1, { ox: 0, oy: 0, rot: 0 }), weight: "light" });
+      wp.push({ kind: "line", pts: [d.hinge, d.leafEnd], weight: "heavy" });
+      wp.push({ kind: "line", pts: arcPolyline(d.hinge, d.radius, d.a0, d.a1, { ox: 0, oy: 0, rot: 0 }), weight: "light" });
     }
     for (const win of fw.windows) {
-      prims.push({ kind: "line", pts: [win.a, win.b], weight: "heavy" });
-      prims.push({ kind: "circle", c: { x: (win.a.x + win.b.x) / 2, y: (win.a.y + win.b.y) / 2 }, r: 0.6, fill: false });
+      wp.push({ kind: "line", pts: [win.a, win.b], weight: "heavy" });
+      wp.push({ kind: "circle", c: { x: (win.a.x + win.b.x) / 2, y: (win.a.y + win.b.y) / 2 }, r: 0.6, fill: false });
     }
+    pushEmph(prims, wp, fw.emphasis);
   }
 
   // Free columns (square footprint to match 3D + STL).
   const idT = { ox: 0, oy: 0, rot: 0 };
   for (const c of scene.freeColumns) {
-    prims.push({ kind: "fill", pts: rectCorners(c.x - c.size / 2, c.y - c.size / 2, c.size, c.size, idT) });
+    pushEmph(prims, [{ kind: "fill", pts: rectCorners(c.x - c.size / 2, c.y - c.size / 2, c.size, c.size, idT) }], c.emphasis);
   }
 
   // Region labels (drawn last so outlines/tactile fill don't cover them). A box
   // annotates its extrusion height so a non-zero massing reads on a flat plan.
   for (const rg of scene.regions) {
+    if (rg.emphasis !== "focus") continue; // reference regions read as hollow outline, no label pile-up
     const tag = rg.kind === "box" ? `${rg.name} (↑ ${rg.height} ft)` : rg.name;
     prims.push({ kind: "text", at: { x: rg.cx, y: rg.cy + 1.4 }, text: tag, size: 2.6, anchor: "middle" });
     prims.push({ kind: "text", at: { x: rg.cx, y: rg.cy - 2.4 }, text: rg.braille, size: 3, braille: true, anchor: "middle" });

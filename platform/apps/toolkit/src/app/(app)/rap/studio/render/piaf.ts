@@ -6,13 +6,14 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { buildPlanModel, PLAN_WEIGHTS } from "./planModel";
+import type { PhaseView } from "../engine/geometry";
 import type { State } from "../engine/types";
 
 const WEIGHT_FT = PLAN_WEIGHTS;
 
 /** Draw the plan to a canvas, then threshold to a crisp 1-bit black/white. */
-export function buildPiafCanvas(state: State, pxWidth = 1700, levelFilter: number | null = null): HTMLCanvasElement {
-  const { prims, bounds } = buildPlanModel(state, levelFilter);
+export function buildPiafCanvas(state: State, pxWidth = 1700, levelFilter: number | null = null, view: PhaseView | null = null): HTMLCanvasElement {
+  const { prims, bounds } = buildPlanModel(state, levelFilter, view);
   const { minX, minY, maxX, maxY } = bounds;
   const worldW = Math.max(1, maxX - minX);
   const worldH = Math.max(1, maxY - minY);

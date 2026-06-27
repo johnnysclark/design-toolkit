@@ -4,7 +4,7 @@
 // recognisably the desktop tool's, just tidied for a first read.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import type { Bay, Layer, Region, State, Style, Tactile3D } from "./types";
+import type { Bay, Layer, Phase, Region, SchemaMode, State, Style, Tactile3D } from "./types";
 import { toBraille } from "./braille";
 
 export const DEFAULT_STYLE: Style = {
@@ -35,12 +35,20 @@ export function defaultLayer(): Layer {
   return { name: "Default", lineweight_mm: 0.25, linetype: "solid" };
 }
 
+/** One phase (id "main") wearing a given schema lens — for single-resolution
+ *  starters and the base state. Coarsest order, shown, no derivation. */
+export function singlePhase(name: string, schema: SchemaMode): Phase {
+  return { id: "main", name, schema, order: 0, derivedFrom: null, basis: null, visible: "auto" };
+}
+
 /** A bare, valid State with one level and only the Default layer — the common
  *  base every starter builds on. */
 export function baseState(notes = "Authored in RAP Studio (web)"): State {
   return {
     schema: "rhino_controller_v4.0",
     mode: "bays",
+    phases: [singlePhase("Model", "bays")],
+    focus: "main",
     meta: { created: "web-studio", last_saved: "web-studio", notes },
     site: { origin: [0, 0], width: 100, height: 100 },
     style: { ...DEFAULT_STYLE },
@@ -100,12 +108,22 @@ export function makeSeedState(): State {
     label: "Bay A",
     braille: toBraille("Bay A"),
     level: 0,
-    layer: "structure"
+    layer: "structure",
+    phase: "structure"
   };
 
   return {
     schema: "rhino_controller_v4.0",
     mode: "bays",
+    // The sample is a 3-phase ladder of ONE building: an (initially empty) Massing
+    // phase, a Structure phase (Bay A), and a Plan phase (the partition wall + plates).
+    // Opens in the composite (whole-building) view.
+    phases: [
+      { id: "massing", name: "Massing", schema: "massing", order: 0, derivedFrom: null, basis: null, visible: "auto" },
+      { id: "structure", name: "Structure", schema: "bays", order: 1, derivedFrom: null, basis: null, visible: "auto" },
+      { id: "plan", name: "Plan", schema: "floorplan", order: 2, derivedFrom: null, basis: null, visible: "auto" }
+    ],
+    focus: "structure",
     meta: {
       created: "web-studio",
       last_saved: "web-studio",
@@ -127,15 +145,18 @@ export function makeSeedState(): State {
     style: { ...DEFAULT_STYLE },
     layers: {
       Default: defaultLayer(),
+      massing: { name: "massing", lineweight_mm: 0.35, linetype: "solid" },
       structure: { name: "structure", lineweight_mm: 0.35, linetype: "solid" },
       slab: { name: "slab", lineweight_mm: 0.25, linetype: "solid" }
     },
     bays: { A: bayA },
     // The building beyond the grid: two floor plates + an interior partition wall.
-    walls: [{ id: "iw1", level: 0, a: [18, 32], b: [78, 32], thickness: 0.5, layer: "Default" }],
+    walls: [{ id: "iw1", level: 0, a: [18, 32], b: [78, 32], thickness: 0.5, layer: "Default", phase: "plan" }],
     regions: [
-      { id: "g_slab1", level: 0, kind: "plate", origin: [18, 12], size: [36, 20], thickness: 0.5, name: "Plate 1", layer: "slab" },
-      { id: "g_slab2", level: 0, kind: "plate", origin: [54, 12], size: [24, 20], thickness: 0.5, name: "Plate 2", layer: "slab" }
+      // Massing phase — the overall envelope the structure + plan sit inside.
+      { id: "g_mass1", level: 0, kind: "box", origin: [18, 12], size: [60, 40], height: 36, name: "Envelope", layer: "massing", phase: "massing" },
+      { id: "g_slab1", level: 0, kind: "plate", origin: [18, 12], size: [36, 20], thickness: 0.5, name: "Plate 1", layer: "slab", phase: "plan" },
+      { id: "g_slab2", level: 0, kind: "plate", origin: [54, 12], size: [24, 20], thickness: 0.5, name: "Plate 2", layer: "slab", phase: "plan" }
     ],
     columns: [],
     openings: [],
@@ -156,6 +177,7 @@ export function makeEmptyState(): State {
  *  on a "structure" layer. id "bay-grid". */
 export function makeBayGridStarter(): State {
   const s = baseState("Structural bay grid starter.");
+  s.phases[0] = singlePhase("Structure", "bays");
   s.layers.structure = { name: "structure", lineweight_mm: 0.35, linetype: "solid" };
   s.bays = {
     A: {
@@ -192,6 +214,7 @@ export function makeMassingStarter(): State {
   ];
   s.regions = regions;
   s.mode = "massing";
+  s.phases[0] = singlePhase("Massing", "massing");
   return s;
 }
 
@@ -201,6 +224,7 @@ export function makeFloorPlateStarter(): State {
   s.layers.slab = { name: "slab", lineweight_mm: 0.25, linetype: "solid" };
   s.regions = [{ id: "g1", level: 0, kind: "plate", origin: [10, 10], size: [60, 40], thickness: 0.5, name: "Plate 1", layer: "slab" }];
   s.mode = "floorplan";
+  s.phases[0] = singlePhase("Floor plan", "floorplan");
   return s;
 }
 

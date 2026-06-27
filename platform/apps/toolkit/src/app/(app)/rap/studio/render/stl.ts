@@ -6,7 +6,7 @@
 // view, so the print matches the screen.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { applyTransform, deriveGeometry, type Pt, type RegionG, type Transform } from "../engine/geometry";
+import { applyTransform, deriveGeometry, type PhaseView, type Pt, type RegionG, type Transform } from "../engine/geometry";
 import type { State, TactilePattern } from "../engine/types";
 import { clipLineToRect, MM_TO_PLAN_FT } from "./planModel";
 
@@ -101,8 +101,10 @@ function addTactileRelief(tris: Tri[], rg: RegionG, topZ: number, tac: TactilePa
   }
 }
 
-export function buildStl(state: State, levelFilter: number | null = null): ArrayBuffer {
-  const scene = deriveGeometry(state, levelFilter);
+export function buildStl(state: State, levelFilter: number | null = null, view: PhaseView | null = null): ArrayBuffer {
+  // Solid relief can't represent a "reference ghost", so the STL is the focused
+  // phase only (reference dropped). Per-phase pin-up exports cover the rest.
+  const scene = deriveGeometry(state, levelFilter, view ? { ...view, refOff: true } : null);
   const cut = state.tactile3d.cut_height;
   const floorT = state.tactile3d.floor_thickness;
   const tris: Tri[] = [];
@@ -196,9 +198,9 @@ export function buildStl(state: State, levelFilter: number | null = null): Array
   const s = FT_TO_MM * state.tactile3d.scale_factor;
   const n = tris.length;
   const buf = new ArrayBuffer(84 + n * 50);
-  const view = new DataView(buf);
+  const dv = new DataView(buf);
   // 80-byte header left zero, then triangle count.
-  view.setUint32(80, n, true);
+  dv.setUint32(80, n, true);
   let off = 84;
   const normal = (t: Tri): number[] => {
     const [p0, p1, p2] = t;
@@ -216,17 +218,17 @@ export function buildStl(state: State, levelFilter: number | null = null): Array
   };
   for (const t of tris) {
     const nrm = normal(t);
-    view.setFloat32(off, nrm[0], true);
-    view.setFloat32(off + 4, nrm[1], true);
-    view.setFloat32(off + 8, nrm[2], true);
+    dv.setFloat32(off, nrm[0], true);
+    dv.setFloat32(off + 4, nrm[1], true);
+    dv.setFloat32(off + 8, nrm[2], true);
     off += 12;
     for (const v of t) {
-      view.setFloat32(off, v[0] * s, true);
-      view.setFloat32(off + 4, v[1] * s, true);
-      view.setFloat32(off + 8, v[2] * s, true);
+      dv.setFloat32(off, v[0] * s, true);
+      dv.setFloat32(off + 4, v[1] * s, true);
+      dv.setFloat32(off + 8, v[2] * s, true);
       off += 12;
     }
-    view.setUint16(off, 0, true);
+    dv.setUint16(off, 0, true);
     off += 2;
   }
   return buf;

@@ -13,10 +13,12 @@
 import { useCallback, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 
-import type { CommandResult, SchemaMode, State } from "./engine/types";
+import type { CommandResult, State } from "./engine/types";
+import { COMPOSITE_FOCUS } from "./engine/types";
 import { makeSeedState, STARTERS, type Starter } from "./engine/seed";
 import { toBraille } from "./engine/braille";
 import { applyCommand, describe, SCHEMA_HINTS, SCHEMA_LABELS } from "./engine/interpreter";
+import { phaseViewOf } from "./engine/geometry";
 import { fullStateString } from "./engine/exportState";
 import PlanSvg from "./render/PlanSvg";
 import JsonTree from "./components/JsonTree";
@@ -72,6 +74,7 @@ export default function RapStudio({ signedIn }: { signedIn: boolean }) {
   const [authorTab, setAuthorTab] = useState<AuthorTab>("assistant");
   const [viewTab, setViewTab] = useState<ViewTab>("3d");
   const [activeLevel, setActiveLevel] = useState<number | null>(null); // null = all levels
+  const [refOff, setRefOff] = useState(false); // master "reference underlay off" — the screen-reader escape hatch
   const idRef = useRef(1);
   // Undo/redo history (applyCommand is pure, so history lives in the caller).
   const undoRef = useRef<State[]>([]);
@@ -212,6 +215,10 @@ export default function RapStudio({ signedIn }: { signedIn: boolean }) {
 
   // ── exports ────────────────────────────────────────────────────────────────
   const fullState = useMemo(() => fullStateString(state), [state]);
+  // The active phase scope — focus one phase (others as reference unless refOff)
+  // or the whole-building composite. EVERY channel reads this one view (parity).
+  const phaseView = useMemo(() => phaseViewOf(state, state.focus, refOff), [state, refOff]);
+  const focusLabel = state.focus === COMPOSITE_FOCUS ? "the whole building" : state.phases.find((p) => p.id === state.focus)?.name ?? state.focus;
   const scopeLabel = activeLevel === null ? "all levels" : `level ${activeLevel}${state.levels[activeLevel]?.label ? ` · ${state.levels[activeLevel].label}` : ""}`;
   const exportState = () => {
     download("state.json", new Blob([fullState], { type: "application/json" }));
@@ -223,17 +230,32 @@ export default function RapStudio({ signedIn }: { signedIn: boolean }) {
     announce("OK: Saved the command log.");
   };
   const exportPiaf = () =>
-    buildPiafCanvas(state, 1700, activeLevel).toBlob((b) => {
+    buildPiafCanvas(state, 1700, activeLevel, phaseView).toBlob((b) => {
       if (b) {
         download("rap-tactile-piaf.png", b);
-        announce(`OK: Exported the PIAF tactile image (${scopeLabel}).`);
+        announce(`OK: Exported the PIAF tactile image (${focusLabel}, ${scopeLabel}).`);
       } else {
         announce("ERROR: Could not export the PIAF image.");
       }
     }, "image/png");
   const exportStl = () => {
-    download("rap-tactile.stl", new Blob([buildStl(state, activeLevel)], { type: "model/stl" }));
-    announce(`OK: Exported the STL (${scopeLabel}).`);
+    download("rap-tactile.stl", new Blob([buildStl(state, activeLevel, phaseView)], { type: "model/stl" }));
+    announce(`OK: Exported the STL (${focusLabel}, ${scopeLabel}).`);
+  };
+  // Pin-up set — one clean PIAF sheet per phase (focused, reference dropped) plus a
+  // composite. The touch-legible substitute for one overloaded multi-resolution sheet.
+  const exportPinup = () => {
+    const slug = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "phase";
+    const sheets: { name: string; view: ReturnType<typeof phaseViewOf> }[] = [
+      ...[...state.phases].sort((a, b) => a.order - b.order).map((p) => ({ name: p.name, view: phaseViewOf(state, p.id, true) })),
+      { name: "composite", view: phaseViewOf(state, COMPOSITE_FOCUS, true) }
+    ];
+    for (const sheet of sheets) {
+      buildPiafCanvas(state, 1700, activeLevel, sheet.view).toBlob((b) => {
+        if (b) download(`rap-pinup-${slug(sheet.name)}.png`, b);
+      }, "image/png");
+    }
+    announce(`OK: Exported a pin-up set — ${sheets.length} PIAF sheets (one per phase + composite, ${scopeLabel}).`);
   };
   // Load a named starter — mirrors the undo-able reset/clear flow: push the
   // current state to the undo stack and swap in a fresh starter State.
@@ -259,12 +281,12 @@ export default function RapStudio({ signedIn }: { signedIn: boolean }) {
   // Empty the model but keep the active schema — "start fresh in this way of
   // thinking." Undoable (clear pushes onto the history stack via runCommand).
   const startFromScratch = useCallback(() => {
-    if (typeof window === "undefined" || window.confirm("Start from scratch? This clears all geometry (your modeling schema stays) — you can Undo it.")) {
+    if (typeof window === "undefined" || window.confirm("Start from scratch? This clears all geometry (your phases stay) — you can Undo it.")) {
       runCommand("clear");
     }
   }, [runCommand]);
 
-  const readback = describe(state, activeLevel);
+  const readback = describe(state, activeLevel, phaseView);
   const bayList = Object.values(state.bays);
   const brailleKey = [
     ...bayList.map((b) => ({ glyph: b.braille, label: b.label })),
@@ -274,14 +296,16 @@ export default function RapStudio({ signedIn }: { signedIn: boolean }) {
   return (
     <div className="space-y-5">
       <p className="text-sm text-neutral-900">
-        Loaded with a <b>sample model</b> (one structural bay, a partition wall, two floor plates on a slab layer, two levels) so you can see
-        what the tool does. The <b>Assistant</b> is the main way to author: describe what you want in plain language and it writes the
-        Controller commands for you — the same way a designer directs <b>Claude Code</b> in a terminal. Every change is read back in all
-        channels (plan, 3D, text, Braille, state tree). Prefer to type commands yourself? Switch to the <b>Console</b>. Use <b>Load starter</b>{" "}
-        to begin from an empty model, a structural bay grid, a massing diagram, a single floor plate, or the sample.
+        Loaded with a <b>sample model</b> — one building described at three <b>phases</b> (Massing → Structure → Plan), the same building at
+        rising resolution. Use the <b>phase rail</b> below to <b>focus</b> one phase and author it cleanly (the others show as a dashed
+        reference ghost), or pick <b>Composite</b> to see the whole building together. The <b>Assistant</b> is the main way to author:
+        describe what you want in plain language and it writes the Controller commands for you — the same way a designer directs{" "}
+        <b>Claude Code</b> in a terminal. Every change is read back in all channels (plan, 3D, text, Braille, state tree). Prefer to type
+        commands yourself? Switch to the <b>Console</b>. Use <b>Load starter</b> to begin from an empty model, a bay grid, a massing
+        diagram, a single floor plate, or the sample.
       </p>
 
-      <SchemaBar mode={state.mode} onPick={(m) => runCommand(`schema set ${m}`)} />
+      <PhaseRail state={state} onCommand={(c) => runCommand(c)} refOff={refOff} onToggleRef={setRefOff} />
 
       {/* Row 1 — author (chat, the primary channel) + 3D model beside it */}
       <div className="grid gap-5 lg:grid-cols-2">
@@ -324,7 +348,7 @@ export default function RapStudio({ signedIn }: { signedIn: boolean }) {
               <button
                 type="button"
                 onClick={startFromScratch}
-                title="Clear all geometry and start fresh (the modeling schema stays)"
+                title="Clear all geometry and start fresh (your phases stay)"
                 className="rounded border-2 border-neutral-900 px-2 py-1 text-xs font-semibold text-neutral-900 hover:bg-neutral-900 hover:text-white"
               >
                 Start from scratch
@@ -338,7 +362,7 @@ export default function RapStudio({ signedIn }: { signedIn: boolean }) {
             className="h-80 w-full overflow-hidden rounded-md border border-neutral-300 bg-white"
             aria-hidden={viewTab === "3d" ? true : undefined}
           >
-            {viewTab === "3d" ? <Scene3D state={state} levelFilter={activeLevel} /> : <PlanSvg state={state} levelFilter={activeLevel} className="h-full w-full p-2" />}
+            {viewTab === "3d" ? <Scene3D state={state} levelFilter={activeLevel} view={phaseView} /> : <PlanSvg state={state} levelFilter={activeLevel} view={phaseView} className="h-full w-full p-2" />}
           </div>
           <p className="mt-2 text-xs text-neutral-900">
             The 3D view is an orthographic (parallel) black-and-white aid for sighted testing — hidden from screen readers. Solid black edges are visible; dotted black edges are hidden lines. The model is fully readable in the tactile plan, the read-back text, and the state tree.
@@ -377,6 +401,7 @@ export default function RapStudio({ signedIn }: { signedIn: boolean }) {
         <ToolbarBtn onClick={exportState}>Download state.json</ToolbarBtn>
         <ToolbarBtn onClick={exportPiaf}>Export PIAF PNG{activeLevel !== null ? ` · L${activeLevel}` : ""}</ToolbarBtn>
         <ToolbarBtn onClick={exportStl}>Export STL{activeLevel !== null ? ` · L${activeLevel}` : ""}</ToolbarBtn>
+        <ToolbarBtn onClick={exportPinup}>Pin-up set (per phase)</ToolbarBtn>
         <ToolbarBtn onClick={exportLog}>Save command log</ToolbarBtn>
         <span className="flex-1" />
         <ToolbarBtn onClick={() => runCommand("undo")} disabled={histLen.undo === 0}>
@@ -445,28 +470,104 @@ export default function RapStudio({ signedIn }: { signedIn: boolean }) {
   );
 }
 
-// The active modeling schema — a "way of thinking" that scopes the surfaced
-// command set (Console help + Assistant grammar + Forms). Switching is undoable
-// and announced like any edit; other schemas' commands still work if typed.
-function SchemaBar({ mode, onPick }: { mode: SchemaMode; onPick: (m: SchemaMode) => void }) {
+// Phase rail — each phase is ONE resolution of the same building, read coarse→fine.
+// A leading "Composite" chip shows the whole building; each phase chip FOCUSES that
+// resolution (others drop to a reference ghost). New geometry lands in the focused
+// phase; switching is undoable + announced like any edit. The chip's lens (bays /
+// massing / floorplan) scopes the Console help, Assistant grammar, and Forms.
+function phaseElementCount(state: State, id: string): number {
+  let n = 0;
+  for (const b of Object.values(state.bays)) if ((b.phase ?? "main") === id) n++;
+  for (const r of state.regions) if ((r.phase ?? "main") === id) n++;
+  for (const w of state.walls) if ((w.phase ?? "main") === id) n++;
+  for (const c of state.columns) if ((c.phase ?? "main") === id) n++;
+  return n;
+}
+
+function PhaseRail({ state, onCommand, refOff, onToggleRef }: { state: State; onCommand: (c: string) => void; refOff: boolean; onToggleRef: (v: boolean) => void }) {
+  const phases = [...state.phases].sort((a, b) => a.order - b.order);
+  const composite = state.focus === COMPOSITE_FOCUS;
+  const addPhase = () => {
+    if (typeof window === "undefined") return;
+    const name = window.prompt("New phase name (e.g. Envelope, Core, Level 2):");
+    if (!name) return;
+    const lens = (window.prompt("Lens for this phase — bays, massing, or floorplan:", "bays") || "bays").trim().toLowerCase();
+    const schema = lens === "massing" || lens === "floorplan" ? lens : "bays";
+    onCommand(`phase add ${name} schema ${schema}`);
+  };
   return (
-    <div className="flex flex-wrap items-center gap-2 rounded-lg border-2 border-neutral-900 px-3 py-2">
-      <span className="display-font text-xs uppercase tracking-tight text-neutral-900">Modeling schema</span>
-      <select
-        value={mode}
-        onChange={(e) => onPick(e.target.value as SchemaMode)}
-        className="rounded border-2 border-neutral-900 px-2 py-1 text-xs font-semibold text-neutral-900"
-        aria-label="Active modeling schema — scopes which commands the console and assistant show"
-      >
-        {(["bays", "massing", "floorplan"] as SchemaMode[]).map((m) => (
-          <option key={m} value={m}>
-            {SCHEMA_LABELS[m]}
-          </option>
-        ))}
-      </select>
-      <span className="text-xs text-neutral-900">
-        — {SCHEMA_HINTS[mode]}. The <b>Console</b> help and the <b>Assistant</b> show this schema&apos;s commands; others still work if you type them.
-      </span>
+    <div className="space-y-2 rounded-lg border-2 border-neutral-900 p-2.5">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <span className="display-font text-xs uppercase tracking-tight text-neutral-900">Design phases — focus one, or compose the whole building</span>
+        <label className="flex items-center gap-1.5 text-xs font-semibold text-neutral-900" title="Silence the dashed reference ghosts of the other phases (a clean single-phase slate).">
+          <input type="checkbox" checked={refOff} onChange={(e) => onToggleRef(e.target.checked)} />
+          Hide reference underlay
+        </label>
+      </div>
+      <div role="group" aria-label="Design phase focus" className="flex flex-wrap items-stretch gap-2">
+        <button
+          type="button"
+          aria-pressed={composite}
+          onClick={() => onCommand("focus composite")}
+          className={`rounded border-2 px-2.5 py-1.5 text-left text-xs ${composite ? "border-neutral-900 bg-neutral-900 text-white" : "border-neutral-900 text-neutral-900 hover:bg-neutral-100"}`}
+        >
+          <span className="block font-bold">Composite</span>
+          <span className="block text-[11px]">the whole building</span>
+        </button>
+        {phases.map((p) => {
+          const active = state.focus === p.id;
+          const count = phaseElementCount(state, p.id);
+          const parent = p.derivedFrom ? state.phases.find((q) => q.id === p.derivedFrom)?.name : null;
+          return (
+            <div key={p.id} className={`flex items-stretch overflow-hidden rounded border-2 ${active ? "border-neutral-900 bg-neutral-900" : "border-neutral-900"} ${p.visible === "hidden" ? "opacity-50" : ""}`}>
+              <button
+                type="button"
+                aria-pressed={active}
+                onClick={() => onCommand(`focus ${p.id}`)}
+                className={`px-2.5 py-1.5 text-left text-xs ${active ? "text-white" : "text-neutral-900 hover:bg-neutral-100"}`}
+              >
+                <span className="block font-bold">{p.name}</span>
+                <span className="block text-[11px]">
+                  {SCHEMA_HINTS[p.schema]} · {count} elt{count === 1 ? "" : "s"}
+                  {parent ? ` · ↳ ${parent}` : ""}
+                </span>
+              </button>
+              <div className={`flex flex-col border-l-2 ${active ? "border-white/40" : "border-neutral-900"}`}>
+                <button
+                  type="button"
+                  title={p.visible === "hidden" ? "Show this phase" : "Hide this phase (never drawn)"}
+                  onClick={() => onCommand(`phase visible ${p.id} ${p.visible === "hidden" ? "auto" : "hidden"}`)}
+                  className={`px-1.5 py-0.5 text-[10px] font-semibold ${active ? "text-white hover:bg-white/15" : "text-neutral-900 hover:bg-neutral-100"}`}
+                >
+                  {p.visible === "hidden" ? "Hidden" : "Shown"}
+                </button>
+                {p.derivedFrom && (
+                  <button
+                    type="button"
+                    title={`Check how ${p.name} fits inside ${parent ?? "its parent"} (spoken footprint deltas in feet)`}
+                    onClick={() => onCommand(`phase fit ${p.id}`)}
+                    className={`border-t px-1.5 py-0.5 text-[10px] font-semibold ${active ? "border-white/40 text-white hover:bg-white/15" : "border-neutral-900 text-neutral-900 hover:bg-neutral-100"}`}
+                  >
+                    Fit?
+                  </button>
+                )}
+              </div>
+            </div>
+          );
+        })}
+        <button
+          type="button"
+          onClick={addPhase}
+          title="Add a new design phase (a fresh resolution to author the building at)"
+          className="rounded border-2 border-dashed border-neutral-900 px-2.5 py-1.5 text-xs font-bold text-neutral-900 hover:bg-neutral-100"
+        >
+          + Phase
+        </button>
+      </div>
+      <p className="text-[11px] text-neutral-900">
+        New geometry lands in the <b>focused</b> phase; other phases show as a dashed <b>reference</b> ghost (a finger reads hollow context vs. solid figure).
+        The focused phase&apos;s lens — {SCHEMA_LABELS.bays.toLowerCase()}, {SCHEMA_LABELS.massing.toLowerCase()}, or {SCHEMA_LABELS.floorplan.toLowerCase()} — scopes the Console, Assistant, and Forms.
+      </p>
     </div>
   );
 }

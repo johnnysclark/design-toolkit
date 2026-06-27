@@ -110,7 +110,15 @@ export function toFullStateJson(state: State): Record<string, unknown> {
     web_walls: state.walls,
     web_columns: state.columns,
     web_openings: state.openings,
-    web_regions: state.regions
+    web_regions: state.regions,
+
+    // ── Design phases (the resolution axis: Massing → Structure → Plan …).
+    // The web_* elements already carry their own `phase` tag (whole-object spread);
+    // native bays stay pristine for the Watcher, so the bay→phase map rides
+    // alongside instead of adding an unknown field to each bay object.
+    web_phases: state.phases,
+    web_focus: state.focus,
+    web_bay_phase: Object.fromEntries(Object.entries(state.bays).map(([k, b]) => [k, b.phase ?? "main"]))
   };
 }
 
