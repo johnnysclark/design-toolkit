@@ -175,3 +175,18 @@ button { font-family: inherit; color: var(--ink); }
 .ff-actions { display: flex; justify-content: flex-end; gap: 8px; }
 .ff-changes { font-size: 11px; background: var(--soft); border: 1px solid var(--line); border-radius: 6px; padding: 7px 9px; max-height: 120px; overflow: auto; }
 .ff-changes b { font-family: var(--font-display); font-weight: normal; text-transform: uppercase; font-size: 9px; }
+
+/* ---- climate (Benchmark Track · Stage A) ------------------------------- */
+.climate-strip { flex: none; padding: 6px 10px; border-bottom: 1px solid var(--line); background: #fbfaf7; }
+.cs-row { font-size: 11px; }
+.cs-row.muted { opacity: .85; }
+.cs-row b { font-family: var(--font-display); font-weight: normal; }
+.cs-clear { margin-top: 4px; font-size: 9px; border: 1px solid var(--line); border-radius: 999px; background: #fff;
+  padding: 2px 7px; cursor: pointer; text-transform: uppercase; font-family: var(--font-display); letter-spacing: -.01em; }
+.cs-clear:hover { background: var(--soft); }
+.cl-badge { font-family: var(--font-display); text-transform: uppercase; font-size: 8.5px; letter-spacing: -.01em;
+  background: var(--ok); color: #fff; border-radius: 4px; padding: 1px 5px; }
+.climate-read { font-size: 11px; font-variant-numeric: tabular-nums; background: #f1f5f1; border: 1px solid #cdddcd;
+  border-radius: 6px; padding: 6px 8px; margin: 0 0 8px; line-height: 1.5; }
+.windrose { margin-top: 4px; }
+.windrose svg { display: block; }

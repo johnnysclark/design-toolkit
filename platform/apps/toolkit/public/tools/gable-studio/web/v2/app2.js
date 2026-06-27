@@ -8,6 +8,7 @@ import { DEFAULTS, run, VARIABLE_DEFS } from "../core.js";
 import { createViewport } from "../viewport.js";
 import { FORCES, draftClause, activeTensions } from "./forces.js";
 import { Series, makeVariation, diffSeeds } from "./series.js";
+import { parseEPW, describeClimate } from "./weather.js";
 
 // ---- tiny DOM + math helpers ----------------------------------------------
 const $ = (s) => document.querySelector(s);
@@ -51,6 +52,7 @@ const state = {
   display: { mode: "analysis", shadowIntensity: 0.6, sunHour: 15, analysisField: "solarYear" },
   currentId: null,    // loaded series variation, or null = unsaved working design
   last: null,         // {model, metrics, evaluation, vars}
+  climate: null,      // parsed EPW summary (Benchmark Track, Stage A), or null = latitude-only
 };
 
 // ---- viewport (reused) ----------------------------------------------------
@@ -131,6 +133,7 @@ function buildForceDeck() {
     const body = el("div", { class: "fc-body" },
       el("p", { class: "fc-blurb" }, f.blurb),
       f.modeled ? reads : el("div", { class: "fc-absence" }, f.absence),
+      climateBlock(f.id),
       inputs, moves,
     );
     const head = el("div", { class: "fc-head", onclick: () => toggleGovern(f.id) },
@@ -433,7 +436,78 @@ document.querySelectorAll("[data-close]").forEach((b) => b.addEventListener("cli
 document.querySelectorAll(".modal").forEach((m) => m.addEventListener("click", (e) => { if (e.target === m) hideModal(m.id); }));
 document.addEventListener("keydown", (e) => { if (e.key === "Escape") document.querySelectorAll(".modal").forEach((m) => (m.style.display = "none")); });
 
+// ---- climate (Benchmark Track · Stage A) ----------------------------------
+function climateBlock(forceId) {
+  const c = state.climate; if (!c) return null;
+  if (forceId === "sun") {
+    const a = c.annual, mo = c.monthly;
+    return el("div", { class: "climate-read" }, el("span", { class: "cl-badge" }, "measured"),
+      ` GHI ${a.ghiTotalKWh} kWh/m²·yr · DNI ${a.dniTotalKWh} · Dec ${mo[11].ghiTotalKWh} / Jun ${mo[5].ghiTotalKWh} kWh/m²`);
+  }
+  if (forceId === "wind") {
+    const r = c.windRose;
+    return el("div", { class: "climate-read" },
+      el("div", null, el("span", { class: "cl-badge" }, "measured"),
+        ` prevailing ${r.prevailingAz}° · mean ${r.meanSpeed} m/s · calm ${r.calmPct}%`),
+      windRoseSVG(r));
+  }
+  if (forceId === "humidity") {
+    const a = c.annual, rhs = c.monthly.map((m) => m.rhMean).filter(Number.isFinite);
+    const lo = rhs.length ? round2(Math.min(...rhs)) : "—", hi = rhs.length ? round2(Math.max(...rhs)) : "—";
+    return el("div", { class: "climate-read" }, el("span", { class: "cl-badge" }, "measured"),
+      ` RH mean ${a.rhMean}% (monthly ${lo}–${hi}%) · air ${a.dbtMean}°C. The es(T) comfort metric is the next increment.`);
+  }
+  return null;
+}
+function windRoseSVG(r) {
+  const totals = r.counts.map((b) => b.reduce((s, x) => s + x, 0));
+  const max = Math.max(1, ...totals), cx = 42, cy = 42, R = 34;
+  let spokes = "";
+  for (let i = 0; i < 16; i++) {
+    const ang = (i * 22.5 - 90) * Math.PI / 180, len = (totals[i] / max) * R;
+    spokes += `<line x1="${cx}" y1="${cy}" x2="${(cx + Math.cos(ang) * len).toFixed(1)}" y2="${(cy + Math.sin(ang) * len).toFixed(1)}" stroke="#b0451f" stroke-width="3" stroke-linecap="round"/>`;
+  }
+  return el("div", { class: "windrose", title: "Wind rose — spoke length ∝ how often the wind comes FROM that compass point",
+    html: `<svg viewBox="0 0 84 84" width="84" height="84"><circle cx="${cx}" cy="${cy}" r="${R}" fill="none" stroke="#111"/><circle cx="${cx}" cy="${cy}" r="1.5" fill="#111"/>${spokes}<text x="${cx}" y="9" text-anchor="middle" font-size="8">N</text></svg>` });
+}
+function renderClimateStrip() {
+  const host = $("#climate-strip"); if (!host) return; host.replaceChildren();
+  if (state.climate) {
+    const c = state.climate;
+    host.append(
+      el("div", { class: "cs-row" }, el("span", { class: "cl-badge" }, "climate · measured"),
+        ` ${c.location.city || "EPW"} — ${c.annual.dbtMean}°C, RH ${c.annual.rhMean}%, GHI ${c.annual.ghiTotalKWh} kWh/m²·yr, wind ${c.windRose.prevailingAz}°`),
+      el("button", { class: "cs-clear", title: "Remove the weather file", onclick: clearClimate }, "latitude-only ✕"),
+    );
+  } else {
+    host.append(el("div", { class: "cs-row muted" },
+      "No weather file — solar & wind use latitude + your inputs (", el("b", null, "modeled"),
+      "). Load a ", el("b", null, ".epw"), " (e.g. climate.onebuilding.org) for real climate."));
+  }
+}
+function loadClimate() {
+  const input = el("input", { type: "file", accept: ".epw,.txt", style: "display:none" });
+  document.body.append(input);
+  input.addEventListener("change", async (e) => {
+    const f = e.target.files[0]; if (!f) { input.remove(); return; }
+    try {
+      const c = parseEPW(await f.text());
+      state.climate = c;
+      if (Number.isFinite(c.location.lat)) state.seed.site.latitude = Math.round(c.location.lat);
+      if (Number.isFinite(c.location.lon)) state.seed.site.longitude = Math.round(c.location.lon * 100) / 100;
+      if (Number.isFinite(c.windRose.prevailingAz)) state.seed.site.windFromAz = Math.round(c.windRose.prevailingAz);
+      if (Number.isFinite(c.windRose.meanSpeed)) state.seed.site.windSpeed = Math.round(c.windRose.meanSpeed * 10) / 10;
+      syncOverlay(); rebuild();
+      setStatus(describeClimate(c));
+    } catch (err) { setStatus("Couldn't read EPW: " + err.message); }
+    input.remove();
+  });
+  input.click();
+}
+function clearClimate() { state.climate = null; rebuild(); setStatus("Removed the weather file — back to latitude-only (modeled)."); }
+
 // ---- header wiring --------------------------------------------------------
+$("#v2-climate").addEventListener("click", loadClimate);
 $("#v2-propose").addEventListener("click", proposeCharter);
 $("#v2-reset").addEventListener("click", resetDesign);
 $("#v2-fork").addEventListener("click", openFork);
@@ -442,7 +516,7 @@ $("#v2-load-series").addEventListener("click", loadSeries);
 const setStatus = (msg) => { $("#v2-status").textContent = msg; };
 
 // ---- rebuild = structural render + a live pass ----------------------------
-function rebuild() { buildForceDeck(); buildMake(); buildCharter(); liveUpdate(); renderSeries(); }
+function rebuild() { renderClimateStrip(); buildForceDeck(); buildMake(); buildCharter(); liveUpdate(); renderSeries(); }
 
 // ---- boot -----------------------------------------------------------------
 Series.load();
