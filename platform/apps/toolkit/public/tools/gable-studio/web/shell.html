@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Eco-Architect</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Archivo+Black&display=swap" rel="stylesheet" />
+  <style>
+    :root { --font-display: "Archivo Black", system-ui, sans-serif; }
+    * { box-sizing: border-box; }
+    html, body { height: 100%; margin: 0; }
+    body { display: flex; flex-direction: column; background: #fff; color: #111;
+           font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+    /* The version switcher — "top of the page". Registry-driven so adding v3/v4
+       is one entry in VERSIONS below. */
+    .verbar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+              padding: 8px 14px; border-bottom: 2px solid #111; background: #fff; }
+    .verbrand { font-family: var(--font-display); font-size: 15px; letter-spacing: -.01em;
+                text-transform: uppercase; margin-right: 4px; }
+    .verbrand small { font-family: system-ui, sans-serif; text-transform: none;
+                      font-weight: 400; font-size: 11px; color: #111; opacity: .7; margin-left: 6px; }
+    .verpills { display: flex; gap: 6px; flex-wrap: wrap; }
+    .verpill { font-family: var(--font-display); text-transform: uppercase; letter-spacing: -.01em;
+               font-size: 11px; padding: 6px 12px; border: 1.5px solid #111; border-radius: 999px;
+               background: #fff; color: #111; cursor: pointer; line-height: 1; }
+    .verpill .vp-sub { font-family: system-ui, sans-serif; text-transform: none; font-weight: 400;
+                       font-size: 10px; opacity: .7; margin-left: 6px; }
+    .verpill[aria-pressed="true"] { background: #111; color: #fff; }
+    .verpill[aria-pressed="true"] .vp-sub { opacity: .85; }
+    .vergrow { flex: 1; }
+    .verlink { font-size: 11px; color: #111; text-decoration: none; border-bottom: 1.5px solid #111;
+               padding-bottom: 1px; }
+    .verstage { flex: 1; border: 0; width: 100%; }
+  </style>
+</head>
+<body>
+  <div class="verbar">
+    <span class="verbrand">Eco-Architect <small>variation studio</small></span>
+    <div class="verpills" id="verpills" role="group" aria-label="Tool version"></div>
+    <span class="vergrow"></span>
+    <a class="verlink" id="verfull" href="#" target="_blank" rel="noopener noreferrer">Open this version full screen ↗</a>
+  </div>
+  <iframe class="verstage" id="verstage" title="Eco-Architect tool" allow="fullscreen"></iframe>
+
+  <script>
+    // Add a version here and it appears in the toggle. `src` is relative to /web/.
+    const VERSIONS = [
+      { id: "v2", label: "V2", sub: "Site-forces method", src: "v2/index.html" },
+      { id: "v1", label: "V1", sub: "Original", src: "index.html" },
+    ];
+    const DEFAULT = "v2";
+    const KEY = "ecoArchitect.version";
+
+    const pills = document.getElementById("verpills");
+    const stage = document.getElementById("verstage");
+    const full = document.getElementById("verfull");
+
+    function pick() {
+      const hash = (location.hash || "").replace(/^#/, "");
+      let saved = null; try { saved = localStorage.getItem(KEY); } catch (e) {}
+      const wanted = hash || saved || DEFAULT;
+      return VERSIONS.find(v => v.id === wanted) ? wanted : DEFAULT;
+    }
+
+    function select(id, { push = true } = {}) {
+      const v = VERSIONS.find(x => x.id === id) || VERSIONS[0];
+      if (stage.getAttribute("data-id") !== v.id) { stage.src = v.src; stage.setAttribute("data-id", v.id); }
+      full.href = v.src;
+      try { localStorage.setItem(KEY, v.id); } catch (e) {}
+      if (push && location.hash.replace(/^#/, "") !== v.id) {
+        history.replaceState(null, "", "#" + v.id);
+      }
+      for (const b of pills.children) b.setAttribute("aria-pressed", String(b.dataset.id === v.id));
+    }
+
+    for (const v of VERSIONS) {
+      const b = document.createElement("button");
+      b.className = "verpill"; b.type = "button"; b.dataset.id = v.id;
+      b.innerHTML = v.label + '<span class="vp-sub">' + v.sub + "</span>";
+      b.addEventListener("click", () => select(v.id));
+      pills.appendChild(b);
+    }
+    window.addEventListener("hashchange", () => select(pick(), { push: false }));
+    select(pick(), { push: false });
+  </script>
+</body>
+</html>
