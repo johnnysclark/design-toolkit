@@ -70,6 +70,8 @@ export interface Bay {
   level: number;
   /** Rhino layer this bay's geometry is drawn on. Missing = "Default". */
   layer?: string;
+  /** Design phase that authored this bay (index into State.phases by id). Missing = "main". */
+  phase?: string;
 }
 
 export interface Level {
@@ -92,6 +94,8 @@ export interface Wall {
   height?: number; // ft; defaults to tactile3d.wall_height
   /** Rhino layer this wall is drawn on (lineweight/linetype/tactile). Missing = "Default". */
   layer?: string;
+  /** Design phase that authored this wall (index into State.phases by id). Missing = "main". */
+  phase?: string;
 }
 
 // ── Rhino layers + tactile patterns (drafting-literal, no program vocabulary) ──
@@ -132,6 +136,7 @@ export interface Region {
   layer: string; // REQUIRED — must be a key in State.layers
   level?: number; // index into State.levels; default 0
   tactile?: TactilePattern; // OPTIONAL per-region override of the layer's tactile
+  phase?: string; // design phase that authored this region (index into State.phases by id). Missing = "main".
 }
 
 /** A free-standing column, anywhere (not tied to a bay grid). */
@@ -142,6 +147,8 @@ export interface Column {
   size: number; // ft (square)
   /** Rhino layer this column is drawn on. Missing = "Default". */
   layer?: string;
+  /** Design phase that authored this column (index into State.phases by id). Missing = "main". */
+  phase?: string;
 }
 
 /** A door/window/portal placed on a free Wall, positioned along it. */
@@ -188,15 +195,48 @@ export interface Tactile3D {
   scale_factor: number;
 }
 
-// The active modeling schema — a "way of thinking" that scopes which commands the
-// console help, the assistant grammar, and the Forms surface. Every command still
-// works if typed (hide-but-allow); the schema just shapes what's shown.
+// The modeling schema — a "way of thinking" that scopes which commands the console
+// help, the assistant grammar, and the Forms surface. Every command still works if
+// typed (hide-but-allow); the schema just shapes what's shown. A schema is no longer
+// a property of the document — it is the LENS a single phase wears (see Phase.schema).
 export type SchemaMode = "bays" | "massing" | "floorplan";
+
+/** A design phase — one RESOLUTION at which the single building is authored
+ *  (e.g. Massing → Structure → Plan). Phases are free-form: add as many as you
+ *  like, each wearing one of the three schema lenses. `phase` is a grouping axis
+ *  on geometry exactly parallel to `level` and `layer`; FOCUSING a phase scopes the
+ *  canvas to it (others shown as reference), and the COMPOSITE view shows every
+ *  phase solid as one whole building. Composition is subtractive, never a merge. */
+export interface Phase {
+  id: string;
+  name: string;
+  /** The vocabulary lens this phase wears (scopes console help / agent grammar / Forms). */
+  schema: SchemaMode;
+  /** Coarse→fine ordering (0 = coarsest). Drives the phase rail + read-back order. */
+  order: number;
+  /** Phase id this phase was one-shot derived from (provenance), or null. */
+  derivedFrom: string | null;
+  /** Footprint signature of `derivedFrom` captured at derive time (for drift checks), or null. */
+  basis: string | null;
+  /** "auto" = drawn (focus or reference per the active view); "hidden" = never drawn. */
+  visible: "auto" | "hidden";
+}
+
+/** Reserved `State.focus` value meaning "show the whole building" (every visible
+ *  phase rendered solid) — the composite view. Any other value is a phase id. */
+export const COMPOSITE_FOCUS = "composite";
 
 export interface State {
   schema: "rhino_controller_v4.0";
-  /** Active modeling schema (set by the starter or the schema selector). */
+  /** Derived MIRROR of the focused phase's schema — kept in sync so the console
+   *  help, agent grammar, Forms, and SchemaBar keep reading one scalar. Authoritative
+   *  source is `phases[focus].schema`; never set this without updating `focus`. */
   mode: SchemaMode;
+  /** Ordered design phases (coarse→fine), always ≥1. The building is authored through
+   *  these lenses. A legacy/single-phase file has one phase, id "main". */
+  phases: Phase[];
+  /** The focused phase id, or COMPOSITE_FOCUS for the whole-building view. */
+  focus: string;
   meta: { created: string; last_saved: string; notes: string };
   site: Site;
   style: Style;

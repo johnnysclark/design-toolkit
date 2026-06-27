@@ -6,7 +6,9 @@
 // pages (consistent header + edges, reflows with the sidebar). "Open full screen"
 // gives the studio its full three-panel width.
 
-const STUDIO_URL = "/tools/gable-studio/web/index.html";
+// Loads the version shell (a top toggle that switches between V2 — the site-forces
+// method — and V1 — the original). Add versions in web/shell.html.
+const STUDIO_URL = "/tools/gable-studio/web/shell.html";
 
 export default function Page() {
   return (

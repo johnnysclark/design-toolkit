@@ -6,11 +6,24 @@
 // converge on one grammar and one auditable log. Fully labelled for keyboard +
 // screen-reader use.
 
-import { useEffect, useReducer, useState } from "react";
-import type { State } from "../engine/types";
+import { useEffect, useReducer, useState, type ReactNode } from "react";
+import type { SchemaMode, State } from "../engine/types";
+import { SCHEMA_LABELS } from "../engine/interpreter";
 
 const fieldCls = "rounded border-2 border-neutral-900 px-2 py-1 text-sm text-neutral-900 outline-none focus:border-[#ff3b21] focus-visible:ring-2 focus-visible:ring-[#ff3b21] focus-visible:ring-offset-1";
 const labelCls = "flex flex-col gap-1 text-xs font-semibold text-neutral-900";
+
+// Hide-but-allow: a control set for the ACTIVE phase lens renders inline; one for
+// another lens collapses into a disclosure (still fully usable when opened).
+function Scoped({ active, title, children }: { active: boolean; title: string; children: ReactNode }) {
+  if (active) return <>{children}</>;
+  return (
+    <details className="rounded border border-dashed border-neutral-400 p-1.5">
+      <summary className="cursor-pointer text-[11px] font-semibold text-neutral-900">{title} — another phase&apos;s lens (open to use it anyway)</summary>
+      <div className="mt-2">{children}</div>
+    </details>
+  );
+}
 
 // A numeric field that commits ONCE — on blur or Enter — not on every keystroke.
 // Uncontrolled (defaultValue + key) so it resyncs when the value changes via
@@ -84,8 +97,15 @@ export default function Forms({ state, onCommand }: { state: State; onCommand: (
     setSel(name);
   };
 
+  const mode = state.mode;
   return (
     <div className="space-y-4 text-neutral-900">
+      <p className="text-xs text-neutral-900">
+        These forms author the <b>focused phase</b> (lens: <b>{SCHEMA_LABELS[mode]}</b>). Controls for another phase&apos;s lens are tucked into
+        the disclosures below — everything still works if you open them.
+      </p>
+      <Scoped active={mode === "bays"} title="Structural bays">
+        <div className="space-y-4">
       {/* Bay picker */}
       <div className="flex flex-wrap items-end gap-2">
         <label className={labelCls}>
@@ -176,9 +196,11 @@ export default function Forms({ state, onCommand }: { state: State; onCommand: (
           <ApertureAdd sel={sel} onCommand={onCommand} count={bay.apertures.length} />
         </>
       )}
+        </div>
+      </Scoped>
 
       {/* Geometry — layers, floor plates, extruded boxes, free walls, columns */}
-      <BuildingAdd state={state} onCommand={onCommand} />
+      <BuildingAdd state={state} mode={mode} onCommand={onCommand} />
     </div>
   );
 }
@@ -191,7 +213,7 @@ function tactileSummary(t?: { pattern: string; spacing_mm: number; angle_deg: nu
   return `${t.pattern} ${t.spacing_mm} mm @ ${t.angle_deg}°`;
 }
 
-function BuildingAdd({ state, onCommand }: { state: State; onCommand: (raw: string) => void }) {
+function BuildingAdd({ state, mode, onCommand }: { state: State; mode: SchemaMode; onCommand: (raw: string) => void }) {
   const layerNames = Object.keys(state.layers);
   // Layer
   const [lname, setLname] = useState("");
@@ -303,6 +325,7 @@ function BuildingAdd({ state, onCommand }: { state: State; onCommand: (raw: stri
       </fieldset>
 
       {/* (ii) Floor plate */}
+      <Scoped active={mode === "floorplan"} title="Floor plate">
       <fieldset className="rounded border border-neutral-300 p-3">
         <legend className="px-1 text-xs font-bold uppercase text-neutral-900">Floor plate (slab region, feet)</legend>
         <div className="grid grid-cols-3 gap-2 sm:grid-cols-6">
@@ -322,8 +345,10 @@ function BuildingAdd({ state, onCommand }: { state: State; onCommand: (raw: stri
           + Place floor plate
         </button>
       </fieldset>
+      </Scoped>
 
       {/* (iii) Extruded box */}
+      <Scoped active={mode === "massing"} title="Extruded box">
       <fieldset className="rounded border border-neutral-300 p-3">
         <legend className="px-1 text-xs font-bold uppercase text-neutral-900">Extruded box (massing volume, feet)</legend>
         <div className="grid grid-cols-3 gap-2 sm:grid-cols-6">
@@ -345,8 +370,10 @@ function BuildingAdd({ state, onCommand }: { state: State; onCommand: (raw: stri
           + Place extruded box
         </button>
       </fieldset>
+      </Scoped>
 
       {/* (iv) Free wall */}
+      <Scoped active={mode === "floorplan"} title="Free wall">
       <fieldset className="rounded border border-neutral-300 p-3">
         <legend className="px-1 text-xs font-bold uppercase text-neutral-900">Free wall (any angle)</legend>
         <div className="grid grid-cols-3 gap-2 sm:grid-cols-6">
@@ -361,8 +388,10 @@ function BuildingAdd({ state, onCommand }: { state: State; onCommand: (raw: stri
           + Draw wall
         </button>
       </fieldset>
+      </Scoped>
 
       {/* (v) Column */}
+      <Scoped active={mode === "bays" || mode === "floorplan"} title="Free column">
       <fieldset className="rounded border border-neutral-300 p-3">
         <legend className="px-1 text-xs font-bold uppercase text-neutral-900">Free column</legend>
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
@@ -374,6 +403,7 @@ function BuildingAdd({ state, onCommand }: { state: State; onCommand: (raw: stri
           + Place column
         </button>
       </fieldset>
+      </Scoped>
     </div>
   );
 }

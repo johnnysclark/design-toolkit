@@ -1,0 +1,1603 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Rhino / Grasshopper Python</title>
+<!--
+  Rhino / Grasshopper Python — a gallery of small, copy-paste RhinoPython and
+  GhPython snippets for everyday studio moves (panelise, attractor fields,
+  contour, Make2D batch, layers, baking…). Each card has a one-line "why",
+  a context tag, and a copy button. Static + client-side: no server, no upload.
+
+  Pair with Coach (the toolkit's Rhino / Grasshopper tutor) for the deeper why.
+  Part of the All Means Works design toolkit (3D Tooling).
+-->
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg: #f5f5f3;
+  --surface: #ffffff;
+  --line: #e4e4e0;
+  --ink: #111111;
+  --accent: #ff3b21;
+  --rhino: #1f6feb;
+  --gh: #1a8a4a;
+  --radius: 10px;
+}
+
+html, body { height: 100%; }
+body {
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  background: var(--bg);
+  color: var(--ink);
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+}
+
+header {
+  padding: 12px 18px;
+  background: var(--surface);
+  border-bottom: 2px solid var(--ink);
+  display: flex;
+  align-items: baseline;
+  gap: 14px;
+  flex-wrap: wrap;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+header h1 { font-size: 18px; font-weight: 800; letter-spacing: -0.01em; text-transform: uppercase; }
+header .subtitle { font-size: 12px; }
+
+.controls {
+  background: var(--surface);
+  border-bottom: 1px solid var(--line);
+  padding: 12px 18px;
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+  position: sticky;
+  top: 49px;
+  z-index: 9;
+}
+#search {
+  font: inherit; font-size: 14px;
+  padding: 9px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  min-width: 220px;
+  flex: 1;
+  max-width: 360px;
+  color: var(--ink);
+}
+.filters { display: flex; gap: 7px; flex-wrap: wrap; }
+.chip {
+  font: inherit; font-size: 12px; font-weight: 600;
+  padding: 7px 12px;
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  background: #fff;
+  cursor: pointer;
+  color: var(--ink);
+}
+.chip.active { background: var(--ink); color: #fff; border-color: var(--ink); }
+.count { font-size: 12px; margin-left: auto; }
+
+main { padding: 18px; flex: 1; }
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(420px, 1fr));
+  gap: 16px;
+  align-items: start;
+}
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+.card-head { padding: 14px 16px 10px; }
+.card-tags { display: flex; gap: 7px; align-items: center; margin-bottom: 8px; flex-wrap: wrap; }
+.tag {
+  font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em;
+  padding: 3px 8px; border-radius: 5px; color: #fff;
+}
+.tag.rhino { background: var(--rhino); }
+.tag.gh { background: var(--gh); }
+.tag.cat { background: #efefec; color: var(--ink); border: 1px solid var(--line); }
+.card h3 { font-size: 15px; font-weight: 800; letter-spacing: -0.01em; margin-bottom: 4px; }
+.card .why { font-size: 13px; line-height: 1.45; }
+.card .why strong { font-weight: 700; }
+
+.code-wrap { position: relative; border-top: 1px solid var(--line); }
+.code-bar {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 6px 12px; background: #fafafa; border-bottom: 1px solid var(--line);
+}
+.code-meta { font-size: 11px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+.copy {
+  font: inherit; font-size: 11px; font-weight: 700;
+  padding: 5px 11px; border-radius: 6px;
+  border: 1px solid var(--ink); background: #fff; cursor: pointer; color: var(--ink);
+}
+.copy:hover { background: var(--ink); color: #fff; }
+.copy.done { background: var(--gh); color: #fff; border-color: var(--gh); }
+pre {
+  margin: 0; padding: 14px 16px;
+  overflow-x: auto;
+  background: #1a1a1a;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px; line-height: 1.55;
+}
+pre code { color: #e8e8e8; white-space: pre; }
+/* light syntax accents */
+.k { color: #ff9d6b; }   /* keyword */
+.s { color: #9ece6a; }   /* string */
+.c { color: #6a7a8c; font-style: italic; } /* comment */
+.f { color: #7aa2f7; }   /* function/attr */
+.n { color: #e0af68; }   /* number */
+
+.io {
+  padding: 9px 16px 14px;
+  font-size: 11.5px; line-height: 1.5;
+  border-top: 1px dashed var(--line);
+  background: #fcfcfb;
+}
+.io .lbl { font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; font-size: 10px; }
+.io code { font-family: ui-monospace, Menlo, monospace; background: #efefec; padding: 1px 5px; border-radius: 4px; }
+
+.empty { text-align: center; padding: 60px 20px; font-size: 14px; }
+footer { padding: 16px 18px; font-size: 12px; border-top: 1px solid var(--line); background: var(--surface); }
+footer a { color: var(--accent); }
+
+@media (max-width: 520px) {
+  .grid { grid-template-columns: 1fr; }
+  #search { max-width: none; }
+}
+</style>
+</head>
+<body>
+<header>
+  <h1>Rhino&nbsp;/&nbsp;Grasshopper&nbsp;Python</h1>
+  <span class="subtitle">Copy-paste snippets for studio moves</span>
+</header>
+
+<div class="controls">
+  <input type="text" id="search" placeholder="Search snippets… (panelise, attractor, contour, layer)">
+  <div class="filters" id="filters"></div>
+  <span class="count" id="count"></span>
+</div>
+
+<main>
+  <div class="grid" id="grid"></div>
+  <div class="empty" id="empty" hidden>No snippets match that search. Try another word, or clear the filter.</div>
+</main>
+
+<footer>
+  Each snippet runs as-is in Rhino's <strong>EditPythonScript</strong> editor (RhinoPython) or a
+  <strong>GhPython</strong> component in Grasshopper (set the inputs/outputs noted on the card).
+  Want the <em>why</em> behind a move? Ask <strong>Coach</strong> in the toolkit. Snippets target
+  Rhino 7 / 8 IronPython-style <code>rhinoscriptsyntax</code>; for Rhino 8 CPython, prefer the
+  <code>rhino3dm</code> / <code>RhinoCommon</code> variants where noted.
+</footer>
+
+<script>
+// ---------------------------------------------------------------------------
+// Snippet library. env: "rhino" (RhinoPython editor) | "gh" (GhPython component).
+// `inputs` / `outputs` describe the GhPython component wiring.
+// Keep each `why` to one plain-English line.
+// ---------------------------------------------------------------------------
+const SNIPPETS = [
+  {
+    title: "Panelise a surface (UV grid)",
+    env: "gh", cat: "Panelise",
+    why: "Divide any surface into a clean grid of quad panels you can rebuild, scale, or replace.",
+    inputs: "srf (Surface) · u (int) · v (int)",
+    outputs: "panels (list of surfaces)",
+    code:
+`import Rhino.Geometry as rg
+
+# Split the surface domain into u x v sub-surfaces.
+panels = []
+du = srf.Domain(0)
+dv = srf.Domain(1)
+for i in range(u):
+    for j in range(v):
+        u0 = du.ParameterAt(i / float(u)); u1 = du.ParameterAt((i + 1) / float(u))
+        v0 = dv.ParameterAt(j / float(v)); v1 = dv.ParameterAt((j + 1) / float(v))
+        sub = srf.Trim(rg.Interval(u0, u1), rg.Interval(v0, v1))
+        if sub: panels.append(sub)`
+  },
+  {
+    title: "Attractor field — scale by distance",
+    env: "gh", cat: "Attractor",
+    why: "Make circles (or any value) grow/shrink with distance from a point — the classic attractor move.",
+    inputs: "pts (list of Point3d) · attractor (Point3d) · rmin (float) · rmax (float)",
+    outputs: "circles (list)",
+    code:
+`import Rhino.Geometry as rg
+
+# Distance from each point to the attractor, remapped to a radius.
+dists = [p.DistanceTo(attractor) for p in pts]
+lo, hi = min(dists), max(dists)
+span = (hi - lo) or 1.0
+
+circles = []
+for p, d in zip(pts, dists):
+    t = (d - lo) / span                 # 0 at nearest, 1 at farthest
+    r = rmin + t * (rmax - rmin)        # near = small, far = large
+    circles.append(rg.Circle(p, r))`
+  },
+  {
+    title: "Attractor field — multiple attractors",
+    env: "gh", cat: "Attractor",
+    why: "Blend several attractors at once by using each point's distance to the nearest one.",
+    inputs: "pts (list) · attractors (list of Point3d) · rmin · rmax · falloff (float)",
+    outputs: "radii (list of float)",
+    code:
+`# Nearest-attractor falloff: closer = stronger pull.
+radii = []
+for p in pts:
+    d = min(p.DistanceTo(a) for a in attractors)
+    influence = 1.0 / (1.0 + (d / falloff) ** 2)   # 1 near, ->0 far
+    radii.append(rmin + (rmax - rmin) * (1.0 - influence))`
+  },
+  {
+    title: "Contour a Brep or Mesh",
+    env: "rhino", cat: "Contour",
+    why: "Slice selected geometry into level lines — for laser-cut sections, site models, or analysis.",
+    inputs: "—",
+    outputs: "—",
+    code:
+`import rhinoscriptsyntax as rs
+
+obj = rs.GetObject("Select object to contour", rs.filter.surface | rs.filter.polysurface | rs.filter.mesh)
+if obj:
+    spacing = rs.GetReal("Contour spacing", 10.0)
+    bbox = rs.BoundingBox(obj)
+    start = bbox[0]                                  # lowest corner
+    end   = [start[0], start[1], bbox[4][2]]         # straight up in Z
+    curves = rs.AddSrfContourCrvs(obj, (start, end), spacing)
+    print("Made %d contours" % (len(curves) if curves else 0))`
+  },
+  {
+    title: "Make2D — batch the current view",
+    env: "rhino", cat: "Document",
+    why: "Generate flattened 2D line drawings from your 3D model for plans, elevations, and details.",
+    inputs: "—",
+    outputs: "—",
+    code:
+`import rhinoscriptsyntax as rs
+import scriptcontext as sc
+
+# Select what you want drawn, then run. Make2D uses the ACTIVE viewport's
+# projection — set Top / Front / Right (or a named view) first.
+objs = rs.GetObjects("Select objects for Make2D", preselect=True)
+if objs:
+    rs.SelectObjects(objs)
+    rs.Command("_-Make2D _DrawingLayout=CurrentView "
+               "_ShowTangentEdges=No _ShowHiddenLines=No _Enter", echo=False)
+    print("Make2D done — new curves are on the 'Make2D' layers.")`
+  },
+  {
+    title: "Populate points on a surface",
+    env: "gh", cat: "Points",
+    why: "Scatter points across a surface (grid or jittered) as seeds for panels, columns, or planting.",
+    inputs: "srf (Surface) · u (int) · v (int) · jitter (float 0–1)",
+    outputs: "pts (list of Point3d)",
+    code:
+`import Rhino.Geometry as rg
+import random
+
+du, dv = srf.Domain(0), srf.Domain(1)
+pts = []
+for i in range(u):
+    for j in range(v):
+        fu = (i + 0.5) / u + random.uniform(-jitter, jitter) / u
+        fv = (j + 0.5) / v + random.uniform(-jitter, jitter) / v
+        pts.append(srf.PointAt(du.ParameterAt(min(max(fu,0),1)),
+                               dv.ParameterAt(min(max(fv,0),1))))`
+  },
+  {
+    title: "Cull duplicate points",
+    env: "gh", cat: "Points",
+    why: "Remove coincident points within a tolerance — clean data before lofting, meshing, or joining.",
+    inputs: "pts (list) · tol (float)",
+    outputs: "clean (list)",
+    code:
+`import Rhino.Geometry as rg
+
+clean = []
+for p in pts:
+    if not any(p.DistanceTo(q) < tol for q in clean):
+        clean.append(p)`
+  },
+  {
+    title: "Sort points along a curve",
+    env: "gh", cat: "Points",
+    why: "Order scattered points by their position along a guide curve — fixes tangled polylines and lofts.",
+    inputs: "pts (list) · crv (Curve)",
+    outputs: "sorted_pts (list)",
+    code:
+`# Sort by the curve parameter closest to each point.
+def t_at(p):
+    ok, t = crv.ClosestPoint(p)
+    return t if ok else 0.0
+
+sorted_pts = sorted(pts, key=t_at)`
+  },
+  {
+    title: "Loft a list of section curves",
+    env: "gh", cat: "Surfaces",
+    why: "Skin a series of profiles into a surface — the workhorse for lofted roofs, hulls, and terrain.",
+    inputs: "curves (list of Curve)",
+    outputs: "srf (Brep)",
+    code:
+`import Rhino.Geometry as rg
+
+loft = rg.Brep.CreateFromLoft(
+    curves, rg.Point3d.Unset, rg.Point3d.Unset,
+    rg.LoftType.Normal, False)
+srf = loft[0] if loft else None`
+  },
+  {
+    title: "Diagrid from a point grid",
+    env: "gh", cat: "Panelise",
+    why: "Turn a rectangular point grid into a diagonal (diagrid) net of lines — structure and facade pattern.",
+    inputs: "grid (tree/list) · u (int) · v (int)   # flattened row-major, length u*v",
+    outputs: "lines (list of Line)",
+    code:
+`import Rhino.Geometry as rg
+
+def at(i, j): return grid[i * v + j]
+
+lines = []
+for i in range(u - 1):
+    for j in range(v - 1):
+        # the two diagonals of each cell
+        lines.append(rg.Line(at(i, j),     at(i+1, j+1)))
+        lines.append(rg.Line(at(i+1, j),   at(i,   j+1)))`
+  },
+  {
+    title: "Remap a number to a new range",
+    env: "gh", cat: "Data",
+    why: "The remap you reach for constantly — map a value from one range onto another (clamped).",
+    inputs: "x (float) · in_lo · in_hi · out_lo · out_hi",
+    outputs: "y (float)",
+    code:
+`span = (in_hi - in_lo) or 1.0
+t = (x - in_lo) / span
+t = max(0.0, min(1.0, t))          # clamp to 0–1
+y = out_lo + t * (out_hi - out_lo)`
+  },
+  {
+    title: "Make layers with lineweight + linetype",
+    env: "rhino", cat: "Document",
+    why: "Set up a drawing's layer system in one go — names, colours, lineweights, dashed/hidden types.",
+    inputs: "—",
+    outputs: "—",
+    code:
+`import rhinoscriptsyntax as rs
+
+# (name, RGB colour, lineweight mm, linetype)
+specs = [
+    ("CUT",     (0, 0, 0),       0.50, "Continuous"),
+    ("OUTLINE", (40, 40, 40),    0.25, "Continuous"),
+    ("HIDDEN",  (120, 120, 120), 0.13, "Hidden"),
+    ("GRID",    (180, 180, 180), 0.13, "Dots"),
+]
+for name, rgb, lw, lt in specs:
+    if not rs.IsLayer(name): rs.AddLayer(name)
+    rs.LayerColor(name, rgb)
+    rs.LayerLinetype(name, lt)        # linetype must already exist in the doc
+    rs.LayerPrintWidth(name, lw)      # plot / print lineweight in mm
+print("Layers ready.")`
+  },
+  {
+    title: "Bake geometry to a named layer",
+    env: "gh", cat: "Document",
+    why: "Push Grasshopper geometry into the Rhino doc on a layer you choose — set a Boolean 'bake' toggle.",
+    inputs: "geo (list of geometry) · layer (str) · bake (bool button)",
+    outputs: "—",
+    code:
+`import scriptcontext as sc
+import Rhino
+
+if bake:
+    doc = Rhino.RhinoDoc.ActiveDoc
+    idx = doc.Layers.FindName(layer, 0) if hasattr(doc.Layers, "FindName") else -1
+    if idx < 0:
+        idx = doc.Layers.Add(layer, System.Drawing.Color.Black)
+    attr = Rhino.DocObjects.ObjectAttributes()
+    attr.LayerIndex = idx
+    for g in geo:
+        doc.Objects.Add(g, attr)
+    doc.Views.Redraw()`
+  },
+  {
+    title: "Contour points → terrain mesh seed",
+    env: "gh", cat: "Surfaces",
+    why: "Triangulate scattered survey points into a Delaunay mesh — a quick site-terrain surface.",
+    inputs: "pts (list of Point3d)",
+    outputs: "mesh (Mesh)",
+    code:
+`import Rhino.Geometry as rg
+
+nodes = rg.Collections.Point3dList(pts)
+faces = rg.Mesh()                     # build via Delaunay on the XY plane
+import Grasshopper
+tri = Grasshopper.Kernel.Geometry.Delaunay.Solver.Solve_Faces(
+        Grasshopper.Kernel.Geometry.Node2List(
+            [rg.Point2d(p.X, p.Y) for p in pts]), 1)
+mesh = Grasshopper.Kernel.Geometry.Delaunay.Solver.Solve_Mesh(
+        Grasshopper.Kernel.Geometry.Node2List(
+            [rg.Point2d(p.X, p.Y) for p in pts]), 1, tri)
+for i, p in enumerate(pts):           # lift back to the points' Z
+    mesh.Vertices.SetVertex(i, p.X, p.Y, p.Z)`
+  },
+  {
+    title: "Export each layer as a DXF",
+    env: "rhino", cat: "Document",
+    why: "Batch-export every layer to its own DXF — clean hand-off to laser cutters or other software.",
+    inputs: "—",
+    outputs: "—",
+    code:
+`import rhinoscriptsyntax as rs
+import os
+
+folder = rs.BrowseForFolder(message="Where to save the DXFs?")
+if folder:
+    for layer in rs.LayerNames():
+        objs = rs.ObjectsByLayer(layer)
+        if not objs: continue
+        rs.UnselectAllObjects(); rs.SelectObjects(objs)
+        path = os.path.join(folder, layer.replace("::", "_") + ".dxf")
+        rs.Command('_-Export "%s" _Enter _Enter' % path, echo=False)
+    rs.UnselectAllObjects()
+    print("Exported per-layer DXFs to %s" % folder)`
+  },
+  {
+    title: "Color meshes by height (analysis)",
+    env: "gh", cat: "Data",
+    why: "Tint a mesh's vertices from low→high — instant elevation / analysis colour without plug-ins.",
+    inputs: "mesh (Mesh) · cold (Colour) · hot (Colour)",
+    outputs: "mesh (Mesh)",
+    code:
+`import System.Drawing as sd
+
+zs = [v.Z for v in mesh.Vertices]
+lo, hi = min(zs), max(zs); span = (hi - lo) or 1.0
+mesh.VertexColors.Clear()
+for v in mesh.Vertices:
+    t = (v.Z - lo) / span
+    r = int(cold.R + (hot.R - cold.R) * t)
+    g = int(cold.G + (hot.G - cold.G) * t)
+    b = int(cold.B + (hot.B - cold.B) * t)
+    mesh.VertexColors.Add(sd.Color.FromArgb(r, g, b))`
+  },
+  {
+    title: "Sweep1 a section along a rail",
+    env: "gh", cat: "Surfaces",
+    why: "Drives one profile curve along a rail to model handrails, mouldings, or continuous facade ribs",
+    inputs: "rail (Curve) · section (Curve)",
+    outputs: "a (Brep list)",
+    code:
+`import Rhino.Geometry as rg
+import scriptcontext as sc
+
+tol = sc.doc.ModelAbsoluteTolerance
+# Sweep the section curve along the rail (False = leave the sweep open)
+breps = rg.Brep.CreateFromSweep(rail, section, False, tol)
+
+if breps and len(breps) > 0:
+    a = list(breps)
+else:
+    a = None  # rail/section may be unset or not sweepable`
+  },
+  {
+    title: "Pipe a curve into a solid tube",
+    env: "gh", cat: "Solids",
+    why: "Wraps a constant-radius solid around any curve for columns, conduit, tube structure, or quick massing",
+    inputs: "rail (Curve) · radius (float)",
+    outputs: "a (Brep list)",
+    code:
+`import Rhino.Geometry as rg
+import scriptcontext as sc
+
+tol = sc.doc.ModelAbsoluteTolerance
+ang = sc.doc.ModelAngleToleranceRadians
+# Round caps close both ends, so the pipe comes out a closed solid
+pipes = rg.Brep.CreatePipe(rail, radius, False, rg.PipeCapMode.Round,
+                           False, tol, ang)
+
+if pipes and len(pipes) > 0:
+    a = list(pipes)
+else:
+    a = None  # check the rail is valid and radius > 0`
+  },
+  {
+    title: "Extrude a profile along a vector, then cap",
+    env: "gh", cat: "Solids",
+    why: "Pushes a closed profile a set distance and direction and seals the ends to get a watertight solid",
+    inputs: "crv (Curve) · vec (Vector)",
+    outputs: "a (Brep)",
+    code:
+`import Rhino.Geometry as rg
+import scriptcontext as sc
+
+tol = sc.doc.ModelAbsoluteTolerance
+# CreateExtrusion sweeps the profile straight along vec (length = vec length)
+ext = rg.Surface.CreateExtrusion(crv, vec)
+
+if ext:
+    brep = ext.ToBrep()
+    # CapPlanarHoles fills the flat open ends, turning the wall into a solid
+    capped = brep.CapPlanarHoles(tol)
+    a = capped if capped else brep
+else:
+    a = None`
+  },
+  {
+    title: "Loft sections with closed option",
+    env: "gh", cat: "Surfaces",
+    why: "Skins a smooth surface across ordered section curves and can wrap them into a closed tube",
+    inputs: "crvs (Curve list) · closed (bool)",
+    outputs: "a (Brep list)",
+    code:
+`import Rhino.Geometry as rg
+
+unset = rg.Point3d.Unset  # no explicit start/end tangent points
+# closed=True joins the last section back to the first (looped loft)
+breps = rg.Brep.CreateFromLoft(crvs, unset, unset,
+                               rg.LoftType.Normal, closed)
+
+if breps and len(breps) > 0:
+    a = list(breps)
+else:
+    a = None  # need at least two ordered curves`
+  },
+  {
+    title: "Offset a surface into a solid shell",
+    env: "rhino", cat: "Surfaces",
+    why: "Thickens a single surface by a wall thickness to make a slab, panel, or shelled solid in one step",
+    inputs: "—",
+    outputs: "—",
+    code:
+`import rhinoscriptsyntax as rs
+
+srf = rs.GetObject("Select a surface to offset", rs.filter.surface)
+if srf:
+    dist = rs.GetReal("Offset distance (thickness)", 1.0)
+    if dist is not None:
+        # create_solid=True walls in the gap so you get a closed solid shell
+        result = rs.OffsetSurface(srf, dist, tolerance=None,
+                                  both_sides=False, create_solid=True)
+        if result:
+            print("Created offset solid")
+        else:
+            print("Offset failed - try a smaller distance")`
+  },
+  {
+    title: "Boolean difference - carve one solid from another",
+    env: "rhino", cat: "Solids",
+    why: "Subtracts cutter solids from a base solid to punch openings, voids, or notches into massing",
+    inputs: "—",
+    outputs: "—",
+    code:
+`import rhinoscriptsyntax as rs
+
+flt = rs.filter.polysurface | rs.filter.surface
+base = rs.GetObjects("Select solids to subtract FROM", flt)
+if base:
+    cutters = rs.GetObjects("Select solids to subtract", flt)
+    if cutters:
+        # BooleanDifference removes the cutter volume from the base solids
+        result = rs.BooleanDifference(base, cutters)
+        if result:
+            print("Created {} solid(s)".format(len(result)))
+        else:
+            print("Boolean failed - solids must be closed and overlap")`
+  },
+  {
+    title: "Triangulate a quad grid into triangles",
+    env: "gh", cat: "Panelise",
+    why: "Splits each UV cell of a surface along a diagonal into two flat triangles so the facade panels are guaranteed planar and buildable",
+    inputs: "srf (Surface) · u (int) · v (int)",
+    outputs: "tris (list)",
+    code:
+`import Rhino.Geometry as rg
+
+ud = srf.Domain(0)  # U parameter domain
+vd = srf.Domain(1)  # V parameter domain
+pts = {}
+for i in range(u + 1):
+    for j in range(v + 1):
+        s = ud.ParameterAt(i / float(u))
+        t = vd.ParameterAt(j / float(v))
+        pts[(i, j)] = srf.PointAt(s, t)
+
+tris = []
+for i in range(u):
+    for j in range(v):
+        a = pts[(i, j)];     b = pts[(i + 1, j)]
+        c = pts[(i + 1, j + 1)]; d = pts[(i, j + 1)]
+        # split the quad cell along the a-c diagonal -> two planar triangles
+        tris.append(rg.PolylineCurve([a, b, c, a]))
+        tris.append(rg.PolylineCurve([a, c, d, a]))`
+  },
+  {
+    title: "Hexagonal (staggered) grid of points",
+    env: "gh", cat: "Panelise",
+    why: "Builds a true hex-packed point field by staggering alternate rows, the seed grid for honeycomb panels or perforation patterns",
+    inputs: "nx (int) · ny (int) · s (float)",
+    outputs: "pts (list)",
+    code:
+`import Rhino.Geometry as rg
+import math
+
+pts = []
+dy = s * math.sqrt(3) / 2.0  # row spacing for a true hexagonal packing
+for j in range(ny):
+    off = (s / 2.0) if (j % 2) else 0.0  # stagger every other row by half a step
+    for i in range(nx):
+        pts.append(rg.Point3d(i * s + off, j * dy, 0))`
+  },
+  {
+    title: "Running-bond brick coursing on a surface",
+    env: "gh", cat: "Panelise",
+    why: "Lays brick-shaped panels in UV space and shifts odd courses by half a brick, the classic running-bond facade joint pattern",
+    inputs: "srf (Surface) · cols (int) · rows (int)",
+    outputs: "bricks (list)",
+    code:
+`import Rhino.Geometry as rg
+
+ud = srf.Domain(0)
+vd = srf.Domain(1)
+bricks = []
+for r in range(rows):
+    off = 0.5 if (r % 2) else 0.0  # shift odd courses by half a brick
+    v0 = vd.ParameterAt(r / float(rows))
+    v1 = vd.ParameterAt((r + 1) / float(rows))
+    for c in range(cols):
+        u0 = ud.ParameterAt(min(max((c + off) / float(cols), 0), 1))
+        u1 = ud.ParameterAt(min(max((c + off + 1) / float(cols), 0), 1))
+        crns = [srf.PointAt(u0, v0), srf.PointAt(u1, v0),
+                srf.PointAt(u1, v1), srf.PointAt(u0, v1)]
+        bricks.append(rg.PolylineCurve(crns + [crns[0]]))`
+  },
+  {
+    title: "Shingle / fish-scale overlap pattern",
+    env: "gh", cat: "Panelise",
+    why: "Tiles arc-topped scales in courses that step up less than their height so each row laps the one below, a rain-shedding shingle skin",
+    inputs: "nx (int) · ny (int) · w (float) · h (float) · ov (float)",
+    outputs: "scales (list)",
+    code:
+`import Rhino.Geometry as rg
+
+scales = []
+step = h * (1.0 - ov)  # course step < tile height -> vertical overlap (ov 0..1)
+for j in range(ny):
+    sx = (w / 2.0) if (j % 2) else 0.0  # stagger alternate courses
+    cy = j * step
+    for i in range(nx):
+        cx = i * w + sx
+        # arc through three points = curved 'scale' tile top
+        arc = rg.Arc(rg.Point3d(cx - w / 2.0, cy, 0),
+                     rg.Point3d(cx, cy + h, 0),
+                     rg.Point3d(cx + w / 2.0, cy, 0))
+        scales.append(arc.ToNurbsCurve())`
+  },
+  {
+    title: "Vertical louvers rotating by an attractor",
+    env: "gh", cat: "Panelise",
+    why: "Spaces brise-soleil fins along a line and twists each about its own vertical axis by its distance to an attractor, tuning shade or views",
+    inputs: "ln (Curve) · n (int) · w (float) · h (float) · att (Point3d)",
+    outputs: "fins (list)",
+    code:
+`import Rhino.Geometry as rg
+import math
+
+bpts = [ln.PointAtNormalizedLength(k / float(n - 1)) for k in range(n)]
+dmax = max(att.DistanceTo(p) for p in bpts)  # for normalising the rotation
+fins = []
+for p in bpts:
+    d = att.DistanceTo(p)
+    ang = (1.0 - d / dmax) * math.pi / 2.0  # near attractor -> up to 90 deg twist
+    rect = rg.PolylineCurve([p,
+                             rg.Point3d(p.X + w, p.Y, p.Z),
+                             rg.Point3d(p.X + w, p.Y, p.Z + h),
+                             rg.Point3d(p.X, p.Y, p.Z + h), p])
+    rect.Rotate(ang, rg.Vector3d.ZAxis, p)  # twist each louver about its base
+    fins.append(rect)`
+  },
+  {
+    title: "Waffle / eggcrate fins from a Brep",
+    env: "gh", cat: "Panelise",
+    why: "Slices a solid with two perpendicular families of planes to get the intersecting rib profiles of a laser-cut eggcrate structure",
+    inputs: "brep (Brep) · sx (float) · sy (float)",
+    outputs: "finsX (list) · finsY (list)",
+    code:
+`import Rhino.Geometry as rg
+import Rhino.Geometry.Intersect as ri
+
+bb = brep.GetBoundingBox(True)  # extents tell us where to slice
+tol = 0.001
+finsX = []; finsY = []
+x = bb.Min.X
+while x <= bb.Max.X:
+    pl = rg.Plane(rg.Point3d(x, 0, 0), rg.Vector3d.XAxis)  # YZ slice plane
+    ok, crvs, _ = ri.Intersection.BrepPlane(brep, pl, tol)
+    if ok and crvs: finsX.extend(crvs)
+    x += sx
+y = bb.Min.Y
+while y <= bb.Max.Y:
+    pl = rg.Plane(rg.Point3d(0, y, 0), rg.Vector3d.YAxis)  # XZ slice plane
+    ok, crvs, _ = ri.Intersection.BrepPlane(brep, pl, tol)
+    if ok and crvs: finsY.extend(crvs)
+    y += sy`
+  },
+  {
+    title: "Attractor field — distance to a curve",
+    env: "gh", cat: "Attractor",
+    why: "Sizes circles by how far each point sits from a guiding curve, so a path or edge drives the pattern density",
+    inputs: "pts (list of Point) · crv (Curve) · maxR (float)",
+    outputs: "circles (list)",
+    code:
+`import Rhino.Geometry as rg
+
+circles = []
+for p in pts:
+    rc, t = crv.ClosestPoint(p)          # nearest parameter on the attractor curve
+    cp = crv.PointAt(t)
+    d = p.DistanceTo(cp)                  # distance from this point to the curve
+    r = min(d * 0.25, maxR)              # radius grows with distance, capped at maxR
+    if r < 0.01:
+        r = 0.01
+    circles.append(rg.Circle(p, r))`
+  },
+  {
+    title: "Sine ripple height field on a grid",
+    env: "rhino", cat: "Attractor",
+    why: "Builds a radial sine-wave point field so you can quickly study an undulating roof or terrain surface",
+    inputs: "—",
+    outputs: "—",
+    code:
+`import rhinoscriptsyntax as rs
+import math
+
+n = rs.GetInteger("Grid size (cells per side)", 20, 2)
+if n:
+    amp = rs.GetReal("Wave amplitude", 3.0)
+    freq = rs.GetReal("Wave frequency", 0.4)
+    pts = []
+    for i in range(n):
+        for j in range(n):
+            d = math.sqrt(i * i + j * j)
+            z = amp * math.sin(d * freq)   # radial ripple height field from origin
+            pts.append(rs.AddPoint(i, j, z))
+    print("Added {} field points".format(len(pts)))`
+  },
+  {
+    title: "Smooth pseudo-noise value field",
+    env: "gh", cat: "Attractor",
+    why: "Generates a deterministic, organic-looking height field by hashing coordinates, with no plugins or numpy needed",
+    inputs: "u (int) · v (int) · scale (float) · amp (float)",
+    outputs: "pts (list)",
+    code:
+`import Rhino.Geometry as rg
+import math
+
+def vhash(ix, iy):
+    # deterministic pseudo-random value 0..1 from integer lattice coords
+    h = (ix * 374761393 + iy * 668265263) & 0xFFFFFFFF
+    h = ((h ^ (h >> 13)) * 1274126177) & 0xFFFFFFFF
+    return ((h ^ (h >> 16)) & 0xFFFFFFFF) / 4294967295.0
+
+def smooth(t):
+    return t * t * (3 - 2 * t)            # smoothstep easing
+
+def noise(x, y):
+    ix, iy = int(math.floor(x)), int(math.floor(y))
+    fx, fy = x - ix, y - iy
+    a = vhash(ix, iy);     b = vhash(ix + 1, iy)
+    c = vhash(ix, iy + 1); d = vhash(ix + 1, iy + 1)
+    sx, sy = smooth(fx), smooth(fy)
+    top = a + (b - a) * sx
+    bot = c + (d - c) * sx
+    return top + (bot - top) * sy         # bilinear value noise
+
+pts = []
+for i in range(u):
+    for j in range(v):
+        z = noise(i * scale, j * scale) * amp
+        pts.append(rg.Point3d(i, j, z))`
+  },
+  {
+    title: "Rotate panels to face an attractor",
+    env: "gh", cat: "Attractor",
+    why: "Aims each panel's normal at a single attractor point, like louvres turning toward the sun or a focal view",
+    inputs: "pts (list of Point) · att (Point) · size (float)",
+    outputs: "panels (list)",
+    code:
+`import Rhino.Geometry as rg
+
+panels = []
+for p in pts:
+    d = att - p                          # vector from panel centre to the attractor
+    if d.Length < 1e-6:
+        continue
+    d.Unitize()
+    pl = rg.Plane(p, d)                   # plane whose Z normal faces the attractor
+    iv = rg.Interval(-size / 2.0, size / 2.0)
+    panels.append(rg.Rectangle3d(pl, iv, iv))`
+  },
+  {
+    title: "Attractor field — combined scale + twist",
+    env: "gh", cat: "Attractor",
+    why: "Drives both panel size and rotation from distance to a point, giving a single facade pattern two reactions at once",
+    inputs: "pts (list of Point) · att (Point) · maxR (float)",
+    outputs: "panels (list)",
+    code:
+`import Rhino.Geometry as rg
+import math
+
+panels = []
+mx = max(p.DistanceTo(att) for p in pts) or 1.0
+for p in pts:
+    t = p.DistanceTo(att) / mx           # normalised distance 0..1
+    pl = rg.Plane(p, rg.Vector3d.ZAxis)
+    pl.Rotate((1 - t) * math.pi, rg.Vector3d.ZAxis, p)  # twist most when near attractor
+    s = 0.2 + t * maxR                   # larger panels farther from attractor
+    iv = rg.Interval(-s / 2.0, s / 2.0)
+    panels.append(rg.Rectangle3d(pl, iv, iv))`
+  },
+  {
+    title: "Delaunay TIN from survey points + slope color",
+    env: "gh", cat: "Site",
+    why: "Turns loose survey points into a triangulated terrain (TIN) tinted by steepness so you can read the land before designing on it",
+    inputs: "P (list of Point3d)",
+    outputs: "mesh (Mesh)",
+    code:
+`import Rhino.Geometry as rg
+import Grasshopper.Kernel.Geometry as gkg
+import Grasshopper.Kernel.Geometry.Delaunay as gkd
+import System.Drawing as sd
+
+# triangulate on X,Y only; keep original 3D points for elevation
+nodes = gkg.Node2List()
+for p in P:
+    nodes.Append(gkg.Node2(p.X, p.Y))
+faces = gkd.Solver.Solve_Faces(nodes, 1)  # triangle connectivity
+
+tin = rg.Mesh()
+for p in P:
+    tin.Vertices.Add(p)  # rebuild in 3D so Z survives
+for f in faces:
+    tin.Faces.AddFace(f.A, f.B, f.C)
+tin.Normals.ComputeNormals()
+
+tin.VertexColors.Clear()
+for n in tin.Normals:
+    nz = rg.Vector3d(n.X, n.Y, n.Z)
+    slope = rg.Vector3d.VectorAngle(nz, rg.Vector3d.ZAxis)  # radians, 0=flat
+    t = min(slope / 0.7854, 1.0)  # 0..45deg mapped to 0..1
+    tin.VertexColors.Add(sd.Color.FromArgb(int(255*t), int(255*(1-t)), 0))
+mesh = tin`
+  },
+  {
+    title: "Drape a curve down onto terrain",
+    env: "gh", cat: "Site",
+    why: "Drops a plan curve (path, ridge, fence line) straight down onto the terrain mesh so it follows the real ground",
+    inputs: "C (Curve) · terrain (Mesh)",
+    outputs: "crvs (list of Curve)",
+    code:
+`import Rhino.Geometry as rg
+import scriptcontext as sc
+
+tol = sc.doc.ModelAbsoluteTolerance
+down = rg.Vector3d(0, 0, -1)  # gravity direction
+# ProjectToMesh(curve, mesh, direction, tol) returns Curve[]
+draped = rg.Curve.ProjectToMesh(C, terrain, down, tol)
+crvs = list(draped)
+print("draped curve count: {}".format(len(crvs)))`
+  },
+  {
+    title: "Aspect analysis coloring (compass)",
+    env: "gh", cat: "Site",
+    why: "Colors the terrain by the compass direction each slope faces, which drives sun exposure, drainage and view decisions",
+    inputs: "terrain (Mesh)",
+    outputs: "mesh (Mesh)",
+    code:
+`import Rhino
+import math
+
+terrain.Normals.ComputeNormals()
+terrain.VertexColors.Clear()
+for n in terrain.Normals:
+    # bearing the slope faces: 0=N, 90=E, 180=S, 270=W
+    aspect = (math.degrees(math.atan2(n.X, n.Y)) + 360) % 360
+    h = aspect / 360.0  # hue wheel = compass bearing
+    hsl = Rhino.Display.ColorHSL(h, 1.0, 0.5)  # hue, sat, lum (0..1)
+    terrain.VertexColors.Add(hsl.ToArgbColor())
+mesh = terrain`
+  },
+  {
+    title: "Cut & fill volume vs a flat pad",
+    env: "gh", cat: "Site",
+    why: "Estimates earth to cut and to fill if the site were leveled to a chosen pad height, the first number in any grading budget",
+    inputs: "mesh (Mesh) · pad (float)",
+    outputs: "cut (float) · fill (float) · net (float)",
+    code:
+`import Rhino.Geometry as rg
+
+mesh.Faces.ConvertQuadsToTriangles()
+cut = 0.0
+fill = 0.0
+for i in range(mesh.Faces.Count):
+    f = mesh.Faces[i]
+    a = mesh.Vertices[f.A]; b = mesh.Vertices[f.B]; c = mesh.Vertices[f.C]
+    # plan (XY) area of the triangle via 2D cross product
+    area = abs((b.X-a.X)*(c.Y-a.Y) - (c.X-a.X)*(b.Y-a.Y)) * 0.5
+    dz = (a.Z + b.Z + c.Z)/3.0 - pad  # average height above pad
+    vol = area * dz
+    if dz > 0:
+        cut += vol      # ground above pad gets removed
+    else:
+        fill += -vol    # ground below pad gets filled
+net = cut - fill
+print("cut={:.2f}  fill={:.2f}  net={:.2f}".format(cut, fill, net))`
+  },
+  {
+    title: "Project points down onto terrain (ray)",
+    env: "gh", cat: "Site",
+    why: "Snaps plan points (tree, column, sample locations) onto the terrain surface by shooting a ray straight down",
+    inputs: "P (list of Point3d) · terrain (Mesh)",
+    outputs: "pts (list of Point3d)",
+    code:
+`import Rhino.Geometry as rg
+from Rhino.Geometry.Intersect import Intersection
+
+pts = []
+for p in P:
+    start = rg.Point3d(p.X, p.Y, p.Z + 1e6)  # start well above the land
+    ray = rg.Ray3d(start, rg.Vector3d(0, 0, -1))  # shoot straight down
+    t = Intersection.MeshRay(terrain, ray)  # ray param at hit, <0 = miss
+    if t >= 0:
+        pts.append(ray.PointAt(t))  # landed point on the terrain
+print("landed {} of {} points".format(len(pts), len(P)))`
+  },
+  {
+    title: "Room schedule of closed curves → CSV",
+    env: "rhino", cat: "Document",
+    why: "Exports area and perimeter of selected room boundaries to a spreadsheet so you can build an area schedule",
+    inputs: "—",
+    outputs: "—",
+    code:
+`import rhinoscriptsyntax as rs
+
+crvs = rs.GetObjects("Select closed room boundary curves", rs.filter.curve, preselect=True)
+if crvs:
+    path = rs.SaveFileName("Save room schedule", "CSV files (*.csv)|*.csv||")
+    if path:
+        with open(path, "w") as f:
+            f.write("Room,Area,Perimeter\\n")
+            for i, c in enumerate(crvs):
+                if not rs.IsCurveClosed(c):
+                    continue  # area only makes sense for a closed loop
+                area = rs.CurveArea(c)[0]   # CurveArea returns (area, centroid); take area
+                perim = rs.CurveLength(c)
+                name = rs.ObjectName(c) or "Room_{}".format(i + 1)
+                f.write("{},{:.2f},{:.2f}\\n".format(name, area, perim))
+        print("Wrote schedule to", path)`
+  },
+  {
+    title: "Label points with text dots",
+    env: "gh", cat: "Document",
+    why: "Drops always-readable text dots at a list of points so plans and diagrams stay tagged when you orbit",
+    inputs: "pts (list of Point3d) · labels (list of str)",
+    outputs: "dots (list of TextDot)",
+    code:
+`import Rhino.Geometry as rg
+
+# pts and labels are parallel lists; labels may be shorter than pts
+dots = []
+for i, p in enumerate(pts):
+    txt = labels[i] if labels and i < len(labels) else str(i)
+    dots.append(rg.TextDot(txt, p))  # screen-facing label, never hidden behind geometry`
+  },
+  {
+    title: "Set up named views (Top/Front/Right/Persp)",
+    env: "rhino", cat: "Document",
+    why: "Creates the four standard saved views in one click so you can flip between drawing-set viewpoints instantly",
+    inputs: "—",
+    outputs: "—",
+    code:
+`import rhinoscriptsyntax as rs
+
+view = rs.CurrentView()
+# name -> (camera location, target, projection mode 1=parallel 2=perspective)
+setups = {
+    "Top":   ((0, 0, 100),   (0, 0, 0), 1),
+    "Front": ((0, -100, 0),  (0, 0, 0), 1),
+    "Right": ((100, 0, 0),   (0, 0, 0), 1),
+    "Perspective": ((80, -80, 60), (0, 0, 0), 2),
+}
+for name, (loc, tgt, mode) in setups.items():
+    rs.ViewProjection(view, mode)        # parallel for orthographic, perspective for the 3D view
+    rs.ViewCameraTarget(view, loc, tgt)  # aim the live viewport
+    rs.AddNamedView(name, view)          # store it as a recallable named view
+    print("Saved named view:", name)`
+  },
+  {
+    title: "Dimension the bounding box of a selection",
+    env: "rhino", cat: "Document",
+    why: "Adds overall width, depth and height dimensions around any selection for quick size documentation",
+    inputs: "—",
+    outputs: "—",
+    code:
+`import rhinoscriptsyntax as rs
+
+objs = rs.GetObjects("Select objects to dimension", preselect=True)
+if objs:
+    p = rs.BoundingBox(objs)  # 8 corner points; p[0]=min, p[1]=+X, p[2]=+XY, p[4]=+Z
+    o = 2.0                   # offset of dimension line from the box, in model units
+    # width (X), depth (Y), height (Z) as aligned dimensions
+    rs.AddAlignedDimension(p[0], p[1], [p[0].X, p[0].Y - o, p[0].Z])
+    rs.AddAlignedDimension(p[1], p[2], [p[1].X + o, p[1].Y, p[1].Z])
+    rs.AddAlignedDimension(p[0], p[4], [p[0].X - o, p[0].Y, p[0].Z])
+    print("Added 3 bounding-box dimensions")`
+  },
+  {
+    title: "Import points from a CSV file",
+    env: "rhino", cat: "Document",
+    why: "Reads x,y,z rows from a CSV (survey or spreadsheet data) and rebuilds them as Rhino points",
+    inputs: "—",
+    outputs: "—",
+    code:
+`import rhinoscriptsyntax as rs
+
+path = rs.OpenFileName("Select CSV of points", "CSV files (*.csv)|*.csv||")
+if path:
+    added = []
+    with open(path, "r") as f:
+        for line in f:
+            parts = line.strip().split(",")
+            if len(parts) < 3:
+                continue
+            try:
+                x, y, z = float(parts[0]), float(parts[1]), float(parts[2])
+            except ValueError:
+                continue  # skip header row or any non-numeric line
+            added.append(rs.AddPoint(x, y, z))
+    print("Imported {} points".format(len(added)))`
+  },
+  {
+    title: "World & oriented bounding box",
+    env: "rhino", cat: "Utilities",
+    why: "Get true overall dimensions of any object and a box aligned to your CPlane for clearance and sizing checks",
+    inputs: "—",
+    outputs: "—",
+    code:
+`import rhinoscriptsyntax as rs
+import Rhino.Geometry as rg
+
+obj = rs.GetObject("Select geometry for bounding box", preselect=True)
+geo = rs.coercegeometry(obj)
+
+# world axis-aligned box, realized as Rhino geometry
+bb = geo.GetBoundingBox(True)
+box = rg.Box(bb)
+print("Size X Y Z:", round(box.X.Length, 2), round(box.Y.Length, 2), round(box.Z.Length, 2))
+
+# orient the box to the active construction plane instead of world axes
+cpl = rs.ViewCPlane()
+local = geo.GetBoundingBox(cpl)          # bbox measured in CPlane coordinates
+xint = rg.Interval(local.Min.X, local.Max.X)
+yint = rg.Interval(local.Min.Y, local.Max.Y)
+zint = rg.Interval(local.Min.Z, local.Max.Z)
+oriented = rg.Box(cpl, xint, yint, zint) # rebuild as a tilted box in world space
+rs.AddBox(oriented.GetCorners())         # draw the oriented box (8 corners)`
+  },
+  {
+    title: "Area, volume & centroid",
+    env: "rhino", cat: "Utilities",
+    why: "Read off floor area, solid volume and balance point of a shape for quick quantity and massing checks",
+    inputs: "—",
+    outputs: "—",
+    code:
+`import rhinoscriptsyntax as rs
+import Rhino.Geometry as rg
+
+obj = rs.GetObject("Select a closed curve, surface or solid", preselect=True)
+geo = rs.coercegeometry(obj)
+
+# area + centroid works for planar curves, surfaces and breps
+amp = rg.AreaMassProperties.Compute(geo)
+if amp:
+    print("Area:", round(amp.Area, 3))
+    print("Centroid:", amp.Centroid)
+    rs.AddPoint(amp.Centroid)
+
+# volume only makes sense for a closed solid
+if isinstance(geo, rg.Brep) and geo.IsSolid:
+    vmp = rg.VolumeMassProperties.Compute(geo)
+    print("Volume:", round(vmp.Volume, 3))`
+  },
+  {
+    title: "Divide curve by count and by length",
+    env: "gh", cat: "Utilities",
+    why: "Drop evenly spaced points (with tangents) along a curve for railings, mullions or setting-out marks",
+    inputs: "crv (Curve) · count (int) · length (float)",
+    outputs: "ptsN (list) · tanN (list) · ptsL (list)",
+    code:
+`import Rhino.Geometry as rg
+
+# by count: 'count' segments -> count+1 points including both ends
+paramsN = crv.DivideByCount(count, True)
+ptsN = []
+tanN = []
+if paramsN:
+    for t in paramsN:
+        ptsN.append(crv.PointAt(t))
+        tanN.append(crv.TangentAt(t))   # unit direction at each point
+
+# by length: equal arc-length spacing of 'length' units
+paramsL = crv.DivideByLength(length, True)
+ptsL = []
+if paramsL:
+    for t in paramsL:
+        ptsL.append(crv.PointAt(t))`
+  },
+  {
+    title: "Closest point on curve and surface",
+    env: "gh", cat: "Utilities",
+    why: "Snap a test point to the nearest spot on a curve or surface to measure gaps and align elements",
+    inputs: "crv (Curve) · srf (Surface) · pt (Point3d)",
+    outputs: "cpCrv (Point3d) · cpSrf (Point3d) · dist (float)",
+    code:
+`import Rhino.Geometry as rg
+
+# nearest point on the curve to pt (ClosestPoint returns success + parameter)
+rc, t = crv.ClosestPoint(pt)
+cpCrv = crv.PointAt(t) if rc else None
+
+# nearest point on the surface, returned as (u, v) parameters
+rc2, u, v = srf.ClosestPoint(pt)
+cpSrf = srf.PointAt(u, v) if rc2 else None
+
+# straight-line distance from the test point to the curve hit
+dist = pt.DistanceTo(cpCrv) if cpCrv else None`
+  },
+  {
+    title: "Offset a planar curve in and out",
+    env: "gh", cat: "Utilities",
+    why: "Make inner and outer parallel curves from a planar outline for wall thickness, setbacks or borders",
+    inputs: "crv (Curve) · dist (float)",
+    outputs: "outer (list) · inner (list)",
+    code:
+`import Rhino.Geometry as rg
+
+tol = 0.001
+ok, pl = crv.TryGetPlane()        # use the curve's own plane if it is planar
+if not ok:
+    pl = rg.Plane.WorldXY
+style = rg.CurveOffsetCornerStyle.Sharp
+
+# positive = outward, negative = inward relative to the plane normal
+o = crv.Offset(pl, dist, tol, style)
+i = crv.Offset(pl, -dist, tol, style)
+outer = list(o) if o else []      # Offset returns an array of curves
+inner = list(i) if i else []`
+  },
+  {
+    title: "Project points onto a plane",
+    env: "gh", cat: "Utilities",
+    why: "Flatten scattered points onto any plane to get clean plan/elevation positions or a working datum",
+    inputs: "pts (list) · pl (Plane)",
+    outputs: "projected (list) · depths (list)",
+    code:
+`import Rhino.Geometry as rg
+
+projected = []
+depths = []
+for p in pts:
+    cp = pl.ClosestPoint(p)        # foot of the perpendicular onto the plane
+    projected.append(cp)
+    # signed distance from the plane (how far above/below it the point was)
+    depths.append(pl.DistanceTo(p))`
+  },
+  {
+    title: "Graft a flat list into a tree",
+    env: "gh", cat: "Data",
+    why: "Pushes every item onto its own branch so downstream components match items one-to-one instead of all-against-all",
+    inputs: "items (list)",
+    outputs: "tree (DataTree)",
+    code:
+`import Grasshopper as gh
+from Grasshopper.Kernel.Data import GH_Path
+
+# Graft: each item lands on its own branch path {i}
+tree = gh.DataTree[object]()
+for i, item in enumerate(items):
+    tree.Add(item, GH_Path(i))  # one item per branch
+`
+  },
+  {
+    title: "Flatten a tree to a single list",
+    env: "gh", cat: "Data",
+    why: "Collapses all branches of a data tree into one flat list when you stop caring about grouping",
+    inputs: "tree (set param to Tree access)",
+    outputs: "flat (list)",
+    code:
+`# 'tree' input must be set to Tree access (right-click the input)
+flat = []
+# Walk every branch in order and append all its items
+for i in range(tree.BranchCount):
+    branch = tree.Branch(i)
+    for item in branch:
+        flat.append(item)
+`
+  },
+  {
+    title: "Partition a list into sublists of size n",
+    env: "gh", cat: "Data",
+    why: "Chops a flat list into fixed-size groups (e.g. 3 points per panel) and outputs each group as a branch",
+    inputs: "items (list) · n (int)",
+    outputs: "chunks (DataTree)",
+    code:
+`import Grasshopper as gh
+from Grasshopper.Kernel.Data import GH_Path
+
+n = max(1, int(n))  # guard against 0 / negative
+chunks = gh.DataTree[object]()
+# Step through the list in jumps of n; each slice becomes a branch
+for b, start in enumerate(range(0, len(items), n)):
+    for item in items[start:start + n]:
+        chunks.Add(item, GH_Path(b))
+`
+  },
+  {
+    title: "Weave (interleave) two lists",
+    env: "gh", cat: "Data",
+    why: "Alternates items from two lists into one (A0, B0, A1, B1...), handy for zipping mullions with glass or odd/even rows",
+    inputs: "a (list) · b (list)",
+    outputs: "woven (list)",
+    code:
+`woven = []
+m = max(len(a), len(b))
+# Alternate: take from A then B at each index, skipping if a list runs out
+for i in range(m):
+    if i < len(a):
+        woven.append(a[i])
+    if i < len(b):
+        woven.append(b[i])
+`
+  },
+  {
+    title: "Dispatch a list by a boolean pattern",
+    env: "gh", cat: "Data",
+    why: "Splits one list into two streams using a repeating True/False mask, e.g. separating alternating bays for two materials",
+    inputs: "L (list) · pattern (list of bool)",
+    outputs: "A (list) · B (list)",
+    code:
+`A = []
+B = []
+P = pattern if pattern else [True]  # fall back to all-True
+# Pattern repeats; True routes to A, False routes to B
+for i, item in enumerate(L):
+    if P[i % len(P)]:
+        A.append(item)
+    else:
+        B.append(item)
+`
+  },
+  {
+    title: "Sun vector from azimuth + altitude",
+    env: "gh", cat: "Sun",
+    why: "Turns a solar azimuth/altitude reading into a unit sun-direction vector so you can drive shadows and sun studies",
+    inputs: "azimuth (float) · altitude (float)",
+    outputs: "toSun (Vector) · sunDir (Vector)",
+    code:
+`import Rhino.Geometry as rg
+import math
+
+az = math.radians(azimuth)    # 0=North, 90=East, measured clockwise
+alt = math.radians(altitude)  # 0=horizon, 90=straight overhead
+# unit vector from the site pointing AT the sun
+toSun = rg.Vector3d(math.sin(az)*math.cos(alt),
+                    math.cos(az)*math.cos(alt),
+                    math.sin(alt))
+toSun.Unitize()
+sunDir = rg.Vector3d(toSun)   # direction the sunlight actually travels
+sunDir.Reverse()              # flip so it points down toward the ground`
+  },
+  {
+    title: "Drop a shadow polygon onto the ground",
+    env: "gh", cat: "Sun",
+    why: "Projects a building's outline along the sun ray to the ground plane to read its cast shadow footprint",
+    inputs: "geo (Brep or Mesh) · sunDir (Vector) · ground (float)",
+    outputs: "shadow (Polyline)",
+    code:
+`import Rhino.Geometry as rg
+
+z = ground if ground is not None else 0.0
+# collect the corner points of the input geometry
+if isinstance(geo, rg.Mesh):
+    src = list(geo.Vertices.ToPoint3dArray())
+else:
+    src = [v.Location for v in geo.Vertices]
+
+d = rg.Vector3d(sunDir); d.Unitize()      # downward light-travel direction
+proj = []
+for p in src:
+    if abs(d.Z) > 1e-9:                    # slide each point down the ray to the ground
+        t = (z - p.Z) / d.Z
+        proj.append(p + d * t)
+
+# 2D convex hull (monotone chain) of the dropped points = shadow outline
+pts = sorted(set((round(p.X, 5), round(p.Y, 5)) for p in proj))
+shadow = None
+if len(pts) >= 3:
+    def cross(o, a, b): return (a[0]-o[0])*(b[1]-o[1]) - (a[1]-o[1])*(b[0]-o[0])
+    lo = []
+    for q in pts:
+        while len(lo) >= 2 and cross(lo[-2], lo[-1], q) <= 0: lo.pop()
+        lo.append(q)
+    up = []
+    for q in reversed(pts):
+        while len(up) >= 2 and cross(up[-2], up[-1], q) <= 0: up.pop()
+        up.append(q)
+    ring = lo[:-1] + up[:-1]
+    shadow = rg.Polyline([rg.Point3d(x, y, z) for x, y in ring] + [rg.Point3d(ring[0][0], ring[0][1], z)])`
+  },
+  {
+    title: "Direct-sun count at a point",
+    env: "gh", cat: "Sun",
+    why: "Counts how many sun positions reach a test point unobstructed, a fast hours-of-sun proxy for shading studies",
+    inputs: "testPt (Point) · sunDirs (list of Vector) · obstacles (list of Brep)",
+    outputs: "count (int) · clearDirs (list of Vector)",
+    code:
+`import Rhino.Geometry as rg
+from Rhino.Geometry.Intersect import Intersection
+
+obs = [o for o in obstacles if o is not None]   # drop any empty inputs
+count = 0
+clearDirs = []
+for v in sunDirs:
+    d = rg.Vector3d(v); d.Unitize()       # vector pointing UP toward the sun
+    if d.Z <= 0:                          # sun below the horizon, skip
+        continue
+    ray = rg.Ray3d(testPt, d)
+    # RayShoot returns the hit points along the ray (empty/None if clear)
+    hit = Intersection.RayShoot(ray, obs, 1) if obs else None
+    if not hit or len(hit) == 0:          # nothing blocks it = direct sun
+        count += 1
+        clearDirs.append(d)`
+  },
+  {
+    title: "Rotate a model to face true north",
+    env: "rhino", cat: "Sun",
+    why: "Spins a model about its pivot so a chosen facade aims at world +Y (true north) before a sun study",
+    inputs: "—",
+    outputs: "—",
+    code:
+`import rhinoscriptsyntax as rs
+import math
+
+objs = rs.GetObjects("Select model to rotate", preselect=True)
+if objs:
+    p0 = rs.GetPoint("Pivot / rotation center")
+    p1 = rs.GetPoint("Point the facade currently aims at")
+    if p0 and p1:
+        dx = p1[0]-p0[0]; dy = p1[1]-p0[1]      # current facing direction in plan
+        cur = math.degrees(math.atan2(dy, dx))
+        rot = 90.0 - cur                        # +Y world is true north (90 deg)
+        rs.RotateObjects(objs, p0, rot)         # rotate about world Z axis
+        print("Rotated {0:.2f} deg to face true north".format(rot))`
+  },
+  {
+    title: "Unroll a developable surface/brep flat",
+    env: "gh", cat: "Fabrication",
+    why: "Flattens a curved-but-developable panel into the XY plane so it can be cut from flat sheet stock",
+    inputs: "srf (Surface or Brep)",
+    outputs: "flat (list of Brep)",
+    code:
+`import Rhino.Geometry as rg
+
+# Unroller develops a single-curvature surface/brep onto the XY plane
+unroller = rg.Unroller(srf)
+unroller.AbsoluteTolerance = 0.01
+unroller.ExplodeOutput = False
+# PerformUnroll returns Brep[] plus out arrays: curves, points, text-dots
+breps, curves, pts, dots = unroller.PerformUnroll()
+flat = list(breps)
+print("unrolled {} piece(s)".format(len(flat)))`
+  },
+  {
+    title: "Nest bounding rectangles in rows on a sheet",
+    env: "gh", cat: "Fabrication",
+    why: "Shelf-packs each part's bounding rectangle into tidy rows so a cut sheet is filled without overlaps",
+    inputs: "shapes (list of Geometry) · sheetW (float) · gap (float)",
+    outputs: "rects (list of Curve)",
+    code:
+`import Rhino.Geometry as rg
+
+x = 0.0; y = 0.0; rowH = 0.0
+rects = []
+for g in shapes:
+    bb = g.GetBoundingBox(True)              # tight box of the part
+    w = bb.Max.X - bb.Min.X
+    h = bb.Max.Y - bb.Min.Y
+    if x + w > sheetW:                       # wrap to a new row at sheet edge
+        x = 0.0; y += rowH + gap; rowH = 0.0
+    pl = rg.Plane(rg.Point3d(x, y, 0), rg.Vector3d.ZAxis)
+    rects.append(rg.Rectangle3d(pl, w, h).ToNurbsCurve())
+    x += w + gap
+    rowH = max(rowH, h)`
+  },
+  {
+    title: "Slice a solid into stacked section curves",
+    env: "gh", cat: "Fabrication",
+    why: "Cuts a solid with evenly spaced horizontal planes to make laser-cut layers for a stacked physical model",
+    inputs: "solid (Brep) · spacing (float)",
+    outputs: "slices (list of Curve)",
+    code:
+`import Rhino.Geometry as rg
+import Rhino.Geometry.Intersect as ri
+
+bb = solid.GetBoundingBox(True)
+z = bb.Min.Z + spacing
+slices = []
+while z < bb.Max.Z:
+    plane = rg.Plane(rg.Point3d(0, 0, z), rg.Vector3d.ZAxis)
+    # BrepPlane returns: bool, Curve[], Point3d[] -> grab the section curves
+    ok, crvs, ipts = ri.Intersection.BrepPlane(solid, plane, 0.01)
+    if ok and crvs:
+        slices.extend(crvs)
+    z += spacing
+print("{} layers".format(len(slices)))`
+  },
+  {
+    title: "Notched panel for cross-halving joint",
+    env: "gh", cat: "Fabrication",
+    why: "Builds a flat panel outline with a centered half-depth slot so two panels interlock at 90 degrees with no glue",
+    inputs: "width (float) · height (float) · thickness (float)",
+    outputs: "panel (Curve)",
+    code:
+`import Rhino.Geometry as rg
+
+hw = width / 2.0          # half panel width
+t  = thickness / 2.0      # half slot width = material thickness
+d  = height / 2.0         # slot reaches halfway up for cross-halving
+# trace the outline, detouring down the centered slot from the top edge
+pts = [rg.Point3d(-hw, 0, 0),
+       rg.Point3d( hw, 0, 0),
+       rg.Point3d( hw, height, 0),
+       rg.Point3d(  t, height, 0),
+       rg.Point3d(  t, height - d, 0),
+       rg.Point3d( -t, height - d, 0),
+       rg.Point3d( -t, height, 0),
+       rg.Point3d(-hw, height, 0),
+       rg.Point3d(-hw, 0, 0)]
+panel = rg.PolylineCurve(pts)`
+  },
+  {
+    title: "Export selected objects to an STL file",
+    env: "rhino", cat: "Fabrication",
+    why: "Pick model parts and write them straight to STL for a slicer or 3D printer without hunting through menus",
+    inputs: "—",
+    outputs: "—",
+    code:
+`import rhinoscriptsyntax as rs
+
+objs = rs.GetObjects("Select objects to export as STL", preselect=True)
+if objs:
+    rs.SelectObjects(objs)                       # the export command acts on the selection
+    path = rs.SaveFileName("Save STL", "STL Files (*.stl)|*.stl||")
+    if path:
+        # scripted export; trailing Enters accept default mesh + binary STL settings
+        rs.Command('_-Export "{}" _Enter _Enter _Enter'.format(path), False)
+        print("Exported {} object(s) to {}".format(len(objs), path))
+    rs.UnselectAllObjects()`
+  }
+];
+
+// ---------------------------------------------------------------------------
+// Render
+// ---------------------------------------------------------------------------
+const CATS = ["All", ...Array.from(new Set(SNIPPETS.map(s => s.cat)))];
+let activeCat = "All";
+let query = "";
+
+const grid = document.getElementById("grid");
+const filtersEl = document.getElementById("filters");
+const countEl = document.getElementById("count");
+const emptyEl = document.getElementById("empty");
+
+CATS.forEach(c => {
+  const b = document.createElement("button");
+  b.className = "chip" + (c === "All" ? " active" : "");
+  b.textContent = c;
+  b.onclick = () => {
+    activeCat = c;
+    [...filtersEl.children].forEach(x => x.classList.remove("active"));
+    b.classList.add("active");
+    render();
+  };
+  filtersEl.appendChild(b);
+});
+
+// minimal, safe syntax highlight (escape first, then tag tokens)
+function esc(s) { return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
+function highlight(code) {
+  let out = esc(code);
+  out = out.replace(/(#.*)$/gm, '<span class="c">$1</span>');
+  out = out.replace(/('[^']*'|"[^"]*")/g, '<span class="s">$1</span>');
+  out = out.replace(/\b(import|from|for|in|if|else|elif|def|return|not|and|or|min|max|range|len|zip|sorted|print|True|False|None)\b/g,
+                    '<span class="k">$1</span>');
+  out = out.replace(/\b(\d+\.?\d*)\b/g, '<span class="n">$1</span>');
+  return out;
+}
+
+function render() {
+  const q = query.trim().toLowerCase();
+  const items = SNIPPETS.filter(s => {
+    const inCat = activeCat === "All" || s.cat === activeCat;
+    const hay = (s.title + " " + s.why + " " + s.cat + " " + s.code).toLowerCase();
+    return inCat && (!q || hay.includes(q));
+  });
+
+  grid.innerHTML = "";
+  emptyEl.hidden = items.length > 0;
+  countEl.textContent = items.length + " of " + SNIPPETS.length + " snippets";
+
+  items.forEach(s => {
+    const envTag = s.env === "rhino"
+      ? '<span class="tag rhino">RhinoPython</span>'
+      : '<span class="tag gh">GhPython</span>';
+    const io = s.env === "gh"
+      ? `<div class="io"><span class="lbl">Inputs</span> ${esc(s.inputs)}<br><span class="lbl">Output</span> ${esc(s.outputs)}</div>`
+      : "";
+    const card = document.createElement("div");
+    card.className = "card";
+    card.innerHTML = `
+      <div class="card-head">
+        <div class="card-tags">${envTag}<span class="tag cat">${esc(s.cat)}</span></div>
+        <h3>${esc(s.title)}</h3>
+        <p class="why">${esc(s.why)}</p>
+      </div>
+      <div class="code-wrap">
+        <div class="code-bar">
+          <span class="code-meta">${s.env === "rhino" ? "EditPythonScript" : "GhPython component"}</span>
+          <button class="copy">Copy</button>
+        </div>
+        <pre><code>${highlight(s.code)}</code></pre>
+      </div>
+      ${io}`;
+    const btn = card.querySelector(".copy");
+    btn.onclick = async () => {
+      try { await navigator.clipboard.writeText(s.code); }
+      catch {
+        const ta = document.createElement("textarea");
+        ta.value = s.code; document.body.appendChild(ta); ta.select();
+        document.execCommand("copy"); ta.remove();
+      }
+      btn.textContent = "Copied ✓"; btn.classList.add("done");
+      setTimeout(() => { btn.textContent = "Copy"; btn.classList.remove("done"); }, 1400);
+    };
+    grid.appendChild(card);
+  });
+}
+
+document.getElementById("search").addEventListener("input", e => { query = e.target.value; render(); });
+render();
+</script>
+</body>
+</html>

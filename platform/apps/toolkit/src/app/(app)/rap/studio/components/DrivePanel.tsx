@@ -160,7 +160,7 @@ export default function DrivePanel({ stateText, onDownloadState, webOnly }: { st
           ]
             .filter(Boolean)
             .join(", ")}{" "}
-          are studio-native and the current desktop Watcher does <b>not</b> rebuild them yet — regions and free geometry stay in the file under <code className="font-mono">web_*</code> keys. Bays, apertures and levels do round-trip; an irregular site boundary currently flattens to a rectangle in Rhino.
+          are studio-native and the current desktop Watcher does <b>not</b> rebuild them yet — regions and free geometry stay in the file under <code className="font-mono">web_*</code> keys. Bays, apertures and levels do round-trip; an irregular site boundary currently flattens to a rectangle in Rhino. Your <b>design phases</b> are a studio-native grouping (they ride under <code className="font-mono">web_phases</code>) — they organise authoring here and don&rsquo;t change what Rhino builds.
         </p>
       )}
 

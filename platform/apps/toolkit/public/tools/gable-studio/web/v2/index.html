@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Eco-Architect V2 · design to site forces</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Archivo+Black&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="./v2.css" />
+  <!-- Zero-build. three.js is the SAME vendored copy v1 uses (../vendor); core.js and
+       viewport.js are reused unchanged. v2 only adds the method UI on top. -->
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "../vendor/three.module.js",
+      "three/addons/": "../vendor/addons/"
+    }
+  }
+  </script>
+</head>
+<body>
+  <header class="v2head">
+    <div class="v2head-l">
+      <h1>Design to site forces</h1>
+      <p class="v2sub">Read the site → name the forces in play → commit a move as a rule → watch it stand → fork the next answer.</p>
+    </div>
+    <div class="v2head-r">
+      <button id="v2-climate" class="btn">☁ Load climate (.epw)</button>
+      <button id="v2-compare" class="btn">⚖ Compare to Ladybug</button>
+      <button id="v2-propose" class="btn">✶ Propose a charter from this site</button>
+      <button id="v2-save-series" class="btn">Save series</button>
+      <button id="v2-load-series" class="btn">Load series</button>
+      <button id="v2-reset" class="btn">Reset design</button>
+    </div>
+  </header>
+
+  <main class="v2main">
+    <!-- LEFT — READ / NAME: the site arrives as forces, not sliders -->
+    <section class="dock left" id="dock-left">
+      <div class="dock-h"><span class="dock-step">1·2</span> Read the site &amp; name the forces</div>
+      <div id="climate-strip" class="climate-strip"></div>
+      <div id="forcedeck" class="scroll"></div>
+    </section>
+
+    <!-- CENTER — MAKE: the viewport + the geometry moves -->
+    <section class="center">
+      <div class="viewbox" id="stage"><canvas id="view"></canvas></div>
+      <div class="viewbar">
+        <button id="v2-mode" class="btn on">☀ Analysis</button>
+        <label class="vb-range">Sun hour <input id="v2-sunhour" type="range" min="5" max="19" step="0.5" value="15" /></label>
+        <label class="vb-range">Shadow <input id="v2-shadow" type="range" min="0" max="1" step="0.05" value="0.6" /></label>
+        <span class="vb-overlay" id="v2-overlay">sun · year</span>
+      </div>
+      <div class="make">
+        <div class="dock-h sub"><span class="dock-step">4</span> Make the move <span class="dock-hint">shape the kit of parts</span></div>
+        <div id="make" class="makegrid"></div>
+      </div>
+    </section>
+
+    <!-- RIGHT — COMMIT / WATCH: the charter and its live standing -->
+    <section class="dock right" id="dock-right">
+      <div class="dock-h"><span class="dock-step">3·5</span> The charter — your brief to the site</div>
+      <div id="charter-standing" class="standing"></div>
+      <div id="charter-tensions" class="tensions"></div>
+      <div id="charter-clauses" class="scroll"></div>
+    </section>
+
+    <!-- BOTTOM — SPAWN: the series of variations -->
+    <section class="series" id="series-dock">
+      <div class="series-h">
+        <span class="dock-step">6</span> The series — a genealogy of forks
+        <button id="v2-fork" class="btn primary">⑂ Fork this variation</button>
+        <span id="v2-status" class="v2status"></span>
+      </div>
+      <div id="series" class="series-board"></div>
+    </section>
+  </main>
+
+  <!-- Fork dialog: capture the decision (the "why") with the new variation -->
+  <div id="forkModal" class="modal" style="display:none">
+    <div class="modal-box">
+      <div class="modal-head"><b>Record this variation</b><button class="modal-x" data-close="forkModal">✕</button></div>
+      <div class="modal-body" id="fork-form"></div>
+    </div>
+  </div>
+
+  <!-- Side-by-side with Ladybug (instructor demo) -->
+  <div id="compareModal" class="modal" style="display:none">
+    <div class="modal-box" style="width:min(580px,94vw)">
+      <div class="modal-head"><b>Compare to Ladybug</b><button class="modal-x" data-close="compareModal">✕</button></div>
+      <div class="modal-body" id="compare-body"></div>
+    </div>
+  </div>
+
+  <script type="module" src="./app2.js"></script>
+</body>
+</html>
