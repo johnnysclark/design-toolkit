@@ -233,6 +233,17 @@ footer a { color: var(--accent); }
   border: 1px solid var(--ink); background: var(--ink); color: #fff; cursor: pointer; }
 .composer .send:disabled { opacity: 0.4; cursor: not-allowed; }
 .hintbar { font-size: 11px; padding: 0 14px 10px; }
+
+/* Suggested edits + "Tell me how it works" chips inside the chat */
+.suggest { display: flex; flex-wrap: wrap; gap: 7px; align-self: stretch; }
+.chip-s {
+  font: inherit; font-size: 12px; font-weight: 600;
+  padding: 7px 11px; border-radius: 16px; text-align: left;
+  border: 1px solid var(--line); background: #fff; color: var(--ink); cursor: pointer;
+}
+.chip-s:hover { border-color: var(--ink); }
+.chip-s.how { border-color: var(--ink); background: var(--ink); color: #fff; }
+.chip-s.how:hover { background: #000; }
 </style>
 </head>
 <body>
@@ -1732,10 +1743,54 @@ function openAI(s) {
   aiSnippet = s; aiThread = []; aiMsgs.innerHTML = "";
   aiTitleEl.textContent = s.title;
   addNote(`Editing <strong>${esc(s.title)}</strong> — ${s.env === "rhino" ? "RhinoPython" : "GhPython"}. The original snippet is loaded as context; ask for any change and copy the result.`);
+  renderSuggest(s);
   aiModal.classList.add("open"); aiModal.setAttribute("aria-hidden", "false");
   setTimeout(() => aiInput.focus(), 50);
 }
 function closeAI() { aiModal.classList.remove("open"); aiModal.setAttribute("aria-hidden", "true"); }
+
+// Tailored edit suggestions per snippet (by category + env), plus a fixed
+// "Tell me how it works" explainer — so a student isn't staring at a blank box.
+function suggestionsFor(s) {
+  const byCat = {
+    Panelise: ["Make the panels hexagonal", "Add a gap (reveal) between panels", "Taper the panel size by height"],
+    Attractor: ["Add a second attractor", "Invert the falloff (near = large)", "Drive rotation instead of size"],
+    Surfaces: ["Cap the ends into a closed solid", "Rebuild the result to a cleaner degree"],
+    Solids: ["Fillet the result edges", "Shell it to a wall thickness"],
+    Site: ["Color the result by slope", "Cut a flat building pad into it"],
+    Contour: ["Let me set the contour count instead of spacing", "Also output the cutting planes"],
+    Points: ["Add an adjustable random jitter", "Cull points outside a boundary curve"],
+    Document: ["Also write a CSV summary", "Put the result on a dedicated layer"],
+    Data: ["Wrap this as a reusable function", "Add inline comments explaining each step"],
+    Sun: ["Sweep across a range of dates", "Also return a sun-hours count"],
+    Fabrication: ["Add tab-and-slot joints", "Nest the parts onto a 4x8 sheet"],
+    Utilities: ["Return more of the computed values", "Add a tolerance input"]
+  };
+  const cat = (byCat[s.cat] || ["Add a tolerance input", "Add inline comments explaining each step"]).slice(0, 3);
+  const envFix = s.env === "gh" ? "Make it work on a list of inputs" : "Let me select multiple objects";
+  return [...cat, envFix, "Add error handling so it fails gracefully"];
+}
+function renderSuggest(s) {
+  const wrap = document.createElement("div");
+  wrap.className = "msg suggest";
+  const how = document.createElement("button");
+  how.className = "chip-s how"; how.type = "button"; how.textContent = "Tell me how it works";
+  how.onclick = () => quickSend("Explain how this snippet works, step by step, in plain language for an architecture student. Point to the key lines and the geometry idea. Don't change the code unless I ask.");
+  wrap.appendChild(how);
+  suggestionsFor(s).forEach(t => {
+    const b = document.createElement("button");
+    b.className = "chip-s"; b.type = "button"; b.textContent = t;
+    b.onclick = () => quickSend(t);
+    wrap.appendChild(b);
+  });
+  aiMsgs.appendChild(wrap);
+  aiMsgs.scrollTop = aiMsgs.scrollHeight;
+}
+function quickSend(text) {
+  if (aiBusy) return;
+  aiInput.value = text;
+  sendAI();
+}
 
 function bubble(role) {
   const d = document.createElement("div");

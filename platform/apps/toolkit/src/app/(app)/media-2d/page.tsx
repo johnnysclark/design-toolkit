@@ -7,10 +7,18 @@ import ToolHub, { HubCard } from "@/components/ToolHub";
 export const metadata = {
   title: "2D Tooling · Design Toolkit",
   description:
-    "A bench of 2D-media tools — drawing & scan cleanup and Vantage (camera, lens & perspective), with more proposed: halftone, vectorize, live video, fabrication."
+    "A bench of 2D-media tools — drawing & scan cleanup, Vantage (camera, lens & perspective), and Pattern Studio (parametric screens → SVG/DXF), with more proposed."
 };
 
 const CARDS: HubCard[] = [
+  {
+    title: "Pattern Studio",
+    source: "Parametric screens & tilings",
+    status: "live",
+    href: "/media-2d/pattern-studio",
+    blurb:
+      "Generate a parametric screen / facade / tiling: a grid of cells whose size and rotation are driven by an attractor you drag. Choose the cell shape and the grid (square / brick / hex), tune the field, then export SVG, PNG, or DXF with real millimetre coordinates — straight into Rhino / AutoCAD or a laser cutter. Client-side."
+  },
   {
     title: "Drawing Cleaner",
     source: "Ported from Drawing-Image-Cleaner + scan-cleaner",
@@ -50,6 +58,12 @@ const CARDS: HubCard[] = [
     status: "proposed",
     blurb:
       "Prep geometry for the laser cutter: map stroke colours to cut / score / engrave, set kerf, tile to bed size, and export clean SVG/DXF — the boring step before fabrication, made quick."
+  },
+  {
+    title: "Scale & Scale-Bar",
+    status: "proposed",
+    blurb:
+      "The drawing-scale companion: convert between ratios (1:50) and imperial (¼\"=1'-0\"), size a drawing to a sheet, and drop a clean graphic scale bar + north arrow as SVG for your layout."
   }
 ];
 
@@ -58,7 +72,7 @@ export default function Media2DPage() {
     <ToolHub
       title="2D Tooling"
       subtitle="Drawing & Fabrication"
-      intro="Single-purpose widgets for 2D studio production — the jobs that usually mean opening Photoshop and remembering a workflow. Each runs entirely in your browser; nothing is uploaded. Drawing Cleaner and Vantage are ready now; the rest are proposals."
+      intro="Single-purpose widgets for 2D studio production — the jobs that usually mean opening Photoshop and remembering a workflow. Each runs entirely in your browser; nothing is uploaded. Drawing Cleaner, Vantage, and Pattern Studio are ready now; the rest are proposals."
       cards={CARDS}
     />
   );
