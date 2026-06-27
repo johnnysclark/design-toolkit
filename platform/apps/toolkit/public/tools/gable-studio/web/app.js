@@ -105,31 +105,30 @@ document.querySelectorAll(".modal").forEach((m) => m.addEventListener("click", (
 document.addEventListener("keydown", (e) => { if (e.key === "Escape") document.querySelectorAll(".modal").forEach((m) => (m.style.display = "none")); });
 $("#btn-info").addEventListener("click", () => showModal("infoModal"));
 
-// Collapsible docks. Collapsing only shrinks a grid track (top/bottom rows or the
-// right column) — a panel can never overlay the centred 3D view. The viewport's
-// ResizeObserver re-fits the render whenever the centre cell changes size.
+// Performance panel collapses to a slim vertical bar (square viewer stays put).
 const mainEl = document.querySelector("main");
-function wireDock(id) {
-  const dock = document.getElementById(id);
-  const toggle = dock.querySelector(".dock-toggle");
-  toggle.addEventListener("click", () => {
-    const collapsed = dock.classList.toggle("collapsed");
-    toggle.setAttribute("aria-expanded", String(!collapsed));
-    if (id === "dock-right") mainEl.classList.toggle("right-collapsed", collapsed);
-  });
-}
-["dock-top", "dock-bottom", "dock-right"].forEach(wireDock);
+const perf = $("#perf"), perfToggle = $("#perf-toggle");
+perfToggle.addEventListener("click", () => {
+  const collapsed = perf.classList.toggle("collapsed");
+  mainEl.classList.toggle("perf-collapsed", collapsed);
+  perfToggle.setAttribute("aria-expanded", String(!collapsed));
+});
 
-// The toolbar's "building & terrain" buttons reveal + scroll to the example
-// massing controls (which now live in the top dock, not a floating window).
-const topDock = document.getElementById("dock-top");
-const revealMassing = () => {
-  topDock.classList.remove("collapsed");
-  topDock.querySelector(".dock-toggle").setAttribute("aria-expanded", "true");
-  document.getElementById("massing").scrollIntoView({ behavior: "smooth", block: "nearest" });
-};
-$("#btn-studio").addEventListener("click", revealMassing);
-$("#btn-studio-2").addEventListener("click", revealMassing);
+// ⤢ Expand the viewer to fill the stage (focus / fullscreen). The panels hide;
+// the viewbox grows, so the viewport's ResizeObserver re-fits the render.
+const expandBtn = $("#btn-expand");
+expandBtn.addEventListener("click", () => {
+  const full = mainEl.classList.toggle("focus");
+  expandBtn.textContent = full ? "⤡" : "⤢";
+  expandBtn.title = full ? "Restore layout" : "Expand viewer";
+});
+
+// The toolbar "Building & terrain" button opens the Design dropdown.
+const designDrop = $("#drop-design");
+$("#btn-studio").addEventListener("click", () => {
+  designDrop.open = true;
+  designDrop.scrollIntoView({ behavior: "smooth", block: "nearest" });
+});
 
 let map = null, marker = null;
 const updateMapReadout = () => { $("#map-readout").textContent = `lat ${state.site.latitude.toFixed(2)}°, lon ${state.site.longitude.toFixed(2)}°`; };
@@ -158,4 +157,4 @@ $("#btn-map").addEventListener("click", () => {
 
 rebuildAll();
 syncModeBtn();
-setStatus("Analysis view (parallel projection): the envelope is coloured by yearly solar. Drag a control to watch the data move; encode your intent as rules; export to Rhino.");
+setStatus("Analysis view (parallel projection): the envelope is coloured by yearly solar. Open the Environment / Design dropdowns to shape it, watch the data move, add rules — or ⤢ expand the viewer.");
