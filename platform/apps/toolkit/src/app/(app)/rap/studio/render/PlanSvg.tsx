@@ -2,12 +2,13 @@
 // The same model rasterises to the PIAF swell-paper PNG, so screen == print.
 
 import { buildPlanModel, PLAN_WEIGHTS, type DrawPrim } from "./planModel";
+import type { PhaseView } from "../engine/geometry";
 import type { State } from "../engine/types";
 
 const WEIGHTS = PLAN_WEIGHTS;
 
-export default function PlanSvg({ state, className, levelFilter = null }: { state: State; className?: string; levelFilter?: number | null }) {
-  const { prims, bounds } = buildPlanModel(state, levelFilter);
+export default function PlanSvg({ state, className, levelFilter = null, view = null }: { state: State; className?: string; levelFilter?: number | null; view?: PhaseView | null }) {
+  const { prims, bounds } = buildPlanModel(state, levelFilter, view);
   const { minX, minY, maxX, maxY } = bounds;
   const w = Math.max(1, maxX - minX);
   const h = Math.max(1, maxY - minY);

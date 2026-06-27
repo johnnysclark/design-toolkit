@@ -22,6 +22,11 @@ function parseJson(text: string): { reply?: string; commands?: string[]; questio
   }
 }
 
+// User-only / structural verbs the assistant must never run. The prompt forbids
+// them, but applyCommand doesn't gate on role, so a leaked `phase remove` or
+// `clear` would actually execute — this is the hard server-side backstop.
+const DENIED_VERBS = new Set(["phase", "focus", "schema", "clear", "reset", "undo", "redo", "room"]);
+
 /** Keep commands that apply cleanly against the supplied state; capture the
  *  rest with their error so the spoken reply can't silently over-claim. */
 function validateCommands(state: State, commands: string[]): { kept: string[]; dropped: { command: string; error: string }[] } {
@@ -31,6 +36,11 @@ function validateCommands(state: State, commands: string[]): { kept: string[]; d
   for (const raw of commands) {
     if (typeof raw !== "string" || !raw.trim()) continue;
     const cmd = raw.trim();
+    const verb = cmd.split(/\s+/)[0]?.toLowerCase();
+    if (DENIED_VERBS.has(verb)) {
+      dropped.push({ command: cmd, error: `The assistant may not run "${verb}" — phases, focus, and history are user-only.` });
+      continue;
+    }
     try {
       const res = applyCommand(cur, cmd);
       if (res.ok) {

@@ -7,7 +7,7 @@ import ToolHub, { HubCard } from "@/components/ToolHub";
 export const metadata = {
   title: "2D Tooling · Design Toolkit",
   description:
-    "A bench of 2D-media tools — drawing & scan cleanup, with more proposed: halftone, vectorize, live video, fabrication."
+    "A bench of 2D-media tools — drawing & scan cleanup and Vantage (camera, lens & perspective), with more proposed: halftone, vectorize, live video, fabrication."
 };
 
 const CARDS: HubCard[] = [
@@ -18,6 +18,14 @@ const CARDS: HubCard[] = [
     href: "/media-2d/drawing-cleaner",
     blurb:
       "Turn a phone photo or scan of a pen/pencil drawing into clean black-on-white. Auto levels with a live histogram, gamma, sharpen, denoise and adaptive lighting, plus straighten/crop, a curves editor with presets, a before/after split, and a full-resolution (resizable) PNG export."
+  },
+  {
+    title: "Vantage",
+    source: "New — interactive demo",
+    status: "live",
+    href: "/media-2d/vantage",
+    blurb:
+      "See how a camera makes an image. Change the lens and watch the field of view and perspective shift (with a dolly-zoom that proves perspective comes from distance, not focal length); open the aperture to throw the background out of focus; and use tilt vs. lens-shift to keep a building's verticals straight — with a live plan diagram, a draughtsman overlay (horizon + vanishing points) and the real numbers.",
   },
   {
     title: "Halftone & Riso",
@@ -50,7 +58,7 @@ export default function Media2DPage() {
     <ToolHub
       title="2D Tooling"
       subtitle="Drawing & Fabrication"
-      intro="Single-purpose widgets for 2D studio production — the jobs that usually mean opening Photoshop and remembering a workflow. Each runs entirely in your browser; nothing is uploaded. Drawing Cleaner is ready now; the rest are proposals."
+      intro="Single-purpose widgets for 2D studio production — the jobs that usually mean opening Photoshop and remembering a workflow. Each runs entirely in your browser; nothing is uploaded. Drawing Cleaner and Vantage are ready now; the rest are proposals."
       cards={CARDS}
     />
   );

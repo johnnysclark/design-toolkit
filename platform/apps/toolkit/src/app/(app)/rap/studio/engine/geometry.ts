@@ -13,6 +13,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import type { ApertureType, Axis, Level, LineType, State, TactilePattern } from "./types";
+import { COMPOSITE_FOCUS } from "./types";
 import { toBraille } from "./braille";
 
 export interface Pt {
@@ -64,6 +65,10 @@ export interface Transform {
   oy: number;
   rot: number; // degrees
 }
+/** How a phase's geometry is drawn in the active view: "focus" = the figure
+ *  (solid, full detail); "reference" = context underlay (renderers draw it as a
+ *  dashed outline a finger can read — never dimmed in colour or shrunk in relief). */
+export type PhaseEmphasis = "focus" | "reference";
 export interface BayGeometry {
   name: string;
   transform: Transform;
@@ -76,6 +81,8 @@ export interface BayGeometry {
   corridor: CorridorG | null;
   label: { x: number; y: number; text: string; braille: string };
   level: number;
+  phase: string;
+  emphasis: PhaseEmphasis;
 }
 // ── Free elements (world coordinates, no per-bay transform) ──────────────────
 export interface FreeWallSolid {
@@ -94,6 +101,8 @@ export interface FreeWallG {
   solids: FreeWallSolid[];
   doors: DoorSwing[]; // world coords, absolute arc angles
   windows: { a: Pt; b: Pt }[];
+  phase: string;
+  emphasis: PhaseEmphasis;
 }
 // A geometric region (floor plate or extruded box) resolved to world feet, with
 // its layer's drafting style + the resolved tactile pattern baked in so renderers
@@ -118,6 +127,8 @@ export interface RegionG {
   height: number; // box: extrusion height ft (0 for a plate)
   thickness: number; // plate: slab thickness ft (0 for a box)
   style: RegionStyleG;
+  phase: string;
+  emphasis: PhaseEmphasis;
 }
 export interface ColG {
   id: string;
@@ -125,6 +136,8 @@ export interface ColG {
   x: number;
   y: number;
   size: number;
+  phase: string;
+  emphasis: PhaseEmphasis;
 }
 
 export interface SceneGeometry {
@@ -135,8 +148,11 @@ export interface SceneGeometry {
   regions: RegionG[];
   freeColumns: ColG[];
   levels: Level[];
-  /** World-space bounds of everything, for a 2D viewBox. */
+  /** World-space bounds of everything (site + geometry), for a fallback viewBox. */
   bounds: { minX: number; minY: number; maxX: number; maxY: number };
+  /** Bounds of the GEOMETRY only (no site/lot) — what the viewers zoom-to-fit and
+   *  center on. null when nothing is placed (then fall back to `bounds`). */
+  geomBounds: { minX: number; minY: number; maxX: number; maxY: number } | null;
 }
 
 /** Apply a bay transform to a local point → world feet. */
@@ -166,9 +182,39 @@ function solidSpans(len: number, gaps: Array<[number, number]>): Array<[number, 
   return spans;
 }
 
+/** The active phase scope for a render. `focus` is a phase id or COMPOSITE_FOCUS;
+ *  `hidden` lists phase ids that are never drawn (visible:"hidden"); `refOff` drops
+ *  reference phases entirely (the master "reference underlay off" toggle). */
+export interface PhaseView {
+  focus: string;
+  hidden: Set<string>;
+  refOff: boolean;
+}
+
+/** Resolve how one phase renders under a view — the SIBLING of `onLevel`, and the
+ *  single place phase scope is decided. Returns null to DROP the element. Read by
+ *  BOTH deriveGeometry and describe() so the visual/tactile/spoken channels cannot
+ *  disagree. With no view (null) every phase is "focus" (solid) — exact back-compat. */
+export function emphasisOf(phaseId: string, view: PhaseView | null): PhaseEmphasis | null {
+  if (!view) return "focus";
+  // The focused phase always shows (focus wins over a stale hidden flag).
+  if (view.focus !== COMPOSITE_FOCUS && phaseId === view.focus) return "focus";
+  if (view.hidden.has(phaseId)) return null;
+  if (view.focus === COMPOSITE_FOCUS) return "focus"; // whole building — every visible phase solid
+  return view.refOff ? null : "reference"; // a non-focused phase = reference ghost (or dropped)
+}
+
+/** Build a PhaseView from state + a focused id, resolving the hidden-set once.
+ *  Call sites (renderers, describe, exports) stay one-liners. */
+export function phaseViewOf(state: State, focus: string, refOff = false): PhaseView {
+  const hidden = new Set(state.phases.filter((p) => p.visible === "hidden").map((p) => p.id));
+  return { focus, hidden, refOff };
+}
+
 /** levelFilter: when set, only elements on that level are emitted (mixed-use
- *  floor-by-floor view); null = the whole building. */
-export function deriveGeometry(state: State, levelFilter: number | null = null): SceneGeometry {
+ *  floor-by-floor view); null = the whole building. `view` scopes the PHASE axis
+ *  (focus vs reference vs hidden); null = every phase solid (the composite). */
+export function deriveGeometry(state: State, levelFilter: number | null = null, view: PhaseView | null = null): SceneGeometry {
   const onLevel = (lvl: number) => levelFilter === null || lvl === levelFilter;
   const bays: BayGeometry[] = [];
   const voids: VoidG[] = [];
@@ -177,15 +223,30 @@ export function deriveGeometry(state: State, levelFilter: number | null = null):
   let maxX = state.site.origin[0] + state.site.width;
   let maxY = state.site.origin[1] + state.site.height;
 
+  // Geometry-only bounds (excludes the site rect + lot boundary) so the viewers can
+  // zoom-to-fit the actual geometry, centered, instead of the whole site.
+  let gMinX = Infinity;
+  let gMinY = Infinity;
+  let gMaxX = -Infinity;
+  let gMaxY = -Infinity;
+  let hasGeom = false;
+
   const expand = (p: Pt) => {
     minX = Math.min(minX, p.x);
     minY = Math.min(minY, p.y);
     maxX = Math.max(maxX, p.x);
     maxY = Math.max(maxY, p.y);
+    hasGeom = true;
+    gMinX = Math.min(gMinX, p.x);
+    gMinY = Math.min(gMinY, p.y);
+    gMaxX = Math.max(gMaxX, p.x);
+    gMaxY = Math.max(gMaxY, p.y);
   };
 
   for (const [name, bay] of Object.entries(state.bays)) {
     if (!onLevel(bay.level ?? 0)) continue;
+    const bayEmphasis = emphasisOf(bay.phase ?? "main", view);
+    if (!bayEmphasis) continue;
     const [nx, ny] = bay.bays;
     const [sx, sy] = bay.spacing;
     const W = nx * sx;
@@ -308,7 +369,9 @@ export function deriveGeometry(state: State, levelFilter: number | null = null):
       doors,
       corridor,
       label: { x: 0, y: -3, text: bay.label, braille: bay.braille },
-      level: bay.level ?? 0
+      level: bay.level ?? 0,
+      phase: bay.phase ?? "main",
+      emphasis: bayEmphasis
     });
 
     // World-space void belonging to this bay (if any).
@@ -329,6 +392,8 @@ export function deriveGeometry(state: State, levelFilter: number | null = null):
   const freeWalls: FreeWallG[] = [];
   for (const w of state.walls) {
     if (!onLevel(w.level)) continue;
+    const wallEmphasis = emphasisOf(w.phase ?? "main", view);
+    if (!wallEmphasis) continue;
     const [ax, ay] = w.a;
     const [bx, by] = w.b;
     const dx = bx - ax;
@@ -383,7 +448,7 @@ export function deriveGeometry(state: State, levelFilter: number | null = null):
       }
       // portal = an open gap, no symbol
     }
-    freeWalls.push({ id: w.id, level: w.level, thickness: w.thickness, height, solids, doors, windows });
+    freeWalls.push({ id: w.id, level: w.level, thickness: w.thickness, height, solids, doors, windows, phase: w.phase ?? "main", emphasis: wallEmphasis });
     expand({ x: ax, y: ay });
     expand({ x: bx, y: by });
   }
@@ -392,46 +457,62 @@ export function deriveGeometry(state: State, levelFilter: number | null = null):
   // Resolve each region's layer style + tactile pattern ONCE here, so every
   // renderer reads the same drafting intent (parity). Tactile resolution order
   // (contract A.7): region.tactile ?? layer.tactile ?? none.
-  const regions: RegionG[] = state.regions
-    .filter((r) => onLevel(r.level ?? 0))
-    .map((r) => {
-      const [x, y] = r.origin;
-      const [w, h] = r.size;
-      expand({ x, y });
-      expand({ x: x + w, y: y + h });
-      const layer = state.layers[r.layer];
-      const resolved = r.tactile ?? layer?.tactile ?? null;
-      const tactile = resolved && resolved.pattern !== "none" ? resolved : null;
-      return {
-        id: r.id,
-        level: r.level ?? 0,
-        kind: r.kind,
-        x,
-        y,
-        w,
-        h,
-        cx: x + w / 2,
-        cy: y + h / 2,
-        name: r.name,
-        braille: toBraille(r.name),
-        height: r.kind === "box" ? r.height ?? 0 : 0,
-        thickness: r.kind === "plate" ? r.thickness ?? state.tactile3d.floor_thickness : 0,
-        style: {
-          lineweight_mm: layer?.lineweight_mm ?? state.style.wall_lineweight_mm,
-          linetype: layer?.linetype ?? "solid",
-          tactile
-        }
-      };
+  const regions: RegionG[] = [];
+  for (const r of state.regions) {
+    if (!onLevel(r.level ?? 0)) continue;
+    const regionEmphasis = emphasisOf(r.phase ?? "main", view);
+    if (!regionEmphasis) continue;
+    const [x, y] = r.origin;
+    const [w, h] = r.size;
+    expand({ x, y });
+    expand({ x: x + w, y: y + h });
+    const layer = state.layers[r.layer];
+    const resolved = r.tactile ?? layer?.tactile ?? null;
+    const tactile = resolved && resolved.pattern !== "none" ? resolved : null;
+    regions.push({
+      id: r.id,
+      level: r.level ?? 0,
+      kind: r.kind,
+      x,
+      y,
+      w,
+      h,
+      cx: x + w / 2,
+      cy: y + h / 2,
+      name: r.name,
+      braille: toBraille(r.name),
+      height: r.kind === "box" ? r.height ?? 0 : 0,
+      thickness: r.kind === "plate" ? r.thickness ?? state.tactile3d.floor_thickness : 0,
+      style: {
+        lineweight_mm: layer?.lineweight_mm ?? state.style.wall_lineweight_mm,
+        linetype: layer?.linetype ?? "solid",
+        tactile
+      },
+      phase: r.phase ?? "main",
+      emphasis: regionEmphasis
     });
+  }
 
   // ── Free columns ────────────────────────────────────────────────────────────
-  const freeColumns: ColG[] = state.columns
-    .filter((c) => onLevel(c.level))
-    .map((c) => ({ id: c.id, level: c.level, x: c.at[0], y: c.at[1], size: c.size }));
+  const freeColumns: ColG[] = [];
+  for (const c of state.columns) {
+    if (!onLevel(c.level)) continue;
+    const colEmphasis = emphasisOf(c.phase ?? "main", view);
+    if (!colEmphasis) continue;
+    freeColumns.push({ id: c.id, level: c.level, x: c.at[0], y: c.at[1], size: c.size, phase: c.phase ?? "main", emphasis: colEmphasis });
+  }
   for (const c of freeColumns) expand({ x: c.x, y: c.y });
 
   const boundary = state.site.boundary ? state.site.boundary.map(([x, y]) => ({ x, y })) : null;
-  if (boundary) for (const p of boundary) expand(p);
+  // The lot boundary grows the site-inclusive bounds only — NOT the geometry bounds,
+  // so a small building in a big lot still zooms to the building.
+  if (boundary)
+    for (const p of boundary) {
+      minX = Math.min(minX, p.x);
+      minY = Math.min(minY, p.y);
+      maxX = Math.max(maxX, p.x);
+      maxY = Math.max(maxY, p.y);
+    }
 
   return {
     site: { w: state.site.width, h: state.site.height, ox: state.site.origin[0], oy: state.site.origin[1], boundary },
@@ -441,6 +522,63 @@ export function deriveGeometry(state: State, levelFilter: number | null = null):
     regions,
     freeColumns,
     levels: state.levels,
-    bounds: { minX, minY, maxX, maxY }
+    bounds: { minX, minY, maxX, maxY },
+    geomBounds: hasGeom ? { minX: gMinX, minY: gMinY, maxX: gMaxX, maxY: gMaxY } : null
   };
+}
+
+/** Axis-aligned bounding box (world feet) of all geometry tagged to a phase, or
+ *  null if the phase is empty. OUTSIDE the render path — feeds `phase fit`/`status`
+ *  and the derive-time `basis` snapshot. Bays use their four (rotated) corners. */
+export interface Footprint {
+  minX: number;
+  minY: number;
+  maxX: number;
+  maxY: number;
+}
+export function phaseFootprint(state: State, phaseId: string): Footprint | null {
+  let minX = Infinity;
+  let minY = Infinity;
+  let maxX = -Infinity;
+  let maxY = -Infinity;
+  let any = false;
+  const acc = (x: number, y: number) => {
+    any = true;
+    minX = Math.min(minX, x);
+    minY = Math.min(minY, y);
+    maxX = Math.max(maxX, x);
+    maxY = Math.max(maxY, y);
+  };
+  for (const bay of Object.values(state.bays)) {
+    if ((bay.phase ?? "main") !== phaseId) continue;
+    const [nx, ny] = bay.bays;
+    const [sx, sy] = bay.spacing;
+    const W = nx * sx;
+    const D = ny * sy;
+    const t: Transform = { ox: bay.origin[0], oy: bay.origin[1], rot: bay.rotation_deg };
+    for (const corner of [
+      { x: 0, y: 0 },
+      { x: W, y: 0 },
+      { x: W, y: D },
+      { x: 0, y: D }
+    ]) {
+      const p = applyTransform(corner, t);
+      acc(p.x, p.y);
+    }
+  }
+  for (const w of state.walls) {
+    if ((w.phase ?? "main") !== phaseId) continue;
+    acc(w.a[0], w.a[1]);
+    acc(w.b[0], w.b[1]);
+  }
+  for (const r of state.regions) {
+    if ((r.phase ?? "main") !== phaseId) continue;
+    acc(r.origin[0], r.origin[1]);
+    acc(r.origin[0] + r.size[0], r.origin[1] + r.size[1]);
+  }
+  for (const c of state.columns) {
+    if ((c.phase ?? "main") !== phaseId) continue;
+    acc(c.at[0], c.at[1]);
+  }
+  return any ? { minX, minY, maxX, maxY } : null;
 }

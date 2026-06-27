@@ -24,6 +24,7 @@ const DEP_GETSAMPLES =
 const FEMA_FLOOD = "https://hazards.fema.gov/arcgis/rest/services/public/NFHL/MapServer/28/query";
 const OPEN_METEO = "https://archive-api.open-meteo.com/v1/archive";
 const NOMINATIM = "https://nominatim.openstreetmap.org/search";
+const NOMINATIM_REVERSE = "https://nominatim.openstreetmap.org/reverse";
 
 // Nominatim's usage policy asks every caller to identify itself. Server-side only.
 const GEOCODER_UA =
@@ -278,6 +279,59 @@ export async function geocodeSearch(q: string, limit = 8): Promise<GeoPlace[]> {
       importance: r.importance != null ? Number(r.importance) : null
     };
   });
+}
+
+// Point → place, via Nominatim /reverse. Powers the map's "drop a pin" input:
+// a clicked lat/lon becomes a named GeoPlace (same shape as geocodeSearch), so the
+// pin path and the typed-search path feed the analyzer identically. Server-side
+// only (Nominatim's policy needs a real User-Agent). Degrades to a coordinate
+// label if the reverse lookup is down — a pin should always be analyzable.
+export async function reverseGeocode(lat: number, lon: number): Promise<GeoPlace> {
+  const coordLabel = `${lat.toFixed(5)}, ${lon.toFixed(5)}`;
+  const fallback: GeoPlace = {
+    label: coordLabel,
+    shortLabel: `${lat.toFixed(4)}, ${lon.toFixed(4)}`,
+    lat,
+    lon,
+    bbox: defaultBbox(lat, lon),
+    category: null,
+    importance: null
+  };
+  if (!Number.isFinite(lat) || !Number.isFinite(lon)) return fallback;
+  const qs = new URLSearchParams({
+    lat: String(lat),
+    lon: String(lon),
+    format: "jsonv2",
+    addressdetails: "1",
+    zoom: "18"
+  });
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 12000);
+  try {
+    const res = await fetch(`${NOMINATIM_REVERSE}?${qs}`, {
+      signal: ctrl.signal,
+      headers: { Accept: "application/json", "User-Agent": GEOCODER_UA }
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status} from the geocoder`);
+    const r = await res.json();
+    if (!r || r.error) return fallback;
+    const name = String(r.name || String(r.display_name || "").split(",")[0] || "").trim();
+    // jsonv2 reverse names the field `category`; search uses `class`. Accept either.
+    const klass = r.category || r.class;
+    return {
+      label: r.display_name || coordLabel,
+      shortLabel: name || fallback.shortLabel,
+      lat,
+      lon,
+      bbox: defaultBbox(lat, lon),
+      category: klass && r.type ? `${klass}/${r.type}` : r.type || null,
+      importance: null
+    };
+  } catch {
+    return fallback;
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 // A ~0.9 km box around a point — the default study area for terrain sampling and

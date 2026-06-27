@@ -1,13 +1,13 @@
 import type { Metadata } from "next";
-import { Space_Grotesk, IBM_Plex_Sans, IBM_Plex_Mono } from "next/font/google";
+import { IBM_Plex_Mono } from "next/font/google";
 
-// Editorial typography, scoped to this page (the rest of the app keeps Archivo
-// Black). Mirrors the Overview page's `.di-doc` system so RAP reads as part of
-// the same statement. Content tracks the ACADIA 2026 paper, "Accessibility
-// Harness & Adaptive Pedagogy for Non-Visual Design Authorship." The student
-// and institution are anonymized, following the paper.
-const grotesk = Space_Grotesk({ subsets: ["latin"], weight: ["500", "700"], variable: "--font-grotesk", display: "swap" });
-const plex = IBM_Plex_Sans({ subsets: ["latin"], weight: ["400", "500"], variable: "--font-plex", display: "swap" });
+// Typography matches the Overview page's `.di-doc` system so the two read as
+// siblings: Archivo Black (the app's --font-display, wired in the root layout)
+// uppercase for headings + pills, a readable system sans for the body, and one
+// loaded webfont — IBM Plex Mono — reserved for the CLI / code blocks. Content
+// tracks the ACADIA 2026 paper, "Accessibility Harness & Adaptive Pedagogy for
+// Non-Visual Design Authorship." The student and institution are anonymized,
+// following the paper.
 const mono = IBM_Plex_Mono({ subsets: ["latin"], weight: ["400", "500"], variable: "--font-mono", display: "swap" });
 
 export const metadata: Metadata = {
@@ -185,8 +185,8 @@ const HORIZON: { title: string; body: string }[] = [
 ];
 
 const STYLES = `
-.di-doc{ color:#141414; font-family:var(--font-plex),system-ui,sans-serif; font-size:17px; line-height:1.62; -webkit-font-smoothing:antialiased; }
-.di-doc h1,.di-doc h2,.di-doc h3{ font-family:var(--font-grotesk),system-ui,sans-serif; color:#111; margin:0; font-weight:500; text-transform:none; letter-spacing:normal; }
+.di-doc{ color:#141414; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif; font-size:17px; line-height:1.62; -webkit-font-smoothing:antialiased; }
+.di-doc h1,.di-doc h2,.di-doc h3{ font-family:var(--font-display),ui-sans-serif,system-ui,sans-serif; color:#111; margin:0; font-weight:400; text-transform:uppercase; letter-spacing:-.01em; }
 .di-doc a{ color:#1A45F0; }
 .di-doc em{ font-style:italic; }
 .di-doc code{ font-family:var(--font-mono),ui-monospace,monospace; font-size:.86em; background:#f1f1ef; padding:1px 5px; border-radius:3px; color:#1a1a1a; }
@@ -194,9 +194,9 @@ const STYLES = `
 
 .di-doc header{ border-bottom:2px solid #111; padding:2px 0 22px; }
 .di-doc .kicker{ font-size:13px; letter-spacing:.16em; text-transform:uppercase; color:#666; }
-.di-doc header h1{ font-size:clamp(28px,4.6vw,42px); line-height:1.04; letter-spacing:-.02em; margin-top:12px; font-weight:700; }
-.di-doc .sub{ font-family:var(--font-grotesk),sans-serif; font-weight:500; font-size:15px; color:#555; margin-top:8px; letter-spacing:.01em; }
-.di-doc .lede{ font-family:var(--font-grotesk),sans-serif; font-weight:500; font-size:clamp(17px,2.2vw,20px); line-height:1.4; color:#222; margin-top:14px; max-width:58ch; }
+.di-doc header h1{ font-size:clamp(28px,4.6vw,42px); line-height:1.04; letter-spacing:-.02em; margin-top:12px; font-weight:400; }
+.di-doc .sub{ font-weight:500; font-size:15px; color:#555; margin-top:8px; letter-spacing:.01em; }
+.di-doc .lede{ font-weight:500; font-size:clamp(17px,2.2vw,20px); line-height:1.4; color:#222; margin-top:14px; max-width:58ch; }
 .di-doc .byline{ font-size:14.5px; color:#444; margin-top:14px; max-width:64ch; }
 .di-doc .byline b{ font-weight:500; color:#111; }
 
@@ -212,7 +212,7 @@ const STYLES = `
 
 .di-doc .jump{ margin-top:26px; display:flex; flex-wrap:wrap; gap:8px; align-items:center; }
 .di-doc .jump .jlbl{ font-size:11px; letter-spacing:.12em; text-transform:uppercase; color:#999; margin-right:4px; }
-.di-doc .jump a{ font-family:var(--font-grotesk),sans-serif; font-size:13px; text-decoration:none; color:#111; background:#fff; border:1px solid #ddd; border-radius:999px; padding:5px 12px; }
+.di-doc .jump a{ font-family:var(--font-display),sans-serif; text-transform:uppercase; letter-spacing:-.01em; font-size:11.5px; text-decoration:none; color:#111; background:#fff; border:1px solid #111; border-radius:999px; padding:6px 12px; }
 .di-doc .jump a:hover{ border-color:#111; }
 
 .di-doc .fig{ margin:22px 0 6px; border:1px solid #e6e6e6; border-radius:4px; overflow:hidden; background:#fff; }
@@ -220,16 +220,16 @@ const STYLES = `
 .di-doc .fig.pad img{ padding:14px; }
 .di-doc .fig figcaption{ font-size:12.5px; line-height:1.45; color:#777; padding:10px 14px; border-top:1px solid #ededed; font-style:italic; }
 
-.di-doc .khead{ border-top:2px solid #111; margin-top:46px; padding-top:15px; margin-bottom:14px; }
-.di-doc .khead h2{ font-size:25px; letter-spacing:-.01em; }
-.di-doc .khead p{ font-size:15px; color:#555; margin:7px 0 0; max-width:62ch; }
+.di-doc .khead{ border-top:2px solid #111; margin-top:44px; padding-top:15px; margin-bottom:14px; }
+.di-doc .khead h2{ font-size:24px; letter-spacing:-.01em; }
+.di-doc .khead p{ font-size:15px; color:#555; margin:7px 0 0; max-width:60ch; }
 
 .di-doc .pipe-cap{ font-size:13px; color:#777; margin:2px 0 8px; }
 
 .di-doc .modes{ display:grid; grid-template-columns:repeat(3,1fr); gap:14px; margin:18px 0 6px; }
 .di-doc .mode{ border:1px solid #e6e6e6; border-radius:4px; padding:15px 16px; background:#fff; }
-.di-doc .mode .mn{ font-family:var(--font-grotesk),sans-serif; font-size:11px; letter-spacing:.06em; color:#bbb; }
-.di-doc .mode .mt{ font-family:var(--font-grotesk),sans-serif; font-weight:500; font-size:15.5px; color:#111; margin:3px 0 6px; }
+.di-doc .mode .mn{ font-size:11px; letter-spacing:.1em; text-transform:uppercase; color:#999; }
+.di-doc .mode .mt{ font-weight:600; font-size:15.5px; color:#111; margin:3px 0 6px; }
 .di-doc .mode p{ font-size:13.5px; line-height:1.5; color:#444; margin:0; }
 
 .di-doc .body p{ font-size:17px; line-height:1.72; margin:0 0 18px; color:#1a1a1a; max-width:64ch; }
@@ -238,14 +238,14 @@ const STYLES = `
 .di-doc .props{ margin:6px 0; border:1px solid #e6e6e6; border-radius:4px; overflow:hidden; background:#fff; }
 .di-doc .prop{ display:grid; grid-template-columns:54px 1fr; gap:0; border-top:1px solid #ededed; }
 .di-doc .prop:first-child{ border-top:none; }
-.di-doc .prop .pn{ font-family:var(--font-grotesk),sans-serif; font-size:13px; color:#bbb; padding:16px 0 16px 18px; }
+.di-doc .prop .pn{ font-family:var(--font-display),sans-serif; font-size:13px; color:#bbb; padding:16px 0 16px 18px; }
 .di-doc .prop .pc{ padding:15px 18px 15px 4px; }
-.di-doc .prop .pt{ font-family:var(--font-grotesk),sans-serif; font-weight:500; font-size:16px; color:#111; }
+.di-doc .prop .pt{ font-weight:500; font-size:16px; color:#111; }
 .di-doc .prop .pd{ font-size:14.5px; line-height:1.5; color:#444; margin-top:4px; max-width:60ch; }
 
 .di-doc .tool-entry{ display:grid; grid-template-columns:minmax(0,1.04fr) minmax(0,1fr); gap:28px; align-items:center; padding:26px 0; border-top:1px solid #ededed; }
 .di-doc .tool-entry:first-of-type{ border-top:none; }
-.di-doc .te-no{ font-family:var(--font-grotesk),sans-serif; font-size:13px; color:#bbb; letter-spacing:.04em; margin-bottom:4px; }
+.di-doc .te-no{ font-family:var(--font-display),sans-serif; font-size:13px; color:#bbb; letter-spacing:.04em; margin-bottom:4px; }
 .di-doc .te-text h3{ font-size:19px; line-height:1.14; margin:0 0 9px; }
 .di-doc .te-text p{ font-size:15px; line-height:1.56; color:#2e2e2e; margin:0; }
 .di-doc .te-text code{ font-size:12.5px; }
@@ -255,7 +255,7 @@ const STYLES = `
 
 .di-doc .feature{ border-top:2px solid #111; border-bottom:2px solid #111; padding:28px 0; margin:30px 0 0; }
 .di-doc .feature .fl{ font-size:12px; letter-spacing:.14em; text-transform:uppercase; color:#888; margin-bottom:13px; }
-.di-doc .feature p{ font-family:var(--font-grotesk),sans-serif; font-weight:500; font-size:22px; line-height:1.34; letter-spacing:-.01em; color:#111; margin:0; max-width:30ch; }
+.di-doc .feature p{ font-weight:700; font-size:21px; line-height:1.36; letter-spacing:-.005em; color:#111; margin:0; max-width:30ch; }
 .di-doc .feature p .hl{ box-shadow:inset 0 -0.36em 0 #F1EBD6; }
 
 .di-doc .readout{ background:#0e0e0e; border-radius:6px; padding:18px 20px; margin:18px 0; overflow-x:auto; }
@@ -268,12 +268,12 @@ const STYLES = `
 
 .di-doc .horizon{ display:grid; grid-template-columns:1fr 1fr; gap:12px; margin:6px 0; }
 .di-doc .hcell{ border:1px solid #e6e6e6; border-left:3px solid #111; border-radius:4px; padding:14px 16px; background:#fff; }
-.di-doc .hcell .ht{ font-family:var(--font-grotesk),sans-serif; font-weight:500; font-size:15px; color:#111; margin-bottom:5px; }
+.di-doc .hcell .ht{ font-weight:600; font-size:15px; color:#111; margin-bottom:5px; }
 .di-doc .hcell .hb{ font-size:13.5px; line-height:1.5; color:#444; }
 
 .di-doc .demo{ border:1px dashed #c9b27a; background:#fbf8f0; border-radius:6px; padding:20px 22px; margin:18px 0 6px; }
 .di-doc .demo .dl{ font-size:11px; letter-spacing:.14em; text-transform:uppercase; color:#a98a3c; margin-bottom:8px; }
-.di-doc .demo .dt{ font-family:var(--font-grotesk),sans-serif; font-weight:500; font-size:18px; color:#111; margin:0 0 8px; }
+.di-doc .demo .dt{ font-weight:600; font-size:18px; color:#111; margin:0 0 8px; }
 .di-doc .demo p{ font-size:15px; line-height:1.6; color:#3a3320; margin:0; max-width:64ch; }
 
 .di-doc .end{ border-top:2px solid #111; margin-top:46px; padding:22px 0 10px; }
@@ -286,11 +286,21 @@ const STYLES = `
   .di-doc .gcell{ border-right:none; border-bottom:1px solid #ededed; }
   .di-doc .gcell:last-child{ border-bottom:none; }
 }
+
+/* Site rule — all text is black, never grey. The SVG mocks keep their own
+   fills, the dark terminal readout keeps its terminal colors, and the inverted
+   CTA buttons keep their white text. */
+.di-doc, .di-doc *:not(a){ color:#111 !important; }
+.di-doc a{ color:#1A45F0 !important; }
+.di-doc a.cta{ color:#fff !important; }
+.di-doc .readout pre{ color:#dcdcdc !important; }
+.di-doc .readout .p{ color:#7fd17f !important; }
+.di-doc .readout .c{ color:#6f6f6f !important; }
 `;
 
 export default function RAP() {
   return (
-    <div className={`di-doc ${grotesk.variable} ${plex.variable} ${mono.variable}`}>
+    <div className={`di-doc ${mono.variable}`}>
       <style>{STYLES}</style>
 
       <div className="wrap">
@@ -314,6 +324,7 @@ export default function RAP() {
 
         <a
           href="/rap/studio"
+          className="cta"
           style={{
             display: "inline-block",
             marginTop: 2,
@@ -321,9 +332,11 @@ export default function RAP() {
             background: "#111",
             color: "#fff",
             textDecoration: "none",
-            fontFamily: "var(--font-grotesk),sans-serif",
-            fontWeight: 500,
-            fontSize: 15,
+            fontFamily: "var(--font-display),sans-serif",
+            textTransform: "uppercase",
+            letterSpacing: "-.01em",
+            fontWeight: 400,
+            fontSize: 14,
             borderRadius: 6
           }}
         >
@@ -609,14 +622,17 @@ export default function RAP() {
           <p style={{ marginTop: 12 }}>
             <a
               href="/rap/studio"
+              className="cta"
               style={{
                 display: "inline-block",
                 padding: "10px 18px",
                 background: "#111",
                 color: "#fff",
                 textDecoration: "none",
-                fontFamily: "var(--font-grotesk),sans-serif",
-                fontWeight: 500,
+                fontFamily: "var(--font-display),sans-serif",
+                textTransform: "uppercase",
+                letterSpacing: "-.01em",
+                fontWeight: 400,
                 borderRadius: 6
               }}
             >

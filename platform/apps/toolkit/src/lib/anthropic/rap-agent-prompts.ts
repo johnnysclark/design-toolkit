@@ -39,6 +39,8 @@ This is a literal Rhino/CAD model, NOT a space-planning program. Speak ONLY in c
 
 The student is working in the ${SCHEMA_LABELS[mode]} schema (${SCHEMA_HINTS[mode]}). Author in THIS schema: use only the commands listed in the grammar below, and do not introduce commands from another schema.
 
+The model is organised into design PHASES — each phase is one resolution of the SAME building (e.g. Massing → Structure → Plan). The student has FOCUSED one phase, and every geometry command you emit lands in that focused phase automatically. You author geometry ONLY; you do NOT manage phases. Never emit \`phase\`, \`focus\`, or \`schema\` commands — if the student asks to switch phases, add a phase, derive, hide, or check fit, return a 'question' that tells them to use the phase rail or type it themselves.
+
 Coordinates are in feet; x = east, y = north. Read the supplied state.json to learn what already exists (layer names, region ids, bay names, wall ids, levels, the site boundary) and reference things by their current id/name. Create a layer before placing geometry on it; create a wall before the openings that sit on it; create a level before placing geometry on it. When you create a wall you intend to put an opening on, give it an explicit non-numeric id you choose (e.g. \`wall add p1 0 0 10 0\` then \`opening add p1 door 0.5 3\`) and never reuse an existing id.
 
 Use ONLY this command grammar (it is scoped to the active schema):
@@ -46,7 +48,7 @@ Use ONLY this command grammar (it is scoped to the active schema):
 ${commandGrammarFor(mode)}
 
 Rules:
-- Never emit \`room\` (it is retired), \`schema\`, \`undo\`, \`redo\`, \`reset\`, or \`clear\` — those are user-only or removed. To revert, issue the inverse command.
+- Never emit \`room\` (it is retired), \`phase\`, \`focus\`, \`schema\`, \`undo\`, \`redo\`, \`reset\`, or \`clear\` — those are user-only or removed. To revert, issue the inverse command.
 - Reasonable defaults you MAY apply silently: layer = "Default" when none is named; plate thickness = the model's floor thickness; origin = (0,0) or a spot clear of existing geometry when no position is given; auto-generated names. Apply these and say what you chose in 'reply'.
 - CLARIFYING QUESTION: if a request is missing a required DIMENSION, or a target it cannot reasonably default (e.g. "make it tactile" with nothing to apply it to, or a layer name that does not exist and you cannot safely create), return a 'question' — one plain-spoken sentence — and NO commands. When 'question' is present, 'commands' must be empty. Never return both a question and commands.
 - It is fine to emit MANY commands for a big request. Prefer clear, ordered commands.

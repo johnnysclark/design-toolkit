@@ -1,0 +1,804 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Model Viewer</title>
+<!--
+  Model Viewer — drop a GLB / GLTF / OBJ / STL and get a clean, shareable web
+  viewer: orbit, turntable, background + lighting, screenshot, and an embed
+  snippet. Client-side only (three.js, vendored r160) — your model is never
+  uploaded; it stays in the browser.
+
+  Dual role: this same page is BOTH the authoring tool and the embed target.
+  When opened with a ?model=<url> query it loads that model directly and hides
+  the editing chrome — so the embed snippet below just points an <iframe> back
+  here with the chosen settings baked into the URL.
+
+  Part of the All Means Works design toolkit (3D Tooling).
+-->
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg: #f5f5f3;
+  --surface: #ffffff;
+  --line: #e4e4e0;
+  --ink: #111111;
+  --accent: #ff3b21;
+  --radius: 8px;
+}
+
+html, body { height: 100%; }
+
+body {
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  background: var(--bg);
+  color: var(--ink);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+header {
+  padding: 10px 18px;
+  background: var(--surface);
+  border-bottom: 2px solid var(--ink);
+  display: flex;
+  align-items: baseline;
+  gap: 14px;
+  flex-shrink: 0;
+}
+header h1 {
+  font-size: 18px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  text-transform: uppercase;
+}
+header .subtitle { font-size: 12px; color: var(--ink); }
+
+.app { display: flex; flex: 1; overflow: hidden; min-height: 0; }
+
+/* Sidebar */
+.sidebar {
+  width: 300px;
+  flex-shrink: 0;
+  background: var(--surface);
+  border-right: 1px solid var(--line);
+  overflow-y: auto;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.group { display: flex; flex-direction: column; gap: 9px; }
+.group > .label {
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--ink);
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 5px;
+}
+
+.row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.row label { font-size: 13px; }
+.row .val { font-size: 12px; font-variant-numeric: tabular-nums; min-width: 38px; text-align: right; }
+
+input[type="range"] { width: 100%; accent-color: var(--accent); }
+input[type="text"] {
+  width: 100%;
+  font: inherit;
+  font-size: 12px;
+  padding: 7px 8px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  color: var(--ink);
+  background: #fff;
+}
+
+.swatches { display: flex; gap: 7px; flex-wrap: wrap; }
+.swatch {
+  width: 30px; height: 30px;
+  border-radius: 6px;
+  border: 2px solid var(--line);
+  cursor: pointer;
+  position: relative;
+  padding: 0;
+}
+.swatch.active { border-color: var(--ink); }
+.swatch.checker {
+  background-image:
+    linear-gradient(45deg, #ccc 25%, transparent 25%),
+    linear-gradient(-45deg, #ccc 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, #ccc 75%),
+    linear-gradient(-45deg, transparent 75%, #ccc 75%);
+  background-size: 10px 10px;
+  background-position: 0 0, 0 5px, 5px -5px, -5px 0;
+  background-color: #fff;
+}
+
+.segmented { display: flex; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
+.segmented button {
+  flex: 1;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 7px 4px;
+  background: #fff;
+  border: 0;
+  border-right: 1px solid var(--line);
+  cursor: pointer;
+  color: var(--ink);
+}
+.segmented button:last-child { border-right: 0; }
+.segmented button.active { background: var(--ink); color: #fff; }
+
+.check { display: flex; align-items: center; gap: 8px; font-size: 13px; cursor: pointer; }
+.check input { accent-color: var(--accent); width: 15px; height: 15px; }
+
+.btn {
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  padding: 9px 12px;
+  border-radius: 6px;
+  border: 1px solid var(--ink);
+  background: #fff;
+  color: var(--ink);
+  cursor: pointer;
+  text-align: center;
+}
+.btn:hover { background: #f0f0ee; }
+.btn.primary { background: var(--ink); color: #fff; }
+.btn.primary:hover { background: #000; }
+.btn.accent { background: var(--accent); color: #fff; border-color: var(--accent); }
+.btn.accent:hover { filter: brightness(0.92); }
+.btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+textarea {
+  width: 100%;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px;
+  line-height: 1.4;
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  resize: vertical;
+  min-height: 76px;
+  color: var(--ink);
+  background: #fafafa;
+}
+
+.hint { font-size: 11px; line-height: 1.45; color: var(--ink); }
+
+/* Viewport */
+.stage { position: relative; flex: 1; min-width: 0; }
+#canvas { display: block; width: 100%; height: 100%; }
+
+.drop {
+  position: absolute; inset: 0;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  gap: 14px;
+  text-align: center;
+  padding: 24px;
+  pointer-events: none;
+}
+.drop.interactive { pointer-events: auto; }
+.drop.dragover .dropcard { border-color: var(--accent); background: #fff; transform: scale(1.02); }
+.dropcard {
+  pointer-events: auto;
+  background: rgba(255,255,255,0.92);
+  border: 2px dashed var(--ink);
+  border-radius: 14px;
+  padding: 34px 40px;
+  max-width: 440px;
+  transition: all 0.15s ease;
+}
+.dropcard h2 { font-size: 16px; font-weight: 800; text-transform: uppercase; margin-bottom: 6px; }
+.dropcard p { font-size: 13px; line-height: 1.5; margin-bottom: 14px; }
+.dropcard .formats { font-size: 11px; opacity: 0.7; margin-top: 12px; }
+
+.badge {
+  position: absolute; top: 12px; left: 12px;
+  display: flex; gap: 8px; align-items: center;
+}
+.pill {
+  background: rgba(0,0,0,0.72);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 5px 10px;
+  border-radius: 20px;
+  backdrop-filter: blur(4px);
+}
+
+.toolbar {
+  position: absolute; bottom: 12px; left: 50%;
+  transform: translateX(-50%);
+  display: flex; gap: 8px;
+  background: rgba(255,255,255,0.92);
+  border: 1px solid var(--line);
+  border-radius: 24px;
+  padding: 6px;
+  backdrop-filter: blur(6px);
+}
+.toolbar button {
+  font: inherit; font-size: 12px; font-weight: 600;
+  border: 0; background: transparent; cursor: pointer;
+  padding: 7px 12px; border-radius: 18px; color: var(--ink);
+}
+.toolbar button:hover { background: #ececea; }
+
+.toast {
+  position: absolute; top: 12px; right: 12px;
+  background: var(--ink); color: #fff;
+  font-size: 12px; font-weight: 600;
+  padding: 8px 12px; border-radius: 6px;
+  opacity: 0; transform: translateY(-6px);
+  transition: opacity 0.2s, transform 0.2s;
+  pointer-events: none;
+  max-width: 280px;
+}
+.toast.show { opacity: 1; transform: translateY(0); }
+.toast.err { background: var(--accent); }
+
+/* Embed-mode: page becomes a bare viewer */
+body.embed header, body.embed .sidebar, body.embed .badge, body.embed .toolbar { display: none; }
+body.embed .stage { flex: 1; }
+
+@media (max-width: 720px) {
+  .app { flex-direction: column; }
+  .sidebar { width: 100%; max-height: 44vh; }
+}
+</style>
+</head>
+<body>
+<header>
+  <h1>Model&nbsp;Viewer</h1>
+  <span class="subtitle">Drop a 3D model · orbit, light, share — in your browser</span>
+</header>
+
+<div class="app">
+  <aside class="sidebar" id="sidebar">
+    <div class="group">
+      <div class="label">Model</div>
+      <button class="btn primary" id="openBtn">Open model…</button>
+      <input type="file" id="fileInput" accept=".glb,.gltf,.obj,.stl" hidden>
+      <div class="hint" id="modelInfo">No model loaded. GLB · GLTF · OBJ · STL.</div>
+    </div>
+
+    <div class="group">
+      <div class="label">Background</div>
+      <div class="swatches" id="bgSwatches"></div>
+    </div>
+
+    <div class="group">
+      <div class="label">Lighting</div>
+      <div class="segmented" id="lightSeg">
+        <button data-light="studio" class="active">Studio</button>
+        <button data-light="sunny">Sunny</button>
+        <button data-light="soft">Soft</button>
+      </div>
+      <div class="row">
+        <label for="exposure">Exposure</label>
+        <span class="val" id="exposureVal">1.0</span>
+      </div>
+      <input type="range" id="exposure" min="0.3" max="2.5" step="0.05" value="1.0">
+    </div>
+
+    <div class="group">
+      <div class="label">Turntable</div>
+      <label class="check"><input type="checkbox" id="turntable"> Auto-rotate</label>
+      <div class="row">
+        <label for="speed">Speed</label>
+        <span class="val" id="speedVal">0.6</span>
+      </div>
+      <input type="range" id="speed" min="0" max="3" step="0.1" value="0.6">
+    </div>
+
+    <div class="group">
+      <div class="label">Display</div>
+      <label class="check"><input type="checkbox" id="grid" checked> Ground grid</label>
+      <label class="check"><input type="checkbox" id="shadow" checked> Contact shadow</label>
+      <label class="check"><input type="checkbox" id="wireframe"> Wireframe</label>
+      <button class="btn" id="frameBtn">Re-frame model</button>
+    </div>
+
+    <div class="group">
+      <div class="label">Export</div>
+      <button class="btn accent" id="shotBtn">Save screenshot (PNG)</button>
+      <div class="label" style="margin-top:4px;border:0;padding:0;">Embed snippet</div>
+      <div class="hint">Paste a public URL to your hosted model (the file isn't uploaded here), then copy the snippet for your portfolio site.</div>
+      <input type="text" id="modelUrl" placeholder="https://…/model.glb">
+      <textarea id="embedOut" readonly placeholder="Load a model + add its hosted URL to generate an &lt;iframe&gt; snippet."></textarea>
+      <button class="btn" id="copyBtn">Copy embed code</button>
+    </div>
+  </aside>
+
+  <div class="stage" id="stage">
+    <canvas id="canvas"></canvas>
+
+    <div class="badge" id="badge" hidden>
+      <span class="pill" id="triPill">—</span>
+    </div>
+
+    <div class="drop interactive" id="drop">
+      <div class="dropcard">
+        <h2>Drop a 3D model</h2>
+        <p>Drag a file anywhere here, or click <strong>Open model…</strong>. Everything runs locally — your model never leaves the browser.</p>
+        <button class="btn primary" id="dropOpenBtn">Choose a file</button>
+        <div class="formats">.glb · .gltf · .obj · .stl</div>
+      </div>
+    </div>
+
+    <div class="toolbar" id="toolbar" hidden>
+      <button id="tbFrame">Re-frame</button>
+      <button id="tbSpin">Spin</button>
+      <button id="tbShot">Screenshot</button>
+    </div>
+
+    <div class="toast" id="toast"></div>
+  </div>
+</div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "./vendor/three.module.js",
+    "three/addons/": "./vendor/addons/"
+  }
+}
+</script>
+
+<script type="module">
+import * as THREE from "three";
+import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+import { OBJLoader } from "three/addons/loaders/OBJLoader.js";
+import { STLLoader } from "three/addons/loaders/STLLoader.js";
+
+// ---- Backgrounds (value null = transparent, for cut-out PNGs) -------------
+const BGS = [
+  { id: "paper",  label: "Paper",       color: "#f5f5f3" },
+  { id: "white",  label: "White",       color: "#ffffff" },
+  { id: "grey",   label: "Studio grey", color: "#9a9a98" },
+  { id: "dark",   label: "Charcoal",    color: "#1a1a1a" },
+  { id: "ink",    label: "Black",       color: "#000000" },
+  { id: "blue",   label: "Blueprint",   color: "#16314f" },
+  { id: "none",   label: "Transparent", color: null }
+];
+
+// ---- State synced into the embed URL --------------------------------------
+const state = {
+  bg: "paper",
+  light: "studio",
+  exposure: 1.0,
+  turntable: false,
+  speed: 0.6,
+  grid: true,
+  shadow: true,
+};
+
+// ---- Three.js setup -------------------------------------------------------
+const canvas = document.getElementById("canvas");
+const stage = document.getElementById("stage");
+
+const renderer = new THREE.WebGLRenderer({
+  canvas, antialias: true, alpha: true, preserveDrawingBuffer: true
+});
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = state.exposure;
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+const scene = new THREE.Scene();
+
+const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 5000);
+camera.position.set(3, 2, 4);
+
+const controls = new OrbitControls(camera, canvas);
+controls.enableDamping = true;
+controls.dampingFactor = 0.08;
+
+const modelGroup = new THREE.Group();   // holds the loaded model
+const spinGroup = new THREE.Group();    // turntable wrapper
+spinGroup.add(modelGroup);
+scene.add(spinGroup);
+
+const lightRig = new THREE.Group();
+scene.add(lightRig);
+
+let grid = null;
+let shadowPlane = null;
+let currentModel = null;
+let wireframeOn = false;
+let modelRadius = 1;
+
+// ---- Lighting presets -----------------------------------------------------
+function applyLighting(kind) {
+  lightRig.clear();
+  if (kind === "studio") {
+    const hemi = new THREE.HemisphereLight(0xffffff, 0x444444, 1.1);
+    lightRig.add(hemi);
+    const key = dirLight(0xffffff, 2.2, [5, 8, 6], true);
+    const fill = dirLight(0xffffff, 0.7, [-6, 4, -3], false);
+    lightRig.add(key, fill);
+  } else if (kind === "sunny") {
+    lightRig.add(new THREE.AmbientLight(0xfff3e0, 0.5));
+    const sun = dirLight(0xfff1d0, 3.0, [6, 10, 4], true);
+    lightRig.add(sun);
+    lightRig.add(dirLight(0xcfe3ff, 0.6, [-5, 3, -6], false));
+  } else { // soft
+    lightRig.add(new THREE.HemisphereLight(0xffffff, 0x888888, 1.4));
+    lightRig.add(new THREE.AmbientLight(0xffffff, 0.6));
+    lightRig.add(dirLight(0xffffff, 0.9, [3, 6, 4], true));
+  }
+}
+function dirLight(color, intensity, pos, castShadow) {
+  const d = new THREE.DirectionalLight(color, intensity);
+  d.position.set(pos[0], pos[1], pos[2]);
+  if (castShadow) {
+    d.castShadow = true;
+    d.shadow.mapSize.set(2048, 2048);
+    const c = d.shadow.camera;
+    c.near = 0.1; c.far = 100;
+    c.left = c.bottom = -10; c.right = c.top = 10;
+    d.shadow.bias = -0.0004;
+  }
+  return d;
+}
+
+// ---- Background ------------------------------------------------------------
+function applyBackground(id) {
+  const bg = BGS.find(b => b.id === id) || BGS[0];
+  scene.background = bg.color ? new THREE.Color(bg.color) : null;
+}
+
+// ---- Loaders --------------------------------------------------------------
+function loadFromFile(file) {
+  const ext = file.name.split(".").pop().toLowerCase();
+  const url = URL.createObjectURL(file);
+  loadByExt(url, ext, file.name).finally(() => URL.revokeObjectURL(url));
+}
+
+async function loadByExt(url, ext, name) {
+  showToast("Loading " + (name || ext.toUpperCase()) + "…");
+  try {
+    let object;
+    if (ext === "glb" || ext === "gltf") {
+      const gltf = await new GLTFLoader().loadAsync(url);
+      object = gltf.scene;
+    } else if (ext === "obj") {
+      object = await new OBJLoader().loadAsync(url);
+      ensureMaterials(object);
+    } else if (ext === "stl") {
+      const geo = await new STLLoader().loadAsync(url);
+      geo.computeVertexNormals();
+      const mat = new THREE.MeshStandardMaterial({ color: 0xbfc4cc, metalness: 0.05, roughness: 0.75 });
+      object = new THREE.Mesh(geo, mat);
+    } else {
+      throw new Error("Unsupported format: ." + ext);
+    }
+    setModel(object, name);
+  } catch (err) {
+    console.error(err);
+    showToast("Couldn't load that file — " + (err.message || "is it a valid model?"), true);
+  }
+}
+
+function ensureMaterials(object) {
+  object.traverse(o => {
+    if (o.isMesh && (!o.material || (Array.isArray(o.material) && !o.material.length))) {
+      o.material = new THREE.MeshStandardMaterial({ color: 0xbfc4cc, metalness: 0.05, roughness: 0.75 });
+    }
+  });
+}
+
+function setModel(object, name) {
+  if (currentModel) { modelGroup.remove(currentModel); disposeTree(currentModel); }
+  currentModel = object;
+
+  let tris = 0;
+  object.traverse(o => {
+    if (o.isMesh) {
+      o.castShadow = true; o.receiveShadow = true;
+      const g = o.geometry;
+      if (g) tris += (g.index ? g.index.count : g.attributes.position.count) / 3;
+    }
+  });
+
+  modelGroup.add(object);
+  centerAndScale(object);
+  frameModel();
+  applyWireframe(wireframeOn);
+
+  document.getElementById("drop").style.display = "none";
+  document.getElementById("toolbar").hidden = false;
+  document.getElementById("badge").hidden = false;
+  document.getElementById("triPill").textContent =
+    Math.round(tris).toLocaleString() + " triangles";
+  document.getElementById("modelInfo").textContent =
+    (name || "Model") + " — " + Math.round(tris).toLocaleString() + " tris";
+  updateEmbed();
+  showToast("Loaded.");
+}
+
+// Normalise: recenter to origin and scale so the model is a friendly size.
+function centerAndScale(object) {
+  modelGroup.position.set(0, 0, 0);
+  modelGroup.scale.set(1, 1, 1);
+  object.position.set(0, 0, 0);
+
+  const box = new THREE.Box3().setFromObject(object);
+  const size = box.getSize(new THREE.Vector3());
+  const center = box.getCenter(new THREE.Vector3());
+  const maxDim = Math.max(size.x, size.y, size.z) || 1;
+  const target = 2.0; // model fits ~2 world units
+  const s = target / maxDim;
+
+  object.position.sub(center);          // center at origin
+  object.position.y += (size.y / 2);    // sit on the ground
+  modelGroup.scale.setScalar(s);
+  modelRadius = (maxDim * s) * 0.5;
+
+  layoutGroundHelpers();
+}
+
+function layoutGroundHelpers() {
+  if (grid) { scene.remove(grid); grid.geometry.dispose(); grid.material.dispose(); grid = null; }
+  if (shadowPlane) { scene.remove(shadowPlane); shadowPlane = null; }
+
+  const extent = Math.max(4, modelRadius * 6);
+  grid = new THREE.GridHelper(extent, 20, 0x999999, 0xcccccc);
+  grid.material.transparent = true; grid.material.opacity = 0.55;
+  grid.visible = state.grid;
+  scene.add(grid);
+
+  const planeMat = new THREE.ShadowMaterial({ opacity: 0.28 });
+  shadowPlane = new THREE.Mesh(new THREE.PlaneGeometry(extent, extent), planeMat);
+  shadowPlane.rotation.x = -Math.PI / 2;
+  shadowPlane.receiveShadow = true;
+  shadowPlane.visible = state.shadow;
+  scene.add(shadowPlane);
+}
+
+function frameModel() {
+  const box = new THREE.Box3().setFromObject(modelGroup);
+  if (box.isEmpty()) return;
+  const size = box.getSize(new THREE.Vector3());
+  const center = box.getCenter(new THREE.Vector3());
+  const maxDim = Math.max(size.x, size.y, size.z);
+  const fov = camera.fov * (Math.PI / 180);
+  let dist = (maxDim / 2) / Math.tan(fov / 2);
+  dist *= 1.6;
+  camera.position.set(center.x + dist * 0.7, center.y + dist * 0.5, center.z + dist * 0.9);
+  controls.target.copy(center);
+  camera.near = dist / 100;
+  camera.far = dist * 100;
+  camera.updateProjectionMatrix();
+  controls.update();
+}
+
+function applyWireframe(on) {
+  wireframeOn = on;
+  if (!currentModel) return;
+  currentModel.traverse(o => {
+    if (o.isMesh) {
+      const mats = Array.isArray(o.material) ? o.material : [o.material];
+      mats.forEach(m => { if (m) m.wireframe = on; });
+    }
+  });
+}
+
+function disposeTree(root) {
+  root.traverse(o => {
+    if (o.isMesh) {
+      o.geometry?.dispose();
+      const mats = Array.isArray(o.material) ? o.material : [o.material];
+      mats.forEach(m => m?.dispose());
+    }
+  });
+}
+
+// ---- Render loop ----------------------------------------------------------
+const clock = new THREE.Clock();
+function animate() {
+  requestAnimationFrame(animate);
+  const dt = clock.getDelta();
+  if (state.turntable) spinGroup.rotation.y += dt * state.speed;
+  controls.update();
+  renderer.render(scene, camera);
+}
+
+function resize() {
+  const w = stage.clientWidth, h = stage.clientHeight;
+  renderer.setSize(w, h, false);
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+}
+window.addEventListener("resize", resize);
+
+// ---- UI wiring ------------------------------------------------------------
+const $ = id => document.getElementById(id);
+
+// Background swatches
+const swatchWrap = $("bgSwatches");
+BGS.forEach(b => {
+  const el = document.createElement("button");
+  el.className = "swatch" + (b.color ? "" : " checker") + (b.id === state.bg ? " active" : "");
+  if (b.color) el.style.background = b.color;
+  el.title = b.label;
+  el.setAttribute("aria-label", "Background: " + b.label);
+  el.onclick = () => {
+    state.bg = b.id;
+    applyBackground(b.id);
+    [...swatchWrap.children].forEach(c => c.classList.remove("active"));
+    el.classList.add("active");
+    updateEmbed();
+  };
+  swatchWrap.appendChild(el);
+});
+
+// Lighting segmented
+$("lightSeg").querySelectorAll("button").forEach(btn => {
+  btn.onclick = () => {
+    state.light = btn.dataset.light;
+    $("lightSeg").querySelectorAll("button").forEach(b => b.classList.remove("active"));
+    btn.classList.add("active");
+    applyLighting(state.light);
+    updateEmbed();
+  };
+});
+
+$("exposure").oninput = e => {
+  state.exposure = parseFloat(e.target.value);
+  renderer.toneMappingExposure = state.exposure;
+  $("exposureVal").textContent = state.exposure.toFixed(2);
+  updateEmbed();
+};
+
+$("turntable").onchange = e => {
+  state.turntable = e.target.checked;
+  updateEmbed();
+};
+$("speed").oninput = e => {
+  state.speed = parseFloat(e.target.value);
+  $("speedVal").textContent = state.speed.toFixed(1);
+  updateEmbed();
+};
+$("grid").onchange = e => { state.grid = e.target.checked; if (grid) grid.visible = state.grid; updateEmbed(); };
+$("shadow").onchange = e => { state.shadow = e.target.checked; if (shadowPlane) shadowPlane.visible = state.shadow; updateEmbed(); };
+$("wireframe").onchange = e => applyWireframe(e.target.checked);
+$("frameBtn").onclick = frameModel;
+
+// File open
+$("openBtn").onclick = () => $("fileInput").click();
+$("dropOpenBtn").onclick = () => $("fileInput").click();
+$("fileInput").onchange = e => { if (e.target.files[0]) loadFromFile(e.target.files[0]); };
+
+// Drag & drop (whole stage)
+const drop = $("drop");
+["dragenter", "dragover"].forEach(ev =>
+  stage.addEventListener(ev, e => { e.preventDefault(); drop.classList.add("dragover"); drop.style.display = "flex"; drop.classList.add("interactive"); }));
+["dragleave", "drop"].forEach(ev =>
+  stage.addEventListener(ev, e => { e.preventDefault(); drop.classList.remove("dragover"); }));
+stage.addEventListener("drop", e => {
+  const f = e.dataTransfer.files[0];
+  if (f) loadFromFile(f);
+  else if (currentModel) drop.style.display = "none";
+});
+
+// Screenshot
+function takeShot() {
+  renderer.render(scene, camera);
+  canvas.toBlob(blob => {
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "model-view.png";
+    a.click();
+    URL.revokeObjectURL(a.href);
+  }, "image/png");
+  showToast("Screenshot saved.");
+}
+$("shotBtn").onclick = takeShot;
+$("tbShot").onclick = takeShot;
+$("tbFrame").onclick = frameModel;
+$("tbSpin").onclick = () => { $("turntable").checked = !$("turntable").checked; $("turntable").onchange({ target: $("turntable") }); };
+
+// Embed snippet
+$("modelUrl").oninput = updateEmbed;
+function buildEmbedUrl() {
+  const base = location.origin + location.pathname;
+  const modelUrl = $("modelUrl").value.trim();
+  const p = new URLSearchParams();
+  if (modelUrl) p.set("model", modelUrl);
+  p.set("bg", state.bg);
+  p.set("light", state.light);
+  p.set("exposure", state.exposure);
+  if (state.turntable) { p.set("turntable", "1"); p.set("speed", state.speed); }
+  if (!state.grid) p.set("grid", "0");
+  if (!state.shadow) p.set("shadow", "0");
+  return base + "?" + p.toString();
+}
+function updateEmbed() {
+  const modelUrl = $("modelUrl").value.trim();
+  const out = $("embedOut");
+  if (!modelUrl) {
+    out.value = currentModel
+      ? "Add the public URL of your hosted model above to generate the embed code."
+      : "Load a model + add its hosted URL to generate an <iframe> snippet.";
+    return;
+  }
+  const url = buildEmbedUrl();
+  out.value =
+`<iframe
+  src="${url}"
+  width="100%" height="520"
+  style="border:0;border-radius:12px;overflow:hidden"
+  allow="fullscreen" loading="lazy"
+  title="3D model viewer"></iframe>`;
+}
+$("copyBtn").onclick = async () => {
+  const txt = $("embedOut").value;
+  try { await navigator.clipboard.writeText(txt); showToast("Embed code copied."); }
+  catch { $("embedOut").select(); document.execCommand("copy"); showToast("Embed code copied."); }
+};
+
+// Toast
+let toastTimer;
+function showToast(msg, isErr) {
+  const t = $("toast");
+  t.textContent = msg;
+  t.className = "toast show" + (isErr ? " err" : "");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove("show"), isErr ? 4200 : 1800);
+}
+
+// ---- Boot: read URL params (embed/share mode) -----------------------------
+function boot() {
+  applyBackground(state.bg);
+  applyLighting(state.light);
+  resize();
+  animate();
+
+  const q = new URLSearchParams(location.search);
+
+  // Apply shared settings to state + UI
+  if (q.has("bg")) state.bg = q.get("bg");
+  if (q.has("light")) state.light = q.get("light");
+  if (q.has("exposure")) state.exposure = parseFloat(q.get("exposure")) || 1.0;
+  state.turntable = q.get("turntable") === "1";
+  if (q.has("speed")) state.speed = parseFloat(q.get("speed"));
+  if (q.get("grid") === "0") state.grid = false;
+  if (q.get("shadow") === "0") state.shadow = false;
+
+  // reflect into renderer + controls
+  applyBackground(state.bg);
+  applyLighting(state.light);
+  renderer.toneMappingExposure = state.exposure;
+
+  // sync visible controls
+  $("exposure").value = state.exposure; $("exposureVal").textContent = state.exposure.toFixed(2);
+  $("turntable").checked = state.turntable;
+  $("speed").value = state.speed; $("speedVal").textContent = state.speed.toFixed(1);
+  $("grid").checked = state.grid;
+  $("shadow").checked = state.shadow;
+  [...swatchWrap.children].forEach((c, i) => c.classList.toggle("active", BGS[i].id === state.bg));
+  $("lightSeg").querySelectorAll("button").forEach(b => b.classList.toggle("active", b.dataset.light === state.light));
+
+  const model = q.get("model");
+  if (model) {
+    document.body.classList.add("embed");
+    const ext = (model.split("?")[0].split(".").pop() || "glb").toLowerCase();
+    loadByExt(model, ext, model.split("/").pop());
+  }
+}
+boot();
+</script>
+</body>
+</html>

@@ -9,8 +9,10 @@
 // COMMAND_GRAMMAR below (which the agent is taught).
 // ─────────────────────────────────────────────────────────────────────────────
 
-import type { ApertureType, Axis, Bay, CommandResult, Layer, LineType, Region, SchemaMode, State, TactileKind, TactilePattern, Vec2 } from "./types";
+import type { ApertureType, Axis, Bay, CommandResult, Layer, LineType, Phase, Region, SchemaMode, State, TactileKind, TactilePattern, Vec2 } from "./types";
+import { COMPOSITE_FOCUS } from "./types";
 import { cloneState, defaultLayer, makeSeedState, newBay } from "./seed";
+import { emphasisOf, phaseFootprint, phaseViewOf, type Footprint, type PhaseView } from "./geometry";
 import { toBraille } from "./braille";
 
 const LINETYPES: LineType[] = ["solid", "dashed", "dotted", "center", "hidden"];
@@ -84,6 +86,72 @@ function pickLayer(state: State, tokens: string[], start: number): { layer?: str
   return { layer: name };
 }
 
+// ── Phase axis helpers (parallel to layers/levels) ────────────────────────────
+
+export function findPhase(state: State, id: string): Phase | undefined {
+  return state.phases.find((p) => p.id === id);
+}
+
+/** Resolve a USER-TYPED phase reference — exact id first, then case-insensitive
+ *  name (so "focus Massing" works as well as "focus massing"). Internal lookups of
+ *  stored ids (state.focus, derivedFrom) use findPhase directly. */
+function resolvePhaseRef(state: State, token: string | undefined): Phase | undefined {
+  if (!token) return undefined;
+  const byId = findPhase(state, token);
+  if (byId) return byId;
+  const low = token.toLowerCase();
+  return state.phases.find((p) => p.name.toLowerCase() === low);
+}
+
+/** Make a unique, slug-style phase id from a free-text name. */
+function slugPhaseId(state: State, name: string): string {
+  const base = name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "phase";
+  let id = base;
+  let i = 2;
+  while (state.phases.some((p) => p.id === id)) id = `${base}-${i++}`;
+  return id;
+}
+
+/** Keep `state.mode` (the console/agent/Forms lens) a faithful mirror of the
+ *  focused phase's schema. Composite focus leaves the last lens in place. */
+function mirrorMode(state: State): void {
+  const f = findPhase(state, state.focus);
+  if (f) state.mode = f.schema;
+}
+
+/** Count every piece of geometry tagged to a phase (untagged = "main"). */
+function countPhaseElements(state: State, id: string): number {
+  let n = 0;
+  for (const b of Object.values(state.bays)) if ((b.phase ?? "main") === id) n++;
+  for (const r of state.regions) if ((r.phase ?? "main") === id) n++;
+  for (const w of state.walls) if ((w.phase ?? "main") === id) n++;
+  for (const c of state.columns) if ((c.phase ?? "main") === id) n++;
+  return n;
+}
+
+/** Resolve which phase NEW geometry lands in: an explicit `phase <id>` tail wins;
+ *  otherwise the focused phase. Authoring in the composite view with no explicit
+ *  phase is refused (the element would have no home resolution). */
+function resolveCreatePhase(state: State, tokens: string[]): { phase?: string; error?: string } {
+  const idx = tokens.indexOf("phase");
+  if (idx !== -1) {
+    const ref = tokens[idx + 1];
+    if (!ref) return { error: "Usage: … phase <id>" };
+    const p = resolvePhaseRef(state, ref);
+    if (!p) return { error: `No phase "${ref}". See: phase list` };
+    return { phase: p.id };
+  }
+  if (state.focus === COMPOSITE_FOCUS)
+    return { error: "You're in the composite (whole-building) view. Focus a phase first (focus <id>), or name one: … phase <id>." };
+  return { phase: state.focus };
+}
+
+/** Serialised footprint signature (feet, 0.1 ft) — the derive-time `basis` snapshot. */
+function footprintSig(fp: Footprint): string {
+  const r = (n: number) => Math.round(n * 10) / 10;
+  return `${r(fp.minX)},${r(fp.minY)},${r(fp.maxX)},${r(fp.maxY)}`;
+}
+
 /** Split input into tokens, respecting double-quoted strings (port of the CLI). */
 export function tokenize(raw: string): string[] {
   const tokens: string[] = [];
@@ -134,9 +202,12 @@ function cmdAddBay(state: State, tokens: string[]): CommandResult {
     if (x === null || y === null) return err(state, "Usage: add bay <name> at <x> <y>");
     origin = [x, y];
   }
+  const pr = resolveCreatePhase(state, tokens);
+  if (pr.error) return err(state, pr.error);
   const next = cloneState(state);
   next.bays[name] = newBay(name, origin);
-  return ok(next, `Added bay ${name} at (${origin[0]}, ${origin[1]}), 2×2 grid, walls on.`);
+  next.bays[name].phase = pr.phase;
+  return ok(next, `Added bay ${name} at (${origin[0]}, ${origin[1]}), 2×2 grid, walls on, in phase ${findPhase(state, pr.phase!)?.name ?? pr.phase}.`);
 }
 
 function cmdRemoveBay(state: State, tokens: string[]): CommandResult {
@@ -219,8 +290,14 @@ function cmdSetBay(state: State, tokens: string[]): CommandResult {
       b.void_shape = shape === "circle" ? "circle" : "rectangle";
       return ok(next, `Bay ${name} void shape = ${b.void_shape}.`);
     }
+    case "phase": {
+      const tp = resolvePhaseRef(next, tokens[4]);
+      if (!tp) return err(state, `No phase "${tokens[4]}". See: phase list`);
+      b.phase = tp.id;
+      return ok(next, `Bay ${name} moved to phase ${tp.name}.`);
+    }
     default:
-      return err(state, `Unknown bay field "${field}". Try: origin · bays · spacing · rotation · label · void_center · void_size · void_shape`);
+      return err(state, `Unknown bay field "${field}". Try: origin · bays · spacing · rotation · label · void_center · void_size · void_shape · phase`);
   }
 }
 
@@ -388,8 +465,10 @@ function cmdWallFree(state: State, tokens: string[]): CommandResult {
     if (next.walls.some((w) => w.id === id)) return err(state, `Wall ${id} already exists.`);
     const pl = pickLayer(next, tokens, i + 4);
     if (pl.error) return err(state, pl.error);
-    next.walls.push({ id, level, a: [x1, y1], b: [x2, y2], thickness: th, layer: pl.layer ?? "Default" });
-    return ok(next, `Added wall ${id} (${x1},${y1})→(${x2},${y2}), ${th} ft thick, level ${level}, on layer ${pl.layer ?? "Default"}.`);
+    const pr = resolveCreatePhase(state, tokens);
+    if (pr.error) return err(state, pr.error);
+    next.walls.push({ id, level, a: [x1, y1], b: [x2, y2], thickness: th, layer: pl.layer ?? "Default", phase: pr.phase });
+    return ok(next, `Added wall ${id} (${x1},${y1})→(${x2},${y2}), ${th} ft thick, level ${level}, on layer ${pl.layer ?? "Default"}, in phase ${findPhase(state, pr.phase!)?.name ?? pr.phase}.`);
   }
   if (sub === "remove") {
     const id = tokens[2];
@@ -553,6 +632,12 @@ function regionSet(orig: State, next: State, r: Region, tokens: string[], kind: 
       r.layer = name;
       return ok(next, `${cap(kind)} ${id} on layer ${name}.`);
     }
+    case "phase": {
+      const tp = resolvePhaseRef(next, tokens[4]);
+      if (!tp) return err(orig, `No phase "${tokens[4]}". See: phase list`);
+      r.phase = tp.id;
+      return ok(next, `${cap(kind)} ${id} moved to phase ${tp.name}.`);
+    }
     case "level": {
       const l = num(tokens[4]);
       if (l === null) return err(orig, `Usage: ${kind} set ${id} level <n>`);
@@ -577,7 +662,7 @@ function regionSet(orig: State, next: State, r: Region, tokens: string[], kind: 
       return ok(next, t.pattern ? `${cap(kind)} ${id} tactile override = ${tactileSummary(t.pattern)}.` : `${cap(kind)} ${id} tactile override cleared (back to its layer).`);
     }
     default:
-      return err(orig, `Unknown field "${field}". Try: origin · size · ${kind === "plate" ? "thickness" : "height"} · layer · level · name · tactile`);
+      return err(orig, `Unknown field "${field}". Try: origin · size · ${kind === "plate" ? "thickness" : "height"} · layer · level · name · tactile · phase`);
   }
 }
 
@@ -603,10 +688,12 @@ function cmdPlate(state: State, tokens: string[]): CommandResult {
     const h = num(tokens[i + 3]);
     if (x === null || y === null || w === null || h === null || w <= 0 || h <= 0)
       return err(state, "Usage: floor plate add [id] <x> <y> <w> <h> [thickness <ft>] [layer <name>] [name <text>]");
-    const { opts, error } = parseOpts(tokens, i + 4, ["thickness", "layer", "name"]);
+    const { opts, error } = parseOpts(tokens, i + 4, ["thickness", "layer", "name", "phase"]);
     if (error) return err(state, error);
     const layer = opts.layer ?? "Default";
     if (!next.layers[layer]) return err(state, `No layer "${layer}". Create it first: layer add ${layer}`);
+    const pr = resolveCreatePhase(state, tokens);
+    if (pr.error) return err(state, pr.error);
     let thickness = state.tactile3d.floor_thickness;
     if (opts.thickness !== undefined) {
       const t = Number(opts.thickness);
@@ -616,8 +703,8 @@ function cmdPlate(state: State, tokens: string[]): CommandResult {
     if (!id) id = nextId(next.regions, "g");
     if (next.regions.some((r) => r.id === id)) return err(state, `Region ${id} already exists.`);
     const name = opts.name ?? `Plate ${next.regions.filter((r) => r.kind === "plate").length + 1}`;
-    next.regions.push({ id, name, kind: "plate", origin: [x, y], size: [w, h], thickness, layer, level: 0 });
-    return ok(next, `Added floor plate ${id} "${name}", ${w}×${h} ft, ${thickness} ft thick, on layer ${layer}.`);
+    next.regions.push({ id, name, kind: "plate", origin: [x, y], size: [w, h], thickness, layer, level: 0, phase: pr.phase });
+    return ok(next, `Added floor plate ${id} "${name}", ${w}×${h} ft, ${thickness} ft thick, on layer ${layer}, in phase ${findPhase(state, pr.phase!)?.name ?? pr.phase}.`);
   }
   if (sub === "remove") {
     const id = tokens[2];
@@ -658,15 +745,17 @@ function cmdBox(state: State, tokens: string[]): CommandResult {
     const height = num(tokens[i + 4]);
     if (x === null || y === null || w === null || h === null || height === null || w <= 0 || h <= 0 || height <= 0)
       return err(state, "Usage: extruded box add [id] <x> <y> <w> <h> <height> [layer <name>] [name <text>]");
-    const { opts, error } = parseOpts(tokens, i + 5, ["layer", "name"]);
+    const { opts, error } = parseOpts(tokens, i + 5, ["layer", "name", "phase"]);
     if (error) return err(state, error);
     const layer = opts.layer ?? "Default";
     if (!next.layers[layer]) return err(state, `No layer "${layer}". Create it first: layer add ${layer}`);
+    const pr = resolveCreatePhase(state, tokens);
+    if (pr.error) return err(state, pr.error);
     if (!id) id = nextId(next.regions, "g");
     if (next.regions.some((r) => r.id === id)) return err(state, `Region ${id} already exists.`);
     const name = opts.name ?? `Box ${next.regions.filter((r) => r.kind === "box").length + 1}`;
-    next.regions.push({ id, name, kind: "box", origin: [x, y], size: [w, h], height, layer, level: 0 });
-    return ok(next, `Added extruded box ${id} "${name}", ${w}×${h} ft footprint, ${height} ft tall, on layer ${layer}.`);
+    next.regions.push({ id, name, kind: "box", origin: [x, y], size: [w, h], height, layer, level: 0, phase: pr.phase });
+    return ok(next, `Added extruded box ${id} "${name}", ${w}×${h} ft footprint, ${height} ft tall, on layer ${layer}, in phase ${findPhase(state, pr.phase!)?.name ?? pr.phase}.`);
   }
   if (sub === "remove") {
     const id = tokens[2];
@@ -707,8 +796,10 @@ function cmdColumn(state: State, tokens: string[]): CommandResult {
     if (next.columns.some((c) => c.id === id)) return err(state, `Column ${id} already exists.`);
     const pl = pickLayer(next, tokens, i + 2);
     if (pl.error) return err(state, pl.error);
-    next.columns.push({ id, level: 0, at: [x, y], size, layer: pl.layer ?? "Default" });
-    return ok(next, `Added column ${id} at (${x}, ${y}), on layer ${pl.layer ?? "Default"}.`);
+    const pr = resolveCreatePhase(state, tokens);
+    if (pr.error) return err(state, pr.error);
+    next.columns.push({ id, level: 0, at: [x, y], size, layer: pl.layer ?? "Default", phase: pr.phase });
+    return ok(next, `Added column ${id} at (${x}, ${y}), on layer ${pl.layer ?? "Default"}, in phase ${findPhase(state, pr.phase!)?.name ?? pr.phase}.`);
   }
   if (sub === "remove") {
     const id = tokens[2];
@@ -784,18 +875,268 @@ function cmdLevel(state: State, tokens: string[]): CommandResult {
   return ok(next, `Added level "${name}" at z = ${z} ft.`);
 }
 
+// ── Phases: the resolution axis (focus one · compose all) ─────────────────────
+
+/** Ordered ladder + current focus, for `phase list` / `focus`. */
+function focusReadout(state: State): string {
+  const cur = state.focus === COMPOSITE_FOCUS ? "Composite (the whole building)" : findPhase(state, state.focus)?.name ?? state.focus;
+  const rows = [...state.phases]
+    .sort((a, b) => a.order - b.order)
+    .map((p) => {
+      const n = countPhaseElements(state, p.id);
+      const tag = p.id === state.focus ? "  ← focused" : p.visible === "hidden" ? "  (hidden)" : "";
+      const der = p.derivedFrom ? `, from ${findPhase(state, p.derivedFrom)?.name ?? p.derivedFrom}` : "";
+      return `  ${p.id}: ${p.name} — ${SCHEMA_LABELS[p.schema]}, ${n} element${n === 1 ? "" : "s"}${der}${tag}`;
+    });
+  return `Phases (${state.phases.length}) · focus = ${cur}:\n${rows.join("\n")}\n  composite — every shown phase together (focus composite)`;
+}
+
+/** `focus <id>` / `focus composite` — re-scope the canvas + console, never edits geometry. */
+function cmdFocus(state: State, tokens: string[]): CommandResult {
+  const id = tokens[1];
+  if (!id) return read(state, focusReadout(state));
+  if (id === "composite" || id === "all" || id === "whole") {
+    if (state.focus === COMPOSITE_FOCUS) return read(state, "Already in the composite (whole-building) view.");
+    const next = cloneState(state);
+    next.focus = COMPOSITE_FOCUS;
+    return ok(next, "Composite view — the whole building, every shown phase together. (Focus a phase to author: focus <id>.)");
+  }
+  const p = resolvePhaseRef(state, id);
+  if (!p) return err(state, `No phase "${id}". See: phase list`);
+  if (state.focus === p.id) return read(state, `Already focused on ${p.name}.`);
+  const next = cloneState(state);
+  next.focus = p.id;
+  mirrorMode(next);
+  return ok(next, `Focused ${p.name} — ${SCHEMA_HINTS[p.schema]}. New geometry lands in ${p.name}; other phases show for reference.`);
+}
+
+function phaseAdd(state: State, tokens: string[]): CommandResult {
+  // phase add <name…> [schema bays|massing|floorplan] [after <id>]
+  const rest = tokens.slice(2);
+  const kwIdx = rest.findIndex((t) => t === "schema" || t === "after");
+  const name = (kwIdx === -1 ? rest : rest.slice(0, kwIdx)).join(" ").trim();
+  if (!name) return err(state, "Usage: phase add <name> [schema bays|massing|floorplan] [after <id>]");
+  const { opts, error } = parseOpts(rest, kwIdx === -1 ? rest.length : kwIdx, ["schema", "after"]);
+  if (error) return err(state, error);
+  let schema: SchemaMode = "bays";
+  if (opts.schema !== undefined) {
+    if (opts.schema !== "bays" && opts.schema !== "massing" && opts.schema !== "floorplan") return err(state, "schema must be bays, massing or floorplan");
+    schema = opts.schema;
+  }
+  const next = cloneState(state);
+  const id = slugPhaseId(next, name);
+  let order: number;
+  if (opts.after !== undefined) {
+    const aft = findPhase(next, opts.after);
+    if (!aft) return err(state, `No phase "${opts.after}" to add after.`);
+    order = aft.order + 1;
+    for (const p of next.phases) if (p.order >= order) p.order += 1;
+  } else {
+    order = next.phases.length ? Math.max(...next.phases.map((p) => p.order)) + 1 : 0;
+  }
+  next.phases.push({ id, name, schema, order, derivedFrom: null, basis: null, visible: "auto" });
+  next.focus = id;
+  mirrorMode(next);
+  return ok(next, `Added phase "${name}" (${SCHEMA_LABELS[schema]}) and focused it — new geometry lands here.`);
+}
+
+function phaseRename(state: State, tokens: string[]): CommandResult {
+  const p = resolvePhaseRef(state, tokens[2]);
+  const name = tokens.slice(3).join(" ").trim();
+  if (!p) return err(state, `No phase "${tokens[2]}".`);
+  if (!name) return err(state, "Usage: phase rename <id> <name>");
+  const next = cloneState(state);
+  findPhase(next, p.id)!.name = name;
+  return ok(next, `Phase "${p.id}" renamed to "${name}".`);
+}
+
+function phaseVisible(state: State, tokens: string[]): CommandResult {
+  const p = resolvePhaseRef(state, tokens[2]);
+  const v = tokens[3];
+  if (!p) return err(state, `No phase "${tokens[2]}".`);
+  if (v !== "auto" && v !== "hidden") return err(state, "Usage: phase visible <id> auto|hidden");
+  const next = cloneState(state);
+  findPhase(next, p.id)!.visible = v;
+  return ok(next, `Phase "${p.name}" is now ${v === "hidden" ? "hidden (never drawn)" : "shown (auto)"}.`);
+}
+
+function phaseRemove(state: State, tokens: string[]): CommandResult {
+  const p = resolvePhaseRef(state, tokens[2]);
+  if (!p) return err(state, `No phase "${tokens[2]}".`);
+  const id = p.id;
+  if (state.phases.length <= 1) return err(state, "Can't remove the only phase — clear the model instead (clear).");
+  const had = countPhaseElements(state, id);
+  const next = cloneState(state);
+  next.bays = Object.fromEntries(Object.entries(next.bays).filter(([, b]) => (b.phase ?? "main") !== id));
+  next.regions = next.regions.filter((r) => (r.phase ?? "main") !== id);
+  next.walls = next.walls.filter((w) => (w.phase ?? "main") !== id);
+  next.columns = next.columns.filter((c) => (c.phase ?? "main") !== id);
+  next.openings = next.openings.filter((o) => next.walls.some((w) => w.id === o.wallId));
+  next.phases = next.phases.filter((q) => q.id !== id);
+  for (const q of next.phases)
+    if (q.derivedFrom === id) {
+      q.derivedFrom = null;
+      q.basis = null;
+    }
+  if (next.focus === id) {
+    next.focus = [...next.phases].sort((a, b) => a.order - b.order)[0].id;
+    mirrorMode(next);
+  }
+  return ok(next, `Removed phase "${p.name}" and its ${had} element${had === 1 ? "" : "s"}.`);
+}
+
+/** `phase derive <child> from <parent>` — a ONE-SHOT macro that seeds the child
+ *  inside the parent's footprint by expanding into ordinary, auditable primitives
+ *  (so the command log stays a complete replayable transcript). Not a live solver. */
+function phaseDerive(state: State, tokens: string[]): CommandResult {
+  const child = resolvePhaseRef(state, tokens[2]);
+  const fromKw = tokens[3];
+  if (!child) return err(state, `No phase "${tokens[2]}". Add it first: phase add <name> …`);
+  if (fromKw !== "from" || !tokens[4]) return err(state, "Usage: phase derive <child> from <parent>");
+  const parent = resolvePhaseRef(state, tokens[4]);
+  if (!parent) return err(state, `No phase "${tokens[4]}".`);
+  const childId = child.id;
+  const parentId = parent.id;
+  if (childId === parentId) return err(state, "A phase can't derive from itself.");
+  const fp = phaseFootprint(state, parentId);
+  if (!fp) return err(state, `Phase "${parent.name}" has no geometry to derive from yet.`);
+  if (countPhaseElements(state, childId) > 0)
+    return err(state, `Phase "${child.name}" already has geometry — clear it first (a re-derive would replace your edits).`);
+
+  const W = fp.maxX - fp.minX;
+  const D = fp.maxY - fp.minY;
+  const r1 = (n: number) => Math.round(n * 10) / 10;
+
+  // The seed primitives depend on the CHILD's lens (parti → detail).
+  const cmds: string[] = [];
+  if (child.schema === "bays") {
+    const nx = Math.max(1, Math.round(W / 24));
+    const ny = Math.max(1, Math.round(D / 24));
+    let bn = (child.name.replace(/[^A-Za-z0-9]/g, "") || "Grid").slice(0, 8);
+    let k = 1;
+    while (state.bays[bn]) bn = `${bn}${k++}`;
+    cmds.push(`add bay ${bn} at ${r1(fp.minX)} ${r1(fp.minY)}`);
+    cmds.push(`set bay ${bn} bays ${nx} ${ny}`);
+    cmds.push(`set bay ${bn} spacing ${r1(W / nx)} ${r1(D / ny)}`);
+    cmds.push(`wall ${bn} on`);
+  } else if (child.schema === "floorplan") {
+    cmds.push(`floor plate add ${r1(fp.minX)} ${r1(fp.minY)} ${r1(W)} ${r1(D)} name "${child.name} slab"`);
+    cmds.push(`wall add ${r1(fp.minX)} ${r1(fp.minY)} ${r1(fp.maxX)} ${r1(fp.minY)}`);
+    cmds.push(`wall add ${r1(fp.maxX)} ${r1(fp.minY)} ${r1(fp.maxX)} ${r1(fp.maxY)}`);
+    cmds.push(`wall add ${r1(fp.maxX)} ${r1(fp.maxY)} ${r1(fp.minX)} ${r1(fp.maxY)}`);
+    cmds.push(`wall add ${r1(fp.minX)} ${r1(fp.maxY)} ${r1(fp.minX)} ${r1(fp.minY)}`);
+  } else if (child.schema === "massing") {
+    cmds.push(`extruded box add ${r1(fp.minX)} ${r1(fp.minY)} ${r1(W)} ${r1(D)} 12 name "${child.name} envelope"`);
+  }
+  if (!cmds.length) return err(state, `Don't know how to derive a ${SCHEMA_LABELS[child.schema]} phase yet.`);
+
+  // Apply through applyCommand with focus on the child, so each creation stamps it.
+  let cur = cloneState(state);
+  cur.focus = childId;
+  mirrorMode(cur);
+  for (const c of cmds) {
+    const res = applyCommand(cur, c);
+    if (!res.ok) return err(state, `Derive failed at "${c}": ${res.message.replace(/^ERROR:\s*/, "")}`);
+    cur = res.state;
+  }
+  const cp = findPhase(cur, childId)!;
+  cp.derivedFrom = parentId;
+  cp.basis = footprintSig(fp);
+  cur.focus = childId;
+  mirrorMode(cur);
+  return ok(cur, `Derived ${child.name} from ${parent.name}, seeded inside its ${Math.round(W)}×${Math.round(D)} ft footprint (${cmds.length} steps). Focused ${child.name} — refine from here.`);
+}
+
+/** Descriptive footprint deltas in FEET (never a pass/fail verdict — cantilevers
+ *  and setbacks are legitimate design). Bounding-box approximation, ±tol ft. */
+function fitReport(childName: string, parentName: string, cf: Footprint, pf: Footprint, tol = 0.5): string {
+  const edges = [
+    { name: "east", d: cf.maxX - pf.maxX },
+    { name: "west", d: pf.minX - cf.minX },
+    { name: "north", d: cf.maxY - pf.maxY },
+    { name: "south", d: pf.minY - cf.minY }
+  ];
+  const head = `FIT — ${childName} vs ${parentName} (axis-aligned footprints, ±${tol} ft):`;
+  const notes = edges
+    .filter((e) => Math.abs(e.d) > tol)
+    .map((e) => {
+      const past = e.d > 0;
+      const ft = Math.abs(Math.round(e.d * 10) / 10);
+      return `${past ? "reaches" : "stops"} ${ft} ft ${past ? "past" : "short of"} ${parentName} on the ${e.name}`;
+    });
+  const body = notes.length === 0 ? `  ${childName} matches ${parentName} on all four edges.` : `  ${childName} ${notes.join("; ")}.`;
+  return `${head}\n${body}\n  (Compared as upright bounding boxes; rotated bays or an irregular lot are approximated.)`;
+}
+
+function phaseFit(state: State, tokens: string[]): CommandResult {
+  const child = resolvePhaseRef(state, tokens[2]);
+  if (!child) return err(state, `No phase "${tokens[2]}".`);
+  if (!child.derivedFrom) return err(state, `Phase "${child.name}" wasn't derived from another phase — nothing to fit it against. (phase derive ${child.id} from <parent>)`);
+  const parent = findPhase(state, child.derivedFrom);
+  if (!parent) return read(state, `Phase "${child.name}" was derived from a phase that no longer exists.`);
+  const cf = phaseFootprint(state, child.id);
+  const pf = phaseFootprint(state, child.derivedFrom);
+  if (!cf || !pf) return read(state, `Need geometry in both ${child.name} and ${parent.name} to compare footprints.`);
+  return read(state, fitReport(child.name, parent.name, cf, pf));
+}
+
+function phaseStatus(state: State, tokens: string[]): CommandResult {
+  const ref = tokens[2];
+  const targets = ref ? ([resolvePhaseRef(state, ref)].filter(Boolean) as Phase[]) : state.phases.filter((p) => p.derivedFrom);
+  if (ref && targets.length === 0) return err(state, `No phase "${ref}".`);
+  if (targets.length === 0) return read(state, "No derived phases to check — nothing has a recorded basis yet (see phase derive).");
+  const lines = targets.map((p) => {
+    if (!p.derivedFrom || !p.basis) return `  ${p.name}: not derived (no basis).`;
+    const parent = findPhase(state, p.derivedFrom);
+    if (!parent) return `  ${p.name}: derived from a phase that no longer exists.`;
+    const pfNow = phaseFootprint(state, p.derivedFrom);
+    if (!pfNow) return `  ${p.name}: ${parent.name} now has no geometry.`;
+    if (footprintSig(pfNow) === p.basis) return `  ${p.name}: in sync — ${parent.name}'s footprint is unchanged since ${p.name} was derived.`;
+    return `  ${p.name}: ${parent.name}'s footprint CHANGED since ${p.name} was derived — "phase fit ${p.id}" to hear the misfit, or "phase derive ${p.id} from ${p.derivedFrom}" to reseed.`;
+  });
+  return read(state, `DRIFT —\n${lines.join("\n")}`);
+}
+
+function cmdPhase(state: State, tokens: string[]): CommandResult {
+  const sub = tokens[1];
+  if (!sub || sub === "list") return read(state, focusReadout(state));
+  if (sub === "focus") return cmdFocus(state, ["focus", ...tokens.slice(2)]);
+  if (sub === "composite" || sub === "whole") return cmdFocus(state, ["focus", "composite"]);
+  if (sub === "add") return phaseAdd(state, tokens);
+  if (sub === "rename") return phaseRename(state, tokens);
+  if (sub === "remove" || sub === "delete") return phaseRemove(state, tokens);
+  if (sub === "visible") return phaseVisible(state, tokens);
+  if (sub === "derive") return phaseDerive(state, tokens);
+  if (sub === "fit") return phaseFit(state, tokens);
+  if (sub === "status") return phaseStatus(state, tokens);
+  return err(state, "Usage: phase list|add|focus|composite|visible|rename|remove|derive|fit|status …");
+}
+
+/** Back-compat schema verb, now expressed through phases: `schema set m` focuses an
+ *  existing phase wearing lens m, else re-lenses the focused phase. */
 function cmdSchema(state: State, tokens: string[]): CommandResult {
   const sub = tokens[1];
   if (!sub || sub === "show") {
-    return read(state, `Active schema: ${SCHEMA_LABELS[state.mode]} — ${SCHEMA_HINTS[state.mode]}. Switch with: schema set bays|massing|floorplan. (Other schemas' commands still work if you type them.)`);
+    const f = findPhase(state, state.focus);
+    const where = f ? `focused on ${f.name} (lens: ${SCHEMA_LABELS[f.schema]} — ${SCHEMA_HINTS[f.schema]})` : "in the composite (whole-building) view";
+    return read(state, `You're ${where}. "schema set bays|massing|floorplan" re-lenses the focused phase or jumps to one; "focus <phase>" moves between phases. Other lenses' commands still work if typed.`);
   }
   if (sub === "set") {
     const m = tokens[2] as SchemaMode;
     if (m !== "bays" && m !== "massing" && m !== "floorplan") return err(state, "Usage: schema set bays|massing|floorplan");
-    if (m === state.mode) return read(state, `Already in the ${SCHEMA_LABELS[m]} schema.`);
+    const existing = [...state.phases].sort((a, b) => a.order - b.order).find((p) => p.schema === m);
+    if (existing && existing.id !== state.focus) {
+      const next = cloneState(state);
+      next.focus = existing.id;
+      mirrorMode(next);
+      return ok(next, `Focused ${existing.name} — the ${SCHEMA_LABELS[m]} phase.`);
+    }
     const next = cloneState(state);
-    next.mode = m;
-    return ok(next, `Schema set to ${SCHEMA_LABELS[m]} — ${SCHEMA_HINTS[m]}.`);
+    const target = findPhase(next, next.focus) ?? [...next.phases].sort((a, b) => a.order - b.order)[0];
+    target.schema = m;
+    next.focus = target.id;
+    mirrorMode(next);
+    return ok(next, `${target.name} now uses the ${SCHEMA_LABELS[m]} lens (${SCHEMA_HINTS[m]}).`);
   }
   return err(state, "Usage: schema | schema set bays|massing|floorplan");
 }
@@ -834,7 +1175,7 @@ function regionLine(state: State, r: Region): string {
  *  Reads back the full model geometrically: site, levels, layers, structural
  *  bays, geometric regions (floor plates + extruded boxes), free walls,
  *  columns, openings. No program vocabulary. */
-export function describe(state: State, levelFilter: number | null = null): string {
+export function describe(state: State, levelFilter: number | null = null, view: PhaseView | null = null): string {
   const names = Object.keys(state.bays);
   const siteDesc = state.site.boundary
     ? `an irregular infill lot (${state.site.boundary.length}-sided, within ${state.site.width}×${state.site.height} ft)`
@@ -843,15 +1184,26 @@ export function describe(state: State, levelFilter: number | null = null): strin
   const plates = state.regions.filter((r) => r.kind === "plate");
   const boxes = state.regions.filter((r) => r.kind === "box");
   const layerNames = Object.keys(state.layers);
-
   const count = (n: number, one: string, many = one + "s") => `${n} ${n === 1 ? one : many}`;
 
-  // OVERVIEW — one plain sentence of what the whole model holds.
+  // ── Phase scope (the resolution axis) ───────────────────────────────────────
+  // emphasisOf is the SAME resolver the renderers use, so spoken + drawn agree.
+  const focused = view && view.focus !== COMPOSITE_FOCUS ? findPhase(state, view.focus) ?? null : null;
+  const composite = !focused;
+  const showDetail = (phase: string | undefined) => emphasisOf(phase ?? "main", view) === "focus";
+
+  const focusHeader = composite
+    ? `FOCUS — Composite: the whole building, every shown phase together.`
+    : `FOCUS — ${focused!.name} (${SCHEMA_HINTS[focused!.schema]})${
+        focused!.derivedFrom ? `, refining ${findPhase(state, focused!.derivedFrom)?.name ?? focused!.derivedFrom}` : ""
+      }. Other phases shown for reference.`;
+
+  // OVERVIEW — one plain sentence of the WHOLE model (every phase).
   const overview =
     `OVERVIEW — ${cap(siteDesc)}; ${count(state.levels.length, "level")}. ` +
     `Holds ${count(names.length, "structural bay")}, ${count(plates.length, "floor plate")}, ` +
     `${count(boxes.length, "extruded box", "extruded boxes")}, ${count(state.walls.length, "free wall")}, ` +
-    `${count(state.columns.length, "column")}, on ${count(layerNames.length, "layer")}.`;
+    `${count(state.columns.length, "column")}, across ${count(state.phases.length, "phase")} on ${count(layerNames.length, "layer")}.`;
 
   // LAYERS — name, linetype, lineweight, and any tactile texture.
   const layerBlock = `LAYERS — ${layerNames
@@ -862,16 +1214,36 @@ export function describe(state: State, levelFilter: number | null = null): strin
     })
     .join("; ")}.`;
 
-  // One block per level: EVERYTHING that sits on it (regions, bays, free walls,
-  // columns) in one place — no separate meso/micro tiers. Scoped when a level is active.
+  // PHASES — per-phase count + footprint + focus/reference/hidden tag. This is the
+  // one channel where the composite reads cleanly (speech doesn't occlude).
+  const phaseCounts = new Map<string, number>();
+  const bump = (p: string | undefined) => phaseCounts.set(p ?? "main", (phaseCounts.get(p ?? "main") ?? 0) + 1);
+  for (const n of names) bump(state.bays[n].phase);
+  for (const r of state.regions) bump(r.phase);
+  for (const w of state.walls) bump(w.phase);
+  for (const c of state.columns) bump(c.phase);
+  const phaseRows = [...state.phases]
+    .sort((a, b) => a.order - b.order)
+    .map((p) => {
+      const cnt = phaseCounts.get(p.id) ?? 0;
+      const e = emphasisOf(p.id, view);
+      const tag = p.id === focused?.id ? "focused" : p.visible === "hidden" ? "hidden" : e === "reference" ? "reference" : "shown";
+      const fp = phaseFootprint(state, p.id);
+      const fpTxt = fp ? `, ${Math.round(fp.maxX - fp.minX)}×${Math.round(fp.maxY - fp.minY)} ft` : "";
+      const der = p.derivedFrom ? `, from ${findPhase(state, p.derivedFrom)?.name ?? p.derivedFrom}` : "";
+      return `  • ${p.name} (${p.schema}): ${cnt} element${cnt === 1 ? "" : "s"}${fpTxt}${der} [${tag}]`;
+    });
+  const phasesBlock = `PHASES (${state.phases.length}) —\n${phaseRows.join("\n")}`;
+
+  // One block per level: only the IN-FOCUS phase's elements (composite = all).
   const oob = (lvl: number) => lvl < 0 || lvl >= state.levels.length;
   const levelBlocks = state.levels
     .map((lvl, li) => ({ lvl, li }))
     .filter(({ li }) => levelFilter === null || li === levelFilter)
     .map(({ lvl, li }) => {
       const lines: string[] = [];
-      for (const r of state.regions.filter((r) => (r.level ?? 0) === li)) lines.push(`  • ${regionLine(state, r)}`);
-      for (const n of names.filter((n) => (state.bays[n].level ?? 0) === li)) {
+      for (const r of state.regions.filter((r) => (r.level ?? 0) === li && showDetail(r.phase))) lines.push(`  • ${regionLine(state, r)}`);
+      for (const n of names.filter((n) => (state.bays[n].level ?? 0) === li && showDetail(state.bays[n].phase))) {
         const b = state.bays[n];
         const walls = b.walls.enabled ? `, ${b.walls.thickness} ft perimeter walls` : "";
         const corridor = b.corridor.enabled ? `, ${b.corridor.width}-ft ${b.corridor.axis}-corridor` : "";
@@ -879,15 +1251,21 @@ export function describe(state: State, levelFilter: number | null = null): strin
         const voids = b.void_center && b.void_size ? `, atrium ${b.void_size[0]}×${b.void_size[1]} ft` : "";
         lines.push(`  • bay ${b.label}: ${b.bays[0]}×${b.bays[1]} grid @ ${b.spacing[0]}×${b.spacing[1]} ft, origin (${b.origin[0]},${b.origin[1]})${walls}${corridor}${aps}${voids}`);
       }
-      for (const w of state.walls.filter((w) => w.level === li)) {
+      for (const w of state.walls.filter((w) => w.level === li && showDetail(w.phase))) {
         const ops = state.openings.filter((o) => o.wallId === w.id);
         const opTxt = ops.length ? `, openings: ${ops.map((o) => `${o.type} ${o.id}`).join(", ")}` : "";
         lines.push(`  • free wall ${w.id}: (${w.a[0]},${w.a[1]})→(${w.b[0]},${w.b[1]}), ${w.thickness} ft thick${opTxt}`);
       }
-      for (const c of state.columns.filter((c) => c.level === li)) lines.push(`  • column ${c.id} at (${c.at[0]},${c.at[1]}), ${c.size} ft`);
-      const body = lines.length ? lines.join("\n") : "  • (nothing on this level yet)";
+      for (const c of state.columns.filter((c) => c.level === li && showDetail(c.phase))) lines.push(`  • column ${c.id} at (${c.at[0]},${c.at[1]}), ${c.size} ft`);
+      const emptyMsg = composite ? "  • (nothing on this level yet)" : "  • (nothing from the focused phase on this level)";
+      const body = lines.length ? lines.join("\n") : emptyMsg;
       return `LEVEL ${li} — ${lvl.label} (z=${lvl.z} ft):\n${body}`;
     });
+
+  // Reconciliation — every element not shown in detail is accounted for, never silent.
+  let notShown = 0;
+  for (const [pid, cnt] of phaseCounts) if (emphasisOf(pid, view) !== "focus") notShown += cnt;
+  const notShownBlock = notShown > 0 ? ["", `NOT SHOWN IN DETAIL — ${notShown} element(s) in other phases (counted in PHASES above).`] : [];
 
   // Anything stranded on an out-of-range level still reconciles with the counts.
   const orphans = [
@@ -899,7 +1277,7 @@ export function describe(state: State, levelFilter: number | null = null): strin
 
   const scope = levelFilter === null ? [] : [`SCOPE — Level ${levelFilter} only (matches the filtered PIAF / STL export).`, ""];
 
-  return [...scope, overview, layerBlock, "", ...levelBlocks, ...orphanBlock].join("\n");
+  return [...scope, focusHeader, "", overview, layerBlock, "", phasesBlock, "", ...levelBlocks, ...notShownBlock, ...orphanBlock].join("\n");
 }
 
 // ─── Dispatcher ──────────────────────────────────────────────────────────────
@@ -922,9 +1300,13 @@ export function applyCommand(state: State, raw: string): CommandResult {
       return read(state, helpFor(state.mode));
     case "schema":
       return cmdSchema(state, tokens);
+    case "phase":
+      return cmdPhase(state, tokens);
+    case "focus":
+      return cmdFocus(state, tokens);
     case "describe":
     case "d":
-      return read(state, describe(state));
+      return read(state, describe(state, null, phaseViewOf(state, state.focus)));
     case "list":
       if (tokens[1] === "bays") return read(state, listBays(state));
       return err(state, "Usage: list bays");
@@ -1054,16 +1436,23 @@ const HELP_BLOCKS: { schemas: SchemaMode[] | "all"; text: string }[] = [
   },
   {
     schemas: "all",
-    text: `SCHEMA (the active way of thinking — scopes the command set above)
-  schema set bays|massing|floorplan     switch · schema  (show the current one)`
+    text: `PHASES (each phase = one resolution of the SAME building; focus one, or compose all)
+  phase list                             the coarse→fine ladder + which phase is focused
+  focus <id> · focus composite           work one phase alone · see the whole building
+  phase add <name> [schema bays|massing|floorplan] [after <id>]
+  phase visible <id> auto|hidden · phase rename <id> <name> · phase remove <id>
+  phase derive <child> from <parent>     seed the child inside the parent's footprint
+  phase fit <id> · phase status          hear how a derived phase fits / has drifted
+  schema set bays|massing|floorplan      re-lens the focused phase (or jump to one)`
   }
 ];
 
 /** The command help/grammar scoped to one schema (others hidden, still typeable). */
 export function helpFor(mode: SchemaMode): string {
   const head =
-    `RAP Studio — schema: ${SCHEMA_LABELS[mode]} (${SCHEMA_HINTS[mode]}). ` +
-    `These are this schema's commands; commands from other schemas still work if you type them. Switch with "schema set …".`;
+    `RAP Studio — lens: ${SCHEMA_LABELS[mode]} (${SCHEMA_HINTS[mode]}). ` +
+    `New geometry lands in the focused phase; "focus <id>" moves between phases, "focus composite" shows the whole building. ` +
+    `These are this lens's commands; commands from other lenses still work if you type them.`;
   const blocks = HELP_BLOCKS.filter((b) => b.schemas === "all" || b.schemas.includes(mode)).map((b) => b.text);
   return [head, "", ...blocks].join("\n\n");
 }
