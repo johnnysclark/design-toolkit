@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Contour Slicer</title>
+<!--
+  Contour Slicer — stack a terrain or form into horizontal contour layers, the
+  way you'd build a topographic model from chipboard or cardboard. It slices a
+  parametric form (or YOUR model, raycast top-down into a heightfield) at the
+  thickness of your sheet material and traces each level with marching squares.
+  Out comes a numbered, nested SVG cut sheet (each layer shows the NEXT one
+  scored on top, so stacking is foolproof) and a flat contour map — plus a 3D
+  stepped preview of the model you'll build.
+
+  Client-side only; three.js vendored (r160); nothing is uploaded.
+  Part of the All Means Works design toolkit (3D Tooling).
+-->
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root { --bg:#f5f5f3; --surface:#fff; --line:#e4e4e0; --ink:#111; --accent:#ff3b21; --score:#1166cc; }
+html, body { height: 100%; }
+body { font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  background: var(--bg); color: var(--ink); display: flex; flex-direction: column; overflow: hidden; }
+header { padding: 10px 18px; background: var(--surface); border-bottom: 2px solid var(--ink);
+  display: flex; align-items: baseline; gap: 14px; flex-shrink: 0; }
+header h1 { font-size: 18px; font-weight: 800; letter-spacing: -0.01em; text-transform: uppercase; }
+header .subtitle { font-size: 12px; }
+.app { display: flex; flex: 1; overflow: hidden; min-height: 0; }
+.sidebar { width: 304px; flex-shrink: 0; background: var(--surface); border-right: 1px solid var(--line);
+  overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 16px; }
+.group { display: flex; flex-direction: column; gap: 9px; }
+.group > .label { font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.06em;
+  border-bottom: 1px solid var(--line); padding-bottom: 5px; }
+.row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.row label { font-size: 13px; }
+.row .val { font-size: 12px; font-variant-numeric: tabular-nums; min-width: 64px; text-align: right; }
+input[type="range"] { width: 100%; accent-color: var(--accent); }
+input[type="number"], select { width: 100%; font: inherit; font-size: 13px; padding: 7px 8px;
+  border: 1px solid var(--line); border-radius: 6px; color: var(--ink); background: #fff; }
+.two { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.btn { font: inherit; font-size: 13px; font-weight: 700; padding: 9px 12px; border-radius: 6px;
+  border: 1px solid var(--ink); background: #fff; color: var(--ink); cursor: pointer; text-align: center; }
+.btn:hover { background: #f0f0ee; }
+.btn.accent { background: var(--accent); color: #fff; border-color: var(--accent); }
+.check { display: flex; align-items: center; gap: 8px; font-size: 13px; cursor: pointer; }
+.check input { accent-color: var(--accent); width: 15px; height: 15px; }
+.hint { font-size: 11px; line-height: 1.45; }
+.stage { position: relative; flex: 1; min-width: 0; }
+#canvas { display: block; width: 100%; height: 100%; }
+.readout { position: absolute; top: 12px; left: 12px; background: rgba(255,255,255,0.92); border: 1px solid var(--line);
+  border-radius: 8px; padding: 9px 12px; backdrop-filter: blur(4px); font-size: 12px; line-height: 1.55; max-width: 260px; }
+.readout .big { font-size: 14px; font-weight: 800; }
+.drop { position: absolute; inset: 0; display: none; align-items: center; justify-content: center;
+  background: rgba(245,245,243,0.85); border: 3px dashed var(--accent); font-weight: 800; font-size: 16px; z-index: 5; }
+.drop.on { display: flex; }
+@media (max-width: 720px) { .app { flex-direction: column; } .sidebar { width: 100%; max-height: 46vh; } }
+</style>
+</head>
+<body>
+<header>
+  <h1>Contour&nbsp;Slicer</h1>
+  <span class="subtitle">Stacked-layer topo model from a surface — laser-ready</span>
+</header>
+
+<div class="app">
+  <aside class="sidebar">
+    <div class="group">
+      <div class="label">Form</div>
+      <select id="form">
+        <option value="dome">Dome (paraboloid)</option>
+        <option value="peak">Peak (Gaussian)</option>
+        <option value="cone">Cone</option>
+        <option value="vault">Barrel vault</option>
+        <option value="saddle">Saddle (hypar)</option>
+        <option value="waves">Waves / dunes</option>
+      </select>
+      <div class="row"><label for="amp">Height</label><span class="val" id="ampV">80 mm</span></div>
+      <input type="range" id="amp" min="10" max="200" value="80">
+      <div class="two">
+        <div><div class="hint">Footprint W (mm)</div><input type="number" id="fw" value="200" min="40" max="900" step="5"></div>
+        <div><div class="hint">Depth D (mm)</div><input type="number" id="fd" value="150" min="40" max="900" step="5"></div>
+      </div>
+    </div>
+
+    <div class="group">
+      <div class="label">Layers</div>
+      <div class="row"><label for="thk">Sheet thickness</label><span class="val" id="thkV">4 mm</span></div>
+      <input type="range" id="thk" min="1" max="20" step="0.5" value="4">
+      <label class="check"><input type="checkbox" id="score" checked> Score next layer for registration</label>
+      <p class="hint">Each cut piece is the plan outline at that elevation. The blue dashed line is the layer above, scored so you know exactly where to stack it.</p>
+    </div>
+
+    <div class="group">
+      <div class="label">Your model</div>
+      <button class="btn" id="importBtn">Import STL / OBJ / PLY ↑</button>
+      <input type="file" id="file" accept=".stl,.obj,.ply" hidden>
+      <button class="btn" id="demoBtn">Back to parametric form</button>
+      <p class="hint" id="modelHint">Drop a model anywhere on the view — it's raycast top-down into a terrain and sliced.</p>
+    </div>
+
+    <div class="group">
+      <div class="label">Export</div>
+      <div class="row"><label for="sheetw">Sheet width</label><span class="val" id="sheetwV">600 mm</span></div>
+      <input type="range" id="sheetw" min="150" max="1200" step="10" value="600">
+      <div class="two">
+        <button class="btn accent" id="svgBtn">Cut sheet</button>
+        <button class="btn" id="mapBtn">Contour map</button>
+      </div>
+      <button class="btn" id="pngBtn">PNG view</button>
+      <p class="hint">Cut sheet and map are sized in real millimetres (hairline = cut, blue dashed = score). Import at 100%.</p>
+    </div>
+  </aside>
+
+  <div class="stage" id="stage">
+    <canvas id="canvas"></canvas>
+    <div class="readout" id="readout"></div>
+    <div class="drop" id="drop">Drop model to slice it</div>
+  </div>
+</div>
+
+<script type="importmap">
+{ "imports": { "three": "./vendor/three.module.js", "three/addons/": "./vendor/addons/" } }
+</script>
+
+<script type="module">
+import * as THREE from "three";
+import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+import { STLLoader } from "three/addons/loaders/STLLoader.js";
+import { OBJLoader } from "three/addons/loaders/OBJLoader.js";
+import { PLYLoader } from "three/addons/loaders/PLYLoader.js";
+
+const $ = id => document.getElementById(id);
+const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+
+const S = { form: "dome", amp: 80, W: 200, D: 150, thk: 4, score: true, sheetw: 600 };
+let layers = [];   // [{ z, loops:[[[x,z]...]] }]  loops in plan (mm)
+let hf = null;     // imported heightfield { g, nx, nz }
+
+const FORMS = {
+  dome:   (u, v) => Math.max(0, 1 - ((u - .5) * 2) ** 2 - ((v - .5) * 2) ** 2),
+  peak:   (u, v) => Math.exp(-(((u - .5) ** 2 + (v - .5) ** 2)) / (2 * 0.2 * 0.2)),
+  cone:   (u, v) => Math.max(0, 1 - 2 * Math.hypot(u - .5, v - .5)),
+  vault:  (u, v) => Math.sqrt(Math.max(0, 1 - ((u - .5) * 2) ** 2)),
+  saddle: (u, v) => clamp(0.5 + 0.5 * ((u - .5) * 2) * ((v - .5) * 2), 0, 1),
+  waves:  (u, v) => clamp(0.5 + 0.32 * (Math.sin(u * Math.PI * 3) + Math.sin(v * Math.PI * 3)) / 2 + 0.18, 0, 1)
+};
+function bilin(x, y) {
+  const { g, nx, nz } = hf;
+  const fx = clamp(x / S.W, 0, 1) * (nx - 1), fz = clamp(y / S.D, 0, 1) * (nz - 1);
+  const i0 = Math.floor(fx), j0 = Math.floor(fz), i1 = Math.min(nx - 1, i0 + 1), j1 = Math.min(nz - 1, j0 + 1);
+  const tx = fx - i0, tz = fz - j0;
+  const a = g[j0 * nx + i0], b = g[j0 * nx + i1], c = g[j1 * nx + i0], d = g[j1 * nx + i1];
+  return (a * (1 - tx) + b * tx) * (1 - tz) + (c * (1 - tx) + d * tx) * tz;
+}
+function Hf(x, y) { return hf ? bilin(x, y) : FORMS[S.form](clamp(x / S.W, 0, 1), clamp(y / S.D, 0, 1)) * S.amp; }
+
+// ── sampled grid + max height ────────────────────────────────────────────────
+const NX = 161;
+let G = null, NZ = 0, MAXH = 0, dx = 0, dz = 0;
+function sample() {
+  NZ = Math.max(20, Math.round(NX * S.D / S.W)); dx = S.W / (NX - 1); dz = S.D / (NZ - 1);
+  G = new Float32Array(NX * NZ); MAXH = 0;
+  for (let j = 0; j < NZ; j++) for (let i = 0; i < NX; i++) { const h = Hf(i * dx, j * dz); G[j * NX + i] = h; if (h > MAXH) MAXH = h; }
+}
+const gAt = (i, j) => (i < 0 || j < 0 || i >= NX || j >= NZ) ? -1e9 : G[j * NX + i];  // border sentinel → closed loops
+
+// ── marching squares at level L → array of segments [x0,z0,x1,z1] ────────────
+function marchSegments(L) {
+  const segs = [];
+  const ix = (va, vb) => (L - va) / (vb - va);   // interp fraction where the level crosses an edge
+  // iterate cells, padded by one ring (i/j from -1..NX-1) so border closes
+  for (let j = -1; j < NZ; j++) for (let i = -1; i < NX; i++) {
+    const v0 = gAt(i, j), v1 = gAt(i + 1, j), v2 = gAt(i + 1, j + 1), v3 = gAt(i, j + 1);
+    let c = 0; if (v0 >= L) c |= 1; if (v1 >= L) c |= 2; if (v2 >= L) c |= 4; if (v3 >= L) c |= 8;
+    if (c === 0 || c === 15) continue;
+    const x0 = i * dx, z0 = j * dz, x1 = (i + 1) * dx, z1 = (j + 1) * dz;
+    const eB = () => [x0 + ix(v0, v1) * dx, z0];                 // bottom edge (0→1)
+    const eR = () => [x1, z0 + ix(v1, v2) * dz];                 // right edge  (1→2)
+    const eT = () => [x0 + ix(v3, v2) * dx, z1];                 // top edge    (3→2)
+    const eL = () => [x0, z0 + ix(v0, v3) * dz];                 // left edge   (0→3)
+    const push = (p, q) => segs.push([p[0], p[1], q[0], q[1]]);
+    switch (c) {
+      case 1: push(eL(), eB()); break;                     // c0 in
+      case 2: push(eB(), eR()); break;                     // c1 in
+      case 3: push(eL(), eR()); break;                     // c0,c1 in
+      case 4: push(eR(), eT()); break;                     // c2 in
+      case 5: push(eL(), eB()); push(eR(), eT()); break;   // c0,c2 (saddle: isolate the inside corners)
+      case 6: push(eB(), eT()); break;                     // c1,c2 in
+      case 7: push(eL(), eT()); break;                     // c0,c1,c2 in (c3 out)
+      case 8: push(eT(), eL()); break;                     // c3 in
+      case 9: push(eB(), eT()); break;                     // c0,c3 in (left column)
+      case 10: push(eB(), eR()); push(eT(), eL()); break;  // c1,c3 (saddle: isolate the inside corners)
+      case 11: push(eR(), eT()); break;                    // c0,c1,c3 in (c2 out)
+      case 12: push(eL(), eR()); break;                    // c2,c3 in (top row)
+      case 13: push(eB(), eR()); break;                    // c0,c2,c3 in (c1 out)
+      case 14: push(eL(), eB()); break;                    // c1,c2,c3 in (c0 out)
+    }
+  }
+  return segs;
+}
+// stitch segments into closed loops
+function stitch(segs) {
+  const q = Math.max(S.W, S.D) / 4000;
+  const key = (x, z) => Math.round(x / q) + "," + Math.round(z / q);
+  const map = new Map();
+  segs.forEach((s, i) => { for (const e of [[s[0], s[1]], [s[2], s[3]]]) { const k = key(e[0], e[1]); (map.get(k) || map.set(k, []).get(k)).push(i); } });
+  const used = new Array(segs.length).fill(false), loops = [];
+  for (let start = 0; start < segs.length; start++) {
+    if (used[start]) continue;
+    used[start] = true;
+    const s = segs[start]; const loop = [[s[0], s[1]]]; let cx = s[2], cz = s[3];
+    const startK = key(s[0], s[1]); let closed = false;
+    for (let guard = 0; guard < segs.length + 2; guard++) {
+      loop.push([cx, cz]);
+      if (key(cx, cz) === startK) { closed = true; break; }
+      const cand = map.get(key(cx, cz)) || [];
+      let nxt = -1; for (const i of cand) if (!used[i]) { nxt = i; break; }
+      if (nxt < 0) break;
+      used[nxt] = true; const t = segs[nxt];
+      if (key(t[0], t[1]) === key(cx, cz)) { cx = t[2]; cz = t[3]; } else { cx = t[0]; cz = t[1]; }
+    }
+    if (closed && loop.length >= 4) loops.push(loop.map(p => [clamp(p[0], 0, S.W), clamp(p[1], 0, S.D)]));
+  }
+  return loops;
+}
+function signedArea(loop) { let a = 0; for (let i = 0, n = loop.length; i < n; i++) { const p = loop[i], q = loop[(i + 1) % n]; a += p[0] * q[1] - q[0] * p[1]; } return a / 2; }
+
+function slice() {
+  sample();
+  layers = [];
+  const K = Math.max(1, Math.round(MAXH / S.thk));
+  for (let k = 0; k < K; k++) {
+    const L = Math.max(1e-4, k * S.thk + S.thk * 0.001);   // bottom of layer k (>0 so base hugs footprint)
+    const loops = stitch(marchSegments(L)).filter(lp => Math.abs(signedArea(lp)) > dx * dz * 2);
+    if (loops.length) layers.push({ z: k * S.thk, loops });
+  }
+}
+
+// ── three.js stepped preview ─────────────────────────────────────────────────
+const canvas = $("canvas"), stage = $("stage");
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, preserveDrawingBuffer: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+const scene = new THREE.Scene(); scene.background = new THREE.Color("#eef1f4");
+const camera = new THREE.PerspectiveCamera(45, 1, 1, 9000);
+const controls = new OrbitControls(camera, canvas); controls.enableDamping = true; controls.maxPolarAngle = Math.PI / 2 - 0.02;
+scene.add(new THREE.HemisphereLight(0xffffff, 0x96968c, 1.05));
+const dl = new THREE.DirectionalLight(0xffffff, 1.25); dl.position.set(0.4, 1, 0.6); scene.add(dl);
+const root = new THREE.Group(); scene.add(root);
+let grid = null;
+const lerp = (a, b, t) => a + (b - a) * t;
+function topoColor(t) { // green → tan → white
+  const c1 = [0.42, 0.55, 0.34], c2 = [0.83, 0.72, 0.5], c3 = [0.96, 0.96, 0.94];
+  const m = t < .5 ? [c1, c2, t * 2] : [c2, c3, (t - .5) * 2];
+  return new THREE.Color(lerp(m[0][0], m[1][0], m[2]), lerp(m[0][1], m[1][1], m[2]), lerp(m[0][2], m[1][2], m[2]));
+}
+
+function rebuild() {
+  slice();
+  while (root.children.length) { const c = root.children.pop(); c.geometry && c.geometry.dispose(); c.material && c.material.dispose && c.material.dispose(); }
+  const K = layers.length || 1;
+  layers.forEach((ly, k) => {
+    const mat = new THREE.MeshStandardMaterial({ color: topoColor(k / K), roughness: .92, metalness: 0, side: THREE.DoubleSide, flatShading: true });
+    ly.loops.forEach(lp => {
+      if (Math.abs(signedArea(lp)) < dx * dz * 3) return;
+      const sh = new THREE.Shape(); sh.moveTo(lp[0][0], lp[0][1]); for (let i = 1; i < lp.length; i++) sh.lineTo(lp[i][0], lp[i][1]);
+      const geo = new THREE.ExtrudeGeometry(sh, { depth: S.thk, bevelEnabled: false });
+      // shape is in (x = plan X, y = plan Z); extrude +Z(local) → want world Y(up) = layer height
+      geo.rotateX(-Math.PI / 2);          // local y(planZ) → world -Z ; local z(extrude) → world Y
+      const m = new THREE.Mesh(geo, mat); m.position.y = ly.z; root.add(m);
+    });
+  });
+  root.position.set(-S.W / 2, 0, S.D / 2);  // rotateX flips Z sign; recentre
+  if (grid) scene.remove(grid);
+  const gs = Math.max(S.W, S.D) * 1.6;
+  grid = new THREE.GridHelper(gs, 24, 0xc6c9c2, 0xdadcd6); grid.material.transparent = true; grid.material.opacity = .5; scene.add(grid);
+  fitCamera(); readout();
+}
+let camFitted = false;
+function fitCamera() { if (camFitted) return; camFitted = true; const s = Math.max(S.W, S.D, MAXH); camera.position.set(s * 0.9, s * 0.85, s * 1.25); controls.target.set(0, MAXH / 3, 0); controls.update(); }
+function readout() {
+  $("readout").innerHTML = `<div class="big">${layers.length} layers</div>` +
+    `${S.thk} mm sheet · stack ${Math.round(layers.length * S.thk)} mm tall<br>` +
+    `Footprint ${Math.round(S.W)}×${Math.round(S.D)} mm · H ${Math.round(MAXH)} mm<br>` +
+    `<span style="opacity:.7">${S.score ? "next layer scored (blue)" : "no registration score"}</span>` +
+    (hf ? `<br><span style="color:var(--accent)">imported model</span>` : "");
+}
+
+// ── SVG export ───────────────────────────────────────────────────────────────
+const GAP = 6;
+function bboxOf(loops) { let x0 = 1e9, z0 = 1e9, x1 = -1e9, z1 = -1e9; for (const lp of loops) for (const p of lp) { x0 = Math.min(x0, p[0]); z0 = Math.min(z0, p[1]); x1 = Math.max(x1, p[0]); z1 = Math.max(z1, p[1]); } return { x0, z0, x1, z1, w: x1 - x0, h: z1 - z0 }; }
+function loopPath(lp, tx, tz) { let d = ""; lp.forEach((p, i) => { d += (i ? "L" : "M") + tx(p[0]).toFixed(2) + " " + tz(p[1]).toFixed(2) + " "; }); return d + "Z"; }
+
+function buildCutSheet() {
+  // each layer is a part; bbox from its own loops; score = next layer's loops in same frame
+  const partsArr = layers.map((ly, k) => ({ name: "L" + k, cut: ly.loops, score: (S.score && layers[k + 1]) ? layers[k + 1].loops : [], bb: bboxOf(ly.loops) }));
+  const sorted = partsArr.slice().sort((a, b) => b.bb.h - a.bb.h);
+  let x = GAP, y = GAP, rowH = 0; const sheetW = S.sheetw;
+  for (const p of sorted) { if (x + p.bb.w + GAP > sheetW && x > GAP) { x = GAP; y += rowH + GAP; rowH = 0; } p.ox = x; p.oy = y; x += p.bb.w + GAP; rowH = Math.max(rowH, p.bb.h); }
+  const H = y + rowH + GAP;
+  let cut = "", scr = "", lab = "";
+  for (const p of sorted) {
+    const tx = X => p.ox + (X - p.bb.x0), tz = Z => p.oy + (p.bb.z1 - Z);   // flip Z
+    for (const lp of p.cut) cut += `<path d="${loopPath(lp, tx, tz)}"/>`;
+    for (const lp of p.score) scr += `<path d="${loopPath(lp, tx, tz)}"/>`;
+    lab += `<text x="${(p.ox + 1.5).toFixed(1)}" y="${(p.oy + 4).toFixed(1)}">${p.name}</text>`;
+  }
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${sheetW}mm" height="${H.toFixed(1)}mm" viewBox="0 0 ${sheetW} ${H.toFixed(1)}">` +
+    `<rect width="${sheetW}" height="${H.toFixed(1)}" fill="#fff"/>` +
+    `<g fill="none" stroke="var(--score)" stroke-width="0.12" stroke-dasharray="1.2 1.2" style="stroke:#1166cc">${scr}</g>` +
+    `<g fill="none" stroke="#111" stroke-width="0.2">${cut}</g>` +
+    `<g fill="#111" font-family="sans-serif" font-size="3.4">${lab}</g></svg>`;
+}
+function buildMap() {
+  // all contours at true plan position (a topographic line drawing)
+  const W = S.W, D = S.D, tx = X => X, tz = Z => D - Z;
+  let paths = "", lab = "";
+  layers.forEach((ly, k) => { for (const lp of ly.loops) paths += `<path d="${loopPath(lp, tx, tz)}"/>`;
+    const bb = bboxOf(ly.loops); if (k % 2 === 0) lab += `<text x="${(bb.x0 + bb.w / 2).toFixed(1)}" y="${(D - bb.z1 + 4).toFixed(1)}" text-anchor="middle">${Math.round(ly.z)}</text>`; });
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}mm" height="${D}mm" viewBox="0 0 ${W} ${D}">` +
+    `<rect width="${W}" height="${D}" fill="#fff"/>` +
+    `<g fill="none" stroke="#111" stroke-width="0.25">${paths}</g>` +
+    `<g fill="#111" font-family="sans-serif" font-size="3">${lab}</g></svg>`;
+}
+function download(name, text, mime) { const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([text], { type: mime })); a.download = name; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1000); }
+
+// ── model import → heightfield ──────────────────────────────────────────────
+function geomsOf(obj) { const gs = []; obj.updateMatrixWorld(true); obj.traverse(o => { if (o.isMesh && o.geometry) { const g = o.geometry.clone(); g.applyMatrix4(o.matrixWorld); gs.push(g); } }); return gs; }
+async function loadFile(file) {
+  const name = file.name.toLowerCase(); $("modelHint").textContent = "Reading " + file.name + "…";
+  try {
+    let obj;
+    if (name.endsWith(".obj")) obj = new OBJLoader().parse(await file.text());
+    else if (name.endsWith(".ply")) obj = new THREE.Mesh(new PLYLoader().parse(await file.arrayBuffer()));
+    else if (name.endsWith(".stl")) obj = new THREE.Mesh(new STLLoader().parse(await file.arrayBuffer()));
+    else { $("modelHint").textContent = "Use STL, OBJ or PLY."; return; }
+    rasterise(obj); $("modelHint").textContent = file.name + " — sliced. Tweak thickness & export.";
+  } catch (err) { console.error(err); $("modelHint").textContent = "Couldn't read that file."; }
+}
+function rasterise(obj) {
+  const gs = geomsOf(obj); if (!gs.length) { $("modelHint").textContent = "No mesh found."; return; }
+  const rayMat = new THREE.MeshBasicMaterial({ side: THREE.DoubleSide });  // DoubleSide so top-down rays hit regardless of winding
+  const mesh = new THREE.Group(); gs.forEach(g => mesh.add(new THREE.Mesh(g, rayMat)));
+  const box = new THREE.Box3().setFromObject(mesh); const sz = new THREE.Vector3(); box.getSize(sz);
+  const planMax = Math.max(sz.x, sz.z) || 1, sc = 200 / planMax;
+  S.W = Math.max(40, sz.x * sc); S.D = Math.max(40, sz.z * sc); $("fw").value = Math.round(S.W); $("fd").value = Math.round(S.D);
+  const nx = 161, nz = Math.max(20, Math.round(nx * S.D / S.W)), g = new Float32Array(nx * nz);
+  const ray = new THREE.Raycaster(), down = new THREE.Vector3(0, -1, 0), topY = box.max.y + Math.max(1, sz.y);
+  for (let j = 0; j < nz; j++) for (let i = 0; i < nx; i++) {
+    const mx = box.min.x + (i / (nx - 1)) * sz.x, mz = box.min.z + (j / (nz - 1)) * sz.z;
+    ray.set(new THREE.Vector3(mx, topY, mz), down); const hits = ray.intersectObjects(mesh.children, true);
+    g[j * nx + i] = hits.length ? (hits[0].point.y - box.min.y) * sc : 0;
+  }
+  hf = { g, nx, nz }; $("form").disabled = true; $("amp").disabled = true; rebuild();
+}
+function useDemo() { hf = null; $("form").disabled = false; $("amp").disabled = false; $("modelHint").textContent = "Parametric form. Drop a model to slice your own."; rebuild(); }
+
+// ── UI ───────────────────────────────────────────────────────────────────────
+$("form").onchange = e => { S.form = e.target.value; rebuild(); };
+$("amp").oninput = e => { S.amp = +e.target.value; $("ampV").textContent = S.amp + " mm"; rebuild(); };
+$("fw").onchange = e => { S.W = clamp(+e.target.value || 200, 40, 900); rebuild(); };
+$("fd").onchange = e => { S.D = clamp(+e.target.value || 150, 40, 900); rebuild(); };
+$("thk").oninput = e => { S.thk = clamp(+e.target.value || 4, 1, 20); $("thkV").textContent = S.thk + " mm"; rebuild(); };
+$("score").onchange = e => { S.score = e.target.checked; readout(); };
+$("sheetw").oninput = e => { S.sheetw = +e.target.value; $("sheetwV").textContent = S.sheetw + " mm"; };
+$("importBtn").onclick = () => $("file").click();
+$("file").onchange = e => { if (e.target.files[0]) loadFile(e.target.files[0]); };
+$("demoBtn").onclick = useDemo;
+$("svgBtn").onclick = () => download("contours-cut.svg", buildCutSheet(), "image/svg+xml");
+$("mapBtn").onclick = () => download("contour-map.svg", buildMap(), "image/svg+xml");
+$("pngBtn").onclick = () => { renderer.render(scene, camera); canvas.toBlob(b => download("contour-model.png", b, "image/png"), "image/png"); };
+
+const drop = $("drop");
+["dragenter", "dragover"].forEach(ev => stage.addEventListener(ev, e => { e.preventDefault(); drop.classList.add("on"); }));
+["dragleave", "drop"].forEach(ev => stage.addEventListener(ev, e => { e.preventDefault(); if (ev === "drop" || e.target === drop) drop.classList.remove("on"); }));
+stage.addEventListener("drop", e => { const f = e.dataTransfer.files[0]; if (f) loadFile(f); });
+
+function resize() { const w = stage.clientWidth, h = stage.clientHeight; renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix(); }
+addEventListener("resize", resize);
+resize(); rebuild();
+(function loop() { controls.update(); renderer.render(scene, camera); requestAnimationFrame(loop); })();
+</script>
+</body>
+</html>

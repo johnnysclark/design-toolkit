@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Waffle Structure</title>
+<!--
+  Waffle Structure — turn a surface or massing into an interlocking egg-crate of
+  ribs: one set of ribs running each way, notched half-depth where they cross so
+  they slot together into a rigid lattice. The classic studio model, minus the
+  Grasshopper headache. Pick a parametric form OR drop in your own model
+  (STL/OBJ/PLY) — it's raycast into a heightfield and waffled. Out comes a
+  true-millimetre nested SVG cut sheet for the laser, plus a 3D preview built
+  from the exact same notched outlines you'll cut.
+
+  Client-side only; three.js vendored (r160); nothing is uploaded.
+  Part of the All Means Works design toolkit (3D Tooling).
+-->
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root { --bg:#f5f5f3; --surface:#fff; --line:#e4e4e0; --ink:#111; --accent:#ff3b21; }
+html, body { height: 100%; }
+body { font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  background: var(--bg); color: var(--ink); display: flex; flex-direction: column; overflow: hidden; }
+header { padding: 10px 18px; background: var(--surface); border-bottom: 2px solid var(--ink);
+  display: flex; align-items: baseline; gap: 14px; flex-shrink: 0; }
+header h1 { font-size: 18px; font-weight: 800; letter-spacing: -0.01em; text-transform: uppercase; }
+header .subtitle { font-size: 12px; }
+.app { display: flex; flex: 1; overflow: hidden; min-height: 0; }
+.sidebar { width: 304px; flex-shrink: 0; background: var(--surface); border-right: 1px solid var(--line);
+  overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 16px; }
+.group { display: flex; flex-direction: column; gap: 9px; }
+.group > .label { font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.06em;
+  border-bottom: 1px solid var(--line); padding-bottom: 5px; }
+.row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.row label { font-size: 13px; }
+.row .val { font-size: 12px; font-variant-numeric: tabular-nums; min-width: 64px; text-align: right; }
+input[type="range"] { width: 100%; accent-color: var(--accent); }
+input[type="number"], select { width: 100%; font: inherit; font-size: 13px; padding: 7px 8px;
+  border: 1px solid var(--line); border-radius: 6px; color: var(--ink); background: #fff; }
+.two { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.three { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.btn { font: inherit; font-size: 13px; font-weight: 700; padding: 9px 12px; border-radius: 6px;
+  border: 1px solid var(--ink); background: #fff; color: var(--ink); cursor: pointer; text-align: center; }
+.btn:hover { background: #f0f0ee; }
+.btn.accent { background: var(--accent); color: #fff; border-color: var(--accent); }
+.check { display: flex; align-items: center; gap: 8px; font-size: 13px; cursor: pointer; }
+.check input { accent-color: var(--accent); width: 15px; height: 15px; }
+.hint { font-size: 11px; line-height: 1.45; }
+.stage { position: relative; flex: 1; min-width: 0; }
+#canvas { display: block; width: 100%; height: 100%; }
+.readout { position: absolute; top: 12px; left: 12px; background: rgba(255,255,255,0.92); border: 1px solid var(--line);
+  border-radius: 8px; padding: 9px 12px; backdrop-filter: blur(4px); font-size: 12px; line-height: 1.55; max-width: 260px; }
+.readout .big { font-size: 14px; font-weight: 800; }
+.drop { position: absolute; inset: 0; display: none; align-items: center; justify-content: center;
+  background: rgba(245,245,243,0.85); border: 3px dashed var(--accent); font-weight: 800; font-size: 16px; z-index: 5; }
+.drop.on { display: flex; }
+@media (max-width: 720px) { .app { flex-direction: column; } .sidebar { width: 100%; max-height: 46vh; } }
+</style>
+</head>
+<body>
+<header>
+  <h1>Waffle&nbsp;Structure</h1>
+  <span class="subtitle">Interlocking ribs from a surface — laser-ready</span>
+</header>
+
+<div class="app">
+  <aside class="sidebar">
+    <div class="group">
+      <div class="label">Form</div>
+      <select id="form">
+        <option value="dome">Dome (paraboloid)</option>
+        <option value="vault">Barrel vault</option>
+        <option value="saddle">Saddle (hypar)</option>
+        <option value="waves">Waves</option>
+        <option value="cone">Cone</option>
+        <option value="peak">Peak (Gaussian)</option>
+      </select>
+      <div class="row"><label for="amp">Height</label><span class="val" id="ampV">70 mm</span></div>
+      <input type="range" id="amp" min="10" max="160" value="70">
+      <div class="two">
+        <div><div class="hint">Footprint W (mm)</div><input type="number" id="fw" value="200" min="40" max="900" step="5"></div>
+        <div><div class="hint">Depth D (mm)</div><input type="number" id="fd" value="150" min="40" max="900" step="5"></div>
+      </div>
+    </div>
+
+    <div class="group">
+      <div class="label">Ribs &amp; material</div>
+      <div class="row"><label>Ribs ↔ (across X)</label><span class="val" id="nbV">9</span></div>
+      <input type="range" id="nb" min="2" max="24" value="9">
+      <div class="row"><label>Ribs ↕ (across Y)</label><span class="val" id="naV">7</span></div>
+      <input type="range" id="na" min="2" max="24" value="7">
+      <div class="two">
+        <div><div class="hint">Thickness (mm)</div><input type="number" id="thk" value="3" min="0.5" max="12" step="0.5"></div>
+        <div><div class="hint">Kerf (mm)</div><input type="number" id="kerf" value="0.1" min="0" max="1" step="0.05"></div>
+      </div>
+      <p class="hint">Slots are cut half-depth at every crossing — one set notched from the top, the other from the bottom — so the ribs slide together. Slot width = thickness − kerf for a snug press-fit.</p>
+    </div>
+
+    <div class="group">
+      <div class="label">Your model</div>
+      <button class="btn" id="importBtn">Import STL / OBJ / PLY ↑</button>
+      <input type="file" id="file" accept=".stl,.obj,.ply" hidden>
+      <button class="btn" id="demoBtn">Back to parametric form</button>
+      <p class="hint" id="modelHint">Drop a model anywhere on the view. It's raycast top-down into a heightfield, then waffled (overhangs are flattened — a waffle is a height map).</p>
+    </div>
+
+    <div class="group">
+      <div class="label">Cut sheet &amp; export</div>
+      <div class="row"><label for="sheetw">Sheet width</label><span class="val" id="sheetwV">600 mm</span></div>
+      <input type="range" id="sheetw" min="150" max="1200" step="10" value="600">
+      <div class="two">
+        <button class="btn accent" id="svgBtn">SVG cut sheet</button>
+        <button class="btn" id="pngBtn">PNG view</button>
+      </div>
+      <p class="hint">The SVG is sized in real millimetres (hairline = cut). Import it into Illustrator / your laser software at 100%. Parts are labelled B# (↕) and A# (↔) for assembly.</p>
+    </div>
+  </aside>
+
+  <div class="stage" id="stage">
+    <canvas id="canvas"></canvas>
+    <div class="readout" id="readout"></div>
+    <div class="drop" id="drop">Drop model to waffle it</div>
+  </div>
+</div>
+
+<script type="importmap">
+{ "imports": { "three": "./vendor/three.module.js", "three/addons/": "./vendor/addons/" } }
+</script>
+
+<script type="module">
+import * as THREE from "three";
+import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+import { STLLoader } from "three/addons/loaders/STLLoader.js";
+import { OBJLoader } from "three/addons/loaders/OBJLoader.js";
+import { PLYLoader } from "three/addons/loaders/PLYLoader.js";
+
+const $ = id => document.getElementById(id);
+const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+
+// ── state ────────────────────────────────────────────────────────────────
+const S = { form: "dome", amp: 70, W: 200, D: 150, nb: 9, na: 7, thk: 3, kerf: 0.1, sheetw: 600 };
+let parts = [];           // { name, pts:[[u,v]...], w, h }  filled by rebuild()
+
+// Imported model → heightfield. When set, H(x,y) samples this instead of a form.
+let hf = null;            // { g:Float32Array, nx, nz }  height (mm) over [0,W]×[0,D]
+
+// ── height field H(x,y): mm height at plan (x in 0..W, y/Z in 0..D) ─────────
+const FORMS = {
+  // all return normalised height in [0,1] for (u,v) in [0,1]
+  dome:   (u, v) => Math.max(0, 1 - ((u - .5) * 2) ** 2 - ((v - .5) * 2) ** 2),
+  vault:  (u, v) => Math.sqrt(Math.max(0, 1 - ((u - .5) * 2) ** 2)),
+  saddle: (u, v) => clamp(0.5 + 0.5 * ((u - .5) * 2) * ((v - .5) * 2), 0, 1),
+  waves:  (u, v) => clamp(0.5 + 0.32 * (Math.sin(u * Math.PI * 3) + Math.sin(v * Math.PI * 3)) / 2 + 0.18, 0, 1),
+  cone:   (u, v) => Math.max(0, 1 - 2 * Math.hypot(u - .5, v - .5)),
+  peak:   (u, v) => Math.exp(-(((u - .5) ** 2 + (v - .5) ** 2)) / (2 * 0.2 * 0.2))
+};
+function bilin(x, y) {
+  const { g, nx, nz } = hf;
+  const fx = clamp(x / S.W, 0, 1) * (nx - 1), fz = clamp(y / S.D, 0, 1) * (nz - 1);
+  const i0 = Math.floor(fx), j0 = Math.floor(fz), i1 = Math.min(nx - 1, i0 + 1), j1 = Math.min(nz - 1, j0 + 1);
+  const tx = fx - i0, tz = fz - j0;
+  const a = g[j0 * nx + i0], b = g[j0 * nx + i1], c = g[j1 * nx + i0], d = g[j1 * nx + i1];
+  return (a * (1 - tx) + b * tx) * (1 - tz) + (c * (1 - tx) + d * tx) * tz;
+}
+function H(x, y) {
+  if (hf) return bilin(x, y);
+  return FORMS[S.form](clamp(x / S.W, 0, 1), clamp(y / S.D, 0, 1)) * S.amp;
+}
+
+// ── rib outline (in its own 2D plane: u along the span, v = height up) ───────
+// slots: array of {pos, depth}. fromTop=true → notch the top edge downward to
+// (top-depth)…top; fromTop=false → notch the bottom edge upward 0…depth.
+function ribOutline(span, topFn, slots, fromTop, sw) {
+  const STEP = Math.max(1, span / 120);
+  const top = u => Math.max(0, topFn(clamp(u, 0, span)));
+  const pts = [];
+  pts.push([0, 0]);
+  // bottom edge, left → right (with bottom slots if !fromTop)
+  if (fromTop) {
+    pts.push([span, 0]);
+  } else {
+    const ss = slots.filter(s => s.depth > 0.4).sort((a, b) => a.pos - b.pos);
+    let u = 0;
+    for (const s of ss) {
+      const l = clamp(s.pos - sw / 2, 0, span), r = clamp(s.pos + sw / 2, 0, span);
+      if (r <= l) continue;
+      if (l > u) pts.push([l, 0]);
+      pts.push([l, s.depth], [r, s.depth], [r, 0]);   // up wall, across, down wall
+      u = r;
+    }
+    if (u < span) pts.push([span, 0]);
+  }
+  // right edge up
+  pts.push([span, top(span)]);
+  // top edge, right → left (with top slots if fromTop)
+  if (fromTop) {
+    const ss = slots.filter(s => s.depth > 0.4).sort((a, b) => b.pos - a.pos);   // descending
+    let u = span;
+    for (const s of ss) {
+      const l = clamp(s.pos - sw / 2, 0, span), r = clamp(s.pos + sw / 2, 0, span);
+      if (r <= l) continue;
+      // sample the surface from u down to r
+      for (let x = u - STEP; x > r; x -= STEP) pts.push([x, top(x)]);
+      const floor = Math.max(0, top(s.pos) - s.depth);
+      pts.push([r, top(r)], [r, floor], [l, floor], [l, top(l)]);  // down wall, across, up wall
+      u = l;
+    }
+    for (let x = u - STEP; x > 0; x -= STEP) pts.push([x, top(x)]);
+    pts.push([0, top(0)]);
+  } else {
+    for (let x = span - STEP; x > 0; x -= STEP) pts.push([x, top(x)]);
+    pts.push([0, top(0)]);
+  }
+  return pts;   // Shape auto-closes back to [0,0]
+}
+
+// ── build all ribs (geometry + nestable parts) ──────────────────────────────
+function ribPositions(n, len, margin) {
+  if (n <= 1) return [len / 2];
+  const a = margin, b = len - margin, out = [];
+  for (let i = 0; i < n; i++) out.push(a + (b - a) * i / (n - 1));
+  return out;
+}
+function buildRibs() {
+  const t = S.thk, margin = Math.max(t * 1.5, Math.min(S.W, S.D) * 0.04);
+  const xs = ribPositions(S.nb, S.W, margin);   // B-ribs: const X, span Z (↕)
+  const zs = ribPositions(S.na, S.D, margin);   // A-ribs: const Z, span X (↔)
+  const minSpace = Math.min(
+    xs.length > 1 ? xs[1] - xs[0] : S.W,
+    zs.length > 1 ? zs[1] - zs[0] : S.D
+  );
+  const sw = clamp(t - S.kerf, 0.4, minSpace * 0.8);   // slot width
+  const out = { B: [], A: [], sw };
+  // B-ribs (↕): at X=xs[i], span Z, slots from TOP at each zs[j]
+  xs.forEach((x, i) => {
+    const slots = zs.map(z => ({ pos: z, depth: H(x, z) / 2 }));
+    out.B.push({ name: "B" + (i + 1), x, axis: "B", pts: ribOutline(S.D, u => H(x, u), slots, true, sw) });
+  });
+  // A-ribs (↔): at Z=zs[j], span X, slots from BOTTOM at each xs[i]
+  zs.forEach((z, j) => {
+    const slots = xs.map(x => ({ pos: x, depth: H(x, z) / 2 }));
+    out.A.push({ name: "A" + (j + 1), z, axis: "A", pts: ribOutline(S.W, u => H(u, z), slots, false, sw) });
+  });
+  return out;
+}
+
+// ── three.js scene ──────────────────────────────────────────────────────────
+const canvas = $("canvas"), stage = $("stage");
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, preserveDrawingBuffer: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+const scene = new THREE.Scene(); scene.background = new THREE.Color("#eef1f4");
+const camera = new THREE.PerspectiveCamera(45, 1, 1, 8000);
+const controls = new OrbitControls(camera, canvas); controls.enableDamping = true;
+controls.maxPolarAngle = Math.PI / 2 - 0.02;
+scene.add(new THREE.HemisphereLight(0xffffff, 0x96968c, 1.05));
+const dl = new THREE.DirectionalLight(0xffffff, 1.3); dl.position.set(0.5, 1, 0.6); scene.add(dl);
+const root = new THREE.Group(); scene.add(root);
+let grid = null;
+const matB = new THREE.MeshStandardMaterial({ color: "#d98c3f", roughness: .85, metalness: 0, side: THREE.DoubleSide, flatShading: true });
+const matA = new THREE.MeshStandardMaterial({ color: "#e7b863", roughness: .85, metalness: 0, side: THREE.DoubleSide, flatShading: true });
+
+function shapeFrom(pts) { const s = new THREE.Shape(); s.moveTo(pts[0][0], pts[0][1]); for (let i = 1; i < pts.length; i++) s.lineTo(pts[i][0], pts[i][1]); return s; }
+
+function rebuild() {
+  // clear root
+  while (root.children.length) { const c = root.children.pop(); c.geometry && c.geometry.dispose(); }
+  const R = buildRibs();
+  parts = [];
+  const t = S.thk;
+  const eX = new THREE.Vector3(1, 0, 0), eY = new THREE.Vector3(0, 1, 0), eZ = new THREE.Vector3(0, 0, 1);
+  const Brot = new THREE.Matrix4().makeBasis(eZ, eY, eX);   // local(x,y,z) → world(Z,Y,X)
+
+  for (const r of R.B) {                       // ↕ ribs, const X, face the Z-Y plane
+    const geo = new THREE.ExtrudeGeometry(shapeFrom(r.pts), { depth: t, bevelEnabled: false });
+    geo.applyMatrix4(Brot);
+    const m = new THREE.Mesh(geo, matB); m.position.set(r.x - t / 2, 0, 0); root.add(m);
+    registerPart(r);
+  }
+  for (const r of R.A) {                        // ↔ ribs, const Z, face the X-Y plane (identity)
+    const geo = new THREE.ExtrudeGeometry(shapeFrom(r.pts), { depth: t, bevelEnabled: false });
+    const m = new THREE.Mesh(geo, matA); m.position.set(0, 0, r.z - t / 2); root.add(m);
+    registerPart(r);
+  }
+  root.position.set(-S.W / 2, 0, -S.D / 2);
+
+  if (grid) scene.remove(grid);
+  const gs = Math.max(S.W, S.D) * 1.6;
+  grid = new THREE.GridHelper(gs, 24, 0xc6c9c2, 0xdadcd6); grid.material.transparent = true; grid.material.opacity = .55; scene.add(grid);
+
+  fitCamera();
+  readout(R);
+}
+function registerPart(r) {
+  let maxV = 0, maxU = 0; for (const p of r.pts) { if (p[1] > maxV) maxV = p[1]; if (p[0] > maxU) maxU = p[0]; }
+  parts.push({ name: r.name, pts: r.pts, w: maxU, h: maxV });
+}
+
+let camFitted = false;
+function fitCamera() {
+  if (camFitted) return; camFitted = true;
+  const span = Math.max(S.W, S.D, S.amp);
+  camera.position.set(span * 0.9, span * 0.8, span * 1.2);
+  controls.target.set(0, S.amp / 3, 0); controls.update();
+}
+
+function readout(R) {
+  const sheets = Math.ceil(layoutHeight() / 400) || 1;
+  $("readout").innerHTML =
+    `<div class="big">${R.B.length} ↕ × ${R.A.length} ↔ ribs</div>` +
+    `${R.B.length + R.A.length} parts · ${S.thk} mm board<br>` +
+    `Footprint ${Math.round(S.W)}×${Math.round(S.D)} mm · H ${Math.round(maxHeight())} mm<br>` +
+    `<span style="opacity:.7">slot ${R.sw.toFixed(1)} mm · sheet ${S.sheetw} mm wide</span>` +
+    (hf ? `<br><span style="color:var(--accent)">imported model</span>` : "");
+}
+function maxHeight() { let m = 0; for (let j = 0; j <= 20; j++) for (let i = 0; i <= 20; i++) { const h = H(i / 20 * S.W, j / 20 * S.D); if (h > m) m = h; } return m; }
+
+// ── SVG nesting / cut sheet ─────────────────────────────────────────────────
+const GAP = 6;
+function layout() {
+  const sheetW = S.sheetw, placed = [];
+  const list = parts.slice().sort((a, b) => b.h - a.h);
+  let x = GAP, y = GAP, rowH = 0;
+  for (const p of list) {
+    if (x + p.w + GAP > sheetW && x > GAP) { x = GAP; y += rowH + GAP; rowH = 0; }
+    placed.push({ ...p, ox: x, oy: y }); x += p.w + GAP; rowH = Math.max(rowH, p.h);
+  }
+  return { placed, w: sheetW, h: y + rowH + GAP };
+}
+function layoutHeight() { return layout().h; }
+function svgPath(p) {
+  // flip v (up) → SVG y-down within the part's cell of height p.h
+  let d = "";
+  p.pts.forEach((pt, i) => { d += (i ? "L" : "M") + (p.ox + pt[0]).toFixed(2) + " " + (p.oy + p.h - pt[1]).toFixed(2) + " "; });
+  return d + "Z";
+}
+function buildSVG() {
+  const L = layout();
+  let s = `<svg xmlns="http://www.w3.org/2000/svg" width="${L.w}mm" height="${L.h.toFixed(1)}mm" viewBox="0 0 ${L.w} ${L.h.toFixed(1)}">`;
+  s += `<rect x="0" y="0" width="${L.w}" height="${L.h.toFixed(1)}" fill="#fff"/>`;
+  s += `<g fill="none" stroke="#111" stroke-width="0.2">`;
+  for (const p of L.placed) s += `<path d="${svgPath(p)}"/>`;
+  s += `</g><g fill="#111" font-family="sans-serif" font-size="3.4">`;
+  for (const p of L.placed) s += `<text x="${(p.ox + 1.5).toFixed(1)}" y="${(p.oy + p.h - 1.5).toFixed(1)}">${p.name}</text>`;
+  s += `</g></svg>`;
+  return s;
+}
+function download(name, text, mime) {
+  const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([text], { type: mime }));
+  a.download = name; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+}
+
+// ── model import → heightfield ──────────────────────────────────────────────
+function geomsOf(obj) {
+  const gs = []; obj.updateMatrixWorld(true);
+  obj.traverse(o => { if (o.isMesh && o.geometry) { const g = o.geometry.clone(); g.applyMatrix4(o.matrixWorld); gs.push(g); } });
+  return gs;
+}
+async function loadFile(file) {
+  const name = file.name.toLowerCase(); $("modelHint").textContent = "Reading " + file.name + "…";
+  try {
+    let obj;
+    if (name.endsWith(".obj")) { obj = new OBJLoader().parse(await file.text()); }
+    else if (name.endsWith(".ply")) { const g = new PLYLoader().parse(await file.arrayBuffer()); obj = new THREE.Mesh(g); }
+    else if (name.endsWith(".stl")) { const g = new STLLoader().parse(await file.arrayBuffer()); obj = new THREE.Mesh(g); }
+    else { $("modelHint").textContent = "Use STL, OBJ or PLY."; return; }
+    rasterise(obj);
+    $("modelHint").textContent = file.name + " — waffled. Tweak ribs & export.";
+  } catch (err) { console.error(err); $("modelHint").textContent = "Couldn't read that file."; }
+}
+function rasterise(obj) {
+  const gs = geomsOf(obj); if (!gs.length) { $("modelHint").textContent = "No mesh found."; return; }
+  const rayMat = new THREE.MeshBasicMaterial({ side: THREE.DoubleSide });  // DoubleSide so top-down rays hit regardless of winding
+  const mesh = new THREE.Group(); gs.forEach(g => mesh.add(new THREE.Mesh(g, rayMat)));
+  const box = new THREE.Box3().setFromObject(mesh); const sz = new THREE.Vector3(); box.getSize(sz);
+  const planMax = Math.max(sz.x, sz.z) || 1, target = 200, sc = target / planMax;
+  S.W = Math.max(40, sz.x * sc); S.D = Math.max(40, sz.z * sc);
+  $("fw").value = Math.round(S.W); $("fd").value = Math.round(S.D);
+  const nx = 161, nz = Math.max(20, Math.round(nx * S.D / S.W)), g = new Float32Array(nx * nz);
+  const ray = new THREE.Raycaster(); const down = new THREE.Vector3(0, -1, 0); const top = box.max.y + Math.max(1, sz.y);
+  for (let j = 0; j < nz; j++) for (let i = 0; i < nx; i++) {
+    const mx = box.min.x + (i / (nx - 1)) * sz.x, mz = box.min.z + (j / (nz - 1)) * sz.z;
+    ray.set(new THREE.Vector3(mx, top, mz), down);
+    const hits = ray.intersectObjects(mesh.children, true);
+    g[j * nx + i] = hits.length ? (hits[0].point.y - box.min.y) * sc : 0;
+  }
+  hf = { g, nx, nz };
+  $("form").disabled = true; $("amp").disabled = true;
+  rebuild();
+}
+function useDemo() { hf = null; $("form").disabled = false; $("amp").disabled = false; $("modelHint").textContent = "Parametric form. Drop a model to waffle your own."; rebuild(); }
+
+// ── UI wiring ────────────────────────────────────────────────────────────────
+$("form").onchange = e => { S.form = e.target.value; rebuild(); };
+$("amp").oninput = e => { S.amp = +e.target.value; $("ampV").textContent = S.amp + " mm"; rebuild(); };
+$("fw").onchange = e => { S.W = clamp(+e.target.value || 200, 40, 900); rebuild(); };
+$("fd").onchange = e => { S.D = clamp(+e.target.value || 150, 40, 900); rebuild(); };
+$("nb").oninput = e => { S.nb = +e.target.value; $("nbV").textContent = S.nb; rebuild(); };
+$("na").oninput = e => { S.na = +e.target.value; $("naV").textContent = S.na; rebuild(); };
+$("thk").onchange = e => { S.thk = clamp(+e.target.value || 3, 0.5, 12); rebuild(); };
+$("kerf").onchange = e => { S.kerf = clamp(+e.target.value || 0, 0, 1); rebuild(); };
+$("sheetw").oninput = e => { S.sheetw = +e.target.value; $("sheetwV").textContent = S.sheetw + " mm"; readout(buildRibs()); };
+$("importBtn").onclick = () => $("file").click();
+$("file").onchange = e => { if (e.target.files[0]) loadFile(e.target.files[0]); };
+$("demoBtn").onclick = useDemo;
+$("svgBtn").onclick = () => download("waffle.svg", buildSVG(), "image/svg+xml");
+$("pngBtn").onclick = () => { renderer.render(scene, camera); canvas.toBlob(b => download("waffle.png", b, "image/png"), "image/png"); };
+
+// drag & drop
+const drop = $("drop");
+["dragenter", "dragover"].forEach(ev => stage.addEventListener(ev, e => { e.preventDefault(); drop.classList.add("on"); }));
+["dragleave", "drop"].forEach(ev => stage.addEventListener(ev, e => { e.preventDefault(); if (ev === "drop" || e.target === drop) drop.classList.remove("on"); }));
+stage.addEventListener("drop", e => { const f = e.dataTransfer.files[0]; if (f) loadFile(f); });
+
+function resize() { const w = stage.clientWidth, h = stage.clientHeight; renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix(); }
+addEventListener("resize", resize);
+resize(); rebuild();
+(function loop() { controls.update(); renderer.render(scene, camera); requestAnimationFrame(loop); })();
+</script>
+</body>
+</html>
