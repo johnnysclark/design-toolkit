@@ -16,8 +16,15 @@
 > test script. Verified: full `npm test` green (parity worst Δ≈6e-14 unchanged); **headless-Chrome
 > smoke (WebGL) PASS** — optimizer runs to a feasible front, scatter + parallel-coordinates render,
 > knee auto-suggested, spawn→series + custom-force authoring work, **0 console exceptions**. Plan:
-> `~/.claude/plans/virtual-napping-dragonfly.md`. NEXT: human review → merge to `main`
-> (Vercel auto-deploys; surfaces at `/site-design`, V3 pill).
+> `~/.claude/plans/virtual-napping-dragonfly.md`. **MERGED + LIVE** at `/site-design` → V3 pill
+> (default stays V2). Two follow-ups also merged+live: **#57** restored V2-style manual geometry
+> editing (MAKE sliders + aperture editor + site sliders on force cards) that the optimizer-only
+> build had dropped; **#58** moved geometry front-and-center (center two-tab **Shape the geometry /
+> Pareto front**, default geometry) and reorganized into 3 labelled zones + numbered optimizer steps
+> for clarity. Full handoff for the next agent → **`gable-studio/HANDOFF-v3-optimizer.md`** (architecture,
+> invariants, gaps, next steps). Top next step: wire **radiation objectives via a Web Worker** (the
+> `evaluate()` seam is ready). Note the inherited gable-geometry bug (`HANDOFF-fix-gable-geometry.md`)
+> affects V3's metrics too (tube vs gable).
 >
 > **Vantage — interactive camera / lens / perspective demo (2026-06-26, branch `tool/vantage`,
 > worktree `design-toolkit-vantage`, NOT merged).** A new client-only tool under the **2D Tooling**
