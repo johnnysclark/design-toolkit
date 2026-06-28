@@ -1,4 +1,25 @@
 <!-- ───────────────────────────── CURRENT STATE (top) ───────────────────────────── -->
+> **Dither Camera — live-camera dither / halftone (GRIT) (2026-06-27, branch
+> `tool/dither-camera`, worktree `design-toolkit-dither`, MERGED + LIVE).** A new client-only tool
+> under the **2D Tooling** hub at `/media-2d/dither-camera` — John's own **GRIT (Grayscale Rendering
+> & Ink Toolkit)** app from the Radical Accessibility Toolkit (`tools/webcam-dither/browser/photo.html`),
+> **vendored verbatim** (2018 lines, self-contained bar an on-demand depth-model import) into
+> `public/tools/dither-camera/index.html` and embedded via `EmbeddedTool` (iframe). A live phone/webcam
+> → dither/halftone tool for PIAF tactile printing + zines: 10 algorithms (Floyd-Steinberg, Atkinson,
+> Bayer, angled halftone, dots, lines…), CMYK colour screening, Sobel edge overlay, posterise,
+> gamma/invert, optional **AI depth map** (Depth-Anything-V2, ~40 MB on first use); freeze a frame →
+> high-contrast PNG; front/back camera. **Reusable infra:** `EmbeddedTool` gained an optional **`allow`**
+> prop (threaded to `FullscreenFrame`'s iframe `allow=`) — camera tools must pass
+> `allow="camera; fullscreen; …"` or Permissions-Policy blocks `getUserMedia` (also needs a secure
+> context — fine on prod https / localhost). New files: `public/tools/dither-camera/index.html` +
+> `app/(app)/media-2d/dither-camera/page.tsx`; edits: `media-2d/page.tsx` card (live), `lib/page-width.ts`
+> ROUTE_TIERS full-width line, `EmbeddedTool.tsx` allow prop. **`toolkit-nav.ts` untouched** (the
+> `/media-2d` hub is already live). Verified: `build:toolkit` green (route 1.44 kB); **headless-Chrome
+> smoke** confirmed wrapper + iframe load, `allow="camera"` present, secure context + `getUserMedia`
+> available, 10 algorithms, and the dither pipeline renders correct halftone output (via GRIT's own
+> `loadImage()` — the headless fake camera doesn't deliver frames, but that's John's proven on-device
+> code). Pushed to `main` → Vercel deploying.
+>
 > **Halftone & Riso — image → halftone / duotone / CMYK spot-colour separation (2026-06-27,
 > branch `tool/halftone-riso`, worktree `design-toolkit-halftone`, MERGED + LIVE).** A new
 > client-only tool under the **2D Tooling** hub at `/media-2d/halftone-riso` — built as a *native*
