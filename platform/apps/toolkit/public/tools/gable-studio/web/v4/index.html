@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Eco-Architect V4 — Goals</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Archivo+Black&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="./v4.css" />
+  <!-- Zero-build: three.js is the SAME vendored copy v1/v2/v3 use (../vendor);
+       core.js + viewport.js + v2/units.js are reused unchanged (zero parity cost). -->
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "../vendor/three.module.js",
+      "three/addons/": "../vendor/addons/"
+    }
+  }
+  </script>
+</head>
+<body>
+  <header class="v4top">
+    <div class="v4brand">Design → goals</div>
+    <p class="v4tag">Shape the building on the left, watch the goals on the right fill in and turn green as you meet them. Not sure what number to chase? Ask the force brainstormer at the bottom.</p>
+    <div class="v4view-ctl">
+      <button id="modeBtn" class="v4btn" type="button">☀ Analysis</button>
+      <label class="v4sel">overlay
+        <select id="overlay">
+          <option value="solarYear">Sun · yearly</option>
+          <option value="solarNow">Sun · now</option>
+          <option value="wind">Wind · windward</option>
+        </select>
+      </label>
+      <label class="v4slider-inline">sun <input id="sunHour" type="range" min="5" max="19" step="0.25" value="12" /></label>
+    </div>
+  </header>
+
+  <main class="v4main">
+    <!-- LEFT — shape the kit of parts -->
+    <section class="v4controls" id="controls" aria-label="Design controls">
+      <div class="v4panelhead">Shape the design <span class="v4hint">feet &amp; inches</span></div>
+      <div id="control-body"></div>
+    </section>
+
+    <!-- CENTER — the building -->
+    <section class="v4stage">
+      <canvas id="view"></canvas>
+      <div class="v4warn" id="geo-warning" role="alert"></div>
+    </section>
+
+    <!-- RIGHT — the live goals dashboard (the star) -->
+    <aside class="v4goals" aria-label="Goals">
+      <div class="v4goalshead">
+        <span class="v4goalstitle">Goals</span>
+        <span class="v4goalscount" id="goal-count">—</span>
+      </div>
+      <div class="v4goalsbar" id="goal-tally" aria-hidden="true"></div>
+      <div id="goal-list" class="v4goallist"></div>
+      <div class="v4addgoal" id="add-goal"></div>
+    </aside>
+  </main>
+
+  <!-- BOTTOM — the force brainstormer -->
+  <section class="v4chat" id="brainstorm" aria-label="Force brainstormer">
+    <div class="v4chathead">
+      <span class="v4chattitle">✶ Force brainstormer</span>
+      <span class="v4chatsub">Turn a feeling into a number — describe what you want and I'll suggest testable goals.</span>
+      <button id="chat-clear" class="v4btn ghost" type="button">Clear</button>
+    </div>
+    <div class="v4thread" id="thread">
+      <div class="v4msg bot">
+        <div class="v4bubble">Tell me what you want this building to <em>do</em> — in plain words. e.g. <button class="v4chip seed" type="button">“bright in winter, not baking in summer”</button> <button class="v4chip seed" type="button">“sheltered from the wind”</button> <button class="v4chip seed" type="button">“feels open to the view”</button>. I'll turn it into goals you can add on the right and test live.</div>
+      </div>
+    </div>
+    <form class="v4composer" id="composer">
+      <input id="chat-input" type="text" autocomplete="off" placeholder="Describe a quality you want (e.g. cozy and well-daylit)…" />
+      <button class="v4btn solid" type="submit" id="chat-send">Brainstorm</button>
+    </form>
+  </section>
+
+  <script type="module" src="./app4.js"></script>
+</body>
+</html>
