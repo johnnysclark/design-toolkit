@@ -1,4 +1,21 @@
 <!-- ───────────────────────────── CURRENT STATE (top) ───────────────────────────── -->
+> **Halftone & Riso — image → halftone / duotone / CMYK spot-colour separation (2026-06-27,
+> branch `tool/halftone-riso`, worktree `design-toolkit-halftone`, MERGED + LIVE).** A new
+> client-only tool under the **2D Tooling** hub at `/media-2d/halftone-riso` — built as a *native*
+> React tool (the Drawing Cleaner pattern, NOT the `EmbeddedTool` iframe): `page.tsx` +
+> `HalftoneRiso.tsx` + a pure `engine.ts`. No API key / auth / cost; nothing uploaded. Separates an
+> image into **Mono / Duotone / Tritone / CMYK** ink-coverage maps, screens each plate as an AM
+> halftone (6 dot shapes, per-plate **screen angle**, **dot gain**, integral-image cell sampling) and
+> over-prints with **multiply** onto a paper colour, with **grain** and per-plate **mis-registration /
+> jitter**. Real RISO ink palette + **9 presets** (default Riso 2-Tone). Exports: full-res composite
+> **PNG**, per-ink **plate masters** (black-on-transparent, for an actual Risograph), and vector
+> **SVG** dots (mix-blend-multiply groups). Files: `app/(app)/media-2d/halftone-riso/{engine.ts,
+> HalftoneRiso.tsx,page.tsx}`; existing-file edits: the `media-2d/page.tsx` card (`proposed → live`)
+> + one `lib/page-width.ts` ROUTE_TIERS line (full-width, like Drawing Cleaner). **`toolkit-nav.ts`
+> untouched** (the `/media-2d` hub is already live). Verified: `engine.ts` Node-tested (**22 cases**,
+> separation/tone/angle/SVG), `build:toolkit` green, and **headless-Chrome smoke PASS** across
+> duotone / CMYK / split-before-after — **0 console errors**. Pushed to `main` → Vercel deploying.
+>
 > **Eco-Architect V3 — NSGA-II optimizer + extensible site forces (2026-06-27, branch
 > `feat/eco-architect-v3`, worktree `design-toolkit-eco-v3`, NOT merged).** A third version of the
 > Site Design tool (Gable Studio), added as a **V3 pill** in `web/shell.html` (default stays V2).
