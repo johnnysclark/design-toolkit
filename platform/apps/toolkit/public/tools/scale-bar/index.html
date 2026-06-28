@@ -89,8 +89,8 @@ input[type="color"] { width: 36px; height: 28px; border: 1px solid var(--line); 
 
     <div class="group">
       <div class="label">Bar</div>
-      <div class="row"><label>Units / cell</label><span class="val" id="perV"></span></div>
-      <input type="range" id="per" min="1" max="100" value="5">
+      <div class="row"><label>Units / cell (<span id="perUnit">ft</span>)</label></div>
+      <input type="number" id="per" min="0" step="any" value="5">
       <div class="row"><label>Cells</label><span class="val" id="ndivV">4</span></div>
       <input type="range" id="ndiv" min="1" max="24" value="4">
       <label class="check"><input type="checkbox" id="leadOn" checked> Sub-divided lead cell</label>
@@ -193,13 +193,36 @@ const $ = id => document.getElementById(id);
 const SVGNS = "http://www.w3.org/2000/svg";
 const PXMM = 3.7795275591;   // CSS px per mm at 96dpi → 100% zoom shows true paper size on screen
 
-// Scale tables. ratio = real / drawn. Metric: the number itself. Imperial: precomputed.
-const METRIC = [10,20,50,100,200,250,500,1000,1250,2500].map(r => ({ label: "1 : " + r, ratio: r }));
+// Scale tables. ratio = real/drawn. Each preset also carries sensible defaults
+// (per = units per cell, ndiv = cells, sub = lead sub-cells) so picking a scale
+// yields a believable bar: round numbers and ~80–150 mm drawn length.
+const METRIC = [
+  { r: 10,   per: 0.2, ndiv: 5, sub: 10 },   // 0–1 m
+  { r: 20,   per: 0.5, ndiv: 4, sub: 10 },   // 0–2 m
+  { r: 50,   per: 1,   ndiv: 5, sub: 10 },   // 0–5 m
+  { r: 100,  per: 2,   ndiv: 5, sub: 10 },   // 0–10 m
+  { r: 200,  per: 5,   ndiv: 4, sub: 10 },   // 0–20 m
+  { r: 250,  per: 5,   ndiv: 5, sub: 5  },   // 0–25 m
+  { r: 500,  per: 10,  ndiv: 5, sub: 10 },   // 0–50 m
+  { r: 1000, per: 20,  ndiv: 5, sub: 10 },   // 0–100 m
+  { r: 1250, per: 20,  ndiv: 5, sub: 10 },   // 0–100 m
+  { r: 2500, per: 50,  ndiv: 5, sub: 10 },   // 0–250 m
+].map(o => ({ label: "1 : " + o.r, ratio: o.r, per: o.per, ndiv: o.ndiv, sub: o.sub }));
 const IMPERIAL = [
-  ['3" = 1\'-0"', 12/3], ['1½" = 1\'-0"', 12/1.5], ['1" = 1\'-0"', 12], ['¾" = 1\'-0"', 12/0.75],
-  ['½" = 1\'-0"', 24], ['¼" = 1\'-0"', 48], ['⅛" = 1\'-0"', 96], ['1" = 10\'', 120],
-  ['1" = 20\'', 240], ['1" = 30\'', 360], ['1" = 40\'', 480], ['1" = 50\'', 600], ['1" = 100\'', 1200]
-].map(([label, ratio]) => ({ label, ratio }));
+  { label: '3" = 1\'-0"',  ratio: 12/3,    per: 1,   ndiv: 2, sub: 12 },  // 0–2 ft, lead foot in inches
+  { label: '1½" = 1\'-0"', ratio: 12/1.5,  per: 1,   ndiv: 3, sub: 12 },  // 0–3 ft
+  { label: '1" = 1\'-0"',  ratio: 12,      per: 1,   ndiv: 4, sub: 12 },  // 0–4 ft
+  { label: '¾" = 1\'-0"',  ratio: 12/0.75, per: 1,   ndiv: 5, sub: 12 },  // 0–5 ft
+  { label: '½" = 1\'-0"',  ratio: 24,      per: 2,   ndiv: 5, sub: 10 },  // 0–10 ft
+  { label: '¼" = 1\'-0"',  ratio: 48,      per: 5,   ndiv: 4, sub: 10 },  // 0–20 ft
+  { label: '⅛" = 1\'-0"',  ratio: 96,      per: 10,  ndiv: 4, sub: 10 },  // 0–40 ft
+  { label: '1" = 10\'',    ratio: 120,     per: 10,  ndiv: 5, sub: 10 },  // 0–50 ft
+  { label: '1" = 20\'',    ratio: 240,     per: 20,  ndiv: 5, sub: 10 },  // 0–100 ft
+  { label: '1" = 30\'',    ratio: 360,     per: 30,  ndiv: 5, sub: 10 },  // 0–150 ft
+  { label: '1" = 40\'',    ratio: 480,     per: 40,  ndiv: 5, sub: 10 },  // 0–200 ft
+  { label: '1" = 50\'',    ratio: 600,     per: 50,  ndiv: 5, sub: 10 },  // 0–250 ft
+  { label: '1" = 100\'',   ratio: 1200,    per: 100, ndiv: 5, sub: 10 },  // 0–500 ft
+];
 
 const FONTS = {
   sans:  "Helvetica, Arial, sans-serif",
@@ -445,15 +468,25 @@ function setEveryLabel() { $("everyV").textContent = S.labelEvery === 1 ? "every
 function setLeadEnabled() { const on = S.leadOn; $("sub").classList.toggle("muted-disabled", !on); $("labelLead").parentElement.classList.toggle("muted-disabled", !on); }
 function segPick(group, key, val) { $(group).querySelectorAll("button").forEach(x => x.classList.toggle("on", x.dataset[key] === val)); }
 
+// Load a scale's sensible defaults (per/cells/sub-cells) so the numbering reads
+// like a real scale. Called whenever the scale or unit system changes.
+function applyScalePreset() {
+  const p = table()[S.scaleIdx];
+  S.per = p.per; S.ndiv = p.ndiv; S.sub = p.sub; S.leadOn = true;
+  $("per").value = niceNum(p.per); $("perUnit").textContent = unit();
+  $("ndiv").value = p.ndiv; $("ndivV").textContent = p.ndiv;
+  $("sub").value = p.sub; $("subV").textContent = p.sub;
+  $("leadOn").checked = true; setLeadEnabled();
+}
 $("sys").querySelectorAll("button").forEach(btn => {
   btn.onclick = () => { S.sys = btn.dataset.s; segPick("sys", "s", S.sys);
-    S.scaleIdx = S.sys === "metric" ? 3 : 5; S.per = 5; $("per").value = S.per;
+    S.scaleIdx = S.sys === "metric" ? 3 : 5;
     S.pins = []; renderPins(); $("pinUnit").textContent = unit();
     S.zoomMode = "smart";
-    fillScaleSelect(); $("perV").textContent = S.per + " " + unit(); setRatioHint(); render(); };
+    fillScaleSelect(); applyScalePreset(); setRatioHint(); render(); };
 });
-$("scale").onchange = e => { S.scaleIdx = +e.target.value; S.zoomMode = "smart"; setRatioHint(); render(); };
-$("per").oninput = e => { S.per = +e.target.value; $("perV").textContent = S.per + " " + unit(); setRatioHint(); render(); };
+$("scale").onchange = e => { S.scaleIdx = +e.target.value; applyScalePreset(); S.zoomMode = "smart"; setRatioHint(); render(); };
+$("per").oninput = e => { const v = parseFloat(e.target.value); if (isFinite(v) && v > 0) { S.per = v; setRatioHint(); render(); } };
 $("ndiv").oninput = e => { S.ndiv = +e.target.value; $("ndivV").textContent = S.ndiv; render(); };
 $("leadOn").onchange = e => { S.leadOn = e.target.checked; setLeadEnabled(); render(); };
 $("sub").oninput = e => { S.sub = +e.target.value; $("subV").textContent = S.sub; render(); };
@@ -478,11 +511,11 @@ addEventListener("resize", () => render());
 
 // init
 fillScaleSelect();
-$("perV").textContent = S.per + " " + unit();
+applyScalePreset();
 $("hV").textContent = niceNum(S.h) + " mm";
 $("pinUnit").textContent = unit();
 $("barStyle").value = S.barStyle; $("styleHint").textContent = STYLE_HINTS[S.barStyle];
-setRatioHint(); setEveryLabel(); setLeadEnabled(); renderPins();
+setRatioHint(); setEveryLabel(); renderPins();
 render();
 </script>
 </body>
