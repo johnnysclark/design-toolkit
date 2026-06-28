@@ -8,6 +8,7 @@
     "serve": "python3 -m http.server 8000",
     "parity": "node test/parity.mjs && python3 test/parity_check.py",
     "sensitivity": "node test/sensitivity.mjs",
-    "test": "node test/parity.mjs && python3 test/parity_check.py && node test/sensitivity.mjs && node test/occlusion.mjs && node test/rad_ref.mjs && python3 test/parity_rad.py"
+    "test:v3": "node web/v3/test_nsga2.mjs && node web/v3/test_genome.mjs && node web/v3/test_objectives.mjs && node web/v3/test_optimize_integration.mjs && node web/v3/test_forces_extra.mjs && node web/v3/test_spawn.mjs && node web/v3/test_authoring.mjs",
+    "test": "node test/parity.mjs && python3 test/parity_check.py && node test/sensitivity.mjs && node test/occlusion.mjs && node test/rad_ref.mjs && python3 test/parity_rad.py && npm run test:v3"
   }
 }
