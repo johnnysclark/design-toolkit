@@ -1,0 +1,541 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sun &amp; Shadow Study</title>
+<!--
+  Sun & Shadow Study — pick a place (latitude / longitude) and a date + time and
+  see where the sun is and how shadows fall across a massing. Real solar geometry
+  (NOAA solar-position algorithm), real cast shadows (three.js shadow map), a sun-
+  path arc for the day, and a one-click day animation. Client-side only — three.js
+  is vendored (r160); nothing is uploaded.
+
+  Part of the All Means Works design toolkit (3D Tooling).
+-->
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root { --bg:#f5f5f3; --surface:#fff; --line:#e4e4e0; --ink:#111; --accent:#ff3b21; }
+html, body { height: 100%; }
+body {
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  background: var(--bg); color: var(--ink); display: flex; flex-direction: column; overflow: hidden;
+}
+header {
+  padding: 10px 18px; background: var(--surface); border-bottom: 2px solid var(--ink);
+  display: flex; align-items: baseline; gap: 14px; flex-shrink: 0;
+}
+header h1 { font-size: 18px; font-weight: 800; letter-spacing: -0.01em; text-transform: uppercase; }
+header .subtitle { font-size: 12px; }
+.app { display: flex; flex: 1; overflow: hidden; min-height: 0; }
+.sidebar {
+  width: 300px; flex-shrink: 0; background: var(--surface); border-right: 1px solid var(--line);
+  overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 16px;
+}
+.group { display: flex; flex-direction: column; gap: 9px; }
+.group > .label {
+  font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.06em;
+  border-bottom: 1px solid var(--line); padding-bottom: 5px;
+}
+.row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.row label { font-size: 13px; }
+.row .val { font-size: 12px; font-variant-numeric: tabular-nums; min-width: 64px; text-align: right; }
+input[type="range"] { width: 100%; accent-color: var(--accent); }
+input[type="number"], select {
+  width: 100%; font: inherit; font-size: 13px; padding: 7px 8px;
+  border: 1px solid var(--line); border-radius: 6px; color: var(--ink); background: #fff;
+}
+.two { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.seg { display: flex; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
+.seg button { flex: 1; font: inherit; font-size: 12px; font-weight: 600; padding: 7px 4px;
+  background: #fff; border: 0; border-right: 1px solid var(--line); cursor: pointer; color: var(--ink); }
+.seg button:last-child { border-right: 0; }
+.seg button.on { background: var(--ink); color: #fff; }
+.btn { font: inherit; font-size: 13px; font-weight: 700; padding: 9px 12px; border-radius: 6px;
+  border: 1px solid var(--ink); background: #fff; color: var(--ink); cursor: pointer; text-align: center; }
+.btn:hover { background: #f0f0ee; }
+.btn.accent { background: var(--accent); color: #fff; border-color: var(--accent); }
+.btn.accent:hover { filter: brightness(0.92); }
+.check { display: flex; align-items: center; gap: 8px; font-size: 13px; cursor: pointer; }
+.check input { accent-color: var(--accent); width: 15px; height: 15px; }
+.hint { font-size: 11px; line-height: 1.45; }
+.stage { position: relative; flex: 1; min-width: 0; }
+#canvas { display: block; width: 100%; height: 100%; }
+.readout {
+  position: absolute; top: 12px; left: 12px; background: rgba(255,255,255,0.92);
+  border: 1px solid var(--line); border-radius: 8px; padding: 9px 12px; backdrop-filter: blur(4px);
+  font-size: 12px; line-height: 1.55; min-width: 190px;
+}
+.readout b { font-weight: 800; }
+.readout .big { font-size: 14px; font-weight: 800; }
+.readout .night { color: var(--accent); font-weight: 700; }
+.places { display: flex; flex-wrap: wrap; gap: 6px; }
+.places button { font: inherit; font-size: 11px; font-weight: 600; padding: 5px 9px; border-radius: 14px;
+  border: 1px solid var(--line); background: #fff; cursor: pointer; color: var(--ink); }
+.places button:hover { border-color: var(--ink); }
+@media (max-width: 720px) { .app { flex-direction: column; } .sidebar { width: 100%; max-height: 46vh; } }
+</style>
+</head>
+<body>
+<header>
+  <h1>Sun&nbsp;&amp;&nbsp;Shadow&nbsp;Study</h1>
+  <span class="subtitle">Where the sun is &amp; how shadows fall — any place, any date</span>
+</header>
+
+<div class="app">
+  <aside class="sidebar">
+    <div class="group">
+      <div class="label">Place</div>
+      <div class="places" id="places"></div>
+      <div class="two">
+        <div><div class="hint">Latitude</div><input type="number" id="lat" value="40" step="0.5" min="-89" max="89"></div>
+        <div><div class="hint">Longitude</div><input type="number" id="lon" value="-88" step="0.5" min="-180" max="180"></div>
+      </div>
+      <div><div class="hint">UTC offset (hours)</div><input type="number" id="tz" value="-6" step="0.5" min="-12" max="14"></div>
+    </div>
+
+    <div class="group">
+      <div class="label">Date</div>
+      <div class="row"><label for="month" id="dateLbl">Jun 21</label></div>
+      <div class="hint">Month</div>
+      <input type="range" id="month" min="1" max="12" value="6">
+      <div class="hint">Day</div>
+      <input type="range" id="day" min="1" max="31" value="21">
+      <div class="seg" id="solstices">
+        <button data-d="3-20">Mar eq</button>
+        <button data-d="6-21" class="on">Jun sol</button>
+        <button data-d="9-22">Sep eq</button>
+        <button data-d="12-21">Dec sol</button>
+      </div>
+    </div>
+
+    <div class="group">
+      <div class="label">Time of day</div>
+      <div class="row"><label>Local time</label><span class="val" id="timeVal">12:00</span></div>
+      <input type="range" id="time" min="0" max="1439" value="720">
+      <button class="btn" id="animBtn">▶ Animate the day</button>
+    </div>
+
+    <div class="group">
+      <div class="label">Massing</div>
+      <div class="two">
+        <button class="btn" id="importBtn">Import model</button>
+        <button class="btn" id="demoBtn" disabled>Demo</button>
+      </div>
+      <input type="file" id="file" accept=".stl,.obj,.ply,.3dm" hidden>
+      <div class="seg" id="massing">
+        <button data-m="tower" class="on">Tower</button>
+        <button data-m="court">Courtyard</button>
+        <button data-m="campus">Campus</button>
+      </div>
+      <div class="row"><label for="height">Main height</label><span class="val" id="heightVal">30 m</span></div>
+      <input type="range" id="height" min="6" max="80" value="30">
+      <div class="hint" id="modelInfo">Built-in massings, or import your own — STL / OBJ / PLY / 3DM (drop a file on the view too). Nothing is uploaded.</div>
+      <label class="check"><input type="checkbox" id="sunpath" checked> Sun-path arc</label>
+      <label class="check"><input type="checkbox" id="grid" checked> Ground grid</label>
+    </div>
+
+    <div class="group">
+      <div class="label">Export</div>
+      <button class="btn accent" id="shot">Save screenshot (PNG)</button>
+      <p class="hint">Real solar geometry (NOAA algorithm) + real cast shadows. North is the dark arrow on the ground. Drag to orbit, scroll to zoom.</p>
+    </div>
+  </aside>
+
+  <div class="stage" id="stage">
+    <canvas id="canvas"></canvas>
+    <div class="readout" id="readout"></div>
+  </div>
+</div>
+
+<script type="importmap">
+{ "imports": { "three": "./vendor/three.module.js", "three/addons/": "./vendor/addons/" } }
+</script>
+
+<script type="module">
+import * as THREE from "three";
+import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+
+const $ = id => document.getElementById(id);
+const D2R = Math.PI / 180, R2D = 180 / Math.PI;
+const mod = (a, n) => ((a % n) + n) % n;
+
+// ── NOAA solar position: local civil time → {altitude, azimuth} ──────────────
+// lat/lon in degrees (lon east-positive), tz hours east of UTC, localHours 0..24.
+function solar(lat, lon, tz, year, month, day, localHours) {
+  const utcMs = Date.UTC(year, month - 1, day) + (localHours - tz) * 3600 * 1000;
+  const JD = utcMs / 86400000 + 2440587.5;
+  const T = (JD - 2451545.0) / 36525.0;
+  const L0 = mod(280.46646 + T * (36000.76983 + T * 0.0003032), 360);
+  const M = 357.52911 + T * (35999.05029 - 0.0001537 * T);
+  const e = 0.016708634 - T * (0.000042037 + 0.0000001267 * T);
+  const Mr = M * D2R;
+  const C = Math.sin(Mr) * (1.914602 - T * (0.004817 + 0.000014 * T))
+          + Math.sin(2 * Mr) * (0.019993 - 0.000101 * T)
+          + Math.sin(3 * Mr) * 0.000289;
+  const trueLong = L0 + C;
+  const omega = 125.04 - 1934.136 * T;
+  const appLong = trueLong - 0.00569 - 0.00478 * Math.sin(omega * D2R);
+  const e0 = 23 + (26 + (21.448 - T * (46.815 + T * (0.00059 - T * 0.001813))) / 60) / 60;
+  const obliq = e0 + 0.00256 * Math.cos(omega * D2R);
+  const declR = Math.asin(Math.sin(obliq * D2R) * Math.sin(appLong * D2R));
+  const y = Math.tan(obliq / 2 * D2R) ** 2;
+  const eqTime = 4 * R2D * (
+      y * Math.sin(2 * L0 * D2R) - 2 * e * Math.sin(Mr)
+    + 4 * e * y * Math.sin(Mr) * Math.cos(2 * L0 * D2R)
+    - 0.5 * y * y * Math.sin(4 * L0 * D2R) - 1.25 * e * e * Math.sin(2 * Mr));
+  const tst = mod(localHours * 60 + eqTime + 4 * lon - 60 * tz, 1440);
+  let ha = tst / 4 - 180; if (ha < -180) ha += 360;
+  const latR = lat * D2R, haR = ha * D2R;
+  let cosZ = Math.sin(latR) * Math.sin(declR) + Math.cos(latR) * Math.cos(declR) * Math.cos(haR);
+  cosZ = Math.min(1, Math.max(-1, cosZ));
+  const zen = Math.acos(cosZ);
+  const altitude = 90 - zen * R2D;
+  let az;
+  const denom = Math.cos(latR) * Math.sin(zen);
+  if (Math.abs(denom) > 1e-9) {
+    let c = (Math.sin(latR) * Math.cos(zen) - Math.sin(declR)) / denom;
+    c = Math.min(1, Math.max(-1, c));
+    az = Math.acos(c) * R2D;
+    az = ha > 0 ? mod(az + 180, 360) : mod(540 - az, 360);
+  } else az = altitude > 0 ? 180 : 0;
+  return { altitude, azimuth: az };
+}
+
+// Scene convention: +Y up, +X = East, -Z = North. Sun direction (toward the sun).
+function sunDir(altitude, azimuth) {
+  const a = altitude * D2R, z = azimuth * D2R;
+  return new THREE.Vector3(Math.sin(z) * Math.cos(a), Math.sin(a), -Math.cos(z) * Math.cos(a));
+}
+
+// Sunrise / sunset by scanning the day (minute steps) for altitude zero-crossings.
+function sunEvents(lat, lon, tz, y, m, d) {
+  let rise = null, set = null, prev = solar(lat, lon, tz, y, m, d, 0).altitude;
+  for (let min = 10; min <= 1440; min += 10) {
+    const alt = solar(lat, lon, tz, y, m, d, min / 60).altitude;
+    if (prev < 0 && alt >= 0 && rise === null) rise = min / 60;
+    if (prev >= 0 && alt < 0 && set === null && rise !== null) set = min / 60;
+    prev = alt;
+  }
+  return { rise, set };
+}
+const hhmm = h => h == null ? "—" : String(Math.floor(h)).padStart(2, "0") + ":" + String(Math.round((h % 1) * 60)).padStart(2, "0");
+
+// ── three.js scene ───────────────────────────────────────────────────────
+const canvas = $("canvas"), stage = $("stage");
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, preserveDrawingBuffer: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color("#cfe3f2");
+
+const camera = new THREE.PerspectiveCamera(45, 1, 0.5, 4000);
+camera.position.set(120, 95, 150);
+const controls = new OrbitControls(camera, canvas);
+controls.enableDamping = true; controls.target.set(0, 12, 0);
+controls.maxPolarAngle = Math.PI / 2 - 0.02; // stay above ground
+
+// ground (receives shadows)
+const ground = new THREE.Mesh(
+  new THREE.CircleGeometry(400, 64),
+  new THREE.MeshStandardMaterial({ color: "#cfd2cc", roughness: 1 }));
+ground.rotation.x = -Math.PI / 2; ground.receiveShadow = true; scene.add(ground);
+
+let grid = new THREE.GridHelper(400, 40, 0xb9bcb5, 0xd2d4ce);
+grid.material.transparent = true; grid.material.opacity = 0.6; scene.add(grid);
+
+// compass: a dark north arrow + labels
+const compass = new THREE.Group(); scene.add(compass);
+{
+  const mat = new THREE.MeshBasicMaterial({ color: 0x111111 });
+  const shaft = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.1, 60), mat);
+  shaft.position.set(0, 0.06, -30); compass.add(shaft);
+  const head = new THREE.Mesh(new THREE.ConeGeometry(4, 9, 4), mat);
+  head.position.set(0, 0.06, -62); head.rotation.x = -Math.PI / 2; compass.add(head);
+}
+function label(text, x, z, color = "#111") {
+  const c = document.createElement("canvas"); c.width = c.height = 128;
+  const g = c.getContext("2d"); g.fillStyle = color; g.font = "bold 90px sans-serif";
+  g.textAlign = "center"; g.textBaseline = "middle"; g.fillText(text, 64, 70);
+  const tex = new THREE.CanvasTexture(c);
+  const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true }));
+  sp.position.set(x, 6, z); sp.scale.set(14, 14, 1); scene.add(sp);
+}
+label("N", 0, -78); label("S", 0, 78); label("E", 78, 0); label("W", -78, 0);
+
+// lights
+const sun = new THREE.DirectionalLight(0xfff4e0, 3.0);
+sun.castShadow = true;
+sun.shadow.mapSize.set(2048, 2048);
+{
+  const c = sun.shadow.camera; c.near = 1; c.far = 900;
+  c.left = c.bottom = -160; c.right = c.top = 160; c.updateProjectionMatrix();
+}
+scene.add(sun); scene.add(sun.target);
+const hemi = new THREE.HemisphereLight(0xbfd8ff, 0x6b6b60, 0.9); scene.add(hemi);
+const ambient = new THREE.AmbientLight(0xffffff, 0.25); scene.add(ambient);
+
+// sun marker + day-path arc
+const sunMarker = new THREE.Mesh(new THREE.SphereGeometry(4, 16, 16),
+  new THREE.MeshBasicMaterial({ color: 0xffcc33 })); scene.add(sunMarker);
+let pathLine = null;
+const ARC_R = 200;
+
+// massing
+const massGroup = new THREE.Group(); scene.add(massGroup);
+const faceMat = () => new THREE.MeshStandardMaterial({ color: "#eceae5", roughness: 0.9, metalness: 0 });
+function box(w, h, d, x, z) {
+  const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), faceMat());
+  m.position.set(x, h / 2, z); m.castShadow = true; m.receiveShadow = true;
+  const edges = new THREE.LineSegments(new THREE.EdgesGeometry(m.geometry),
+    new THREE.LineBasicMaterial({ color: 0x44443f })); m.add(edges);
+  return m;
+}
+function buildMassing(kind, mainH) {
+  massGroup.clear();
+  if (kind === "tower") {
+    massGroup.add(box(26, mainH, 26, 0, 0));
+    massGroup.add(box(40, 10, 18, -8, 40));
+    massGroup.add(box(16, 16, 16, 42, -10));
+  } else if (kind === "court") {
+    const t = 14, L = 70, h = mainH * 0.6;
+    massGroup.add(box(L, h, t, 0, -(L - t) / 2));
+    massGroup.add(box(L, h, t, 0, (L - t) / 2));
+    massGroup.add(box(t, h, L - 2 * t, -(L - t) / 2, 0));
+    massGroup.add(box(t, mainH, L - 2 * t, (L - t) / 2, 0));
+  } else { // campus
+    massGroup.add(box(50, mainH * 0.55, 22, -40, -20));
+    massGroup.add(box(24, mainH, 24, 20, 10));
+    massGroup.add(box(34, mainH * 0.4, 34, 30, -45));
+    massGroup.add(box(18, mainH * 0.7, 44, -45, 45));
+  }
+}
+
+// ── import a 3D model as the massing ─────────────────────────────────────────
+function collectGeoms(root) {
+  root.updateMatrixWorld(true);
+  const out = [];
+  root.traverse((c) => {
+    const mesh = c;
+    if (!mesh.isMesh || !mesh.geometry) return;
+    const base = mesh.geometry;
+    const pos = base.getAttribute("position");
+    if (!pos || pos.count === 0) return;
+    const bake = (world) => {
+      const g = base.clone(); g.applyMatrix4(world);
+      if (!g.getAttribute("normal")) g.computeVertexNormals();
+      out.push(g);
+    };
+    if (mesh.isInstancedMesh && mesh.getMatrixAt && mesh.count) {
+      const m = mesh.matrixWorld.clone();
+      for (let i = 0; i < mesh.count; i++) { mesh.getMatrixAt(i, m); bake(mesh.matrixWorld.clone().multiply(m)); }
+    } else bake(mesh.matrixWorld);
+  });
+  return out;
+}
+async function parseModel(file) {
+  const name = file.name.toLowerCase();
+  if (name.endsWith(".obj")) {
+    const { OBJLoader } = await import("three/addons/loaders/OBJLoader.js");
+    return collectGeoms(new OBJLoader().parse(await file.text()));
+  }
+  if (name.endsWith(".3dm")) {
+    const buf3dm = await file.arrayBuffer();
+    const { Rhino3dmLoader } = await import("three/addons/loaders/3DMLoader.js");
+    const loader = new Rhino3dmLoader(); loader.setLibraryPath("/vendor/rhino3dm/");
+    const obj = await new Promise((res, rej) => loader.parse(buf3dm, res, rej));
+    obj.rotation.x = -Math.PI / 2; // Rhino Z-up → three Y-up
+    const out = collectGeoms(obj); loader.dispose?.(); return out;
+  }
+  const buf = await file.arrayBuffer();
+  if (name.endsWith(".ply")) {
+    const { PLYLoader } = await import("three/addons/loaders/PLYLoader.js");
+    const g = new PLYLoader().parse(buf);
+    if (!g.getAttribute("normal")) g.computeVertexNormals();
+    const p = g.getAttribute("position"); return p && p.count ? [g] : [];
+  }
+  const { STLLoader } = await import("three/addons/loaders/STLLoader.js");
+  const g = new STLLoader().parse(buf);
+  if (!g.getAttribute("normal")) g.computeVertexNormals();
+  const p = g.getAttribute("position"); return p && p.count ? [g] : [];
+}
+// Center the model on the ground (min-Y = 0), scaled so its footprint ≈ FIT metres.
+const FIT = 60;
+function useImported(geos, label) {
+  massGroup.clear();
+  const group = new THREE.Group();
+  for (const g of geos) {
+    const mesh = new THREE.Mesh(g, faceMat());
+    mesh.castShadow = true; mesh.receiveShadow = true;
+    mesh.add(new THREE.LineSegments(new THREE.EdgesGeometry(g, 30),
+      new THREE.LineBasicMaterial({ color: 0x44443f })));
+    group.add(mesh);
+  }
+  const box = new THREE.Box3().setFromObject(group);
+  const size = new THREE.Vector3(); box.getSize(size);
+  const center = new THREE.Vector3(); box.getCenter(center);
+  const footprint = Math.max(size.x, size.z) || 1;
+  const s = FIT / footprint;
+  group.scale.setScalar(s);
+  group.position.set(-center.x * s, -box.min.y * s, -center.z * s); // sit on ground, centred
+  massGroup.add(group);
+  state.imported = true;
+  $("demoBtn").disabled = false; $("height").disabled = true;
+  $("massing").querySelectorAll("button").forEach(b => b.classList.remove("on"));
+  $("modelInfo").textContent = `${label} — ${Math.round(size.x)}×${Math.round(size.z)}×${Math.round(size.y)} (model units), shown ~${FIT} m wide.`;
+}
+async function loadFile(file) {
+  if (!/\.(stl|obj|ply|3dm)$/i.test(file.name)) { $("modelInfo").textContent = "Use STL, OBJ, PLY or 3DM."; return; }
+  $("modelInfo").textContent = "Loading " + file.name + "…";
+  try {
+    const geos = await parseModel(file);
+    if (!geos.length) { $("modelInfo").textContent = /\.3dm$/i.test(file.name)
+      ? "No render meshes in that .3dm — shade the Rhino view before saving." : "No geometry found."; return; }
+    useImported(geos, file.name);
+  } catch (e) { $("modelInfo").textContent = "Couldn't load that file: " + (e.message || e); }
+}
+
+// ── state + update ─────────────────────────────────────────────────────────
+const state = { lat: 40, lon: -88, tz: -6, month: 6, day: 21, time: 720, massing: "tower", height: 30, imported: false, showPath: true, showGrid: true };
+const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+const DAYS = [31,29,31,30,31,30,31,30,31,30,31,31];
+const YEAR = 2025;
+
+function buildPath() {
+  if (pathLine) { scene.remove(pathLine); pathLine.geometry.dispose(); pathLine = null; }
+  if (!state.showPath) return;
+  const pts = [];
+  for (let min = 0; min <= 1440; min += 8) {
+    const { altitude, azimuth } = solar(state.lat, state.lon, state.tz, YEAR, state.month, state.day, min / 60);
+    if (altitude < 0) continue;
+    pts.push(sunDir(altitude, azimuth).multiplyScalar(ARC_R));
+  }
+  if (pts.length < 2) return;
+  pathLine = new THREE.Line(
+    new THREE.BufferGeometry().setFromPoints(pts),
+    new THREE.LineBasicMaterial({ color: 0xe6a200 }));
+  scene.add(pathLine);
+}
+
+function update() {
+  const h = state.time / 60;
+  const { altitude, azimuth } = solar(state.lat, state.lon, state.tz, YEAR, state.month, state.day, h);
+  const up = altitude > 0;
+  const dir = sunDir(Math.max(altitude, -2), azimuth);
+  sun.position.copy(dir).multiplyScalar(300);
+  sun.target.position.set(0, 0, 0);
+  sun.intensity = up ? 3.0 : 0.0;
+  hemi.intensity = up ? 0.9 : 0.25;
+  ambient.intensity = up ? 0.25 : 0.18;
+  scene.background.set(up ? "#cfe3f2" : "#20242c");
+  sunMarker.position.copy(dir).multiplyScalar(ARC_R);
+  sunMarker.visible = up;
+
+  const ev = sunEvents(state.lat, state.lon, state.tz, YEAR, state.month, state.day);
+  $("readout").innerHTML =
+    `<div class="big">${MONTHS[state.month - 1]} ${state.day} · ${hhmm(h)}</div>` +
+    (up
+      ? `Altitude <b>${altitude.toFixed(1)}°</b><br>Azimuth <b>${azimuth.toFixed(0)}°</b> (${compassName(azimuth)})`
+      : `<span class="night">Sun is below the horizon</span>`) +
+    `<br>Sunrise <b>${hhmm(ev.rise)}</b> · Sunset <b>${hhmm(ev.set)}</b>` +
+    `<br><span style="opacity:.7">${state.lat.toFixed(1)}°, ${state.lon.toFixed(1)}°</span>`;
+}
+function compassName(az) {
+  const names = ["N","NE","E","SE","S","SW","W","NW"];
+  return names[Math.round(az / 45) % 8];
+}
+
+// ── UI ───────────────────────────────────────────────────────────────────
+const PLACES = [
+  { n: "Champaign IL", lat: 40.1, lon: -88.2, tz: -6 },
+  { n: "New York", lat: 40.7, lon: -74.0, tz: -5 },
+  { n: "London", lat: 51.5, lon: -0.13, tz: 0 },
+  { n: "Reykjavík", lat: 64.1, lon: -21.9, tz: 0 },
+  { n: "Singapore", lat: 1.35, lon: 103.8, tz: 8 },
+  { n: "Sydney", lat: -33.9, lon: 151.2, tz: 10 }
+];
+PLACES.forEach(p => {
+  const b = document.createElement("button"); b.textContent = p.n;
+  b.onclick = () => { state.lat = p.lat; state.lon = p.lon; state.tz = p.tz;
+    $("lat").value = p.lat; $("lon").value = p.lon; $("tz").value = p.tz; buildPath(); update(); };
+  $("places").appendChild(b);
+});
+const clampDay = () => { const max = DAYS[state.month - 1]; if (state.day > max) { state.day = max; $("day").value = max; } $("day").max = max; };
+function setDateLabel() { $("dateLbl").textContent = MONTHS[state.month - 1] + " " + state.day; }
+
+$("lat").oninput = e => { state.lat = +e.target.value; buildPath(); update(); };
+$("lon").oninput = e => { state.lon = +e.target.value; buildPath(); update(); };
+$("tz").oninput = e => { state.tz = +e.target.value; buildPath(); update(); };
+$("month").oninput = e => { state.month = +e.target.value; clampDay(); setDateLabel(); buildPath(); update(); seg("solstices", null); };
+$("day").oninput = e => { state.day = +e.target.value; setDateLabel(); buildPath(); update(); seg("solstices", null); };
+$("time").oninput = e => { state.time = +e.target.value; $("timeVal").textContent = hhmm(state.time / 60); update(); };
+$("height").oninput = e => { state.height = +e.target.value; $("heightVal").textContent = state.height + " m"; buildMassing(state.massing, state.height); };
+$("sunpath").onchange = e => { state.showPath = e.target.checked; buildPath(); };
+$("grid").onchange = e => { state.showGrid = e.target.checked; grid.visible = state.showGrid; };
+
+function seg(id, active) {
+  $(id).querySelectorAll("button").forEach(b => b.classList.toggle("on", active != null && b === active));
+}
+$("solstices").querySelectorAll("button").forEach(b => {
+  b.onclick = () => {
+    const [m, d] = b.dataset.d.split("-").map(Number);
+    state.month = m; state.day = d; $("month").value = m; clampDay(); $("day").value = d;
+    setDateLabel(); seg("solstices", b); buildPath(); update();
+  };
+});
+function toDemo(kind) {
+  state.imported = false; state.massing = kind;
+  $("demoBtn").disabled = true; $("height").disabled = false;
+  $("modelInfo").textContent = "Built-in massings, or import your own — STL / OBJ / PLY / 3DM (drop a file on the view too). Nothing is uploaded.";
+  buildMassing(kind, state.height);
+}
+$("massing").querySelectorAll("button").forEach(b => {
+  b.onclick = () => { seg("massing", b); toDemo(b.dataset.m); };
+});
+// import / demo / drop
+$("importBtn").onclick = () => $("file").click();
+$("demoBtn").onclick = () => {
+  const btn = $("massing").querySelector(`button[data-m="${state.massing}"]`);
+  seg("massing", btn);
+  toDemo(state.massing);
+};
+$("file").onchange = e => { if (e.target.files[0]) loadFile(e.target.files[0]); };
+["dragover", "dragenter"].forEach(ev => stage.addEventListener(ev, e => { e.preventDefault(); }));
+stage.addEventListener("drop", e => { e.preventDefault(); if (e.dataTransfer.files[0]) loadFile(e.dataTransfer.files[0]); });
+
+let animId = null;
+$("animBtn").onclick = () => {
+  if (animId) { cancelAnimationFrame(animId); animId = null; $("animBtn").textContent = "▶ Animate the day"; return; }
+  $("animBtn").textContent = "⏸ Stop";
+  const step = () => {
+    state.time = (state.time + 4) % 1440;
+    $("time").value = state.time; $("timeVal").textContent = hhmm(state.time / 60);
+    update(); animId = requestAnimationFrame(step);
+  };
+  animId = requestAnimationFrame(step);
+};
+
+$("shot").onclick = () => {
+  renderer.render(scene, camera);
+  canvas.toBlob(b => { const a = document.createElement("a");
+    a.href = URL.createObjectURL(b); a.download = "sun-study.png"; a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000); }, "image/png");
+};
+
+function resize() {
+  const w = stage.clientWidth, h = stage.clientHeight;
+  renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix();
+}
+addEventListener("resize", resize);
+
+// boot
+buildMassing(state.massing, state.height);
+buildPath(); resize(); setDateLabel();
+$("timeVal").textContent = hhmm(state.time / 60);
+update();
+(function loop() { controls.update(); renderer.render(scene, camera); requestAnimationFrame(loop); })();
+</script>
+</body>
+</html>

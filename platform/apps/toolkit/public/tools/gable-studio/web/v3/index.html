@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Eco-Architect V3 · evolve the trade-offs</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Archivo+Black&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="./v3.css" />
+  <script type="importmap">
+  { "imports": { "three": "../vendor/three.module.js", "three/addons/": "../vendor/addons/" } }
+  </script>
+</head>
+<body>
+  <header class="v3head">
+    <div class="v3head-l">
+      <h1>Evolve the trade-offs</h1>
+      <p class="v3sub"><b>Two ways to design.</b> ① Shape the building <b>by hand</b> with the Geometry sliders (center). ② Or set up the <b>optimizer</b> (right) — name what matters, what can change, what to improve — and Run it to <b>evolve a range of options</b> and pick from the trade-offs.</p>
+    </div>
+    <div class="v3head-r">
+      <button id="v3-propose" class="btn">✶ Propose a charter</button>
+      <button id="v3-reset" class="btn">Reset design</button>
+      <button id="v3-save" class="btn">Save project</button>
+      <button id="v3-load" class="btn">Load project</button>
+    </div>
+  </header>
+
+  <main class="v3main">
+    <!-- LEFT ZONE — the site & forces -->
+    <section class="dock left" id="dock-left">
+      <div class="zone-h">▸ The site &amp; forces</div>
+      <p class="zone-hint">Read each force. <b>Commit a move</b> to turn it into a rule in your Charter (right) — or skip this and just shape the building by hand in the center.</p>
+      <div id="forcedeck"></div>
+      <button id="v3-define" class="btn wide small">＋ Define a force</button>
+    </section>
+
+    <!-- CENTER ZONE — the design: see it + shape it / evolve it -->
+    <section class="center">
+      <div class="viewbox" id="stage"><canvas id="view"></canvas></div>
+      <div id="v3-phenotype" class="phenotype">This is your design. Shape it by hand below, or Run the optimizer (right) and hover a point on the front to preview options here.</div>
+      <div class="ctabs" role="tablist">
+        <button class="ctab on" data-tab="make" id="ctab-make">✏ Shape the geometry</button>
+        <button class="ctab" data-tab="front" id="ctab-front">★ Pareto front (optimizer)</button>
+      </div>
+      <div class="ctab-body">
+        <div id="tab-make" class="tabpane">
+          <p class="hint">Drag to shape the kit of parts — the model above updates live. (Site values like latitude &amp; wind live on the force cards at left.)</p>
+          <div id="make" class="makegrid"></div>
+          <div class="sub-h">Openings — apertures</div>
+          <div id="apertures"></div>
+        </div>
+        <div id="tab-front" class="tabpane" hidden>
+          <div class="charts-h">The Pareto front <span class="dock-hint" id="v3-chart-mode">— set up the optimizer at right, then ▶ Run</span></div>
+          <div id="v3-charts" class="chartstage"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- RIGHT ZONE — the optimizer recipe (numbered) -->
+    <section class="dock right" id="dock-right">
+      <div class="zone-h">▸ The optimizer</div>
+      <p class="zone-hint">Evolve a whole range of designs at once. Set the three steps, then Run — a front of trade-off options appears in the center to choose from.</p>
+      <details class="panel" open>
+        <summary><span class="dock-step">1</span> Charter — what it must answer</summary>
+        <div class="panel-body">
+          <p class="hint">The rules your design is judged against. Commit moves from the forces (left), or ✶ Propose a charter.</p>
+          <div id="charter-standing" class="standing"></div>
+          <div id="charter-tensions" class="tensions"></div>
+          <div id="charter-clauses"></div>
+          <button id="v3-mark-tension" class="btn wide small">＋ Mark a tension</button>
+        </div>
+      </details>
+      <details class="panel">
+        <summary><span class="dock-step">2</span> Genes — what may change</summary>
+        <div class="panel-body">
+          <p class="hint">Tick the dimensions the optimizer is free to vary (and their range).</p>
+          <div id="v3-genes" class="genescroll"></div>
+        </div>
+      </details>
+      <details class="panel">
+        <summary><span class="dock-step">3</span> Objectives — what to improve</summary>
+        <div class="panel-body">
+          <p class="hint">What to push better. Soft rules become objectives automatically; add your own here.</p>
+          <div id="v3-objectives" class="optobj"></div>
+        </div>
+      </details>
+      <details class="panel" open>
+        <summary><span class="dock-step">4</span> Run &amp; pick</summary>
+        <div class="panel-body">
+          <div class="runrow">
+            <label>Pop <input id="v3-pop" type="number" min="20" max="200" step="10" value="80" /></label>
+            <label>Gens <input id="v3-gens" type="number" min="10" max="200" step="10" value="60" /></label>
+            <label>Seed <input id="v3-seed" type="number" min="0" step="1" value="1" /></label>
+          </div>
+          <div class="runrow">
+            <button id="v3-run" class="btn primary">▶ Run</button>
+            <button id="v3-pause" class="btn" disabled>⏸ Pause</button>
+            <button id="v3-step" class="btn">⏭ Step</button>
+            <button id="v3-stop" class="btn" disabled>⏹ Stop</button>
+          </div>
+          <div id="v3-progress" class="progress"></div>
+          <svg id="v3-convergence" class="convergence" viewBox="0 0 240 54" preserveAspectRatio="none"></svg>
+          <p class="hint">Hover a point on the front to preview it, click to select, then Spawn it into your series.</p>
+          <button id="v3-spawn" class="btn primary wide" disabled>⑂ Spawn this phenotype into the series</button>
+          <div class="honesty">Optimizing transparent first-order proxies — a front to <b>reason with</b>, not to trust. Not validated simulation.</div>
+        </div>
+      </details>
+    </section>
+
+    <!-- BOTTOM ZONE — the series -->
+    <section class="series" id="series-dock">
+      <div class="series-h">
+        ▸ The series — your saved designs
+        <button id="v3-fork" class="btn">⑂ Fork the current design</button>
+        <span id="v3-status" class="v3status"></span>
+      </div>
+      <div id="series" class="series-board"></div>
+    </section>
+  </main>
+
+  <div id="forkModal" class="modal" style="display:none"><div class="modal-box"><div class="modal-head"><b>Record this variation</b><button class="modal-x" data-close="forkModal">✕</button></div><div class="modal-body" id="fork-form"></div></div></div>
+  <div id="defineModal" class="modal" style="display:none"><div class="modal-box"><div class="modal-head"><b>Define a site force</b><button class="modal-x" data-close="defineModal">✕</button></div><div class="modal-body" id="define-form"></div></div></div>
+  <div id="tensionModal" class="modal" style="display:none"><div class="modal-box"><div class="modal-head"><b>Mark a tension</b><button class="modal-x" data-close="tensionModal">✕</button></div><div class="modal-body" id="tension-form"></div></div></div>
+
+  <script type="module" src="./app3.js"></script>
+</body>
+</html>
