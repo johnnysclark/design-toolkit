@@ -11,6 +11,14 @@ export const metadata = {
 
 const CARDS: HubCard[] = [
   {
+    title: "Rhino / Grasshopper Python",
+    source: "Snippet gallery + AI edit",
+    status: "live",
+    href: "/tools-3d/rhino-python",
+    blurb:
+      "A searchable gallery of small, copy-paste RhinoPython / GhPython snippets for studio moves (panelise, attractor fields, contour, Make2D batch, layers, baking), each with a one-line explanation and an 'Edit with AI' console — paired with Coach for the why."
+  },
+  {
     title: "Waffle Structure",
     source: "Interlocking ribs · laser-ready",
     status: "live",
@@ -55,13 +63,6 @@ const CARDS: HubCard[] = [
     href: "/tools-3d/model-viewer",
     blurb:
       "Drop a GLB/GLTF/OBJ/STL and get a clean, shareable web viewer for the portfolio site — orbit, set a turntable, pick a background and lighting, save a screenshot, and grab an embed snippet. Client-side, no account."
-  },
-  {
-    title: "Rhino / Grasshopper Python",
-    status: "live",
-    href: "/tools-3d/rhino-python",
-    blurb:
-      "A searchable gallery of small, copy-paste RhinoPython / GhPython snippets for studio moves (panelise, attractor fields, contour, Make2D batch, layers, baking), each with a one-line explanation — paired with Coach for the why."
   },
   {
     title: "Topography Builder",
