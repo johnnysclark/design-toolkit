@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import dynamic from "next/dynamic";
+import FullscreenButton from "@/components/FullscreenButton";
 import ModelToggle, { useModelTier, type ModelTier } from "@/components/ModelToggle";
 import Link from "next/link";
 import { Card, Stat, CoverageStrip } from "./ui";
@@ -51,6 +52,7 @@ async function readJson(res: Response): Promise<any> {
 }
 
 export default function SiteAnalysisTool({ signedIn }: { signedIn: boolean }) {
+  const mapBoxRef = useRef<HTMLDivElement>(null);
   const [mode, setMode] = useState<Mode>("place");
   const [query, setQuery] = useState("");
   const [candidates, setCandidates] = useState<Candidate[]>([]);
@@ -323,7 +325,8 @@ export default function SiteAnalysisTool({ signedIn }: { signedIn: boolean }) {
 
       {/* the map — always live; a picker before a site is chosen, the analyzed site after */}
       <div>
-        <div className="h-[480px] w-full overflow-hidden rounded-xl border border-neutral-200">
+        <div ref={mapBoxRef} className="relative h-[480px] w-full overflow-hidden rounded-xl border border-neutral-200">
+          <FullscreenButton targetRef={mapBoxRef} label="map" className="absolute left-2 top-28 z-10" />
           <SiteMapGL
             centroid={result ? result.site.centroid : US_CENTER}
             bbox={result?.site.bbox}

@@ -17,6 +17,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import FullscreenButton from "@/components/FullscreenButton";
 
 // ── canvas ink (functional accents on a white ground) ───────────────────────
 const INK = "#111111";
@@ -434,6 +435,7 @@ export default function DrawingCleaner() {
   const grayRef = useRef<Uint8Array | null>(null);
   const histRef = useRef<Uint32Array>(new Uint32Array(256));
   const outRef = useRef<ImageData | null>(null);
+  const editorRef = useRef<HTMLDivElement>(null);
   const dimsRef = useRef({ w: 0, h: 0 });
   const cropRef = useRef<{ x: number; y: number; w: number; h: number } | null>(null);
   const autoRef = useRef({ white: 200, black: 60, gamma: 100 });
@@ -1383,7 +1385,8 @@ export default function DrawingCleaner() {
 
   // ════════════════════════════════ RENDER ══════════════════════════════════
   return (
-    <div className="flex flex-col gap-5 lg:flex-row lg:items-start">
+    <div ref={editorRef} className="relative flex flex-col gap-5 lg:flex-row lg:items-start">
+      <FullscreenButton targetRef={editorRef} label="editor" />
       <input
         ref={fileInputRef}
         type="file"

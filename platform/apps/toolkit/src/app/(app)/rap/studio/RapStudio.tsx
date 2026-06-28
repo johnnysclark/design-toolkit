@@ -12,6 +12,7 @@
 
 import { useCallback, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
+import FullscreenButton from "@/components/FullscreenButton";
 
 import type { CommandResult, State } from "./engine/types";
 import { COMPOSITE_FOCUS } from "./engine/types";
@@ -76,6 +77,7 @@ export default function RapStudio({ signedIn }: { signedIn: boolean }) {
   const [activeLevel, setActiveLevel] = useState<number | null>(null); // null = all levels
   const [refOff, setRefOff] = useState(false); // master "reference underlay off" — the screen-reader escape hatch
   const idRef = useRef(1);
+  const viewportRef = useRef<HTMLDivElement>(null);
   // Undo/redo history (applyCommand is pure, so history lives in the caller).
   const undoRef = useRef<State[]>([]);
   const redoRef = useRef<State[]>([]);
@@ -295,7 +297,7 @@ export default function RapStudio({ signedIn }: { signedIn: boolean }) {
 
   return (
     <div className="space-y-5">
-      <p className="text-sm text-neutral-900">
+      <p className="max-w-prose text-sm text-neutral-900">
         Loaded with a <b>sample model</b> — one building described at three <b>phases</b> (Massing → Structure → Plan), the same building at
         rising resolution. Use the <b>phase rail</b> below to <b>focus</b> one phase and author it cleanly (the others show as a dashed
         reference ghost), or pick <b>Composite</b> to see the whole building together. The <b>Assistant</b> is the main way to author:
@@ -358,11 +360,17 @@ export default function RapStudio({ signedIn }: { signedIn: boolean }) {
             </div>
           }
         >
-          <div
-            className="h-80 w-full overflow-hidden rounded-md border border-neutral-300 bg-white"
-            aria-hidden={viewTab === "3d" ? true : undefined}
-          >
-            {viewTab === "3d" ? <Scene3D state={state} levelFilter={activeLevel} view={phaseView} /> : <PlanSvg state={state} levelFilter={activeLevel} view={phaseView} className="h-full w-full p-2" />}
+          <div ref={viewportRef} className="relative h-80 w-full">
+            {/* Button sits OUTSIDE the aria-hidden viewport so it stays reachable by
+                assistive tech; the wrapper is the fullscreen target so the button
+                travels into focus mode and the inner view (h-full) fills the screen. */}
+            <FullscreenButton targetRef={viewportRef} label="3D preview" />
+            <div
+              className="h-full w-full overflow-hidden rounded-md border border-neutral-300 bg-white"
+              aria-hidden={viewTab === "3d" ? true : undefined}
+            >
+              {viewTab === "3d" ? <Scene3D state={state} levelFilter={activeLevel} view={phaseView} /> : <PlanSvg state={state} levelFilter={activeLevel} view={phaseView} className="h-full w-full p-2" />}
+            </div>
           </div>
           <p className="mt-2 text-xs text-neutral-900">
             The 3D view is an orthographic (parallel) black-and-white aid for sighted testing — hidden from screen readers. Solid black edges are visible; dotted black edges are hidden lines. The model is fully readable in the tactile plan, the read-back text, and the state tree.

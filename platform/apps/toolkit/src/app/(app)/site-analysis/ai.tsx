@@ -11,7 +11,7 @@ import { Card, ClaimChip, ClaimList, Read } from "./ui";
 export function SynthesisStrip({ synthesis }: { synthesis: Synthesis }) {
   return (
     <Card accent title="AI Design Synthesis" className="space-y-4">
-      <p className="text-base font-medium leading-snug text-neutral-900">
+      <p className="max-w-prose text-base font-medium leading-snug text-neutral-900">
         {synthesis.site_in_a_sentence}
       </p>
 

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import FullscreenFrame from "@/components/FullscreenFrame";
 
 // Wrapper for a self-contained, client-only tool served from public/tools/<tool>/
 // and embedded in the app shell via an iframe — the same pattern as Eco-Architect
@@ -50,18 +51,11 @@ export default function EmbeddedTool({
           rel="noopener noreferrer"
           className="shrink-0 rounded-md border border-neutral-300 px-3 py-1.5 text-sm font-medium text-neutral-900 transition hover:border-neutral-400 hover:bg-neutral-50"
         >
-          Open full screen ↗
+          Open in new tab ↗
         </a>
       </div>
 
-      <div className="mt-6 overflow-hidden rounded-xl border border-neutral-200 bg-white">
-        <iframe
-          src={src}
-          title={title}
-          className="block h-[82vh] w-full border-0"
-          allow="fullscreen; clipboard-read; clipboard-write"
-        />
-      </div>
+      <FullscreenFrame src={src} title={title} heightClass="h-[82vh]" label={title} />
 
       {note && <p className="mt-3 max-w-2xl text-sm text-neutral-900">{note}</p>}
     </div>

@@ -1051,7 +1051,7 @@ function ResultPanel({
         )}
 
         {a?.description?.trim() && (
-          <p className="mt-3 text-sm text-neutral-900">{a.description}</p>
+          <p className="mt-3 max-w-prose text-sm text-neutral-900">{a.description}</p>
         )}
         {a?.visible_text?.trim() && (
           <p className="mt-2 text-sm text-neutral-900">
@@ -1138,7 +1138,7 @@ function ResultPanel({
           )}
           {e.context && (
             <div className="mt-3 text-sm">
-              <p className="text-neutral-900">{e.context.summary}</p>
+              <p className="max-w-prose text-neutral-900">{e.context.summary}</p>
               <a
                 href={e.context.url}
                 target="_blank"
@@ -1159,7 +1159,7 @@ function ResultPanel({
           <p className="mt-1 text-sm text-neutral-900">
             Words to describe and search for this kind of work.
           </p>
-          <dl className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
+          <dl className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
             {vocab.map((v, i) => (
               <div key={i} className="rounded-lg border border-neutral-200 p-2">
                 <dt className="text-sm font-medium">

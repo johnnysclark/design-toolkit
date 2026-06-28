@@ -18,6 +18,7 @@
 
 import { useCallback, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
+import FullscreenButton from "@/components/FullscreenButton";
 import type * as THREE from "three";
 
 const ObliqueScene = dynamic(() => import("./ObliqueScene"), {
@@ -132,6 +133,7 @@ const DIRS: { id: string; glyph: string; dx: 1 | -1; dy: 1 | -1 }[] = [
 ];
 
 export default function Obliquify() {
+  const viewportRef = useRef<HTMLDivElement>(null);
   const [geometries, setGeometries] = useState<THREE.BufferGeometry[] | null>(null);
   const [modelName, setModelName] = useState("Demo massing");
   const [oblique, setOblique] = useState(true);
@@ -347,6 +349,7 @@ export default function Obliquify() {
             <span className="text-xs font-semibold text-neutral-900">{modelName}</span>
           </div>
           <div
+            ref={viewportRef}
             className="relative h-[64vh] min-h-[22rem] overflow-hidden rounded-md border-2 border-neutral-900 bg-white"
             onDragOver={(e) => {
               e.preventDefault();
@@ -359,6 +362,7 @@ export default function Obliquify() {
               if (e.dataTransfer.files.length) loadFile(e.dataTransfer.files[0]);
             }}
           >
+            <FullscreenButton targetRef={viewportRef} label="viewport" />
             <ObliqueScene
               geometries={geometries}
               angle={angle}

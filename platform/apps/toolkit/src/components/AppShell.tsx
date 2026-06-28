@@ -2,8 +2,10 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import SidebarNav from "@/components/SidebarNav";
 import { TOOLKIT_NAV } from "@/lib/toolkit-nav";
+import { widthClassFor } from "@/lib/page-width";
 
 // Top bar (single bold title + menu toggle + auth) over a collapsible menu bar.
 export default function AppShell({
@@ -15,6 +17,10 @@ export default function AppShell({
 }) {
   const [open, setOpen] = useState(true);
   const signedIn = !!email;
+  // Width adapts to the route: reading/chat tools stay narrow, interactive
+  // working surfaces (map, 3D/CAD, galleries, embeds) fill the available width.
+  const pathname = usePathname();
+  const widthClass = widthClassFor(pathname ?? "");
 
   return (
     <div className="flex min-h-screen flex-col">
@@ -94,8 +100,8 @@ export default function AppShell({
             </div>
           </aside>
         )}
-        <main id="main" tabIndex={-1} className="flex-1 overflow-x-hidden px-6 py-8 sm:px-10 sm:py-12">
-          <div className="mx-auto max-w-5xl">{children}</div>
+        <main id="main" tabIndex={-1} className="min-w-0 flex-1 overflow-x-hidden px-6 py-8 sm:px-10 sm:py-12">
+          <div className={`mx-auto ${widthClass}`}>{children}</div>
         </main>
       </div>
     </div>
