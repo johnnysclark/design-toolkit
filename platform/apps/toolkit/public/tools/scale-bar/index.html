@@ -66,8 +66,8 @@ input[type="color"] { width: 36px; height: 28px; border: 1px solid var(--line); 
     <div class="group">
       <div class="label">Scale</div>
       <div class="seg" id="sys">
-        <button data-s="metric" class="on">Metric</button>
-        <button data-s="imperial">Imperial</button>
+        <button data-s="metric">Metric</button>
+        <button data-s="imperial" class="on">Imperial</button>
       </div>
       <select id="scale"></select>
       <div class="hint" id="ratioHint"></div>
@@ -76,7 +76,7 @@ input[type="color"] { width: 36px; height: 28px; border: 1px solid var(--line); 
     <div class="group">
       <div class="label">Bar</div>
       <div class="row"><label>Units / division</label><span class="val" id="perV"></span></div>
-      <input type="range" id="per" min="1" max="100" value="5">
+      <input type="range" id="per" min="1" max="100" value="10">
       <div class="row"><label>Divisions</label><span class="val" id="ndivV">4</span></div>
       <input type="range" id="ndiv" min="2" max="10" value="4">
       <div class="row"><label>Fine sub-divisions</label><span class="val" id="subV">10</span></div>
@@ -99,9 +99,21 @@ input[type="color"] { width: 36px; height: 28px; border: 1px solid var(--line); 
     </div>
 
     <div class="group">
+      <div class="label">Bar style</div>
+      <select id="barStyle">
+        <option value="alternating">Alternating (filled blocks)</option>
+        <option value="open">Open boxes (outline + ticks)</option>
+        <option value="stepped">Stepped (castellated)</option>
+        <option value="ruler">Ruler (baseline + ticks)</option>
+        <option value="solid">Solid bar</option>
+        <option value="wavy">Wavy (scalloped lead)</option>
+      </select>
+      <div class="hint" id="styleHint"></div>
+    </div>
+
+    <div class="group">
       <div class="label">Style</div>
       <div class="row"><label>Ink</label><input type="color" id="ink" value="#111111"></div>
-      <label class="check"><input type="checkbox" id="ticks"> Open (tick) style — no fill</label>
       <div class="hint">The bar is drawn at real millimetres for the chosen scale — export and place it at 100% on your sheet and it reads true.</div>
     </div>
 
@@ -133,8 +145,17 @@ const IMPERIAL = [
 ].map(([label, ratio]) => ({ label, ratio }));
 
 const S = {
-  sys: "metric", scaleIdx: 3, per: 5, ndiv: 4, sub: 10, h: 3,
-  north: true, northStyle: "simple", rot: 0, ink: "#111111", ticks: false
+  sys: "imperial", scaleIdx: 5, per: 10, ndiv: 4, sub: 10, h: 3,
+  north: true, northStyle: "simple", rot: 0, ink: "#111111", barStyle: "alternating"
+};
+
+const STYLE_HINTS = {
+  alternating: "Solid filled blocks alternating dark / light — the classic architectural scale.",
+  open: "Outlined boxes with a tick at every division — clean for line drawings.",
+  stepped: "Castellated square-wave profile; raised teeth mark alternating divisions.",
+  ruler: "A baseline with downward ticks — full-height at divisions, short at sub-divisions.",
+  solid: "One solid bar; divisions are read from the ticks and labels above.",
+  wavy: "Scalloped half-circle arcs over the sub-divided lead, then a plain line."
 };
 const table = () => S.sys === "metric" ? METRIC : IMPERIAL;
 const ratio = () => table()[S.scaleIdx].ratio;
@@ -201,13 +222,36 @@ function buildSVG() {
   else segs.push({ x: pad, w: ext, fillIdx: 0 });
   for (let k = 0; k < S.ndiv; k++) segs.push({ x: x0 + drawnPerDiv * k, w: drawnPerDiv, fillIdx: (S.sub > 0 ? S.sub : 1) + k });
 
-  if (S.ticks) {
-    // open style: outline + division ticks
-    b += `<rect x="${f(pad)}" y="${f(barY)}" width="${f(totalW)}" height="${f(barH)}" fill="none" stroke="${ink}" stroke-width="0.3"/>`;
-    for (const s of segs) b += `<line x1="${f(s.x)}" y1="${f(barY)}" x2="${f(s.x)}" y2="${f(barY + barH)}" stroke="${ink}" stroke-width="0.3"/>`;
-    b += `<line x1="${f(pad + totalW)}" y1="${f(barY)}" x2="${f(pad + totalW)}" y2="${f(barY + barH)}" stroke="${ink}" stroke-width="0.3"/>`;
+  const sw = 0.3, barB = barY + barH;
+  if (S.barStyle === "open") {
+    // outlined boxes: outline + a tick at every division boundary
+    b += `<rect x="${f(pad)}" y="${f(barY)}" width="${f(totalW)}" height="${f(barH)}" fill="none" stroke="${ink}" stroke-width="${sw}"/>`;
+    for (const s of segs) b += `<line x1="${f(s.x)}" y1="${f(barY)}" x2="${f(s.x)}" y2="${f(barB)}" stroke="${ink}" stroke-width="${sw}"/>`;
+    b += `<line x1="${f(pad + totalW)}" y1="${f(barY)}" x2="${f(pad + totalW)}" y2="${f(barB)}" stroke="${ink}" stroke-width="${sw}"/>`;
+  } else if (S.barStyle === "stepped") {
+    // castellated square wave — raised teeth on even (filled-index) segments
+    let d = `M ${f(pad)} ${f(barB)}`;
+    for (const s of segs) { const y = s.fillIdx % 2 === 0 ? barY : barB; d += ` L ${f(s.x)} ${f(y)} L ${f(s.x + s.w)} ${f(y)}`; }
+    d += ` L ${f(pad + totalW)} ${f(barB)} Z`;
+    b += `<path d="${d}" fill="none" stroke="${ink}" stroke-width="${sw}"/>`;
+  } else if (S.barStyle === "ruler") {
+    // baseline with downward ticks: short at sub-divisions, full-height at main divisions
+    b += `<line x1="${f(pad)}" y1="${f(barB)}" x2="${f(pad + totalW)}" y2="${f(barB)}" stroke="${ink}" stroke-width="${sw}"/>`;
+    for (const s of segs) b += `<line x1="${f(s.x)}" y1="${f(barY + barH * 0.45)}" x2="${f(s.x)}" y2="${f(barB)}" stroke="${ink}" stroke-width="${sw}"/>`;
+    for (let k = 0; k <= S.ndiv; k++) { const x = x0 + drawnPerDiv * k; b += `<line x1="${f(x)}" y1="${f(barY)}" x2="${f(x)}" y2="${f(barB)}" stroke="${ink}" stroke-width="${sw}"/>`; }
+  } else if (S.barStyle === "solid") {
+    // one solid bar; divisions read from the ticks + labels above
+    b += `<rect x="${f(pad)}" y="${f(barY)}" width="${f(totalW)}" height="${f(barH)}" fill="${ink}"/>`;
+  } else if (S.barStyle === "wavy") {
+    // scalloped arcs over the sub-divided lead, then a plain baseline
+    let d = `M ${f(pad)} ${f(barB)}`;
+    if (S.sub > 0) { const w = ext / S.sub; for (let k = 0; k < S.sub; k++) d += ` a ${f(w / 2)} ${f(barH)} 0 0 1 ${f(w)} 0`; }
+    else d += ` L ${f(x0)} ${f(barB)}`;
+    d += ` L ${f(pad + totalW)} ${f(barB)}`;
+    b += `<path d="${d}" fill="none" stroke="${ink}" stroke-width="${sw}"/>`;
   } else {
-    b += `<rect x="${f(pad)}" y="${f(barY)}" width="${f(totalW)}" height="${f(barH)}" fill="none" stroke="${ink}" stroke-width="0.3"/>`;
+    // alternating (default): solid filled blocks, dark / light
+    b += `<rect x="${f(pad)}" y="${f(barY)}" width="${f(totalW)}" height="${f(barH)}" fill="none" stroke="${ink}" stroke-width="${sw}"/>`;
     for (const s of segs) if (s.fillIdx % 2 === 0) b += `<rect x="${f(s.x)}" y="${f(barY)}" width="${f(s.w)}" height="${f(barH)}" fill="${ink}"/>`;
   }
 
@@ -269,10 +313,11 @@ $("northStyle").querySelectorAll("button").forEach(b => { b.onclick = () => { S.
   $("northStyle").querySelectorAll("button").forEach(x => x.classList.toggle("on", x === b)); render(); }; });
 $("rot").oninput = e => { S.rot = +e.target.value; $("rotV").textContent = S.rot + "°"; render(); };
 $("ink").oninput = e => { S.ink = e.target.value; render(); };
-$("ticks").onchange = e => { S.ticks = e.target.checked; render(); };
+$("barStyle").onchange = e => { S.barStyle = e.target.value; $("styleHint").textContent = STYLE_HINTS[S.barStyle]; render(); };
 addEventListener("resize", render);
 
 fillScaleSelect(); $("perV").textContent = S.per + " " + unit(); $("hV").textContent = S.h + " mm"; setRatioHint();
+$("barStyle").value = S.barStyle; $("styleHint").textContent = STYLE_HINTS[S.barStyle];
 render();
 </script>
 </body>
