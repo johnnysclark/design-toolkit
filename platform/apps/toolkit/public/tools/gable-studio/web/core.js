@@ -7,7 +7,8 @@
 // THE FORM (v2): three independent plan rectangles, each with its own centre,
 // width, length and rotation, so each can overhang the others:
 //   • PLINTH — a floating floor SLAB (thickness t). The only floor.
-//   • WALLS  — a rectangular tube (height h, wall thickness wt). No floor/ceiling.
+//   • WALLS  — thin plan slabs (thickness wt) extruded up and CLIPPED by the roof
+//              underside, so the massing is a fully-enclosed gable. No floor/ceiling.
 //   • ROOF   — the overhanging plane: a single ridge with TWO independent pitch
 //              angles (gable, shed, butterfly…), plus thickness.
 // Plus 4 aperture cuts (3 wall + 1 roof). The ground is a RAVINE-EDGE topography.
@@ -80,16 +81,115 @@ function worldPoint(centerRel, z, elemRot, center, north) {
   return [w[0], w[1], z];
 }
 
+// --- roof underside: the height the gable-enclosed walls rise to ------------
+// roofUnderZ is the underside of the (thickness-t) roof slab at a world (x,y).
+// It is PIECEWISE-LINEAR along any straight edge — one kink, where the edge
+// crosses the ridge — so the wall clip below is EXACT with a single inserted
+// ridge vertex (no sampling), for any roof rotation, pitch, or ridge offset.
+function roofLocalX(wx, wy, Rf, north) {
+  const a = rotZ([wx, wy, 0], -north);                       // undo site north
+  const rl = rotZ([a[0] - Rf.cx, a[1] - Rf.cy, 0], -Rf.R);  // into the roof's own frame
+  return rl[0];
+}
+function roofUnderZAt(rlx, Rf, G) {
+  const slope = rlx <= G.ridgeX ? G.tanL : G.tanR;
+  const topZ = G.zRidge - Math.abs(rlx - G.ridgeX) * slope;
+  return topZ - Rf.t * Math.sqrt(1 + slope * slope);         // slab underside (along the roof normal)
+}
+export function roofUnderZWorld(wx, wy, Rf, G, north) {
+  return roofUnderZAt(roofLocalX(wx, wy, Rf, north), Rf, G);
+}
+
+// Exact clip of ONE wall's OUTER face by the roof underside → the metric face
+// (area + centroid), the eave (min) height, and the aperture anchor. A,B are the
+// outer edge's world endpoints at z=0; faceWidth = |B−A| (the run). The face is
+// the (u,z) polygon bounded below by z=0 and above by roofUnderZ along the edge:
+// a trapezoid for an eave wall, a pentagon peaking at the ridge for a gable end.
+function clipWallOuter(A, B, faceWidth, Rf, G, north) {
+  const rlA = roofLocalX(A[0], A[1], Rf, north), rlB = roofLocalX(B[0], B[1], Rf, north);
+  const ts = [0];
+  if ((rlA - G.ridgeX) * (rlB - G.ridgeX) < 0) ts.push((G.ridgeX - rlA) / (rlB - rlA)); // ridge vertex
+  ts.push(1);
+  const hs = ts.map((t) => roofUnderZWorld(A[0] + (B[0] - A[0]) * t, A[1] + (B[1] - A[1]) * t, Rf, G, north));
+  const verts = [[0, 0], [faceWidth, 0]];                    // bottom edge, then top edge (R→L)
+  for (let i = ts.length - 1; i >= 0; i--) verts.push([ts[i] * faceWidth, hs[i]]);
+  let a2 = 0, cu = 0, cz = 0;                                // shoelace (signed area + centroid)
+  for (let i = 0; i < verts.length; i++) {
+    const p = verts[i], q = verts[(i + 1) % verts.length];
+    const cr = p[0] * q[1] - q[0] * p[1]; a2 += cr; cu += (p[0] + q[0]) * cr; cz += (p[1] + q[1]) * cr;
+  }
+  const signed = a2 / 2, big = Math.abs(signed) > 1e-12;
+  const uC = big ? cu / (6 * signed) : faceWidth / 2, zC = big ? cz / (6 * signed) : 0;
+  let eave = hs[0]; for (const h of hs) if (h < eave) eave = h;
+  const fr = faceWidth > 1e-12 ? uC / faceWidth : 0.5;
+  return {
+    area: Math.abs(signed),
+    centroid: [A[0] + (B[0] - A[0]) * fr, A[1] + (B[1] - A[1]) * fr, zC],
+    eaveHeight: eave,
+    apC: [(A[0] + B[0]) / 2, (A[1] + B[1]) / 2, eave / 2],   // outer-plane, mid-run, mid-eave
+  };
+}
+
+// ONE wall's gable-clipped slab as world QUADS (a closed solid). The SINGLE
+// source of the wall solid: shared by massingTriangles (occluders / radiation)
+// AND the viewport render so they cannot drift. Local rect [x0..x1]×[y0..y1]
+// extruded z=0 up to the roof underside, clipped exactly (ridge vertex inserted
+// on each long edge; roofUnderZ is piecewise-linear so this is the true clip).
+export function clippedWallQuads(x0, x1, y0, y1, W, Rf, G, north) {
+  const Wc = [W.cx, W.cy], longX = Math.abs(x1 - x0) >= Math.abs(y1 - y0);
+  const edgePt = (side, s) => longX ? [x0 + (x1 - x0) * s, side ? y1 : y0] : [side ? x1 : x0, y0 + (y1 - y0) * s];
+  const cross = (side) => {
+    const a = worldPoint(edgePt(side, 0), 0, W.R, Wc, north), b = worldPoint(edgePt(side, 1), 0, W.R, Wc, north);
+    const ra = roofLocalX(a[0], a[1], Rf, north), rb = roofLocalX(b[0], b[1], Rf, north);
+    return ((ra - G.ridgeX) * (rb - G.ridgeX) < 0) ? (G.ridgeX - ra) / (rb - ra) : null;
+  };
+  const ss = [0, 1]; for (const c of [cross(0), cross(1)]) if (c !== null) ss.push(c);
+  ss.sort((p, q) => p - q);
+  const uniq = ss.filter((v, i) => i === 0 || v !== ss[i - 1]);   // drop a duplicated ridge station
+  const col = (s) => {
+    const a = worldPoint(edgePt(0, s), 0, W.R, Wc, north), b = worldPoint(edgePt(1, s), 0, W.R, Wc, north);
+    return { aB: a, aT: [a[0], a[1], roofUnderZWorld(a[0], a[1], Rf, G, north)],
+             bB: b, bT: [b[0], b[1], roofUnderZWorld(b[0], b[1], Rf, G, north)] };
+  };
+  const cols = uniq.map(col), quads = [];
+  for (let i = 0; i + 1 < cols.length; i++) {
+    const p = cols[i], q = cols[i + 1];
+    quads.push([p.aB, q.aB, q.aT, p.aT], [p.bB, p.bT, q.bT, q.bB], [p.aT, q.aT, q.bT, p.bT], [p.aB, p.bB, q.bB, q.aB]);
+  }
+  const a0 = cols[0], aN = cols[cols.length - 1];
+  quads.push([a0.aB, a0.aT, a0.bT, a0.bB], [aN.aB, aN.bB, aN.bT, aN.aT]);     // end caps
+  return quads;
+}
+
 function buildFrames(P, north) {
   const frames = {};
   const W = P.walls, Wc = [W.cx, W.cy];
-  const wallZ = W.h / 2;
+  const Rf = P.roof, Rc = [Rf.cx, Rf.cy];
+
+  // roof geometry first — the walls clip up to its underside
+  const zRidge = W.h + Rf.ridgeRise;
+  const ridgeX = Rf.ridgePos * (Rf.W / 2);
+  const halfL = ridgeX + Rf.W / 2, halfR = Rf.W / 2 - ridgeX;
+  const tanL = Math.tan(Rf.pitchL * D2R), tanR = Math.tan(Rf.pitchR * D2R);
+  const eaveZL = zRidge - halfL * tanL, eaveZR = zRidge - halfR * tanR;
+  const G = { zRidge, ridgeX, halfL, halfR, eaveZL, eaveZR, tanL, tanR };
+
+  // walls — each a thin plan slab EXTRUDED UP and CLIPPED by the roof, so the
+  // massing is a fully-enclosed gable. `area`/`c` are the clipped OUTER face (the
+  // single geometry that drives metrics + radiation, matching the render). The
+  // metric centre `c` is the clipped centroid (the radiation sample point);
+  // `faceHeight` is the eave (min) height and `apC` the lower-zone anchor, so
+  // apertures stay inside the guaranteed-rectangular zone (never above the eave).
   const wall = (key, nLocal, tanLocal, faceWidth, centerRel) => {
+    const hf = faceWidth / 2;
+    const A = worldPoint([centerRel[0] - tanLocal[0] * hf, centerRel[1] - tanLocal[1] * hf], 0, W.R, Wc, north);
+    const B = worldPoint([centerRel[0] + tanLocal[0] * hf, centerRel[1] + tanLocal[1] * hf], 0, W.R, Wc, north);
+    const clip = clipWallOuter(A, B, faceWidth, Rf, G, north);
     frames[key] = {
       kind: "wall", n: norm(rotZ(nLocal, W.R + north)),
-      c: worldPoint(centerRel, wallZ, W.R, Wc, north),
+      c: clip.centroid, apC: clip.apC,
       uAxis: rotZ(tanLocal, W.R + north), vAxis: [0, 0, 1],
-      faceWidth, faceHeight: W.h, area: faceWidth * W.h,
+      faceWidth, faceHeight: clip.eaveHeight, area: clip.area,
     };
   };
   wall("wall_px", [1, 0, 0], [0, 1, 0], W.L, [W.W / 2, 0]);
@@ -98,12 +198,6 @@ function buildFrames(P, north) {
   wall("wall_ny", [0, -1, 0], [1, 0, 0], W.W, [0, -W.L / 2]);
 
   // roof: ridge along local Y, two independent pitches, optional ridge offset
-  const Rf = P.roof, Rc = [Rf.cx, Rf.cy];
-  const zRidge = W.h + Rf.ridgeRise;
-  const ridgeX = Rf.ridgePos * (Rf.W / 2);
-  const halfL = ridgeX + Rf.W / 2, halfR = Rf.W / 2 - ridgeX;
-  const tanL = Math.tan(Rf.pitchL * D2R), tanR = Math.tan(Rf.pitchR * D2R);
-  const eaveZL = zRidge - halfL * tanL, eaveZR = zRidge - halfR * tanR;
   frames.roof_l = {
     kind: "roof", n: norm(rotZ([-tanL, 0, 1], Rf.R + north)),
     c: worldPoint([(ridgeX - Rf.W / 2) / 2, 0], (zRidge + eaveZL) / 2, Rf.R, Rc, north),
@@ -118,7 +212,7 @@ function buildFrames(P, north) {
     faceWidth: halfR * Math.sqrt(1 + tanR * tanR), faceHeight: Rf.L,
     area: halfR * Math.sqrt(1 + tanR * tanR) * Rf.L,
   };
-  frames._roofGeom = { zRidge, ridgeX, halfL, halfR, eaveZL, eaveZR };
+  frames._roofGeom = G;
   return frames;
 }
 
@@ -136,9 +230,10 @@ function plinthFaces(P, north, T) {
 function buildApertures(P, frames) {
   return (P.apertures || []).map((ap) => {
     const f = frames[ap.host] || frames.wall_ny;
+    const anchor = f.apC || f.c;   // walls anchor on the lower-zone centre (apC); roofs use c
     const w = clamp(ap.w, 0.05, f.faceWidth), h = clamp(ap.h, 0.05, f.faceHeight);
     const du = (clamp(ap.u, 0, 1) - 0.5) * f.faceWidth, dv = (clamp(ap.v, 0, 1) - 0.5) * f.faceHeight;
-    const c = add(add(f.c, scale(f.uAxis, du)), scale(f.vAxis, dv));
+    const c = add(add(anchor, scale(f.uAxis, du)), scale(f.vAxis, dv));
     return { id: ap.id, host: ap.host, kind: f.kind, area: w * h, w, h, n: f.n, c };
   });
 }
@@ -372,8 +467,9 @@ export function massingTriangles(model) {
   const Pl = P.plinth, rect = (W, L) => [[-W / 2, -L / 2], [W / 2, -L / 2], [W / 2, L / 2], [-W / 2, L / 2]];
   prism(rect(Pl.W, Pl.L), -Pl.t, 0, Pl.R, Pl.cx, Pl.cy);
   const Wl = P.walls, hw = Wl.W / 2, hl = Wl.L / 2, tw = Wl.wt;
+  // walls: gable-clipped slabs (the SAME quads the viewport renders)
   for (const [x0, x1, y0, y1] of [[hw - tw, hw, -hl, hl], [-hw, -hw + tw, -hl, hl], [-hw, hw, hl - tw, hl], [-hw, hw, -hl, -hl + tw]])
-    prism([[x0, y0], [x1, y0], [x1, y1], [x0, y1]], 0, Wl.h, Wl.R, Wl.cx, Wl.cy);
+    for (const qd of clippedWallQuads(x0, x1, y0, y1, Wl, P.roof, G, n)) quad(qd[0], qd[1], qd[2], qd[3]);
   const Rf = P.roof;
   const slope = (eaveX, ridgeX, eaveZ, nx) => {
     const k = Math.hypot(nx, 1) || 1, nl = [nx / k, 0, 1 / k];

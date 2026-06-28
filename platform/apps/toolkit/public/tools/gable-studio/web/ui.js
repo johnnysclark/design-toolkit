@@ -69,7 +69,7 @@ function selectRow(obj, key, label, options, onChange) {
 // the converter appends ft / ° / mph etc.)
 const GROUPS = (state) => [
   ["Plinth (floor slab)", state.params.plinth, [["cx", "centre X", -6, 6, 0.1], ["cy", "centre Y", -6, 6, 0.1], ["W", "width", 2, 20, 0.1], ["L", "length", 2, 24, 0.1], ["R", "rotation", -45, 45, 1], ["t", "thickness", 0.1, 2, 0.05]]],
-  ["Walls (tube)", state.params.walls, [["cx", "centre X", -6, 6, 0.1], ["cy", "centre Y", -6, 6, 0.1], ["W", "width", 2, 16, 0.1], ["L", "length", 2, 18, 0.1], ["R", "rotation", -45, 45, 1], ["h", "height", 2, 6, 0.05], ["wt", "wall thick", 0.1, 0.6, 0.02]]],
+  ["Walls (gable)", state.params.walls, [["cx", "centre X", -6, 6, 0.1], ["cy", "centre Y", -6, 6, 0.1], ["W", "width", 2, 16, 0.1], ["L", "length", 2, 18, 0.1], ["R", "rotation", -45, 45, 1], ["h", "height", 2, 6, 0.05], ["wt", "wall thick", 0.1, 0.6, 0.02]]],
   ["Roof (overhang)", state.params.roof, [["cx", "centre X", -6, 6, 0.1], ["cy", "centre Y", -6, 6, 0.1], ["W", "width", 2, 18, 0.1], ["L", "length", 2, 20, 0.1], ["R", "rotation", -90, 90, 1], ["ridgeRise", "ridge rise", 0, 5, 0.05], ["pitchL", "pitch L", -45, 60, 1], ["pitchR", "pitch R", -45, 60, 1], ["ridgePos", "ridge shift", -1, 1, 0.05], ["t", "thickness", 0.1, 0.8, 0.02]]],
 ];
 const TERR = (state) => [["plateauZ", "ground level", -3, 2, 0.1], ["ravineDepth", "ravine depth", 0, 15, 0.5], ["ravineEdge", "ravine edge", -4, 15, 0.5], ["ravineWidth", "ravine slope", 1, 12, 0.5], ["ravineAngle", "ravine direction", -90, 90, 5], ["undAmp", "undulation", 0, 1, 0.05]].map((r) => [state.site.terrain, ...r]);

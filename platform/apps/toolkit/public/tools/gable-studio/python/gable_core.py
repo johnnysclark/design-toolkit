@@ -1,8 +1,9 @@
 """gable_core.py — line-for-line python port of web/core.js (v2).
 
 Pure-stdlib geometry + metric proxies + rule evaluation for the v2 form:
-three independent plan rectangles (PLINTH slab / WALLS tube / ROOF overhang with
-two independent pitches) + 4 apertures, on a ravine-edge terrain. NO Rhino
+three independent plan rectangles (PLINTH slab / WALLS clipped by the roof into a
+fully-enclosed gable / ROOF overhang with two independent pitches) + 4 apertures,
+on a ravine-edge terrain. NO Rhino
 imports. If you edit a formula, edit web/core.js to match (test/ proves parity).
 
 Conventions: +X East, +Y North, +Z Up, metres, degrees in. Floor (plinth top)
@@ -81,27 +82,116 @@ def world_point(center_rel, z, elem_rot, center, north):
     return [w[0], w[1], z]
 
 
+# --- roof underside: the height the gable-enclosed walls rise to (port of
+# web/core.js). roofUnderZ is piecewise-linear along any straight edge (one kink,
+# at the ridge crossing), so the wall clip is EXACT with a single inserted vertex.
+def roof_local_x(wx, wy, Rf, north):
+    a = rotZ([wx, wy, 0], -north)
+    rl = rotZ([a[0] - Rf["cx"], a[1] - Rf["cy"], 0], -Rf["R"])
+    return rl[0]
+
+
+def roof_under_z_at(rlx, Rf, G):
+    slope = G["tanL"] if rlx <= G["ridgeX"] else G["tanR"]
+    topZ = G["zRidge"] - abs(rlx - G["ridgeX"]) * slope
+    return topZ - Rf["t"] * math.sqrt(1 + slope * slope)
+
+
+def roof_under_z_world(wx, wy, Rf, G, north):
+    return roof_under_z_at(roof_local_x(wx, wy, Rf, north), Rf, G)
+
+
+def clip_wall_outer(A, B, face_width, Rf, G, north):
+    rlA = roof_local_x(A[0], A[1], Rf, north)
+    rlB = roof_local_x(B[0], B[1], Rf, north)
+    ts = [0.0]
+    if (rlA - G["ridgeX"]) * (rlB - G["ridgeX"]) < 0:
+        ts.append((G["ridgeX"] - rlA) / (rlB - rlA))
+    ts.append(1.0)
+    hs = [roof_under_z_world(A[0] + (B[0] - A[0]) * t, A[1] + (B[1] - A[1]) * t, Rf, G, north) for t in ts]
+    verts = [[0.0, 0.0], [face_width, 0.0]]
+    for i in range(len(ts) - 1, -1, -1):
+        verts.append([ts[i] * face_width, hs[i]])
+    a2 = cu = cz = 0.0
+    nv = len(verts)
+    for i in range(nv):
+        p = verts[i]
+        q = verts[(i + 1) % nv]
+        cr = p[0] * q[1] - q[0] * p[1]
+        a2 += cr
+        cu += (p[0] + q[0]) * cr
+        cz += (p[1] + q[1]) * cr
+    signed = a2 / 2
+    big = abs(signed) > 1e-12
+    uC = cu / (6 * signed) if big else face_width / 2
+    zC = cz / (6 * signed) if big else 0.0
+    eave = hs[0]
+    for h in hs:
+        if h < eave:
+            eave = h
+    fr = uC / face_width if face_width > 1e-12 else 0.5
+    return {
+        "area": abs(signed),
+        "centroid": [A[0] + (B[0] - A[0]) * fr, A[1] + (B[1] - A[1]) * fr, zC],
+        "eaveHeight": eave,
+        "apC": [(A[0] + B[0]) / 2, (A[1] + B[1]) / 2, eave / 2],
+    }
+
+
+def clipped_wall_quads(x0, x1, y0, y1, W, Rf, G, north):
+    Wc = [W["cx"], W["cy"]]
+    longX = abs(x1 - x0) >= abs(y1 - y0)
+
+    def edge_pt(side, s):
+        if longX:
+            return [x0 + (x1 - x0) * s, y1 if side else y0]
+        return [x1 if side else x0, y0 + (y1 - y0) * s]
+
+    def cross(side):
+        a = world_point(edge_pt(side, 0), 0, W["R"], Wc, north)
+        b = world_point(edge_pt(side, 1), 0, W["R"], Wc, north)
+        ra = roof_local_x(a[0], a[1], Rf, north)
+        rb = roof_local_x(b[0], b[1], Rf, north)
+        if (ra - G["ridgeX"]) * (rb - G["ridgeX"]) < 0:
+            return (G["ridgeX"] - ra) / (rb - ra)
+        return None
+
+    ss = [0.0, 1.0]
+    for c in (cross(0), cross(1)):
+        if c is not None:
+            ss.append(c)
+    ss.sort()
+    uniq = [v for i, v in enumerate(ss) if i == 0 or v != ss[i - 1]]
+
+    def col(s):
+        a = world_point(edge_pt(0, s), 0, W["R"], Wc, north)
+        b = world_point(edge_pt(1, s), 0, W["R"], Wc, north)
+        return {"aB": a, "aT": [a[0], a[1], roof_under_z_world(a[0], a[1], Rf, G, north)],
+                "bB": b, "bT": [b[0], b[1], roof_under_z_world(b[0], b[1], Rf, G, north)]}
+
+    cols = [col(s) for s in uniq]
+    quads = []
+    for i in range(len(cols) - 1):
+        p = cols[i]
+        q = cols[i + 1]
+        quads.append([p["aB"], q["aB"], q["aT"], p["aT"]])
+        quads.append([p["bB"], p["bT"], q["bT"], q["bB"]])
+        quads.append([p["aT"], q["aT"], q["bT"], p["bT"]])
+        quads.append([p["aB"], p["bB"], q["bB"], q["aB"]])
+    a0 = cols[0]
+    aN = cols[len(cols) - 1]
+    quads.append([a0["aB"], a0["aT"], a0["bT"], a0["bB"]])
+    quads.append([aN["aB"], aN["bB"], aN["bT"], aN["aT"]])
+    return quads
+
+
 def build_frames(P, north):
     frames = {}
     W = P["walls"]
     Wc = [W["cx"], W["cy"]]
-    wallZ = W["h"] / 2.0
-
-    def wall(key, n_local, tan_local, face_width, center_rel):
-        frames[key] = {
-            "kind": "wall", "n": norm(rotZ(n_local, W["R"] + north)),
-            "c": world_point(center_rel, wallZ, W["R"], Wc, north),
-            "uAxis": rotZ(tan_local, W["R"] + north), "vAxis": [0, 0, 1],
-            "faceWidth": face_width, "faceHeight": W["h"], "area": face_width * W["h"],
-        }
-
-    wall("wall_px", [1, 0, 0], [0, 1, 0], W["L"], [W["W"] / 2, 0])
-    wall("wall_nx", [-1, 0, 0], [0, 1, 0], W["L"], [-W["W"] / 2, 0])
-    wall("wall_py", [0, 1, 0], [1, 0, 0], W["W"], [0, W["L"] / 2])
-    wall("wall_ny", [0, -1, 0], [1, 0, 0], W["W"], [0, -W["L"] / 2])
-
     Rf = P["roof"]
     Rc = [Rf["cx"], Rf["cy"]]
+
     zRidge = W["h"] + Rf["ridgeRise"]
     ridgeX = Rf["ridgePos"] * (Rf["W"] / 2)
     halfL = ridgeX + Rf["W"] / 2
@@ -110,6 +200,26 @@ def build_frames(P, north):
     tanR = math.tan(Rf["pitchR"] * D2R)
     eaveZL = zRidge - halfL * tanL
     eaveZR = zRidge - halfR * tanR
+    G = {"zRidge": zRidge, "ridgeX": ridgeX, "halfL": halfL, "halfR": halfR,
+         "eaveZL": eaveZL, "eaveZR": eaveZR, "tanL": tanL, "tanR": tanR}
+
+    def wall(key, n_local, tan_local, face_width, center_rel):
+        hf = face_width / 2
+        A = world_point([center_rel[0] - tan_local[0] * hf, center_rel[1] - tan_local[1] * hf], 0, W["R"], Wc, north)
+        B = world_point([center_rel[0] + tan_local[0] * hf, center_rel[1] + tan_local[1] * hf], 0, W["R"], Wc, north)
+        clip = clip_wall_outer(A, B, face_width, Rf, G, north)
+        frames[key] = {
+            "kind": "wall", "n": norm(rotZ(n_local, W["R"] + north)),
+            "c": clip["centroid"], "apC": clip["apC"],
+            "uAxis": rotZ(tan_local, W["R"] + north), "vAxis": [0, 0, 1],
+            "faceWidth": face_width, "faceHeight": clip["eaveHeight"], "area": clip["area"],
+        }
+
+    wall("wall_px", [1, 0, 0], [0, 1, 0], W["L"], [W["W"] / 2, 0])
+    wall("wall_nx", [-1, 0, 0], [0, 1, 0], W["L"], [-W["W"] / 2, 0])
+    wall("wall_py", [0, 1, 0], [1, 0, 0], W["W"], [0, W["L"] / 2])
+    wall("wall_ny", [0, -1, 0], [1, 0, 0], W["W"], [0, -W["L"] / 2])
+
     frames["roof_l"] = {
         "kind": "roof", "n": norm(rotZ([-tanL, 0, 1], Rf["R"] + north)),
         "c": world_point([(ridgeX - Rf["W"] / 2) / 2, 0], (zRidge + eaveZL) / 2, Rf["R"], Rc, north),
@@ -124,7 +234,7 @@ def build_frames(P, north):
         "faceWidth": halfR * math.sqrt(1 + tanR * tanR), "faceHeight": Rf["L"],
         "area": halfR * math.sqrt(1 + tanR * tanR) * Rf["L"],
     }
-    frames["_roofGeom"] = {"zRidge": zRidge, "ridgeX": ridgeX, "halfL": halfL, "halfR": halfR, "eaveZL": eaveZL, "eaveZR": eaveZR}
+    frames["_roofGeom"] = G
     return frames
 
 
@@ -146,11 +256,12 @@ def build_apertures(P, frames):
     out = []
     for ap in P.get("apertures", []):
         f = frames.get(ap["host"], frames["wall_ny"])
+        anchor = f.get("apC", f["c"])   # walls anchor on the lower-zone centre (apC); roofs use c
         w = clamp(ap["w"], 0.05, f["faceWidth"])
         h = clamp(ap["h"], 0.05, f["faceHeight"])
         du = (clamp(ap["u"], 0, 1) - 0.5) * f["faceWidth"]
         dv = (clamp(ap["v"], 0, 1) - 0.5) * f["faceHeight"]
-        c = add(add(f["c"], scale(f["uAxis"], du)), scale(f["vAxis"], dv))
+        c = add(add(anchor, scale(f["uAxis"], du)), scale(f["vAxis"], dv))
         out.append({"id": ap["id"], "host": ap["host"], "kind": f["kind"], "area": w * h, "w": w, "h": h, "n": f["n"], "c": c})
     return out
 
