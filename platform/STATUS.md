@@ -16,6 +16,34 @@
 > separation/tone/angle/SVG), `build:toolkit` green, and **headless-Chrome smoke PASS** across
 > duotone / CMYK / split-before-after — **0 console errors**. Pushed to `main` → Vercel deploying.
 >
+
+> **VECTORIZE — new 2D tool BUILT + live-smoke-tested + MERGED (2026-06-27, branch `tool/vectorize`,
+> worktree `design-toolkit-vectorize`, PR #64 → Vercel auto-deploying `main`).** The "Vectorize / Make2D cleanup"
+> card in 2D Tooling is now a working tool at **`/media-2d/vectorize`** (client-only, public — the
+> image never leaves the browser; no API key, no sign-in). Raster → vector with three modes:
+> **Centreline** (Zhang–Suen thinning + skeleton walk → one editable path per stroke — the Make2D /
+> pen-sketch case), **Outline** (boundary-edge loop tracing → filled shapes, holes via
+> `fill-rule:evenodd`), and **Colour** (median-cut posterise → one filled layer per colour).
+> Controls: Otsu auto / manual threshold, invert, despeckle, RDP **detail**, corner-aware
+> Catmull-Rom **smoothing** + corner threshold, min-line-length, stroke weight/colour, fill colour,
+> trace-resolution cap. Live preview (Vector / Overlay-on-source / Source, node handles, scroll-zoom)
+> built by injecting our own generated SVG. Export **SVG** + **DXF** (real-mm LWPOLYLINE, INSUNITS=4,
+> Y-flipped — same idiom as the Surveyor exporter) + Copy SVG.
+> - **Engine:** pure-TS `src/lib/vectorize/` (11 files; no DOM, no deps) — `binarize` (gray/Otsu/
+>   despeckle), `outline`, `centreline`, `simplify` (RDP), `fit` (Catmull-Rom→Bézier), `color`,
+>   `svg`, `dxf`, `trace` orchestrator. **36/36 numeric self-tests pass** (`verify.ts`, run via the
+>   compile-to-CJS-then-node idiom — no test runner in the repo).
+> - **Verified live** in headless Chrome over CDP (Node-26 global `WebSocket`, no puppeteer): Sample →
+>   all three modes produce paths, correct viewBox, exports enabled, **zero runtime exceptions**;
+>   screenshots confirm the centreline hugs the source (Overlay) and the house style matches.
+> - **Build green** (`next build`, 40 pages; `/media-2d/vectorize` 10.8 kB). Hub card flipped
+>   proposed→live in `(app)/media-2d/page.tsx`. No `toolkit-nav.ts` change (it's a hub sub-page).
+> - **Note:** a fresh worktree needs `npm install` (don't symlink an older branch's node_modules —
+>   `main` added `maplibre-gl`) and a `.env.local` (placeholder Supabase URL/key is enough for the
+>   public client-only page; the app-shell server client throws on undefined env).
+> - **MERGED + LIVE** via PR #64 → `main` (Vercel auto-deploying). Rebased onto current main
+>   (past Halftone & Riso); route added to `ROUTE_TIERS` (full width); `build:toolkit` green (41 pages).
+
 > **Eco-Architect V3 — NSGA-II optimizer + extensible site forces (2026-06-27, branch
 > `feat/eco-architect-v3`, worktree `design-toolkit-eco-v3`, NOT merged).** A third version of the
 > Site Design tool (Gable Studio), added as a **V3 pill** in `web/shell.html` (default stays V2).

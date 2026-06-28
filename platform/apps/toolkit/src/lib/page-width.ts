@@ -41,6 +41,7 @@ const ROUTE_TIERS: Array<[string, WidthTier]> = [
   ["/tools-3d", "full"], // 3D Tooling hub — card grid tiles to 3 cols
   ["/media-2d/drawing-cleaner", "full"], // fixed rail + fluid fit-to-container preview
   ["/media-2d/halftone-riso", "full"], // fixed rail + fluid fit-to-container preview
+  ["/media-2d/vectorize", "full"], // raster→vector tracer — fixed rail + fluid SVG preview
   ["/media-2d/vantage", "full"], // three.js camera demo (100vh iframe)
   ["/media-2d/pattern-studio", "full"], // embedded pattern canvas
   ["/media-2d/scale-bar", "full"], // embedded scale-bar tool
