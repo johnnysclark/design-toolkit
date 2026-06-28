@@ -54,21 +54,26 @@ export async function importThreeDM(arrayBuffer) {
   };
 
   const find = (name) => unionBox(byLayer[name]);
+  const minDz = (boxes) => (boxes && boxes.length) ? Math.min(...boxes.map((b) => b.dz)) : null;
   const plinth = find("plinth"), roof = find("roof");
 
+  const roomBoxes = byLayer["walls"] || byLayer["room"];
   const room = find("walls") || find("room");
   if (plinth && room) {
     const ctr = (b) => [(b.min[0] + b.max[0]) / 2, (b.min[1] + b.max[1]) / 2];
     const [pcx, pcy] = ctr(plinth), [wcx, wcy] = ctr(room), [rcx, rcy] = roof ? ctr(roof) : [wcx, wcy];
+    // walls are gable-clipped, so the union bbox reaches the ridge — take the
+    // SHORTEST wall object's height (the eave = the as-built wall height) for h.
+    const wallH = minDz(roomBoxes) ?? room.dz;
     const params = {
       plinth: { cx: r2(pcx), cy: r2(pcy), W: r2(plinth.dx), L: r2(plinth.dy), t: r2(plinth.dz), R: 0 },
-      walls: { cx: r2(wcx), cy: r2(wcy), W: r2(room.dx), L: r2(room.dy), h: r2(room.dz), R: 0 },
+      walls: { cx: r2(wcx), cy: r2(wcy), W: r2(room.dx), L: r2(room.dy), h: r2(wallH), R: 0 },
       roof: { cx: r2(rcx), cy: r2(rcy), W: r2(roof ? roof.dx : room.dx), L: r2(roof ? roof.dy : room.dy), ridgeRise: r2(roof ? roof.dz : 1.5), R: 0 },
     };
     return {
       mode: "convention", params,
-      message: `Read Plinth + Walls${roof ? " + Roof" : ""} layers → recovered footprints + heights. ` +
-        `Rotations/pitches/north assumed 0 and apertures kept from the current design (bbox method).`,
+      message: `Read Plinth + Walls${roof ? " + Roof" : ""} layers → recovered footprints + heights ` +
+        `(wall height from the eave). Rotations/pitches/north assumed 0 and apertures kept from the current design (bbox method).`,
       summary,
     };
   }
