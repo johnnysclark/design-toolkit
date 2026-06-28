@@ -6,10 +6,26 @@ import ToolHub, { HubCard } from "@/components/ToolHub";
 export const metadata = {
   title: "3D Tooling · Design Toolkit",
   description:
-    "A bench of 3D tools — Obliquify (oblique projection), a Three.js Model Viewer, a Sun & Shadow study, and a Rhino/Grasshopper Python snippet gallery, with more proposed."
+    "A bench of 3D tools — Waffle Structure and Contour Slicer (laser-ready fabrication), Obliquify (oblique projection), a Three.js Model Viewer, a Sun & Shadow study, a Solar Envelope, and a Rhino/Grasshopper Python gallery."
 };
 
 const CARDS: HubCard[] = [
+  {
+    title: "Waffle Structure",
+    source: "Interlocking ribs · laser-ready",
+    status: "live",
+    href: "/tools-3d/waffle",
+    blurb:
+      "Turn a surface or your own model into an interlocking egg-crate of ribs — notched half-depth where they cross so they slot together. Pick a parametric form or drop in an STL/OBJ/PLY (it's raycast into a heightfield and waffled), set rib counts, material thickness and kerf, then export a true-millimetre nested SVG cut sheet for the laser, with parts labelled for assembly. Client-side, nothing uploaded."
+  },
+  {
+    title: "Contour Slicer",
+    source: "Stacked-layer topo model · laser-ready",
+    status: "live",
+    href: "/tools-3d/contour-slicer",
+    blurb:
+      "Slice a terrain or form into horizontal contour layers — a topographic model from stacked chipboard. Choose your sheet thickness and it traces each level (marching squares), nests the numbered layers onto a millimetre-true SVG cut sheet with the next layer scored on top for foolproof stacking, and gives you a flat contour map too. Pairs with the Topography Builder; drop in your own model to slice it. Client-side."
+  },
   {
     title: "Sun & Shadow Study",
     source: "Solar geometry + cast shadows",
