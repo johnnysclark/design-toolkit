@@ -21,6 +21,8 @@ import {
   toDXF,
   toSVG,
   trace,
+  type FillStyle,
+  type OutlineMethod,
   type TraceMode,
   type TraceOptions,
   type TraceResult
@@ -54,11 +56,19 @@ export default function Vectorize() {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   // ── options ──
-  const [mode, setMode] = useState<TraceMode>("centreline");
+  const [mode, setMode] = useState<TraceMode>("outline");
+  const [outlineMethod, setOutlineMethod] = useState<OutlineMethod>("centreline");
+  const [fillStyle, setFillStyle] = useState<FillStyle>("mono");
+  const [blur, setBlur] = useState(0);
   const [autoThreshold, setAuto] = useState(true);
   const [threshold, setThreshold] = useState(128);
+  const [adaptive, setAdaptive] = useState(false);
+  const [adaptiveRadius, setAdaptiveRadius] = useState(14);
+  const [adaptiveBias, setAdaptiveBias] = useState(8);
   const [invert, setInvert] = useState(false);
+  const [morphAmt, setMorphAmt] = useState(0);
   const [despeckle, setDespeckle] = useState(6);
+  const [holeArea, setHoleArea] = useState(2);
   const [detail, setDetail] = useState(1.2);
   const [smooth, setSmooth] = useState(0.8);
   const [corner, setCorner] = useState(78);
@@ -86,6 +96,7 @@ export default function Vectorize() {
     source: true,
     mode: true,
     ink: true,
+    cleanup: true,
     shape: true,
     output: true
   });
@@ -214,7 +225,8 @@ export default function Vectorize() {
     const img = new Image();
     img.onload = () => {
       loadFromImage(img, url, "sample-plan.png");
-      setMode("centreline");
+      setMode("outline");
+      setOutlineMethod("centreline");
     };
     img.src = url;
   }, [loadFromImage]);
@@ -255,10 +267,18 @@ export default function Vectorize() {
   // ── the trace (debounced; the engine is synchronous but fast at capped res) ──
   const optsKey = JSON.stringify({
     mode,
+    outlineMethod,
+    fillStyle,
+    blur,
     autoThreshold,
     threshold,
+    adaptive,
+    adaptiveRadius,
+    adaptiveBias,
     invert,
+    morphAmt,
     despeckle,
+    holeArea,
     detail,
     smooth,
     corner,
@@ -281,11 +301,19 @@ export default function Vectorize() {
       }
       const opts: TraceOptions = {
         mode,
+        outlineMethod,
+        fillStyle,
         scale: wk.scale,
-        threshold,
+        blur,
         autoThreshold,
+        threshold,
+        adaptive,
+        adaptiveRadius,
+        adaptiveBias,
         invert,
+        morph: morphAmt,
         despeckle,
+        holeArea,
         detail,
         smooth,
         corner,
@@ -431,7 +459,10 @@ export default function Vectorize() {
     };
   }, [result, whiteBg]);
 
-  const inkControls = mode !== "color";
+  // Colour fill quantises RGB directly, so the black-ink threshold controls don't
+  // apply to it; every other mode binarises first.
+  const isColour = mode === "fill" && fillStyle === "colour";
+  const usesThreshold = !isColour;
 
   // ════════════════════════════════ RENDER ══════════════════════════════════
   return (
@@ -475,68 +506,122 @@ export default function Vectorize() {
 
         <Section title="Mode" open={open.mode} onToggle={() => toggle("mode")}>
           <Tabs
-            label="Trace mode"
+            label="Vectorize mode"
             tabs={[
-              ["centreline", "Centreline"],
               ["outline", "Outline"],
-              ["color", "Colour"]
+              ["fill", "Fill"]
             ]}
             active={mode}
             onPick={(t) => setMode(t as TraceMode)}
           />
           <p className="mt-2 text-xs text-neutral-900">
-            {mode === "centreline"
-              ? "Traces down the middle of each stroke — line drawings become single editable paths."
-              : mode === "outline"
-                ? "Traces the boundary of filled ink — logos, silhouettes, poché. Holes drop out."
-                : "Posterises the image and traces each flat colour as its own filled layer."}
+            {mode === "outline"
+              ? "Stroked line work — the output is open/closed paths, not solids."
+              : "Solid filled shapes — the ink (or each colour) becomes a filled region."}
           </p>
-          {mode === "color" && (
+
+          {mode === "outline" && (
             <div className="mt-3">
-              <SliderRow
-                label="Colours"
-                value={String(colors)}
-                min={2}
-                max={12}
-                raw={colors}
-                onChange={setColors}
+              <div className="mb-1 text-xs font-semibold text-neutral-900">Method</div>
+              <Tabs
+                label="Outline method"
+                tabs={[
+                  ["centreline", "Centreline"],
+                  ["contour", "Contour"]
+                ]}
+                active={outlineMethod}
+                onPick={(t) => setOutlineMethod(t as OutlineMethod)}
               />
+              <p className="mt-2 text-xs text-neutral-900">
+                {outlineMethod === "centreline"
+                  ? "One line down the middle of each stroke — a Make2D / pen drawing becomes single editable paths."
+                  : "Strokes the boundary of the ink — the silhouette / edge of filled shapes (thick lines give a double edge)."}
+              </p>
+            </div>
+          )}
+
+          {mode === "fill" && (
+            <div className="mt-3">
+              <div className="mb-1 text-xs font-semibold text-neutral-900">Style</div>
+              <Tabs
+                label="Fill style"
+                tabs={[
+                  ["mono", "Mono"],
+                  ["colour", "Colour"]
+                ]}
+                active={fillStyle}
+                onPick={(t) => setFillStyle(t as FillStyle)}
+              />
+              <p className="mt-2 text-xs text-neutral-900">
+                {fillStyle === "mono"
+                  ? "A single filled colour — silhouettes, logos, poché. Interior holes drop out (even-odd)."
+                  : "Posterises the image and fills each flat colour band as its own layer."}
+              </p>
+              {fillStyle === "colour" && (
+                <div className="mt-3">
+                  <SliderRow label="Colours" value={String(colors)} min={2} max={12} raw={colors} onChange={setColors} />
+                </div>
+              )}
             </div>
           )}
         </Section>
 
-        {inkControls && (
+        {usesThreshold && (
           <Section title="Ink & threshold" open={open.ink} onToggle={() => toggle("ink")}>
-            <CheckRow label="Auto threshold (Otsu)" checked={autoThreshold} onChange={setAuto} />
-            <div className="mt-2">
-              <SliderRow
-                label="Threshold"
-                value={autoThreshold && result ? `${result.threshold} (auto)` : String(threshold)}
-                min={1}
-                max={254}
-                raw={autoThreshold && result ? result.threshold : threshold}
-                disabled={autoThreshold}
-                onChange={(v) => {
-                  setThreshold(v);
-                  setAuto(false);
-                }}
-              />
-            </div>
+            <CheckRow label="Adaptive (uneven lighting)" checked={adaptive} onChange={setAdaptive} />
+            {adaptive ? (
+              <div className="mt-2 space-y-3">
+                <SliderRow label="Local radius" value={`${adaptiveRadius} px`} min={3} max={60} raw={adaptiveRadius} onChange={setAdaptiveRadius} />
+                <SliderRow label="Bias" value={String(adaptiveBias)} min={0} max={40} raw={adaptiveBias} onChange={setAdaptiveBias} />
+                <p className="text-[11px] text-neutral-900">
+                  Thresholds each pixel against its neighbourhood — pulls ink out of shadowed phone photos. Bias up = stricter.
+                </p>
+              </div>
+            ) : (
+              <div className="mt-2 space-y-2">
+                <CheckRow label="Auto (Otsu)" checked={autoThreshold} onChange={setAuto} />
+                <SliderRow
+                  label="Threshold"
+                  value={autoThreshold && result ? `${result.threshold} (auto)` : String(threshold)}
+                  min={1}
+                  max={254}
+                  raw={autoThreshold && result && result.threshold >= 0 ? result.threshold : threshold}
+                  disabled={autoThreshold}
+                  onChange={(v) => {
+                    setThreshold(v);
+                    setAuto(false);
+                  }}
+                />
+              </div>
+            )}
             <div className="mt-2">
               <CheckRow label="Invert (light ink on dark)" checked={invert} onChange={setInvert} />
-            </div>
-            <div className="mt-3">
-              <SliderRow label="Despeckle" value={`${despeckle} px²`} min={0} max={80} raw={despeckle} onChange={setDespeckle} />
             </div>
           </Section>
         )}
 
+        <Section title="Cleanup" open={open.cleanup} onToggle={() => toggle("cleanup")}>
+          <SliderRow label="Pre-blur" value={blur === 0 ? "off" : `${blur} px`} min={0} max={6} raw={blur} onChange={setBlur} />
+          <div className="mt-1 mb-3 text-[11px] text-neutral-900">Softens grain &amp; noise before tracing.</div>
+          <SliderRow
+            label="Clean up"
+            value={morphAmt === 0 ? "off" : morphAmt > 0 ? `bridge ${morphAmt}` : `open ${-morphAmt}`}
+            min={-4}
+            max={4}
+            raw={morphAmt}
+            onChange={setMorphAmt}
+          />
+          <div className="mt-1 mb-3 text-[11px] text-neutral-900">
+            − drops specks &amp; shaves fuzz · + bridges hairline gaps and joins broken strokes.
+          </div>
+          <SliderRow label="Despeckle" value={`${despeckle} px²`} min={0} max={150} raw={despeckle} onChange={setDespeckle} />
+          <div className="mt-3">
+            <SliderRow label="Min feature / hole" value={`${holeArea} px²`} min={0} max={150} raw={holeArea} onChange={setHoleArea} />
+          </div>
+          <div className="mt-1 text-[11px] text-neutral-900">Drops isolated specks and tiny loops / holes below this area.</div>
+        </Section>
+
         <Section title="Shape & smoothing" open={open.shape} onToggle={() => toggle("shape")}>
-          {!inkControls && (
-            <div className="mb-3">
-              <SliderRow label="Despeckle" value={`${despeckle} px²`} min={0} max={80} raw={despeckle} onChange={setDespeckle} />
-            </div>
-          )}
           <SliderRow label="Detail (simplify)" value={detail.toFixed(1)} min={0} max={6} step={0.1} raw={detail} onChange={setDetail} />
           <div className="mt-1 mb-3 text-[11px] text-neutral-900">Lower = follows every wobble. Higher = fewer, cleaner nodes.</div>
           <SliderRow label="Smoothing" value={`${Math.round(smooth * 100)}%`} min={0} max={100} raw={Math.round(smooth * 100)} onChange={(v) => setSmooth(v / 100)} />
@@ -544,12 +629,14 @@ export default function Vectorize() {
             <SliderRow label="Corner threshold" value={`${corner}°`} min={20} max={160} raw={corner} onChange={setCorner} />
           </div>
           <div className="mt-1 text-[11px] text-neutral-900">Turns sharper than this stay hard corners; gentler ones curve.</div>
-          {mode === "centreline" && (
-            <>
-              <div className="mt-3">
-                <SliderRow label="Min line length" value={`${minLength} px`} min={0} max={40} raw={minLength} onChange={setMinLength} />
-              </div>
+          {mode === "outline" && outlineMethod === "centreline" && (
+            <div className="mt-3">
+              <SliderRow label="Min line length" value={`${minLength} px`} min={0} max={40} raw={minLength} onChange={setMinLength} />
               <div className="mt-1 text-[11px] text-neutral-900">Drops skeleton spurs and crumbs at crossings.</div>
+            </div>
+          )}
+          {mode === "outline" && (
+            <>
               <div className="mt-3">
                 <SliderRow label="Stroke weight" value={strokeWidth.toFixed(1)} min={0.3} max={8} step={0.1} raw={strokeWidth} onChange={setStrokeWidth} />
               </div>
@@ -558,7 +645,7 @@ export default function Vectorize() {
               </div>
             </>
           )}
-          {mode === "outline" && (
+          {mode === "fill" && fillStyle === "mono" && (
             <div className="mt-3">
               <ColorRow label="Fill colour" value={fill} onChange={setFill} />
             </div>
@@ -676,7 +763,7 @@ export default function Vectorize() {
             <span className="font-semibold">{status}</span>
             {stats && (
               <span className="tabular-nums">
-                {mode === "color" ? `${stats.subpaths} shapes` : `${stats.regions} region${stats.regions === 1 ? "" : "s"}`} ·{" "}
+                {isColour ? `${stats.subpaths} shapes` : `${stats.regions} region${stats.regions === 1 ? "" : "s"}`} ·{" "}
                 {stats.subpaths} path{stats.subpaths === 1 ? "" : "s"} · {stats.nodes} nodes · ~{stats.kb} KB ·{" "}
                 {Math.round(traceMs)} ms
               </span>

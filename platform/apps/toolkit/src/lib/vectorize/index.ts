@@ -1,6 +1,9 @@
 // Vectorize engine — public surface. Pure functions on typed arrays; no DOM.
 export * from "./types";
-export { toGray, otsu, binarize, despeckle } from "./binarize";
+export { integral, boxSum } from "./integral";
+export { toGray, otsu, binarize, adaptiveBinarize, despeckle } from "./binarize";
+export { blurChannel, blurRGBA } from "./blur";
+export { dilate, erode, morph } from "./morph";
 export { rdp, rdpClosed, polylineLength, polygonArea } from "./simplify";
 export { fitPath, flattenCmds } from "./fit";
 export { traceLoops } from "./outline";

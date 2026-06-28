@@ -2,6 +2,7 @@
 // and a connected-component despeckle. Same integer luma weights as the Drawing
 // Cleaner so the two tools "see" ink the same way.
 
+import { boxSum, integral } from "./integral";
 import type { RGBA } from "./types";
 
 // Luma 0..255, compositing over white via alpha so transparent PNGs read as a
@@ -66,6 +67,37 @@ export function binarize(gray: Uint8Array, threshold: number, invert: boolean): 
     for (let i = 0; i < n; i++) bin[i] = gray[i] > threshold ? 1 : 0;
   } else {
     for (let i = 0; i < n; i++) bin[i] = gray[i] <= threshold ? 1 : 0;
+  }
+  return bin;
+}
+
+// Adaptive (local-mean) threshold — ink is darker than the average of its
+// `radius` neighbourhood by at least `bias`. Handles uneven lighting / shadowed
+// phone photos where a single global threshold blows out one corner. O(1)/pixel
+// via the integral image. `bias` lifts faint ink in (higher = stricter).
+export function adaptiveBinarize(
+  gray: Uint8Array,
+  w: number,
+  h: number,
+  radius: number,
+  bias: number,
+  invert: boolean
+): Uint8Array {
+  const r = Math.max(1, Math.round(radius));
+  const I = integral(gray, w, h);
+  const bin = new Uint8Array(w * h);
+  for (let y = 0; y < h; y++) {
+    const y0 = y - r < 0 ? 0 : y - r;
+    const y1 = y + r >= h ? h - 1 : y + r;
+    for (let x = 0; x < w; x++) {
+      const x0 = x - r < 0 ? 0 : x - r;
+      const x1 = x + r >= w ? w - 1 : x + r;
+      const cnt = (x1 - x0 + 1) * (y1 - y0 + 1);
+      const mean = boxSum(I, w, x0, y0, x1, y1) / cnt;
+      const v = gray[y * w + x];
+      const ink = invert ? v >= mean + bias : v <= mean - bias;
+      bin[y * w + x] = ink ? 1 : 0;
+    }
   }
   return bin;
 }
