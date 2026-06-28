@@ -114,6 +114,17 @@ def bake(model, params, site):
         m.Normals.ComputeNormals()
         return m
 
+    def quad_mesh(quads):   # mesh from world-space quads (gable-clipped wall slab)
+        m = r3.Mesh()
+        b = 0
+        for q in quads:
+            for p in q:
+                m.Vertices.Add(p[0], p[1], p[2])
+            m.Faces.AddFace(b, b + 1, b + 2, b + 3)
+            b += 4
+        m.Normals.ComputeNormals()
+        return m
+
     def add_box(W, L, zb, zt, R, cx, cy, lname):
         c = [(-W / 2, -L / 2), (W / 2, -L / 2), (W / 2, L / 2), (-W / 2, L / 2)]
         f3.Objects.AddMesh(box_mesh([pt(x, y, zb, R, cx, cy) for x, y in c], [pt(x, y, zt, R, cx, cy) for x, y in c]), attr(li[lname]))
@@ -123,11 +134,11 @@ def bake(model, params, site):
     # plinth slab
     add_box(Pl["W"], Pl["L"], -Pl["t"], 0, Pl["R"], Pl["cx"], Pl["cy"], "Plinth")
 
-    # walls: 4 slabs forming a tube (no floor/ceiling)
+    # walls: gable-clipped slabs (match the browser); one mesh PER wall so the
+    # re-import can recover the wall height from the shortest (eave) wall.
     hw, hl, tw = Wl["W"] / 2, Wl["L"] / 2, Wl["wt"]
     for (x0, x1, y0, y1) in [(hw - tw, hw, -hl, hl), (-hw, -hw + tw, -hl, hl), (-hw, hw, hl - tw, hl), (-hw, hw, -hl, -hl + tw)]:
-        c = [(x0, y0), (x1, y0), (x1, y1), (x0, y1)]
-        f3.Objects.AddMesh(box_mesh([pt(x, y, 0, Wl["R"], Wl["cx"], Wl["cy"]) for x, y in c], [pt(x, y, Wl["h"], Wl["R"], Wl["cx"], Wl["cy"]) for x, y in c]), attr(li["Walls"]))
+        f3.Objects.AddMesh(quad_mesh(gc.clipped_wall_quads(x0, x1, y0, y1, Wl, Rf, G, north)), attr(li["Walls"]))
 
     # roof: two slope slabs with thickness (independent pitches)
     def slope(eaveX, ridgeX, eaveZ, nx):

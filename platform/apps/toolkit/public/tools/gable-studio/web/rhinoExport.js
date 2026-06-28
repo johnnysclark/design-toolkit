@@ -3,7 +3,7 @@
 // layers mirror python/run_rhino3dm.py exactly (Plinth slab / Walls tube / Roof
 // slopes / Apertures), so the file re-imports cleanly. Lazy-loaded; returns null
 // if rhino3dm can't load (the python in the bundle still rebuilds everything).
-import { rotZ, scale, add } from "./core.js";
+import { rotZ, scale, add, clippedWallQuads } from "./core.js";
 
 let _rhino = null;
 async function getRhino() {
@@ -33,6 +33,13 @@ export async function buildThreeDM(model) {
     for (const f of [[0, 1, 2, 3], [4, 5, 6, 7], [0, 1, 5, 4], [1, 2, 6, 5], [2, 3, 7, 6], [3, 0, 4, 7]]) m.faces().addQuadFace(f[0], f[1], f[2], f[3]);
     return m;
   };
+  // mesh from a list of world-space quads (gable-clipped wall slabs)
+  const quadMesh = (quads) => {
+    const m = new rhino.Mesh();
+    let b = 0;
+    for (const q of quads) { for (const p of q) m.vertices().add(p[0], p[1], p[2]); m.faces().addQuadFace(b, b + 1, b + 2, b + 3); b += 4; }
+    return m;
+  };
   const addBox = (W, L, zb, zt, R, cx, cy, lname) => {
     const c = [[-W / 2, -L / 2], [W / 2, -L / 2], [W / 2, L / 2], [-W / 2, L / 2]];
     doc.objects().addMesh(boxMesh(c.map(([x, y]) => w(x, y, zb, R, cx, cy, n)), c.map(([x, y]) => w(x, y, zt, R, cx, cy, n))), attr(li[lname]));
@@ -41,11 +48,11 @@ export async function buildThreeDM(model) {
   const Pl = P.plinth, Wl = P.walls, Rf = P.roof;
   addBox(Pl.W, Pl.L, -Pl.t, 0, Pl.R, Pl.cx, Pl.cy, "Plinth");
 
+  // walls: gable-clipped slabs (match the browser); one mesh PER wall so the
+  // re-import can recover the wall height from the shortest (eave) wall.
   const hw = Wl.W / 2, hl = Wl.L / 2, tw = Wl.wt;
-  for (const [x0, x1, y0, y1] of [[hw - tw, hw, -hl, hl], [-hw, -hw + tw, -hl, hl], [-hw, hw, hl - tw, hl], [-hw, hw, -hl, -hl + tw]]) {
-    const c = [[x0, y0], [x1, y0], [x1, y1], [x0, y1]];
-    doc.objects().addMesh(boxMesh(c.map(([x, y]) => w(x, y, 0, Wl.R, Wl.cx, Wl.cy, n)), c.map(([x, y]) => w(x, y, Wl.h, Wl.R, Wl.cx, Wl.cy, n))), attr(li.Walls));
-  }
+  for (const [x0, x1, y0, y1] of [[hw - tw, hw, -hl, hl], [-hw, -hw + tw, -hl, hl], [-hw, hw, hl - tw, hl], [-hw, hw, -hl, -hl + tw]])
+    doc.objects().addMesh(quadMesh(clippedWallQuads(x0, x1, y0, y1, Wl, Rf, G, n)), attr(li.Walls));
 
   const slope = (eaveX, ridgeX, eaveZ, nx) => {
     const k = Math.hypot(nx, 1) || 1, nl = [nx / k, 0, 1 / k];

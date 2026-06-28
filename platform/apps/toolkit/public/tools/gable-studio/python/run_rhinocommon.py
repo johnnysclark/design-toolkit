@@ -63,11 +63,17 @@ def main():
     Pl, Wl, Rf = P["plinth"], P["walls"], P["roof"]
     box("Plinth", Pl["W"], Pl["L"], -Pl["t"], 0, Pl["R"], Pl["cx"], Pl["cy"])
 
+    # walls: gable-clipped slabs (match the browser) as meshes; one PER wall so
+    # the web re-import can recover the wall height from the shortest (eave) wall.
     hw, hl, tw = Wl["W"] / 2, Wl["L"] / 2, Wl["wt"]
     for (x0, x1, y0, y1) in [(hw - tw, hw, -hl, hl), (-hw, -hw + tw, -hl, hl), (-hw, hw, hl - tw, hl), (-hw, hw, -hl, -hl + tw)]:
-        c = [(x0, y0), (x1, y0), (x1, y1), (x0, y1)]
-        pts = [w(x, y, 0, Wl["R"], Wl["cx"], Wl["cy"]) for x, y in c] + [w(x, y, Wl["h"], Wl["R"], Wl["cx"], Wl["cy"]) for x, y in c]
-        oid = rs.AddBox(pts)
+        quads = gc.clipped_wall_quads(x0, x1, y0, y1, Wl, Rf, G, north)
+        verts, faces, b = [], [], 0
+        for q in quads:
+            verts += [(p[0], p[1], p[2]) for p in q]
+            faces.append([b, b + 1, b + 2, b + 3])
+            b += 4
+        oid = rs.AddMesh(verts, faces)
         if oid:
             rs.ObjectLayer(oid, "Walls")
 

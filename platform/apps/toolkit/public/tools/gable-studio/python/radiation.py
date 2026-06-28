@@ -10,7 +10,7 @@ If you edit web/radiation.js (or the raycast/massing in web/core.js), edit here.
 Conventions: +X East, +Y North, +Z Up; azimuth clockwise from N.
 """
 import math
-from gable_core import rotZ, build_model
+from gable_core import rotZ, build_model, clipped_wall_quads
 
 D2R = math.pi / 180.0
 
@@ -88,8 +88,10 @@ def massing_triangles(model):
     hw = Wl["W"] / 2
     hl = Wl["L"] / 2
     tw = Wl["wt"]
+    # walls: gable-clipped slabs (the SAME quads the viewport renders)
     for (x0, x1, y0, y1) in [[hw - tw, hw, -hl, hl], [-hw, -hw + tw, -hl, hl], [-hw, hw, hl - tw, hl], [-hw, hw, -hl, -hl + tw]]:
-        prism([[x0, y0], [x1, y0], [x1, y1], [x0, y1]], 0, Wl["h"], Wl["R"], Wl["cx"], Wl["cy"])
+        for qd in clipped_wall_quads(x0, x1, y0, y1, Wl, P["roof"], G, n):
+            quad(qd[0], qd[1], qd[2], qd[3])
 
     Rf = P["roof"]
 
