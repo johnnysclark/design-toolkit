@@ -5,10 +5,12 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Scale Bar &amp; North</title>
 <!--
-  Scale Bar & North — make a correct graphic scale bar and a north arrow for a
-  drawing sheet. Pick a scale (metric ratio or imperial architect's scale), set
-  the length and divisions, and export an SVG sized in real millimetres (so it
-  prints true at 100%) or a PNG. Pure SVG, nothing uploaded.
+  Scale Bar & North — a fully parametric graphic scale bar + north arrow for a
+  drawing sheet. Choose a scale, the number of cells and what each cell is worth,
+  an optional sub-divided lead, exactly which values get labelled (every-Nth plus
+  your own custom labels), and independent text sizes for the numbers, caption,
+  unit and the north "N". Exports an SVG sized in real millimetres (so it prints
+  true at 100%) or a PNG. Pure SVG, nothing uploaded.
 
   Part of the All Means Works design toolkit (2D Tooling).
 -->
@@ -23,16 +25,17 @@ header { padding: 10px 18px; background: var(--surface); border-bottom: 2px soli
 header h1 { font-size: 18px; font-weight: 800; letter-spacing: -0.01em; text-transform: uppercase; }
 header .subtitle { font-size: 12px; }
 .app { display: flex; flex: 1; overflow: hidden; min-height: 0; }
-.sidebar { width: 300px; flex-shrink: 0; background: var(--surface); border-right: 1px solid var(--line);
+.sidebar { width: 320px; flex-shrink: 0; background: var(--surface); border-right: 1px solid var(--line);
   overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 16px; }
 .group { display: flex; flex-direction: column; gap: 9px; }
 .group > .label { font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.06em;
   border-bottom: 1px solid var(--line); padding-bottom: 5px; }
+.sub { font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; margin-top: 3px; }
 .row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .row label { font-size: 13px; }
-.row .val { font-size: 12px; font-variant-numeric: tabular-nums; min-width: 56px; text-align: right; }
+.row .val { font-size: 12px; font-variant-numeric: tabular-nums; min-width: 64px; text-align: right; }
 input[type="range"] { width: 100%; accent-color: var(--accent); }
-input[type="number"], select { width: 100%; font: inherit; font-size: 13px; padding: 7px 8px;
+input[type="number"], input[type="text"], select { width: 100%; font: inherit; font-size: 13px; padding: 7px 8px;
   border: 1px solid var(--line); border-radius: 6px; color: var(--ink); background: #fff; }
 input[type="color"] { width: 36px; height: 28px; border: 1px solid var(--line); border-radius: 6px; padding: 0; background: #fff; }
 .seg { display: flex; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
@@ -46,19 +49,30 @@ input[type="color"] { width: 36px; height: 28px; border: 1px solid var(--line); 
   border: 1px solid var(--ink); background: #fff; color: var(--ink); cursor: pointer; text-align: center; }
 .btn:hover { background: #f0f0ee; }
 .btn.accent { background: var(--accent); color: #fff; border-color: var(--accent); }
+.btn.sm { padding: 7px 10px; font-size: 12px; }
 .two { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.zoomrow { display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: center; }
+.pins { display: flex; flex-direction: column; gap: 6px; }
+.pinrow { display: grid; grid-template-columns: 1fr 1fr 28px; gap: 6px; align-items: center; }
+.pinrow input { padding: 5px 6px; font-size: 12px; }
+.pinrow button { border: 1px solid var(--line); border-radius: 6px; background: #fff; cursor: pointer;
+  font-size: 15px; line-height: 1; padding: 4px 0; color: var(--ink); }
+.pinrow button:hover { background: #f0f0ee; }
+.muted-disabled { opacity: 0.4; pointer-events: none; }
 .hint { font-size: 11px; line-height: 1.45; }
-.stage { position: relative; flex: 1; min-width: 0; display: flex; align-items: center; justify-content: center; padding: 28px;
-  background: #f7f7f5; }
-#wrap { background: #fff; box-shadow: 0 2px 18px rgba(0,0,0,0.12); padding: 28px 34px; }
-.note { position: absolute; bottom: 12px; left: 12px; font-size: 12px; background: rgba(255,255,255,0.9);
-  border: 1px solid var(--line); border-radius: 6px; padding: 5px 10px; }
+.stage { position: relative; flex: 1; min-width: 0; display: flex; align-items: safe center; justify-content: safe center;
+  padding: 28px; overflow: auto; background: #f7f7f5;
+  background-image: radial-gradient(var(--line) 1px, transparent 1px); background-size: 22px 22px; }
+#wrap { background: #fff; box-shadow: 0 2px 18px rgba(0,0,0,0.12); padding: 28px 34px; flex-shrink: 0; }
+#art { display: block; }
+.note { position: absolute; bottom: 12px; left: 12px; font-size: 12px; background: rgba(255,255,255,0.92);
+  border: 1px solid var(--line); border-radius: 6px; padding: 5px 10px; pointer-events: none; }
 </style>
 </head>
 <body>
 <header>
   <h1>Scale&nbsp;Bar&nbsp;&amp;&nbsp;North</h1>
-  <span class="subtitle">A correct graphic scale bar + north arrow for your sheet</span>
+  <span class="subtitle">A fully parametric graphic scale bar + north arrow for your sheet</span>
 </header>
 
 <div class="app">
@@ -75,15 +89,61 @@ input[type="color"] { width: 36px; height: 28px; border: 1px solid var(--line); 
 
     <div class="group">
       <div class="label">Bar</div>
-      <div class="row"><label>Units / division</label><span class="val" id="perV"></span></div>
-      <input type="range" id="per" min="1" max="100" value="10">
-      <div class="row"><label>Divisions</label><span class="val" id="ndivV">4</span></div>
-      <input type="range" id="ndiv" min="2" max="10" value="4">
-      <div class="row"><label>Fine sub-divisions</label><span class="val" id="subV">10</span></div>
-      <input type="range" id="sub" min="0" max="20" value="10">
-      <div class="row"><label>Bar height</label><span class="val" id="hV">3 mm</span></div>
-      <input type="range" id="h" min="1" max="8" value="3">
+      <div class="row"><label>Units / cell</label><span class="val" id="perV"></span></div>
+      <input type="range" id="per" min="1" max="100" value="5">
+      <div class="row"><label>Cells</label><span class="val" id="ndivV">4</span></div>
+      <input type="range" id="ndiv" min="1" max="24" value="4">
+      <label class="check"><input type="checkbox" id="leadOn" checked> Sub-divided lead cell</label>
+      <div class="row"><label>Lead sub-cells</label><span class="val" id="subV">10</span></div>
+      <input type="range" id="sub" min="1" max="20" value="10">
+      <div class="row"><label>Bar thickness</label><span class="val" id="hV">2.5 mm</span></div>
+      <input type="range" id="h" min="0.5" max="10" step="0.5" value="2.5">
       <div class="row"><label>Drawn length</label><span class="val" id="drawnV"></span></div>
+    </div>
+
+    <div class="group">
+      <div class="label">Labels</div>
+      <div class="row"><label>Label every</label><span class="val" id="everyV">every cell</span></div>
+      <input type="range" id="every" min="1" max="12" value="1">
+      <label class="check"><input type="checkbox" id="labelLead" checked> Label the lead value</label>
+      <label class="check"><input type="checkbox" id="unitSub" checked> Unit on last number</label>
+      <div class="sub">Custom labels</div>
+      <div class="pins" id="pins"></div>
+      <button class="btn sm" id="addPin">+ Add label</button>
+      <div class="hint">Pin a value (in <span id="pinUnit">ft</span>) anywhere on the bar; optional text overrides the number. A custom label replaces the automatic one at the same spot.</div>
+    </div>
+
+    <div class="group">
+      <div class="label">Text sizes</div>
+      <div class="row"><label>Numbers</label><span class="val" id="fNumV">4 mm</span></div>
+      <input type="range" id="fNum" min="2" max="14" step="0.5" value="4">
+      <div class="row"><label>Caption</label><span class="val" id="fCapV">3.5 mm</span></div>
+      <input type="range" id="fCap" min="1.5" max="14" step="0.5" value="3.5">
+      <div class="row"><label>Unit</label><span class="val" id="fUnitV">2.5 mm</span></div>
+      <input type="range" id="fUnit" min="1" max="10" step="0.5" value="2.5">
+      <div class="row"><label>North &ldquo;N&rdquo;</label><span class="val" id="fNV">5 mm</span></div>
+      <input type="range" id="fN" min="2" max="16" step="0.5" value="5">
+      <div class="row"><label>Font</label></div>
+      <div class="seg" id="font">
+        <button data-f="sans" class="on">Sans</button>
+        <button data-f="mono">Mono</button>
+        <button data-f="serif">Serif</button>
+      </div>
+      <label class="check"><input type="checkbox" id="caption" checked> Show scale caption</label>
+    </div>
+
+    <div class="group">
+      <div class="label">Bar style</div>
+      <select id="barStyle">
+        <option value="checker">Two-row blocks (checker)</option>
+        <option value="alternating">Alternating (single row)</option>
+        <option value="open">Open boxes (outline + ticks)</option>
+        <option value="stepped">Stepped (castellated)</option>
+        <option value="ruler">Ruler (ticked scale)</option>
+        <option value="solid">Solid bar</option>
+        <option value="wavy">Wavy (scalloped lead)</option>
+      </select>
+      <div class="hint" id="styleHint"></div>
     </div>
 
     <div class="group">
@@ -99,22 +159,18 @@ input[type="color"] { width: 36px; height: 28px; border: 1px solid var(--line); 
     </div>
 
     <div class="group">
-      <div class="label">Bar style</div>
-      <select id="barStyle">
-        <option value="alternating">Alternating (filled blocks)</option>
-        <option value="open">Open boxes (outline + ticks)</option>
-        <option value="stepped">Stepped (castellated)</option>
-        <option value="ruler">Ruler (baseline + ticks)</option>
-        <option value="solid">Solid bar</option>
-        <option value="wavy">Wavy (scalloped lead)</option>
-      </select>
-      <div class="hint" id="styleHint"></div>
+      <div class="label">Colour</div>
+      <div class="row"><label>Ink</label><input type="color" id="ink" value="#111111"></div>
+      <div class="hint">Drawn at real millimetres for the chosen scale — export and place it at 100% on your sheet and it reads true.</div>
     </div>
 
     <div class="group">
-      <div class="label">Style</div>
-      <div class="row"><label>Ink</label><input type="color" id="ink" value="#111111"></div>
-      <div class="hint">The bar is drawn at real millimetres for the chosen scale — export and place it at 100% on your sheet and it reads true.</div>
+      <div class="label">Preview</div>
+      <div class="row"><label>Zoom</label><span class="val" id="zoomV">—</span></div>
+      <div class="zoomrow">
+        <input type="range" id="zoom" min="25" max="800" value="200">
+        <button class="btn sm" id="fitBtn">Fit</button>
+      </div>
     </div>
 
     <div class="group">
@@ -135,6 +191,7 @@ input[type="color"] { width: 36px; height: 28px; border: 1px solid var(--line); 
 <script>
 const $ = id => document.getElementById(id);
 const SVGNS = "http://www.w3.org/2000/svg";
+const PXMM = 3.7795275591;   // CSS px per mm at 96dpi → 100% zoom shows true paper size on screen
 
 // Scale tables. ratio = real / drawn. Metric: the number itself. Imperial: precomputed.
 const METRIC = [10,20,50,100,200,250,500,1000,1250,2500].map(r => ({ label: "1 : " + r, ratio: r }));
@@ -144,21 +201,40 @@ const IMPERIAL = [
   ['1" = 20\'', 240], ['1" = 30\'', 360], ['1" = 40\'', 480], ['1" = 50\'', 600], ['1" = 100\'', 1200]
 ].map(([label, ratio]) => ({ label, ratio }));
 
+const FONTS = {
+  sans:  "Helvetica, Arial, sans-serif",
+  mono:  "'DejaVu Sans Mono', 'SFMono-Regular', Menlo, 'Courier New', monospace",
+  serif: "Georgia, 'Times New Roman', serif"
+};
+
 const S = {
-  sys: "imperial", scaleIdx: 5, per: 10, ndiv: 4, sub: 10, h: 3,
-  north: true, northStyle: "simple", rot: 0, ink: "#111111", barStyle: "alternating"
+  sys: "imperial", scaleIdx: 5, per: 5, ndiv: 4,
+  leadOn: true, sub: 10,
+  h: 2.5,
+  labelEvery: 1, labelLead: true, unitSub: true,
+  pins: [],                                   // [{ v: "<units from 0>", t: "<optional text>" }]
+  caption: true,
+  fNum: 4, fCap: 3.5, fUnit: 2.5, fN: 5,      // independent text sizes (mm)
+  font: "sans",
+  barStyle: "checker",
+  north: true, northStyle: "simple", rot: 0,
+  ink: "#111111",
+  zoomPct: 200, zoomMode: "smart"             // smart = fit but keep numbers legible; fit = whole bar; manual = slider
 };
 
 const STYLE_HINTS = {
-  alternating: "Solid filled blocks alternating dark / light — the classic architectural scale.",
-  open: "Outlined boxes with a tick at every division — clean for line drawings.",
-  stepped: "Castellated square-wave profile; raised teeth mark alternating divisions.",
-  ruler: "A baseline with downward ticks — full-height at divisions, short at sub-divisions.",
-  solid: "One solid bar; divisions are read from the ticks and labels above.",
+  checker: "Two rows of filled blocks, offset like a checkerboard — the standard map / drawing scale bar.",
+  alternating: "A single row of filled blocks alternating dark / light.",
+  open: "Outlined boxes with a tick at every cell — clean over line drawings.",
+  stepped: "Castellated square-wave profile; raised teeth mark alternating cells.",
+  ruler: "An engineer's rule: top line with downward ticks, long at cells, short at sub-cells.",
+  solid: "One solid bar; values are read from the ticks and numbers above.",
   wavy: "Scalloped half-circle arcs over the sub-divided lead, then a plain line."
 };
+
 const table = () => S.sys === "metric" ? METRIC : IMPERIAL;
 const ratio = () => table()[S.scaleIdx].ratio;
+const scaleLabel = () => table()[S.scaleIdx].label;
 const unit = () => S.sys === "metric" ? "m" : "ft";
 const realMMperUnit = () => S.sys === "metric" ? 1000 : 304.8; // m or ft → mm
 
@@ -172,115 +248,166 @@ function fillScaleSelect() {
 const f = n => Math.round(n * 100) / 100;
 const niceNum = n => (Math.round(n * 1000) / 1000).toString();
 
-// north arrow as an SVG group, height ~ Hmm, centred at (cx, baseY going up)
-function northSVG(cx, topY, sizeMM, ink) {
-  const r = sizeMM / 2, rot = S.rot;
-  let g = `<g transform="rotate(${rot} ${f(cx)} ${f(topY + r)})" fill="${ink}" stroke="${ink}">`;
+// north arrow group; arrow body spans topY..topY+sizeMM, "N" (size letterMM) sits above the tip
+function northSVG(cx, topY, sizeMM, letterMM, ink, fontFam) {
+  const r = sizeMM / 2, rot = S.rot, cy = topY + r;
+  let g = `<g transform="rotate(${rot} ${f(cx)} ${f(cy)})">`;
   if (S.northStyle === "needle") {
-    g += `<polygon points="${f(cx)},${f(topY)} ${f(cx - r*0.32)},${f(topY + sizeMM)} ${f(cx)},${f(topY + sizeMM*0.78)} ${f(cx + r*0.32)},${f(topY + sizeMM)}" />`;
+    g += `<polygon points="${f(cx)},${f(topY)} ${f(cx - r*0.3)},${f(topY + sizeMM)} ${f(cx)},${f(topY + sizeMM*0.78)} ${f(cx + r*0.3)},${f(topY + sizeMM)}" fill="${ink}"/>`;
   } else if (S.northStyle === "star") {
-    const cy = topY + r; let pts = "";
-    for (let k = 0; k < 8; k++) { const a = -Math.PI/2 + k * Math.PI/4; const rr = k % 2 ? r*0.32 : r; pts += `${f(cx + rr*Math.cos(a))},${f(cy + rr*Math.sin(a))} `; }
-    g += `<polygon points="${pts.trim()}" />`;
+    let pts = "";
+    for (let k = 0; k < 8; k++) { const a = -Math.PI/2 + k * Math.PI/4; const rr = k % 2 ? r*0.34 : r; pts += `${f(cx + rr*Math.cos(a))},${f(cy + rr*Math.sin(a))} `; }
+    g += `<polygon points="${pts.trim()}" fill="${ink}"/>`;
   } else { // simple half-filled triangle
-    g += `<polygon points="${f(cx)},${f(topY)} ${f(cx - r*0.5)},${f(topY + sizeMM)} ${f(cx)},${f(topY + sizeMM*0.7)}" fill="${ink}"/>`;
-    g += `<polygon points="${f(cx)},${f(topY)} ${f(cx + r*0.5)},${f(topY + sizeMM)} ${f(cx)},${f(topY + sizeMM*0.7)}" fill="#fff" stroke="${ink}" stroke-width="0.4"/>`;
+    g += `<polygon points="${f(cx)},${f(topY)} ${f(cx - r*0.5)},${f(topY + sizeMM)} ${f(cx)},${f(topY + sizeMM*0.72)}" fill="${ink}"/>`;
+    g += `<polygon points="${f(cx)},${f(topY)} ${f(cx + r*0.5)},${f(topY + sizeMM)} ${f(cx)},${f(topY + sizeMM*0.72)}" fill="#fff" stroke="${ink}" stroke-width="${f(sizeMM*0.035)}"/>`;
   }
   g += `</g>`;
-  // upright "N" label above the arrow tip (label does not rotate)
-  g += `<text x="${f(cx)}" y="${f(topY - sizeMM*0.18)}" font-family="sans-serif" font-size="${f(sizeMM*0.45)}" font-weight="700" text-anchor="middle" fill="${ink}">N</text>`;
+  g += `<text x="${f(cx)}" y="${f(topY - letterMM*0.35)}" font-family="${fontFam}" font-size="${f(letterMM)}" font-weight="700" text-anchor="middle" fill="${ink}">N</text>`;
   return g;
 }
 
-// Build the full SVG (in mm). pad = margin in mm.
+// Build the full SVG, all coordinates in real millimetres.
 function buildSVG() {
-  const r = ratio(), ink = S.ink;
-  const drawnPerDiv = (S.per * realMMperUnit()) / r;   // mm on paper per division
-  const Lmm = drawnPerDiv * S.ndiv;                    // main bar drawn length (mm)
-  const barH = S.h;
-  const ext = drawnPerDiv;                             // sub-divided extension to the left of 0
+  const r = ratio(), ink = S.ink, fontFam = FONTS[S.font];
+  const upm = realMMperUnit() / r;                    // paper mm per real unit
+  const dpd = S.per * upm;                            // mm per cell
+  const leadOn = S.leadOn;
+  const ext = leadOn ? dpd : 0;                       // sub-divided lead width (left of 0)
+  const Lmm = dpd * S.ndiv;                           // main bar drawn length
   const totalW = Lmm + ext;
-  const fontMM = Math.max(2, barH * 0.95);
-  const tickUp = barH * 1.1;
-  const pad = Math.max(6, fontMM * 1.4);
-  const northH = S.north ? Math.max(10, barH * 4) : 0;
-  const northGap = S.north ? fontMM * 2 : 0;
+  const barH = S.h;
+  const lab = S.fNum, cap = S.fCap, uni = S.fUnit, nLet = S.fN;
+  const sw = Math.max(0.25, barH * 0.08);
+  const tickLen = Math.max(barH * 0.9, lab * 0.7);
+  const labelGap = lab * 0.45;
+  const capLine = S.caption ? cap * 1.35 : 0;
 
-  const W = totalW + pad * 2;
-  const H = pad * 2 + barH + tickUp + fontMM * 1.4 + (S.north ? northH + northGap : 0);
-  const x0 = pad + ext;          // x of "0"
-  const topNorth = pad;
-  const barY = pad + (S.north ? northH + northGap : 0);
+  const hpad = Math.max(lab * 2.2, uni * 2.5, 6);     // horizontal room so end numbers don't clip
+  const xLeft = hpad;                                 // far-left end of the bar
+  const x0 = xLeft + ext;                             // x of "0"
+  const xAt = v => x0 + v * upm;                      // x for value v (units from 0)
+
+  // vertical layout, top → bottom
+  let y = Math.max(lab * 0.7, 4);
+  let northTop = 0, northH = 0;
+  if (S.north) { northH = Math.max(nLet * 2.6, barH * 4); northTop = y + nLet * 0.55; y = northTop + northH + lab * 1.0; }
+  const labelBaseline = y + lab;
+  const barTopY = labelBaseline + labelGap + tickLen;
+  const barBotY = barTopY + barH;
+  const capBaseline = barBotY + capLine;
+
+  const capW = S.caption ? scaleLabel().length * cap * 0.62 : 0;
+  const W = Math.max(totalW + hpad * 2, xLeft + capW + hpad);
+  const H = (S.caption ? capBaseline : barBotY) + Math.max(lab * 0.4, 3);
+
+  const ln = (x1, y1, x2, y2) => `<line x1="${f(x1)}" y1="${f(y1)}" x2="${f(x2)}" y2="${f(y2)}" stroke="${ink}" stroke-width="${f(sw)}"/>`;
 
   let b = `<rect x="0" y="0" width="${f(W)}" height="${f(H)}" fill="#ffffff"/>`;
+  if (S.north) b += northSVG(xLeft + totalW / 2, northTop, northH, nLet, ink, fontFam);
 
-  if (S.north) b += northSVG(W / 2, topNorth, northH, ink);
-
-  // segments: extension (sub parts) then ndiv main divisions, alternating fill
+  // cells: sub-divided lead (optional), then ndiv main cells, alternating fill index
   const segs = [];
-  if (S.sub > 0) for (let k = 0; k < S.sub; k++) segs.push({ x: pad + (ext * k / S.sub), w: ext / S.sub, fillIdx: k });
-  else segs.push({ x: pad, w: ext, fillIdx: 0 });
-  for (let k = 0; k < S.ndiv; k++) segs.push({ x: x0 + drawnPerDiv * k, w: drawnPerDiv, fillIdx: (S.sub > 0 ? S.sub : 1) + k });
+  if (leadOn) {
+    if (S.sub > 0) for (let k = 0; k < S.sub; k++) segs.push({ x: xLeft + ext * k / S.sub, w: ext / S.sub, fi: k });
+    else segs.push({ x: xLeft, w: ext, fi: 0 });
+  }
+  const base = leadOn ? (S.sub > 0 ? S.sub : 1) : 0;
+  for (let k = 0; k < S.ndiv; k++) segs.push({ x: x0 + dpd * k, w: dpd, fi: base + k });
 
-  const sw = 0.3, barB = barY + barH;
-  if (S.barStyle === "open") {
-    // outlined boxes: outline + a tick at every division boundary
-    b += `<rect x="${f(pad)}" y="${f(barY)}" width="${f(totalW)}" height="${f(barH)}" fill="none" stroke="${ink}" stroke-width="${sw}"/>`;
-    for (const s of segs) b += `<line x1="${f(s.x)}" y1="${f(barY)}" x2="${f(s.x)}" y2="${f(barB)}" stroke="${ink}" stroke-width="${sw}"/>`;
-    b += `<line x1="${f(pad + totalW)}" y1="${f(barY)}" x2="${f(pad + totalW)}" y2="${f(barB)}" stroke="${ink}" stroke-width="${sw}"/>`;
+  // ── the bar itself ───────────────────────────────────────────────
+  if (S.barStyle === "checker") {
+    // two offset rows of filled blocks — the typical map / drawing scale bar
+    const midY = barTopY + barH / 2, half = barH / 2;
+    for (const s of segs) {
+      const yy = s.fi % 2 === 0 ? barTopY : midY;   // even cells fill the top row, odd cells the bottom
+      b += `<rect x="${f(s.x)}" y="${f(yy)}" width="${f(s.w)}" height="${f(half)}" fill="${ink}"/>`;
+    }
+    b += `<rect x="${f(xLeft)}" y="${f(barTopY)}" width="${f(totalW)}" height="${f(barH)}" fill="none" stroke="${ink}" stroke-width="${f(sw)}"/>`;
+    b += ln(xLeft, midY, xLeft + totalW, midY);
+  } else if (S.barStyle === "open") {
+    b += `<rect x="${f(xLeft)}" y="${f(barTopY)}" width="${f(totalW)}" height="${f(barH)}" fill="none" stroke="${ink}" stroke-width="${f(sw)}"/>`;
+    for (const s of segs) b += ln(s.x, barTopY, s.x, barBotY);
+    b += ln(xLeft + totalW, barTopY, xLeft + totalW, barBotY);
   } else if (S.barStyle === "stepped") {
-    // castellated square wave — raised teeth on even (filled-index) segments
-    let d = `M ${f(pad)} ${f(barB)}`;
-    for (const s of segs) { const y = s.fillIdx % 2 === 0 ? barY : barB; d += ` L ${f(s.x)} ${f(y)} L ${f(s.x + s.w)} ${f(y)}`; }
-    d += ` L ${f(pad + totalW)} ${f(barB)} Z`;
-    b += `<path d="${d}" fill="none" stroke="${ink}" stroke-width="${sw}"/>`;
+    let d = `M ${f(xLeft)} ${f(barBotY)}`;
+    for (const s of segs) { const yy = s.fi % 2 === 0 ? barTopY : barBotY; d += ` L ${f(s.x)} ${f(yy)} L ${f(s.x + s.w)} ${f(yy)}`; }
+    d += ` L ${f(xLeft + totalW)} ${f(barBotY)} Z`;
+    b += `<path d="${d}" fill="none" stroke="${ink}" stroke-width="${f(sw)}"/>`;
   } else if (S.barStyle === "ruler") {
-    // baseline with downward ticks: short at sub-divisions, full-height at main divisions
-    b += `<line x1="${f(pad)}" y1="${f(barB)}" x2="${f(pad + totalW)}" y2="${f(barB)}" stroke="${ink}" stroke-width="${sw}"/>`;
-    for (const s of segs) b += `<line x1="${f(s.x)}" y1="${f(barY + barH * 0.45)}" x2="${f(s.x)}" y2="${f(barB)}" stroke="${ink}" stroke-width="${sw}"/>`;
-    for (let k = 0; k <= S.ndiv; k++) { const x = x0 + drawnPerDiv * k; b += `<line x1="${f(x)}" y1="${f(barY)}" x2="${f(x)}" y2="${f(barB)}" stroke="${ink}" stroke-width="${sw}"/>`; }
+    b += ln(xLeft, barTopY, xLeft + totalW, barTopY);
+    for (const s of segs) b += ln(s.x, barTopY, s.x, barTopY + barH * 0.5);
+    if (leadOn) b += ln(xLeft, barTopY, xLeft, barBotY);
+    for (let k = 0; k <= S.ndiv; k++) { const x = x0 + dpd * k; b += ln(x, barTopY, x, barBotY); }
   } else if (S.barStyle === "solid") {
-    // one solid bar; divisions read from the ticks + labels above
-    b += `<rect x="${f(pad)}" y="${f(barY)}" width="${f(totalW)}" height="${f(barH)}" fill="${ink}"/>`;
+    b += `<rect x="${f(xLeft)}" y="${f(barTopY)}" width="${f(totalW)}" height="${f(barH)}" fill="${ink}"/>`;
   } else if (S.barStyle === "wavy") {
-    // scalloped arcs over the sub-divided lead, then a plain baseline
-    let d = `M ${f(pad)} ${f(barB)}`;
-    if (S.sub > 0) { const w = ext / S.sub; for (let k = 0; k < S.sub; k++) d += ` a ${f(w / 2)} ${f(barH)} 0 0 1 ${f(w)} 0`; }
-    else d += ` L ${f(x0)} ${f(barB)}`;
-    d += ` L ${f(pad + totalW)} ${f(barB)}`;
-    b += `<path d="${d}" fill="none" stroke="${ink}" stroke-width="${sw}"/>`;
-  } else {
-    // alternating (default): solid filled blocks, dark / light
-    b += `<rect x="${f(pad)}" y="${f(barY)}" width="${f(totalW)}" height="${f(barH)}" fill="none" stroke="${ink}" stroke-width="${sw}"/>`;
-    for (const s of segs) if (s.fillIdx % 2 === 0) b += `<rect x="${f(s.x)}" y="${f(barY)}" width="${f(s.w)}" height="${f(barH)}" fill="${ink}"/>`;
+    const baseY = barBotY;
+    let d = `M ${f(xLeft)} ${f(baseY)}`;
+    if (leadOn && S.sub > 0) { const w = ext / S.sub; for (let k = 0; k < S.sub; k++) d += ` a ${f(w/2)} ${f(barH)} 0 0 1 ${f(w)} 0`; }
+    else d += ` L ${f(x0)} ${f(baseY)}`;
+    d += ` L ${f(xLeft + totalW)} ${f(baseY)}`;
+    b += `<path d="${d}" fill="none" stroke="${ink}" stroke-width="${f(sw)}"/>`;
+  } else { // alternating (default)
+    b += `<rect x="${f(xLeft)}" y="${f(barTopY)}" width="${f(totalW)}" height="${f(barH)}" fill="none" stroke="${ink}" stroke-width="${f(sw)}"/>`;
+    for (const s of segs) if (s.fi % 2 === 0) b += `<rect x="${f(s.x)}" y="${f(barTopY)}" width="${f(s.w)}" height="${f(barH)}" fill="${ink}"/>`;
   }
 
-  // labels: ticks + values at each main boundary (0 .. per*ndiv), and the extension value on the far left
-  const lblY = barY - barH * 0.5;
-  const tk = (x) => `<line x1="${f(x)}" y1="${f(barY - tickUp)}" x2="${f(x)}" y2="${f(barY)}" stroke="${ink}" stroke-width="0.3"/>`;
-  const txt = (x, t) => `<text x="${f(x)}" y="${f(barY - tickUp - fontMM*0.3)}" font-family="sans-serif" font-size="${f(fontMM)}" text-anchor="middle" fill="${ink}">${t}</text>`;
-  b += tk(pad) + txt(pad, niceNum(S.per));            // far-left extension value
-  for (let k = 0; k <= S.ndiv; k++) { const x = x0 + drawnPerDiv * k; b += tk(x) + txt(x, niceNum(S.per * k)); }
-  // units label at the right end (below the bar)
-  b += `<text x="${f(pad + totalW)}" y="${f(barY + barH + fontMM*1.3)}" font-family="sans-serif" font-size="${f(fontMM)}" text-anchor="end" fill="${ink}">${unit()}</text>`;
-  // scale caption at left below
-  b += `<text x="${f(pad)}" y="${f(barY + barH + fontMM*1.3)}" font-family="sans-serif" font-size="${f(fontMM)}" font-weight="700" fill="${ink}">${table()[S.scaleIdx].label}</text>`;
+  // ── which values get a number ────────────────────────────────────
+  const every = Math.max(1, S.labelEvery);
+  const autos = [];
+  if (leadOn && S.labelLead) autos.push({ x: xLeft, t: niceNum(S.per), u: false });
+  for (let i = 0; i <= S.ndiv; i++) {
+    if (i % every === 0 || i === 0 || i === S.ndiv)
+      autos.push({ x: xAt(i * S.per), t: niceNum(i * S.per), u: (i === S.ndiv && S.unitSub) });
+  }
+  // custom pinned labels (override an auto at the same spot)
+  const lo = leadOn ? -S.per : 0, hi = S.ndiv * S.per;
+  const pins = [];
+  for (const p of S.pins) {
+    const v = parseFloat(p.v);
+    if (!isFinite(v) || v < lo - 1e-9 || v > hi + 1e-9) continue;
+    pins.push({ x: xAt(v), t: (p.t && p.t.length) ? p.t : niceNum(v), u: false });
+  }
+  const kept = autos.filter(a => !pins.some(p => Math.abs(p.x - a.x) < 0.15));
+  const labels = kept.concat(pins);
 
-  return { svg: `<svg xmlns="${SVGNS}" width="${f(W)}mm" height="${f(H)}mm" viewBox="0 0 ${f(W)} ${f(H)}">${b}</svg>`, W, H, Lmm, drawnPerDiv };
+  // ── number ticks + values above the bar ──────────────────────────
+  const tickTop = barTopY - tickLen;
+  for (const L of labels) {
+    b += ln(L.x, tickTop, L.x, barTopY);
+    let t = `<text x="${f(L.x)}" y="${f(labelBaseline)}" font-family="${fontFam}" font-size="${f(lab)}" text-anchor="middle" fill="${ink}">${L.t}`;
+    if (L.u) t += `<tspan dx="${f(uni*0.18)}" dy="${f(uni*0.18)}" font-size="${f(uni)}">${unit()}</tspan>`;
+    b += t + `</text>`;
+  }
+
+  // ── scale caption below the bar ──────────────────────────────────
+  if (S.caption) b += `<text x="${f(xLeft)}" y="${f(capBaseline)}" font-family="${fontFam}" font-size="${f(cap)}" font-weight="700" fill="${ink}">${scaleLabel()}</text>`;
+
+  return { svg: `<svg xmlns="${SVGNS}" width="${f(W)}mm" height="${f(H)}mm" viewBox="0 0 ${f(W)} ${f(H)}" text-rendering="geometricPrecision">${b}</svg>`, W, H, Lmm };
 }
 
 function render() {
-  const { svg, W, Lmm } = buildSVG();
-  // show on screen scaled up so small print sizes are visible
-  const art = $("art");
+  const { svg, W, H, Lmm } = buildSVG();
   const stage = document.querySelector(".stage");
-  const maxW = stage.clientWidth - 120, maxH = stage.clientHeight - 120;
-  // parse viewBox H from svg
-  const m = svg.match(/viewBox="0 0 ([\d.]+) ([\d.]+)"/); const vbW = +m[1], vbH = +m[2];
-  const sc = Math.min(maxW / vbW, maxH / vbH, 6);
-  art.outerHTML = svg.replace("<svg ", `<svg id="art" width="${f(vbW*sc)}" height="${f(vbH*sc)}" `).replace(/width="[\d.]+mm" height="[\d.]+mm" /, "");
+  const availW = Math.max(140, stage.clientWidth - 64), availH = Math.max(140, stage.clientHeight - 64);
+  const fitPct = Math.min(availW / W, availH / H) / PXMM * 100;
+  if (S.zoomMode === "smart") {
+    const minTextPct = (11 / (S.fNum * PXMM)) * 100;   // keep numbers ≳ 11px on screen, scroll if needed
+    S.zoomPct = Math.max(25, Math.min(600, Math.max(fitPct, Math.min(minTextPct, 260))));
+  } else if (S.zoomMode === "fit") {
+    S.zoomPct = Math.max(15, Math.min(600, fitPct));
+  }
+  $("zoom").value = Math.round(S.zoomPct);
+  $("zoomV").textContent = Math.round(S.zoomPct) + "%";
+
+  const pxmm = (S.zoomPct / 100) * PXMM;
+  $("art").outerHTML = svg
+    .replace("<svg ", `<svg id="art" width="${f(W*pxmm)}" height="${f(H*pxmm)}" `)
+    .replace(/width="[\d.]+mm" height="[\d.]+mm" /, "");
+
   $("drawnV").textContent = f(Lmm) + " mm";
-  $("note").textContent = `Scale ${table()[S.scaleIdx].label} · bar = ${niceNum(S.per*S.ndiv)} ${unit()} drawn at ${f(Lmm)} mm`;
+  $("note").textContent = `${scaleLabel()} · ${niceNum(S.per*S.ndiv)} ${unit()} in ${S.ndiv} cell${S.ndiv>1?"s":""} · drawn ${f(Lmm)} mm`;
 }
 function curSVG() { return buildSVG().svg; }
 
@@ -289,35 +416,73 @@ $("svgBtn").onclick = () => dl(new Blob([curSVG()], { type: "image/svg+xml" }), 
 $("pngBtn").onclick = () => {
   const svg = curSVG(), m = svg.match(/viewBox="0 0 ([\d.]+) ([\d.]+)"/), vbW = +m[1], vbH = +m[2];
   const img = new Image(); const url = URL.createObjectURL(new Blob([svg], { type: "image/svg+xml" }));
-  img.onload = () => { const k = Math.max(4, 1200 / vbW); const cv = document.createElement("canvas");
+  img.onload = () => { const k = Math.max(6, 1600 / vbW); const cv = document.createElement("canvas");
     cv.width = Math.round(vbW*k); cv.height = Math.round(vbH*k); const g = cv.getContext("2d");
     g.fillStyle = "#fff"; g.fillRect(0,0,cv.width,cv.height); g.drawImage(img, 0, 0, cv.width, cv.height);
     cv.toBlob(b => dl(b, "scale-bar.png"), "image/png"); URL.revokeObjectURL(url); };
   img.src = url;
 };
 
-// ── wiring ───────────────────────────────────────────────────────────────
+// ── custom-label rows ──────────────────────────────────────────────
+function renderPins() {
+  const wrap = $("pins"); wrap.innerHTML = "";
+  S.pins.forEach((p, i) => {
+    const row = document.createElement("div"); row.className = "pinrow";
+    const v = document.createElement("input"); v.type = "number"; v.step = "any"; v.placeholder = unit(); v.value = p.v; v.dataset.i = i; v.dataset.k = "v";
+    const t = document.createElement("input"); t.type = "text"; t.placeholder = "text (optional)"; t.value = p.t; t.dataset.i = i; t.dataset.k = "t";
+    const x = document.createElement("button"); x.textContent = "×"; x.title = "Remove";
+    v.oninput = e => { S.pins[i].v = e.target.value; render(); };
+    t.oninput = e => { S.pins[i].t = e.target.value; render(); };
+    x.onclick = () => { S.pins.splice(i, 1); renderPins(); render(); };
+    row.append(v, t, x); wrap.appendChild(row);
+  });
+}
+$("addPin").onclick = () => { S.pins.push({ v: "", t: "" }); renderPins(); };
+
+// ── wiring ─────────────────────────────────────────────────────────
 function setRatioHint() { $("ratioHint").textContent = "Ratio 1 : " + niceNum(ratio()) + " — " + niceNum(S.per) + " " + unit() + " = " + f((S.per*realMMperUnit())/ratio()) + " mm on paper."; }
-$("sys").querySelectorAll("button").forEach(b => {
-  b.onclick = () => { S.sys = b.dataset.s; $("sys").querySelectorAll("button").forEach(x => x.classList.toggle("on", x === b));
-    S.scaleIdx = S.sys === "metric" ? 3 : 5; S.per = S.sys === "metric" ? 5 : 10; $("per").value = S.per;
+function setEveryLabel() { $("everyV").textContent = S.labelEvery === 1 ? "every cell" : "every " + S.labelEvery; }
+function setLeadEnabled() { const on = S.leadOn; $("sub").classList.toggle("muted-disabled", !on); $("labelLead").parentElement.classList.toggle("muted-disabled", !on); }
+function segPick(group, key, val) { $(group).querySelectorAll("button").forEach(x => x.classList.toggle("on", x.dataset[key] === val)); }
+
+$("sys").querySelectorAll("button").forEach(btn => {
+  btn.onclick = () => { S.sys = btn.dataset.s; segPick("sys", "s", S.sys);
+    S.scaleIdx = S.sys === "metric" ? 3 : 5; S.per = 5; $("per").value = S.per;
+    S.pins = []; renderPins(); $("pinUnit").textContent = unit();
+    S.zoomMode = "smart";
     fillScaleSelect(); $("perV").textContent = S.per + " " + unit(); setRatioHint(); render(); };
 });
-$("scale").onchange = e => { S.scaleIdx = +e.target.value; setRatioHint(); render(); };
+$("scale").onchange = e => { S.scaleIdx = +e.target.value; S.zoomMode = "smart"; setRatioHint(); render(); };
 $("per").oninput = e => { S.per = +e.target.value; $("perV").textContent = S.per + " " + unit(); setRatioHint(); render(); };
 $("ndiv").oninput = e => { S.ndiv = +e.target.value; $("ndivV").textContent = S.ndiv; render(); };
+$("leadOn").onchange = e => { S.leadOn = e.target.checked; setLeadEnabled(); render(); };
 $("sub").oninput = e => { S.sub = +e.target.value; $("subV").textContent = S.sub; render(); };
-$("h").oninput = e => { S.h = +e.target.value; $("hV").textContent = S.h + " mm"; render(); };
+$("h").oninput = e => { S.h = +e.target.value; $("hV").textContent = niceNum(S.h) + " mm"; render(); };
+$("every").oninput = e => { S.labelEvery = +e.target.value; setEveryLabel(); render(); };
+$("labelLead").onchange = e => { S.labelLead = e.target.checked; render(); };
+$("unitSub").onchange = e => { S.unitSub = e.target.checked; render(); };
+$("caption").onchange = e => { S.caption = e.target.checked; render(); };
+$("fNum").oninput = e => { S.fNum = +e.target.value; $("fNumV").textContent = niceNum(S.fNum) + " mm"; render(); };
+$("fCap").oninput = e => { S.fCap = +e.target.value; $("fCapV").textContent = niceNum(S.fCap) + " mm"; render(); };
+$("fUnit").oninput = e => { S.fUnit = +e.target.value; $("fUnitV").textContent = niceNum(S.fUnit) + " mm"; render(); };
+$("fN").oninput = e => { S.fN = +e.target.value; $("fNV").textContent = niceNum(S.fN) + " mm"; render(); };
+$("font").querySelectorAll("button").forEach(btn => { btn.onclick = () => { S.font = btn.dataset.f; segPick("font", "f", S.font); render(); }; });
+$("barStyle").onchange = e => { S.barStyle = e.target.value; $("styleHint").textContent = STYLE_HINTS[S.barStyle]; render(); };
 $("north").onchange = e => { S.north = e.target.checked; render(); };
-$("northStyle").querySelectorAll("button").forEach(b => { b.onclick = () => { S.northStyle = b.dataset.n;
-  $("northStyle").querySelectorAll("button").forEach(x => x.classList.toggle("on", x === b)); render(); }; });
+$("northStyle").querySelectorAll("button").forEach(btn => { btn.onclick = () => { S.northStyle = btn.dataset.n; segPick("northStyle", "n", S.northStyle); render(); }; });
 $("rot").oninput = e => { S.rot = +e.target.value; $("rotV").textContent = S.rot + "°"; render(); };
 $("ink").oninput = e => { S.ink = e.target.value; render(); };
-$("barStyle").onchange = e => { S.barStyle = e.target.value; $("styleHint").textContent = STYLE_HINTS[S.barStyle]; render(); };
-addEventListener("resize", render);
+$("zoom").oninput = e => { S.zoomMode = "manual"; S.zoomPct = +e.target.value; $("zoomV").textContent = S.zoomPct + "%"; render(); };
+$("fitBtn").onclick = () => { S.zoomMode = "fit"; render(); };
+addEventListener("resize", () => render());
 
-fillScaleSelect(); $("perV").textContent = S.per + " " + unit(); $("hV").textContent = S.h + " mm"; setRatioHint();
+// init
+fillScaleSelect();
+$("perV").textContent = S.per + " " + unit();
+$("hV").textContent = niceNum(S.h) + " mm";
+$("pinUnit").textContent = unit();
 $("barStyle").value = S.barStyle; $("styleHint").textContent = STYLE_HINTS[S.barStyle];
+setRatioHint(); setEveryLabel(); setLeadEnabled(); renderPins();
 render();
 </script>
 </body>
