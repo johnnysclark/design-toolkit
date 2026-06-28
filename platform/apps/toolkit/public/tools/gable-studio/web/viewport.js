@@ -6,7 +6,7 @@
 // World coords: +X East, +Y North, +Z Up; three.js is Y-up so map (x,y,z)->(x,z,y).
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
-import { windField, sunDirection, terrainHeight, rotZ, dirAz, massingTriangles, sampleSolarGrid } from "./core.js";
+import { windField, sunDirection, terrainHeight, rotZ, dirAz, massingTriangles, sampleSolarGrid, clippedWallQuads, roofUnderZWorld } from "./core.js";
 
 const v3 = (p) => new THREE.Vector3(p[0], p[2], p[1]);
 const tf = (lx, ly, lz, R, cx, cy, north) => { const p = rotZ([lx, ly, 0], R); const w = rotZ([p[0] + cx, p[1] + cy, 0], north); return [w[0], w[1], lz]; };
@@ -117,54 +117,19 @@ export function createViewport(canvas) {
     // plinth slab
     const Pl = P.plinth; box(Pl.W, Pl.L, -Pl.t, 0, Pl.R, Pl.cx, Pl.cy, n, "plinth");
 
-    // roof geometry (defined before the walls so the walls can clip to it)
-    const Rf = P.roof, G = model.roofGeom;
-    const tanL = Math.tan(Rf.pitchL * Math.PI / 180), tanR = Math.tan(Rf.pitchR * Math.PI / 180);
-    // underside Z of the roof slab at a world (x,y) — the height the walls rise to.
-    // Transforms the point into the roof's own (rotated/offset) frame first.
-    const roofUnderZ = (wx, wy) => {
-      const a = rotZ([wx, wy, 0], -n);
-      const rl = rotZ([a[0] - Rf.cx, a[1] - Rf.cy, 0], -Rf.R);
-      const slope = rl[0] <= G.ridgeX ? tanL : tanR;
-      const topZ = rl[0] <= G.ridgeX ? G.zRidge - (G.ridgeX - rl[0]) * slope : G.zRidge - (rl[0] - G.ridgeX) * slope;
-      return topZ - Rf.t * Math.sqrt(1 + slope * slope);
-    };
+    // roof geometry (the walls clip up to its underside; roofGeom carries tanL/tanR)
+    const Rf = P.roof, G = model.roofGeom, W = P.walls;
 
-    // walls: 4 slabs EXTENDED UP and CLIPPED by the roof planes, so the building
-    // is fully enclosed (gable ends close into triangles; eave walls meet the roof
-    // underside). Sampled along each wall's run so any roof rotation/pitch works;
-    // a constant-slope run stays a clean plane (only the ridge shows a hard edge).
-    const W = P.walls;
-    const NSAMP = 64;
-    const clippedWallSlab = (x0, x1, y0, y1, name) => {
-      const longX = Math.abs(x1 - x0) >= Math.abs(y1 - y0);
-      const rowAt = (s) => {
-        const po = longX ? [x0 + (x1 - x0) * s, y1] : [x1, y0 + (y1 - y0) * s];
-        const pi = longX ? [x0 + (x1 - x0) * s, y0] : [x0, y0 + (y1 - y0) * s];
-        const oB = tf(po[0], po[1], 0, W.R, W.cx, W.cy, n), iB = tf(pi[0], pi[1], 0, W.R, W.cx, W.cy, n);
-        return { oB, iB,
-          oT: tf(po[0], po[1], roofUnderZ(oB[0], oB[1]), W.R, W.cx, W.cy, n),
-          iT: tf(pi[0], pi[1], roofUnderZ(iB[0], iB[1]), W.R, W.cx, W.cy, n) };
-      };
-      const quads = [];
-      let prev = rowAt(0); const first = prev;
-      for (let i = 1; i <= NSAMP; i++) {
-        const row = rowAt(i / NSAMP);
-        quads.push([prev.oB, row.oB, row.oT, prev.oT]);  // outer face
-        quads.push([prev.iB, prev.iT, row.iT, row.iB]);  // inner face
-        quads.push([prev.oT, prev.iT, row.iT, row.oT]);  // top (under the roof)
-        quads.push([prev.oB, prev.iB, row.iB, row.oB]);  // bottom (z = 0)
-        prev = row;
-      }
-      quads.push([first.oB, first.oT, first.iT, first.iB]); // start cap
-      quads.push([prev.oB, prev.iB, prev.iT, prev.oT]);     // end cap
-      solid(quads, name);
-    };
+    // walls: thin slabs EXTENDED UP and CLIPPED by the roof, so the building is a
+    // fully-enclosed gable (gable ends close into triangles; eave walls meet the
+    // roof underside). The SAME clipped quads core.js bakes into the occluders +
+    // metric areas — so render == analysis == metrics, one geometry, no drift.
     const hw = W.W / 2, hl = W.L / 2, t = W.wt;
-    clippedWallSlab(hw - t, hw, -hl, hl, "wall_px");
-    clippedWallSlab(-hw, -hw + t, -hl, hl, "wall_nx");
-    clippedWallSlab(-hw, hw, hl - t, hl, "wall_py");
-    clippedWallSlab(-hw, hw, -hl, -hl + t, "wall_ny");
+    const wallRects = [
+      ["wall_px", hw - t, hw, -hl, hl], ["wall_nx", -hw, -hw + t, -hl, hl],
+      ["wall_py", -hw, hw, hl - t, hl], ["wall_ny", -hw, hw, -hl, -hl + t],
+    ];
+    for (const [name, x0, x1, y0, y1] of wallRects) solid(clippedWallQuads(x0, x1, y0, y1, W, Rf, G, n), name);
 
     // roof: two slope slabs with independent pitch + thickness
     const slope = (eaveX, ridgeX, eaveZ, nLocal, name) => {
@@ -197,8 +162,34 @@ export function createViewport(canvas) {
 
     // analysis grid cells (walls + roofs + plinth top) for the detailed overlay
     analysisCells = [];
+    // walls tile the FULL clipped outer face (incl. the gable triangle) so the
+    // analysis overlay colours the whole enclosed gable, not just the lower tube.
+    for (const [name, x0, x1, y0, y1] of wallRects) {
+      const f = model.frames[name];
+      const oA = [f.apC[0] - f.uAxis[0] * f.faceWidth / 2, f.apC[1] - f.uAxis[1] * f.faceWidth / 2, 0];
+      const oB = [f.apC[0] + f.uAxis[0] * f.faceWidth / 2, f.apC[1] + f.uAxis[1] * f.faceWidth / 2, 0];
+      wallCellsInto(oA, oB, f.n, f.faceWidth, Rf, G, n, analysisCells);
+    }
     const plinthTop = { c: tf(0, 0, 0, Pl.R, Pl.cx, Pl.cy, n), uAxis: rotZ([1, 0, 0], Pl.R + n), vAxis: rotZ([0, 1, 0], Pl.R + n), faceWidth: Pl.W, faceHeight: Pl.L, n: [0, 0, 1] };
-    for (const f of [...model.walls, ...model.roofs, plinthTop]) gridCellsInto(f, analysisCells);
+    for (const f of [...model.roofs, plinthTop]) gridCellsInto(f, analysisCells);
+  }
+
+  // Tile ONE wall's clipped outer face into analysis cells that follow the gable
+  // profile: columns along the run, each subdivided z=0..roofUnderZ(column). So
+  // the solar overlay covers the triangular gable infill, not just the lower tube.
+  function wallCellsInto(outerA, outerB, nrm, faceWidth, Rf, G, north, out) {
+    const nu = Math.max(3, Math.min(24, Math.round(faceWidth / 0.3)));
+    const at = (s, z) => [outerA[0] + (outerB[0] - outerA[0]) * s, outerA[1] + (outerB[1] - outerA[1]) * s, z];
+    const hAt = (s) => { const p = at(s, 0); return roofUnderZWorld(p[0], p[1], Rf, G, north); };
+    for (let i = 0; i < nu; i++) {
+      const s0 = i / nu, s1 = (i + 1) / nu, sc = (i + 0.5) / nu;
+      const hL = hAt(s0), hR = hAt(s1), hC = hAt(sc);
+      const nv = Math.max(2, Math.min(24, Math.round(Math.max(hL, hR) / 0.3)));
+      for (let j = 0; j < nv; j++) {
+        const f0 = j / nv, f1 = (j + 1) / nv, fc = (j + 0.5) / nv;
+        out.push({ corners: [at(s0, hL * f0), at(s1, hR * f0), at(s1, hR * f1), at(s0, hL * f1)], center: at(sc, hC * fc), n: nrm });
+      }
+    }
   }
 
   function gridCellsInto(f, out) {
