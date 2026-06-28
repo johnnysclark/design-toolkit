@@ -32,11 +32,34 @@ b { font-weight: 700; }
   grid-template-columns: 300px minmax(0,1fr) 350px;
   grid-template-rows: minmax(0,1fr) auto;
   grid-template-areas: "left center right" "series series series"; }
-.dock.left { grid-area: left; border-right: 2px solid var(--line); }
+.dock.left { grid-area: left; border-right: 2px solid var(--line); overflow-y: auto; }
 .center { grid-area: center; display: flex; flex-direction: column; min-width: 0; }
 .dock.right { grid-area: right; border-left: 2px solid var(--line); overflow-y: auto; }
 .series { grid-area: series; border-top: 2px solid var(--line); }
-.dock { display: flex; flex-direction: column; min-height: 0; padding: 8px; gap: 6px; }
+.dock { display: flex; flex-direction: column; min-height: 0; }
+
+/* collapsible accordion panels — the obvious "this opens" affordance */
+.panel { border-bottom: 1.5px solid var(--line); }
+.panel > summary { cursor: pointer; list-style: none; font-family: var(--font-display); text-transform: uppercase;
+  font-size: 11px; letter-spacing: -.01em; padding: 7px 8px; display: flex; align-items: center; gap: 6px; user-select: none; }
+.panel > summary::-webkit-details-marker { display: none; }
+.panel > summary::before { content: "▸"; font-size: 9px; display: inline-block; width: 9px; }
+.panel[open] > summary::before { content: "▾"; }
+.panel > summary:hover { background: var(--soft); }
+.panel-body { padding: 0 8px 10px; display: flex; flex-direction: column; gap: 6px; }
+.genescroll { max-height: 260px; overflow-y: auto; display: flex; flex-direction: column; }
+
+/* geometry sliders (manual MAKE) + aperture editor */
+.makegrid { display: flex; flex-direction: column; gap: 3px; }
+.sl { display: flex; flex-wrap: wrap; align-items: center; gap: 1px 6px; }
+.sl > label { font-size: 10px; flex: 1; }
+.slval { font-size: 10px; font-variant-numeric: tabular-nums; }
+.sl input[type=range] { flex-basis: 100%; width: 100%; height: 16px; margin: 0; accent-color: var(--accent); }
+.fc-inputs { display: flex; flex-direction: column; gap: 2px; margin: 4px 0; }
+.aprow { border: 1px solid var(--line); border-radius: 7px; padding: 5px 6px; margin-bottom: 5px; }
+.aphd { display: flex; align-items: center; gap: 5px; font-size: 11px; margin-bottom: 3px; }
+.ap-host { flex: 1; font-size: 10px; }
+.ap-empty { font-size: 10px; opacity: .7; }
 
 .dock-h { font-family: var(--font-display); text-transform: uppercase; font-size: 11px; letter-spacing: -.01em;
   border-bottom: 1.5px solid var(--line); padding-bottom: 4px; margin-top: 4px; }
@@ -80,6 +103,8 @@ b { font-weight: 700; }
 
 /* charts */
 .charts { flex: 1; display: flex; flex-direction: column; padding: 6px 8px; min-height: 0; }
+.charts-h { font-family: var(--font-display); text-transform: uppercase; font-size: 11px; letter-spacing: -.01em;
+  border-bottom: 1px solid var(--line); padding-bottom: 4px; margin-bottom: 4px; }
 .chartstage { flex: 1; min-height: 0; display: flex; align-items: stretch; justify-content: center; }
 .chartstage svg { width: 100%; height: 100%; }
 .chart-empty { font-size: 12px; opacity: .7; align-self: center; margin: auto; }

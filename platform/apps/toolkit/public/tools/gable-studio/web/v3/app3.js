@@ -3,13 +3,13 @@
 // the NSGA-II optimizer + extensible forces on top. The loop it enacts:
 //   READ forces → COMMIT a charter → choose GENES (free vars) + OBJECTIVES →
 //   EVOLVE a Pareto front (live) → INSPECT a phenotype → SPAWN it into the series.
-import { DEFAULTS, run, VARIABLE_DEFS } from "../core.js";
+import { DEFAULTS, run, VARIABLE_DEFS, WALL_HOSTS, ROOF_HOSTS, HOST_LABELS } from "../core.js";
 import { createViewport } from "../viewport.js";
 import { FORCES, TENSIONS as TENSIONS_BUILTIN, draftClause } from "../v2/forces.js";
 import { Series, makeVariation, diffSeeds } from "../v2/series.js";
-import { fmtMetricImp, impConv } from "../v2/units.js";
+import { fmtMetricImp, impConv, sliderUnit } from "../v2/units.js";
 import { EXTRA_FORCES, EXTRA_TENSIONS } from "./forces_extra.js";
-import { GENE_CATALOG, DEFAULT_GENES, buildGenes, bounds as geneBounds, encode, decode } from "./genome.js";
+import { GENE_CATALOG, DEFAULT_GENES, buildGenes, bounds as geneBounds, encode, decode, getPath, setPath } from "./genome.js";
 import { deriveObjectives, makeEvaluator, METRIC_CHOICES } from "./objectives.js";
 import { nsga2Stepper } from "./nsga2.js";
 import { buildPhenotypeVariation } from "./spawn.js";
@@ -63,12 +63,54 @@ let viewport = null;
 try { viewport = createViewport($("#view")); }
 catch (e) { $("#stage").append(el("div", { class: "viewerr" }, "3D viewport could not start (needs WebGL). Forces, charter, optimizer and series still work. " + e.message)); }
 
-// ---- base design recompute -------------------------------------------------
+// ---- manual geometry (MAKE) — reuses v2's imperial slider model -------------
+const MAKE_SPEC = GENE_CATALOG.filter((g) => g.target === "params" && !g.path.startsWith("apertures"));
+let metricReadEls = [];
+function makeSlider(rootObj, spec, onChange) {
+  const U = sliderUnit(spec);
+  const valEl = el("span", { class: "slval" }, U.label(getPath(rootObj, spec.path)));
+  const input = el("input", { type: "range", min: U.dmin, max: U.dmax, step: U.dstep, value: U.toDisp(getPath(rootObj, spec.path)),
+    oninput: (e) => { const v = U.fromDisp(parseFloat(e.target.value)); setPath(rootObj, spec.path, v); valEl.textContent = U.label(v); onChange(); } });
+  return el("div", { class: "sl" }, el("label", null, spec.label), valEl, input);
+}
+function buildMake() { const host = $("#make"); if (!host) return; host.replaceChildren(); for (const sp of MAKE_SPEC) host.append(makeSlider(state.seed.params, sp, onGeo)); }
+function buildApertures() {
+  const host = $("#apertures"); if (!host) return; host.replaceChildren();
+  const aps = state.seed.params.apertures || [];
+  if (!aps.length) host.append(el("div", { class: "ap-empty" }, "No openings."));
+  aps.forEach((ap, i) => host.append(apertureRow(ap, i)));
+  host.append(el("button", { class: "btn small wide", onclick: addAperture }, "＋ add opening"));
+}
+function apertureRow(ap, i) {
+  const hostSel = el("select", { class: "ap-host", onchange: (e) => { ap.host = e.target.value; onGeo(); } },
+    ...[...WALL_HOSTS, ...ROOF_HOSTS].map((h) => el("option", { value: h, selected: h === ap.host ? true : null }, HOST_LABELS[h])));
+  return el("div", { class: "aprow" },
+    el("div", { class: "aphd" }, el("b", null, ap.id || ("A" + (i + 1))), hostSel,
+      el("button", { class: "clause-x", title: "Remove", onclick: () => { state.seed.params.apertures.splice(i, 1); state.selected = null; rebuildBase(); } }, "✕")),
+    makeSlider(ap, { path: "w", label: "width", min: 0.2, max: 6, step: 0.1, unit: "m" }, onGeo),
+    makeSlider(ap, { path: "h", label: "height", min: 0.2, max: 3, step: 0.1, unit: "m" }, onGeo),
+    makeSlider(ap, { path: "u", label: "across", min: 0, max: 1, step: 0.05, unit: "" }, onGeo),
+    makeSlider(ap, { path: "v", label: "up", min: 0, max: 1, step: 0.05, unit: "" }, onGeo));
+}
+function addAperture() { const aps = state.seed.params.apertures; aps.push({ id: "A" + (aps.length + 1), host: "wall_ny", u: 0.5, v: 0.5, w: 1.2, h: 1.2 }); state.selected = null; rebuildBase(); }
+const onGeo = () => { state.selected = null; liveUpdate(); };
+
+// ---- recompute -------------------------------------------------------------
+// light (slider drags): recompute metrics, refresh viewport + reads + charter,
+// WITHOUT rebuilding the deck/make/aperture DOM so a drag isn't interrupted.
+function liveUpdate() {
+  const r = run(state.seed.params, state.seed.site, state.seed.ruleset);
+  state.last = { model: r.model, metrics: r.metrics, evaluation: r.evaluation, vars: r.vars };
+  if (viewport && !state.selected) viewport.setModel(r.model, state.display);
+  for (const mr of metricReadEls) mr.el.textContent = fmtMetricImp(unitOf(mr.key), r.metrics[mr.key]);
+  renderCharter(); renderObjectives();
+}
+// structural: rebuild the deck + geometry sliders + charter + objectives.
 function rebuildBase() {
   const r = run(state.seed.params, state.seed.site, state.seed.ruleset);
   state.last = { model: r.model, metrics: r.metrics, evaluation: r.evaluation, vars: r.vars };
   if (viewport && !state.selected) viewport.setModel(r.model, state.display);
-  buildForceDeck(); renderCharter(); renderObjectives();
+  buildForceDeck(); buildMake(); buildApertures(); renderCharter(); renderObjectives();
 }
 
 // ---- LEFT: force deck ------------------------------------------------------
@@ -83,7 +125,7 @@ function movePreview(m) {
   return `test: ${labelOf(r.lhs)} ${r.op} ${r.provenance}`;
 }
 function buildForceDeck() {
-  const host = $("#forcedeck"); host.replaceChildren();
+  const host = $("#forcedeck"); host.replaceChildren(); metricReadEls = [];
   for (const f of allForces()) {
     const governs = state.governing.has(f.id);
     const head = el("div", { class: "fc-head" },
@@ -91,7 +133,9 @@ function buildForceDeck() {
       f.custom ? el("button", { class: "fc-custom-x", title: "Delete this custom force", onclick: (e) => { e.stopPropagation(); deleteCustomForce(f.id); } }, "✕") : null,
       el("button", { class: "fc-gov", onclick: (e) => { e.stopPropagation(); toggleGovern(f.id); } }, governs ? "governs ✓" : "govern"));
     const reads = el("div", { class: "fc-reads" });
-    if (f.modeled) for (const k of (f.reads || [])) reads.append(el("span", { class: "fc-read", title: labelOf(k) }, labelOf(k) + ": ", el("b", null, state.last ? fmtMetricImp(unitOf(k), state.last.metrics[k]) : "—")));
+    if (f.modeled) for (const k of (f.reads || [])) { const b = el("b", null, state.last ? fmtMetricImp(unitOf(k), state.last.metrics[k]) : "—"); metricReadEls.push({ key: k, el: b }); reads.append(el("span", { class: "fc-read", title: labelOf(k) }, labelOf(k) + ": ", b)); }
+    const inputs = el("div", { class: "fc-inputs" });
+    if (f.inputs) for (const sp of f.inputs) inputs.append(makeSlider(state.seed.site, sp, onGeo));
     const moves = el("div");
     moves.append(el("div", { class: "fc-moves-h" }, f.modeled ? "Moves — commit one as a rule" : "Response"));
     for (const m of f.moves) {
@@ -103,7 +147,7 @@ function buildForceDeck() {
     }
     host.append(el("div", { class: "forcecard" + (governs ? " governs" : "") }, head,
       el("p", { class: "fc-blurb" }, f.blurb),
-      f.modeled ? reads : el("div", { class: "fc-absence" }, f.absence || ""), moves));
+      f.modeled ? reads : el("div", { class: "fc-absence" }, f.absence || ""), inputs, moves));
   }
 }
 
