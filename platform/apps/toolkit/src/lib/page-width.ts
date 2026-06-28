@@ -48,6 +48,8 @@ const ROUTE_TIERS: Array<[string, WidthTier]> = [
   ["/tools-3d/rhino-python", "full"], // embedded Rhino/GhPython gallery
   ["/tools-3d/solar-envelope", "full"], // embedded three.js solar envelope
   ["/tools-3d/sun-study", "full"], // embedded three.js sun study
+  ["/tools-3d/waffle", "full"], // embedded three.js waffle structure
+  ["/tools-3d/contour-slicer", "full"], // embedded three.js contour slicer
   ["/rap/studio", "full"] // RAP — orthographic CAD viewport + panels
 ];
 
