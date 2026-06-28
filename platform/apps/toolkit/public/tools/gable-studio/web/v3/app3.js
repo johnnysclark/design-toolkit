@@ -38,6 +38,7 @@ const fmtObj = (o, v) => fmtMetricImp(o.unit || unitOf(o.metricKey), v);
 const setStatus = (t) => { $("#v3-status").textContent = t; };
 const showModal = (id) => { $("#" + id).style.display = "flex"; };
 const hideModal = (id) => { $("#" + id).style.display = "none"; };
+function showTab(name) { for (const b of document.querySelectorAll(".ctab")) b.classList.toggle("on", b.dataset.tab === name); const mk = $("#tab-make"), fr = $("#tab-front"); if (mk) mk.hidden = name !== "make"; if (fr) fr.hidden = name !== "front"; }
 
 // ---- state -----------------------------------------------------------------
 const state = {
@@ -277,9 +278,9 @@ function loop() {
   if (state.stepper.done) { finishRun(); return; }
   state.raf = requestAnimationFrame(loop);
 }
-function startRun() { if (state.running) return; if (!initRun()) return; state.running = true; updateButtons(); setStatus(`Evolving — ${state.problem.objectives.length} objective(s), ${state.problem.constraints.length} constraint(s), ${state.activeGenes.length} genes, seed ${state.runParams.seed}.`); state.raf = requestAnimationFrame(loop); }
+function startRun() { if (state.running) return; if (!initRun()) return; showTab("front"); state.running = true; updateButtons(); setStatus(`Evolving — ${state.problem.objectives.length} objective(s), ${state.problem.constraints.length} constraint(s), ${state.activeGenes.length} genes, seed ${state.runParams.seed}.`); state.raf = requestAnimationFrame(loop); }
 function pauseRun() { state.running = false; if (state.raf) cancelAnimationFrame(state.raf); updateButtons(); setStatus("Paused — Resume with Run, or Step one generation."); }
-function stepRun() { if (state.running) return; if (!state.stepper || state.stepper.done) { if (!initRun()) return; } if (!state.stepper.done) { state.result = state.stepper.step(); drawCharts(); updateProgress(); } if (state.stepper.done) finishRun(); else updateButtons(); }
+function stepRun() { if (state.running) return; if (!state.stepper || state.stepper.done) { if (!initRun()) return; } showTab("front"); if (!state.stepper.done) { state.result = state.stepper.step(); drawCharts(); updateProgress(); } if (state.stepper.done) finishRun(); else updateButtons(); }
 function stopRun() { state.running = false; if (state.raf) cancelAnimationFrame(state.raf); if (state.result && state.result.front.length) selectKnee(); state.stepper = null; updateButtons(); setStatus("Stopped — partial front kept. Pick a phenotype to spawn."); }
 function finishRun() { state.running = false; if (state.result && state.result.front.length) selectKnee(); updateButtons(); setStatus(`Done — ${state.result.front.length} designs on the front. The ringed point is a suggested compromise.`); }
 function selectKnee() { const k = charts.kneePoint(state.result.front, state.problem.directions); if (k) selectPhenotype(k); }
@@ -463,6 +464,7 @@ $("#v3-step").addEventListener("click", stepRun);
 $("#v3-stop").addEventListener("click", stopRun);
 $("#v3-spawn").addEventListener("click", openSpawn);
 $("#v3-fork").addEventListener("click", openFork);
+document.querySelectorAll(".ctab").forEach((b) => b.addEventListener("click", () => showTab(b.dataset.tab)));
 document.querySelectorAll("[data-close]").forEach((b) => b.addEventListener("click", () => hideModal(b.getAttribute("data-close"))));
 document.querySelectorAll(".modal").forEach((m) => m.addEventListener("click", (e) => { if (e.target === m) hideModal(m.id); }));
 
