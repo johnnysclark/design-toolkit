@@ -1,0 +1,577 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Diagram Studio</title>
+<!--
+  Diagram Studio — a quick concept-diagram kit for the early sketch phase:
+  parti, bubble, adjacency & flow, all on one canvas. Drop labelled bubbles
+  (a circle's radius reads as program area) and rounded-rect zones, wire them
+  with adjacency lines (thin = weak, thick = strong) or directional flow arrows,
+  and lay big bold parti arrows for the concept move. Drag to compose, links
+  follow; out comes a clean vector SVG (editable in Illustrator) or a PNG.
+
+  Single self-contained file. Vanilla JS, inline SVG, no network — runs offline.
+  Part of the All Means Works design toolkit (2D Tooling).
+-->
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root { --bg:#f5f5f3; --surface:#fff; --line:#e4e4e0; --ink:#111; --accent:#ff3b21; }
+html, body { height: 100%; }
+body { font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  background: var(--bg); color: var(--ink); display: flex; flex-direction: column; overflow: hidden; }
+header { padding: 10px 18px; background: var(--surface); border-bottom: 2px solid var(--ink);
+  display: flex; align-items: baseline; gap: 14px; flex-shrink: 0; }
+header h1 { font-size: 18px; font-weight: 800; letter-spacing: -0.01em; text-transform: uppercase; }
+header .subtitle { font-size: 12px; }
+.app { display: flex; flex: 1; overflow: hidden; min-height: 0; }
+.sidebar { width: 304px; flex-shrink: 0; background: var(--surface); border-right: 1px solid var(--line);
+  overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 16px; }
+.group { display: flex; flex-direction: column; gap: 9px; }
+.group > .label { font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.06em;
+  border-bottom: 1px solid var(--line); padding-bottom: 5px; }
+.row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.row label { font-size: 13px; }
+.row .val { font-size: 12px; font-variant-numeric: tabular-nums; min-width: 64px; text-align: right; }
+input[type="range"] { width: 100%; accent-color: var(--accent); }
+input[type="range"]:disabled { opacity: .4; }
+input[type="text"], select { width: 100%; font: inherit; font-size: 13px; padding: 7px 8px;
+  border: 1px solid var(--line); border-radius: 6px; color: var(--ink); background: #fff; }
+input[type="text"]:disabled { opacity: .5; }
+.two { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.btn { font: inherit; font-size: 13px; font-weight: 700; padding: 9px 12px; border-radius: 6px;
+  border: 1px solid var(--ink); background: #fff; color: var(--ink); cursor: pointer; text-align: center; }
+.btn:hover { background: #f0f0ee; }
+.btn:disabled { opacity: .4; cursor: default; }
+.btn.accent { background: var(--accent); color: #fff; border-color: var(--accent); }
+.btn.on { background: var(--ink); color: #fff; border-color: var(--ink); }   /* active tool / mode */
+.check { display: flex; align-items: center; gap: 8px; font-size: 13px; cursor: pointer; }
+.check input { accent-color: var(--accent); width: 15px; height: 15px; }
+.hint { font-size: 11px; line-height: 1.45; }
+.swatches { display: flex; flex-wrap: wrap; gap: 6px; }
+.swatch { width: 27px; height: 27px; border-radius: 6px; border: 1px solid var(--line); cursor: pointer; padding: 0; }
+.swatch.on { outline: 2px solid var(--ink); outline-offset: 1px; }
+.stage { position: relative; flex: 1; min-width: 0; }
+#svg { display: block; width: 100%; height: 100%; background: var(--surface); touch-action: none;
+  -webkit-user-select: none; user-select: none; }
+.readout { position: absolute; top: 12px; left: 12px; background: rgba(255,255,255,0.92); border: 1px solid var(--line);
+  border-radius: 8px; padding: 9px 12px; backdrop-filter: blur(4px); font-size: 12px; line-height: 1.55; max-width: 290px; }
+.readout .big { font-size: 13px; font-weight: 800; }
+/* inline label editor floated over the canvas at the element's screen position */
+.editor { position: absolute; transform: translate(-50%, -50%); font: inherit; font-size: 14px; font-weight: 600;
+  text-align: center; color: var(--ink); border: 2px solid var(--accent); border-radius: 6px; padding: 3px 6px;
+  background: #fff; min-width: 96px; z-index: 10; }
+@media (max-width: 720px) { .app { flex-direction: column; } .sidebar { width: 100%; max-height: 46vh; } }
+</style>
+</head>
+<body>
+<header>
+  <h1>Diagram&nbsp;Studio</h1>
+  <span class="subtitle">Parti · bubble · adjacency · flow — concept diagrams</span>
+</header>
+
+<div class="app">
+  <aside class="sidebar">
+    <div class="group">
+      <div class="label">Add</div>
+      <div class="two">
+        <button class="btn" id="addBubble">Bubble&nbsp;◯</button>
+        <button class="btn" id="addZone">Zone&nbsp;▭</button>
+      </div>
+      <button class="btn" id="addParti">Parti arrow&nbsp;➜</button>
+      <p class="hint">Pick a tool, then click the canvas to drop it. Drag elements to move (links follow). Double-click to rename.</p>
+    </div>
+
+    <div class="group">
+      <div class="label">Connect</div>
+      <button class="btn" id="connectBtn">Connect nodes</button>
+      <select id="linkType">
+        <option value="weak">Adjacency — weak (thin)</option>
+        <option value="strong">Adjacency — strong (thick)</option>
+        <option value="arrow">Flow → (directional)</option>
+      </select>
+      <p class="hint">Click two nodes to link them with the chosen type. This menu also re-types a selected link.</p>
+    </div>
+
+    <div class="group">
+      <div class="label">Selected</div>
+      <input type="text" id="labelInput" placeholder="Select an element to label…" disabled>
+      <div class="row"><label for="size">Size</label><span class="val" id="sizeV">—</span></div>
+      <input type="range" id="size" min="24" max="180" value="80" disabled>
+      <div class="swatches" id="swatches"></div>
+      <label class="check" id="accentRow" style="display:none"><input type="checkbox" id="partiAccent"> Accent (red) arrow</label>
+      <button class="btn" id="deleteBtn" disabled>Delete selected</button>
+    </div>
+
+    <div class="group">
+      <div class="label">Diagram</div>
+      <div class="two">
+        <button class="btn" id="undoBtn">Undo</button>
+        <button class="btn" id="clearBtn">Clear</button>
+      </div>
+    </div>
+
+    <div class="group">
+      <div class="label">Export</div>
+      <div class="two">
+        <button class="btn accent" id="svgBtn">Download SVG</button>
+        <button class="btn" id="pngBtn">Download PNG</button>
+      </div>
+      <p class="hint">Vector SVG (cropped to your diagram, editable downstream) or a 2× PNG snapshot. Black line-work on white.</p>
+    </div>
+  </aside>
+
+  <div class="stage" id="stage">
+    <svg id="svg" viewBox="0 0 1000 700" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg"></svg>
+    <div class="readout" id="readout"></div>
+  </div>
+</div>
+
+<script>
+"use strict";
+// ── tiny helpers ─────────────────────────────────────────────────────────────
+const SVGNS = "http://www.w3.org/2000/svg";
+const $ = id => document.getElementById(id);
+const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+const INK = "#111", ACCENT = "#ff3b21";
+const FONT = 'ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif';
+const TINTS = ["#ffffff", "#ffe1dd", "#ffe6c9", "#fff6c9", "#dbf0d8", "#dceaf7", "#e8ddf5", "#ececea"];
+
+// Create an SVG element. `attrs.text` becomes textContent; everything else an attribute.
+function el(tag, attrs, parent) {
+  const e = document.createElementNS(SVGNS, tag);
+  for (const k in attrs) { if (k === "text") e.textContent = attrs[k]; else e.setAttribute(k, attrs[k]); }
+  if (parent) parent.appendChild(e);
+  return e;
+}
+
+// ── state ────────────────────────────────────────────────────────────────────
+// nodes: bubble {id,type:'bubble',x,y(center),r,label,fill}  zone {id,type:'zone',x,y(top-left),w,h,aspect,label,fill}
+// links: {id,a,b,type:'weak'|'strong'|'arrow'}   partis: {id,x1,y1,x2,y2,w,accent,label}
+let nodes = [], links = [], partis = [];
+let idc = 1; const uid = () => "e" + (idc++);
+let sel = null;            // {kind:'node'|'link'|'parti', id} | null
+let mode = "select";       // 'select' | 'addBubble' | 'addZone' | 'addParti' | 'connect'
+let connectFrom = null;    // node id of the first pick in connect mode
+let drag = null;           // active drag/resize gesture
+let exporting = false;     // when true, draw primitives omit interaction-only bits
+const history = [];        // undo stack of state snapshots
+
+const byId      = id => nodes.find(n => n.id === id);
+const partiById = id => partis.find(p => p.id === id);
+const linkById  = id => links.find(l => l.id === id);
+
+const svg = $("svg"), stage = $("stage"), readout = $("readout");
+const size = $("size"), sizeV = $("sizeV"), labelInput = $("labelInput");
+const linkType = $("linkType"), swatches = $("swatches");
+const accentRow = $("accentRow"), partiAccent = $("partiAccent"), deleteBtn = $("deleteBtn");
+
+// ── coordinate mapping (screen ↔ SVG user space, honouring viewBox + letterbox) ─
+function toSVG(evt) {
+  const pt = svg.createSVGPoint(); pt.x = evt.clientX; pt.y = evt.clientY;
+  const r = pt.matrixTransform(svg.getScreenCTM().inverse());
+  return { x: r.x, y: r.y };
+}
+function svgToScreen(x, y) {
+  const m = svg.getScreenCTM(), r = stage.getBoundingClientRect();
+  return { x: x * m.a + m.e - r.left, y: y * m.d + m.f - r.top };  // no rotation/skew here
+}
+
+// ── geometry ───────────────────────────────────────────────────────────────────
+function nodeCenter(n) { return n.type === "bubble" ? { x: n.x, y: n.y } : { x: n.x + n.w / 2, y: n.y + n.h / 2 }; }
+// Point on a node's outline heading toward (tx,ty) — so links attach cleanly to the edge.
+function edgePoint(n, tx, ty) {
+  const c = nodeCenter(n); let dx = tx - c.x, dy = ty - c.y; const len = Math.hypot(dx, dy) || 1; dx /= len; dy /= len;
+  if (n.type === "bubble") return { x: c.x + dx * n.r, y: c.y + dy * n.r };
+  const sx = dx !== 0 ? (n.w / 2) / Math.abs(dx) : Infinity, sy = dy !== 0 ? (n.h / 2) / Math.abs(dy) : Infinity;
+  const s = Math.min(sx, sy);
+  return { x: c.x + dx * s, y: c.y + dy * s };
+}
+function linkEndpoints(l) {
+  const a = byId(l.a), b = byId(l.b); if (!a || !b) return null;
+  const ca = nodeCenter(a), cb = nodeCenter(b);
+  return { pa: edgePoint(a, cb.x, cb.y), pb: edgePoint(b, ca.x, ca.y) };
+}
+// Block-arrow polygon (tapered shaft → wide head) for a bold parti move.
+function partiPoints(p) {
+  const dx = p.x2 - p.x1, dy = p.y2 - p.y1, len = Math.hypot(dx, dy) || 1;
+  const ux = dx / len, uy = dy / len, nx = -uy, ny = ux;        // unit dir + normal
+  const sh = (p.w || 18) / 2, hh = (p.w || 18) * 1.1;           // shaft & head half-widths
+  const hl = Math.min(len * 0.5, (p.w || 18) * 3.2);            // head length
+  const nX = p.x2 - ux * hl, nY = p.y2 - uy * hl;               // neck (shaft→head)
+  const pt = (x, y) => x.toFixed(1) + "," + y.toFixed(1);
+  return [
+    pt(p.x1 + nx * sh, p.y1 + ny * sh), pt(nX + nx * sh, nY + ny * sh),
+    pt(nX + nx * hh, nY + ny * hh), pt(p.x2, p.y2), pt(nX - nx * hh, nY - ny * hh),
+    pt(nX - nx * sh, nY - ny * sh), pt(p.x1 - nx * sh, p.y1 - ny * sh)
+  ].join(" ");
+}
+
+// ── defs (drafting grid + flow arrowheads) ──────────────────────────────────────
+function defsNode() {
+  const d = el("defs", {});
+  const gp = el("pattern", { id: "grid", width: 26, height: 26, patternUnits: "userSpaceOnUse" }, d);
+  el("path", { d: "M26 0 L0 0 0 26", fill: "none", stroke: "#eceae6", "stroke-width": 1 }, gp);  // light artwork
+  [["flow", INK], ["flowA", ACCENT]].forEach(([id, c]) => {
+    const m = el("marker", { id, viewBox: "0 0 10 10", refX: 8, refY: 5, markerWidth: 7, markerHeight: 7, orient: "auto-start-reverse" }, d);
+    el("path", { d: "M0 0 L10 5 L0 10 z", fill: c }, m);
+  });
+  return d;
+}
+
+// ── draw primitives (pure: attributes only — listeners are attached separately) ──
+function drawNode(parent, n) {
+  if (n.type === "bubble") {
+    const c = el("circle", { cx: n.x, cy: n.y, r: n.r, fill: n.fill || "#fff", stroke: INK, "stroke-width": 2.2 }, parent);
+    if (n.label) el("text", { x: n.x, y: n.y, dy: "0.34em", "text-anchor": "middle",
+      "font-size": clamp(n.r * 0.34, 11, 21), "font-weight": 600, fill: INK, "font-family": FONT, "pointer-events": "none", text: n.label }, parent);
+    return c;
+  }
+  const r = el("rect", { x: n.x, y: n.y, width: n.w, height: n.h, rx: 14, ry: 14, fill: n.fill || "#dceaf7", stroke: INK, "stroke-width": 1.8 }, parent);
+  if (n.label) el("text", { x: n.x + n.w / 2, y: n.y + 21, "text-anchor": "middle",
+    "font-size": 14, "font-weight": 700, "letter-spacing": 1.4, fill: INK, "font-family": FONT, "pointer-events": "none", text: n.label.toUpperCase() }, parent);
+  return r;
+}
+function drawLink(parent, l) {
+  const e = linkEndpoints(l); if (!e) return null;
+  const w = l.type === "strong" ? 6 : l.type === "arrow" ? 2.6 : 1.7;
+  const hit = exporting ? null : el("line", { x1: e.pa.x, y1: e.pa.y, x2: e.pb.x, y2: e.pb.y, stroke: "#000", "stroke-opacity": 0, "stroke-width": 16 }, parent);
+  const line = el("line", { x1: e.pa.x, y1: e.pa.y, x2: e.pb.x, y2: e.pb.y, stroke: INK, "stroke-width": w, "stroke-linecap": "round" }, parent);
+  if (l.type === "arrow") line.setAttribute("marker-end", "url(#flow)");
+  return { hit, line };
+}
+function drawParti(parent, p) {
+  const poly = el("polygon", { points: partiPoints(p), fill: p.accent ? ACCENT : INK }, parent);
+  if (p.label) el("text", { x: (p.x1 + p.x2) / 2, y: (p.y1 + p.y2) / 2 - 14, "text-anchor": "middle",
+    "font-size": 15, "font-weight": 800, "letter-spacing": 1, fill: INK, "font-family": FONT, "pointer-events": "none", text: p.label.toUpperCase() }, parent);
+  return poly;
+}
+
+// ── selection overlay + resize/endpoint handles (accent, live canvas only) ───────
+function handle(parent, x, y, kind, id) {
+  const cursor = kind === "rBubble" ? "ew-resize" : kind === "rZone" ? "nwse-resize" : "move";
+  const h = el("circle", { cx: x, cy: y, r: 7, fill: "#fff", stroke: ACCENT, "stroke-width": 2.5 }, parent);
+  h.style.cursor = cursor;
+  h.addEventListener("pointerdown", evt => { evt.stopPropagation(); drag = { type: kind, id, moved: false }; bindWindow(); });
+  return h;
+}
+function drawRing(parent, n) {                       // dashed ring = first pick in connect mode
+  if (!n) return;
+  if (n.type === "bubble") el("circle", { cx: n.x, cy: n.y, r: n.r + 5, fill: "none", stroke: ACCENT, "stroke-width": 2.5, "stroke-dasharray": "6 5" }, parent);
+  else el("rect", { x: n.x - 5, y: n.y - 5, width: n.w + 10, height: n.h + 10, rx: 16, fill: "none", stroke: ACCENT, "stroke-width": 2.5, "stroke-dasharray": "6 5" }, parent);
+}
+function drawOverlay(parent, s) {
+  if (s.kind === "node") {
+    const n = byId(s.id); if (!n) return;
+    if (n.type === "bubble") { el("circle", { cx: n.x, cy: n.y, r: n.r, fill: "none", stroke: ACCENT, "stroke-width": 2.5 }, parent); handle(parent, n.x + n.r, n.y, "rBubble", n.id); }
+    else { el("rect", { x: n.x, y: n.y, width: n.w, height: n.h, rx: 14, fill: "none", stroke: ACCENT, "stroke-width": 2.5 }, parent); handle(parent, n.x + n.w, n.y + n.h, "rZone", n.id); }
+  } else if (s.kind === "parti") {
+    const p = partiById(s.id); if (!p) return;
+    el("polygon", { points: partiPoints(p), fill: "none", stroke: ACCENT, "stroke-width": 2.5 }, parent);
+    handle(parent, p.x1, p.y1, "tail", s.id); handle(parent, p.x2, p.y2, "head", s.id);
+  } else if (s.kind === "link") {
+    const l = linkById(s.id); if (!l) return; const e = linkEndpoints(l); if (!e) return;
+    const w = (l.type === "strong" ? 6 : l.type === "arrow" ? 2.6 : 1.7) + 1.4;
+    const ln = el("line", { x1: e.pa.x, y1: e.pa.y, x2: e.pb.x, y2: e.pb.y, stroke: ACCENT, "stroke-width": w, "stroke-linecap": "round" }, parent);
+    if (l.type === "arrow") ln.setAttribute("marker-end", "url(#flowA)");
+  }
+}
+
+// ── render the live scene ────────────────────────────────────────────────────────
+let scene;
+function render() {
+  scene.replaceChildren();
+  el("rect", { x: -2000, y: -2000, width: 6000, height: 6000, fill: "url(#grid)" }, scene);  // drafting grid
+  nodes.filter(n => n.type === "zone").forEach(n => attachNode(drawNode(scene, n), n));        // zones at the back
+  links.forEach(l => attachLink(drawLink(scene, l), l));
+  partis.forEach(p => attachParti(drawParti(scene, p), p));
+  nodes.filter(n => n.type === "bubble").forEach(n => attachNode(drawNode(scene, n), n));      // bubbles on top
+  if (connectFrom) drawRing(scene, byId(connectFrom));
+  if (sel) drawOverlay(scene, sel);
+  updateReadout();
+}
+function updateReadout() {
+  const nb = nodes.filter(n => n.type === "bubble").length, nz = nodes.filter(n => n.type === "zone").length;
+  const m = mode === "addBubble" ? "Click the canvas to place a bubble"
+    : mode === "addZone" ? "Click the canvas to place a zone"
+    : mode === "addParti" ? "Click the canvas to place a parti arrow"
+    : mode === "connect" ? (connectFrom ? "Click the second node to link" : "Connect — click the first node")
+    : "Drag to move · double-click to rename";
+  let st = "Nothing selected";
+  if (sel && sel.kind === "node") { const n = byId(sel.id);
+    st = n.type === "bubble" ? `${n.label || "Bubble"} — r ${Math.round(n.r)} (area ∝ ${Math.round(Math.PI * n.r * n.r).toLocaleString()})`
+      : `${n.label || "Zone"} — ${Math.round(n.w)}×${Math.round(n.h)}`;
+  } else if (sel && sel.kind === "parti") { const p = partiById(sel.id); st = "Parti arrow" + (p.label ? ` — ${p.label}` : ""); }
+  else if (sel && sel.kind === "link") st = "Link — " + linkById(sel.id).type;
+  const plural = (n, w) => n + " " + w + (n !== 1 ? "s" : "");
+  readout.innerHTML = `<div class="big">${m}</div>${plural(nb, "bubble")} · ${plural(nz, "zone")} · ${plural(links.length, "link")} · ${plural(partis.length, "parti")}<br><span>${st}</span>`;
+}
+
+// ── history / undo ────────────────────────────────────────────────────────────────
+function pushHistory() {
+  history.push(JSON.parse(JSON.stringify({ nodes, links, partis, idc })));
+  if (history.length > 60) history.shift();
+}
+function undo() {
+  if (!history.length) return;
+  const s = history.pop();
+  nodes = s.nodes; links = s.links; partis = s.partis; idc = s.idc;
+  sel = null; updatePanel(); render();
+}
+
+// ── selection + sidebar panel sync ──────────────────────────────────────────────
+function selectEl(kind, id) { sel = kind ? { kind, id } : null; updatePanel(); render(); }
+function updatePanel() {
+  const isNode = sel && sel.kind === "node", isParti = sel && sel.kind === "parti", isLink = sel && sel.kind === "link";
+  deleteBtn.disabled = !sel;
+  labelInput.disabled = !(isNode || isParti);
+  labelInput.value = isNode ? byId(sel.id).label : isParti ? partiById(sel.id).label : "";
+  accentRow.style.display = isParti ? "flex" : "none";
+  if (isParti) partiAccent.checked = partiById(sel.id).accent;
+  if (isNode) {                                   // size slider tracks bubble radius / zone width
+    const n = byId(sel.id);
+    if (n.type === "bubble") { size.min = 24; size.max = 180; size.value = n.r; }
+    else { size.min = 90; size.max = 560; size.value = n.w; }
+    size.disabled = false; sizeV.textContent = Math.round(+size.value);
+  } else { size.disabled = true; sizeV.textContent = "—"; }
+  if (isLink) linkType.value = linkById(sel.id).type;
+  [...swatches.children].forEach(b => b.classList.toggle("on", isNode && byId(sel.id).fill === b.dataset.c));
+}
+
+// ── modes ──────────────────────────────────────────────────────────────────────
+function setMode(m) {
+  mode = m; connectFrom = null;
+  [["addBubble", "addBubble"], ["addZone", "addZone"], ["addParti", "addParti"], ["connectBtn", "connect"]]
+    .forEach(([id, mm]) => $(id).classList.toggle("on", mode === mm));
+  svg.style.cursor = /^add/.test(mode) ? "crosshair" : mode === "connect" ? "pointer" : "default";
+  render();
+}
+
+// ── placing new elements ─────────────────────────────────────────────────────────
+function placeAt(x, y) {
+  pushHistory();
+  let kind, id;
+  if (mode === "addBubble") { const n = { id: uid(), type: "bubble", x, y, r: 54, label: "Space", fill: "#fff" }; nodes.push(n); kind = "node"; id = n.id; }
+  else if (mode === "addZone") { const w = 210, h = 140, n = { id: uid(), type: "zone", x: x - w / 2, y: y - h / 2, w, h, aspect: w / h, label: "Zone", fill: "#dceaf7" }; nodes.push(n); kind = "node"; id = n.id; }
+  else { const p = { id: uid(), x1: x - 78, y1: y, x2: x + 78, y2: y, w: 20, accent: false, label: "" }; partis.push(p); kind = "parti"; id = p.id; }
+  sel = { kind, id }; updatePanel(); setMode("select");   // place one, then back to select
+}
+
+// ── connect mode picking ─────────────────────────────────────────────────────────
+function connectPick(n) {
+  if (connectFrom === null) { connectFrom = n.id; render(); }
+  else if (connectFrom === n.id) { connectFrom = null; render(); }
+  else { pushHistory(); const id = uid(); links.push({ id, a: connectFrom, b: n.id, type: linkType.value }); connectFrom = null; selectEl("link", id); }
+}
+
+// ── attach interaction handlers to freshly-drawn elements ─────────────────────────
+// Manual double-tap detection: render() rebuilds the DOM on every select, so a native
+// dblclick (which needs the same element for both clicks) can't be relied on.
+let lastTap = { key: null, t: 0 };
+function isDoubleTap(key) {
+  const now = Date.now(), dbl = lastTap.key === key && now - lastTap.t < 350;
+  lastTap = { key, t: now };
+  return dbl;
+}
+function attachNode(elm, n) {
+  if (!elm) return; elm.style.cursor = "move";
+  elm.addEventListener("pointerdown", evt => {
+    if (/^add/.test(mode)) return;                 // let the click fall through to the canvas (placement)
+    evt.stopPropagation();
+    if (mode === "connect") { connectPick(n); return; }
+    if (isDoubleTap("node:" + n.id)) { editLabel("node", n.id); return; }   // double-click → rename
+    selectEl("node", n.id);
+    const p = toSVG(evt);
+    drag = { type: "node", id: n.id, offx: p.x - n.x, offy: p.y - n.y, moved: false };
+    bindWindow();
+  });
+}
+function attachParti(elm, p) {
+  if (!elm) return; elm.style.cursor = "move";
+  elm.addEventListener("pointerdown", evt => {
+    if (mode !== "select") return;                 // ignore in add/connect (canvas handles those)
+    evt.stopPropagation();
+    if (isDoubleTap("parti:" + p.id)) { editLabel("parti", p.id); return; }
+    selectEl("parti", p.id);
+    const q = toSVG(evt);
+    drag = { type: "parti", id: p.id, px: q.x, py: q.y, b: { x1: p.x1, y1: p.y1, x2: p.x2, y2: p.y2 }, moved: false };
+    bindWindow();
+  });
+}
+function attachLink(o, l) {
+  if (!o || !o.hit) return; o.hit.style.cursor = "pointer";
+  o.hit.addEventListener("pointerdown", evt => { if (mode !== "select") return; evt.stopPropagation(); selectEl("link", l.id); });
+}
+
+// ── drag / resize gesture (window-level so it survives re-renders) ────────────────
+function bindWindow() { window.addEventListener("pointermove", onMove); window.addEventListener("pointerup", onUp); }
+function onUp() { drag = null; window.removeEventListener("pointermove", onMove); window.removeEventListener("pointerup", onUp); }
+function onMove(evt) {
+  if (!drag) return;
+  if (!drag.moved) { drag.moved = true; pushHistory(); }   // record once, only if the gesture actually moves
+  const p = toSVG(evt);
+  if (drag.type === "node") { const n = byId(drag.id); n.x = p.x - drag.offx; n.y = p.y - drag.offy; }
+  else if (drag.type === "parti") { const q = partiById(drag.id), dx = p.x - drag.px, dy = p.y - drag.py;
+    q.x1 = drag.b.x1 + dx; q.y1 = drag.b.y1 + dy; q.x2 = drag.b.x2 + dx; q.y2 = drag.b.y2 + dy; }
+  else if (drag.type === "head") { const q = partiById(drag.id); q.x2 = p.x; q.y2 = p.y; }
+  else if (drag.type === "tail") { const q = partiById(drag.id); q.x1 = p.x; q.y1 = p.y; }
+  else if (drag.type === "rBubble") { const n = byId(drag.id); n.r = clamp(Math.hypot(p.x - n.x, p.y - n.y), 18, 300); size.value = n.r; sizeV.textContent = Math.round(n.r); }
+  else if (drag.type === "rZone") { const n = byId(drag.id), c = nodeCenter(n);  // resize symmetric about centre, fixed aspect
+    const w = clamp(Math.abs(p.x - c.x) * 2, 70, 760); n.w = w; n.h = w / n.aspect; n.x = c.x - n.w / 2; n.y = c.y - n.h / 2;
+    size.value = w; sizeV.textContent = Math.round(w); }
+  render();
+}
+
+// ── inline label editor (double-click) ────────────────────────────────────────────
+function editLabel(kind, id) {
+  const t = kind === "node" ? byId(id) : partiById(id); if (!t) return;
+  selectEl(kind, id);
+  const c = kind === "node" ? nodeCenter(t) : { x: (t.x1 + t.x2) / 2, y: (t.y1 + t.y2) / 2 };
+  const s = svgToScreen(c.x, c.y);
+  const inp = document.createElement("input");
+  inp.type = "text"; inp.value = t.label; inp.className = "editor";
+  inp.style.left = s.x + "px"; inp.style.top = s.y + "px";
+  stage.appendChild(inp);
+  setTimeout(() => { inp.focus(); inp.select(); }, 0);   // defer so the pointerdown's default focus doesn't steal it
+  pushHistory();
+  let done = false;
+  const commit = () => { if (done) return; done = true; t.label = inp.value; inp.remove(); labelInput.value = t.label; render(); };
+  inp.addEventListener("keydown", e => { if (e.key === "Enter") commit(); else if (e.key === "Escape") { done = true; inp.remove(); render(); } });
+  inp.addEventListener("blur", commit);
+}
+
+// ── canvas (empty-space) clicks ─────────────────────────────────────────────────
+svg.addEventListener("pointerdown", evt => {
+  const p = toSVG(evt);
+  if (/^add/.test(mode)) placeAt(p.x, p.y);
+  else if (mode === "connect") { connectFrom = null; render(); }
+  else selectEl(null);
+});
+
+// ── export: build a clean, content-cropped SVG, then serialise / rasterise ────────
+function contentBBox() {
+  let a = 1e9, b = 1e9, c = -1e9, d = -1e9;
+  const ext = (x, y) => { a = Math.min(a, x); b = Math.min(b, y); c = Math.max(c, x); d = Math.max(d, y); };
+  nodes.forEach(n => { if (n.type === "bubble") { ext(n.x - n.r, n.y - n.r); ext(n.x + n.r, n.y + n.r); } else { ext(n.x, n.y); ext(n.x + n.w, n.y + n.h); } });
+  partis.forEach(p => { ext(p.x1, p.y1); ext(p.x2, p.y2); });
+  if (a > c) { a = 0; b = 0; c = 1000; d = 700; }            // empty diagram → default frame
+  const pad = 48; return { x: a - pad, y: b - pad, w: (c - a) + pad * 2, h: (d - b) + pad * 2 };
+}
+function buildExportSVG() {
+  const bb = contentBBox();
+  exporting = true;
+  const ex = document.createElementNS(SVGNS, "svg");
+  ex.setAttribute("xmlns", SVGNS);
+  ex.setAttribute("viewBox", `${bb.x.toFixed(1)} ${bb.y.toFixed(1)} ${bb.w.toFixed(1)} ${bb.h.toFixed(1)}`);
+  ex.setAttribute("width", Math.round(bb.w)); ex.setAttribute("height", Math.round(bb.h));
+  ex.appendChild(defsNode());
+  el("rect", { x: bb.x, y: bb.y, width: bb.w, height: bb.h, fill: "#fff" }, ex);
+  nodes.filter(n => n.type === "zone").forEach(n => drawNode(ex, n));
+  links.forEach(l => drawLink(ex, l));
+  partis.forEach(p => drawParti(ex, p));
+  nodes.filter(n => n.type === "bubble").forEach(n => drawNode(ex, n));
+  exporting = false;
+  return new XMLSerializer().serializeToString(ex);
+}
+function download(name, data, mime) {
+  const blob = data instanceof Blob ? data : new Blob([data], { type: mime });
+  const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = name; a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 800);
+}
+function downloadPNG() {
+  const bb = contentBBox(), str = buildExportSVG(), scale = 2;
+  const url = URL.createObjectURL(new Blob([str], { type: "image/svg+xml;charset=utf-8" }));
+  const img = new Image();
+  img.onload = () => {
+    const cv = document.createElement("canvas");
+    cv.width = Math.round(bb.w * scale); cv.height = Math.round(bb.h * scale);
+    const ctx = cv.getContext("2d");
+    ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, cv.width, cv.height);
+    ctx.drawImage(img, 0, 0, cv.width, cv.height);
+    URL.revokeObjectURL(url);
+    cv.toBlob(b => download("diagram.png", b, "image/png"), "image/png");
+  };
+  img.onerror = () => { URL.revokeObjectURL(url); console.warn("PNG render failed"); };
+  img.src = url;
+}
+
+// ── UI wiring ──────────────────────────────────────────────────────────────────
+$("addBubble").onclick = () => setMode(mode === "addBubble" ? "select" : "addBubble");
+$("addZone").onclick   = () => setMode(mode === "addZone"   ? "select" : "addZone");
+$("addParti").onclick  = () => setMode(mode === "addParti"  ? "select" : "addParti");
+$("connectBtn").onclick = () => setMode(mode === "connect"  ? "select" : "connect");
+
+labelInput.addEventListener("focus", () => { if (sel) pushHistory(); });
+labelInput.oninput = () => {
+  if (!sel) return;
+  const t = sel.kind === "node" ? byId(sel.id) : sel.kind === "parti" ? partiById(sel.id) : null;
+  if (t) { t.label = labelInput.value; render(); }
+};
+size.addEventListener("pointerdown", () => { if (sel && sel.kind === "node") pushHistory(); });
+size.oninput = () => {
+  if (!(sel && sel.kind === "node")) return;
+  const n = byId(sel.id), v = +size.value;
+  if (n.type === "bubble") n.r = v;
+  else { const c = nodeCenter(n); n.w = v; n.h = v / n.aspect; n.x = c.x - n.w / 2; n.y = c.y - n.h / 2; }
+  sizeV.textContent = Math.round(v); render();
+};
+linkType.onchange = () => { if (sel && sel.kind === "link") { pushHistory(); linkById(sel.id).type = linkType.value; render(); } };
+partiAccent.onchange = () => { if (sel && sel.kind === "parti") { pushHistory(); partiById(sel.id).accent = partiAccent.checked; render(); } };
+
+// fill-tint swatches (apply to selected bubble or zone)
+TINTS.forEach(c => {
+  const b = document.createElement("button");
+  b.className = "swatch"; b.style.background = c; b.dataset.c = c;
+  b.title = c === "#ffffff" ? "No tint (white)" : "Tint";
+  b.onclick = () => { if (sel && sel.kind === "node") { pushHistory(); byId(sel.id).fill = c; updatePanel(); render(); } };
+  swatches.appendChild(b);
+});
+
+function deleteSel() {
+  if (!sel) return; pushHistory();
+  if (sel.kind === "node") { nodes = nodes.filter(n => n.id !== sel.id); links = links.filter(l => l.a !== sel.id && l.b !== sel.id); }
+  else if (sel.kind === "link") links = links.filter(l => l.id !== sel.id);
+  else partis = partis.filter(p => p.id !== sel.id);
+  sel = null; updatePanel(); render();
+}
+deleteBtn.onclick = deleteSel;
+$("undoBtn").onclick = undo;
+$("clearBtn").onclick = () => { pushHistory(); nodes = []; links = []; partis = []; sel = null; updatePanel(); render(); };
+$("svgBtn").onclick = () => download("diagram.svg", '<?xml version="1.0" encoding="UTF-8"?>\n' + buildExportSVG(), "image/svg+xml");
+$("pngBtn").onclick = downloadPNG;
+
+// keyboard: Delete removes selection, Cmd/Ctrl+Z undoes, Esc returns to select
+window.addEventListener("keydown", e => {
+  if (/input|textarea|select/i.test(document.activeElement.tagName)) return;
+  if ((e.key === "Delete" || e.key === "Backspace") && sel) { e.preventDefault(); deleteSel(); }
+  else if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "z") { e.preventDefault(); undo(); }
+  else if (e.key === "Escape") setMode("select");
+});
+
+// ── seed a believable starter diagram so the tool reads as working on load ───────
+function seed() {
+  const z = { id: uid(), type: "zone", x: 140, y: 250, w: 420, h: 300, aspect: 420 / 300, label: "Public Realm", fill: "#dceaf7" };
+  const entry   = { id: uid(), type: "bubble", x: 255, y: 405, r: 46, label: "Entry",   fill: "#fff" };
+  const living  = { id: uid(), type: "bubble", x: 470, y: 360, r: 82, label: "Living",  fill: "#fff" };
+  const kitchen = { id: uid(), type: "bubble", x: 748, y: 262, r: 58, label: "Kitchen", fill: "#fff" };
+  const bed     = { id: uid(), type: "bubble", x: 762, y: 488, r: 62, label: "Bedroom", fill: "#fff" };
+  nodes = [z, entry, living, kitchen, bed];
+  links = [
+    { id: uid(), a: entry.id,   b: living.id, type: "strong" },
+    { id: uid(), a: living.id,  b: kitchen.id, type: "strong" },
+    { id: uid(), a: living.id,  b: bed.id,     type: "weak" },
+    { id: uid(), a: kitchen.id, b: bed.id,     type: "arrow" }
+  ];
+  partis = [{ id: uid(), x1: 140, y1: 612, x2: 372, y2: 452, w: 22, accent: false, label: "Approach" }];
+}
+
+// ── init ───────────────────────────────────────────────────────────────────────
+svg.appendChild(defsNode());
+scene = el("g", {}, svg);
+seed();
+updatePanel();
+render();
+</script>
+</body>
+</html>

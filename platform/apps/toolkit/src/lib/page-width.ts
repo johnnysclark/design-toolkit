@@ -46,6 +46,11 @@ const ROUTE_TIERS: Array<[string, WidthTier]> = [
   ["/media-2d/vantage", "full"], // three.js camera demo (100vh iframe)
   ["/media-2d/pattern-studio", "full"], // embedded pattern canvas
   ["/media-2d/scale-bar", "full"], // embedded scale-bar tool
+  ["/media-2d/hatch", "full"], // architectural hatch/poché generator
+  ["/media-2d/entourage", "full"], // silhouette entourage compositor
+  ["/media-2d/figure-ground", "full"], // figure-ground / Nolli tracer
+  ["/media-2d/proportion", "full"], // proportioning overlays
+  ["/media-2d/diagram-studio", "full"], // concept diagram kit
   ["/tools-3d/obliquify", "full"], // r3f oblique/paraline viewer
   ["/tools-3d/model-viewer", "full"], // embedded WebGL model viewer
   ["/tools-3d/rhino-python", "full"], // embedded Rhino/GhPython gallery
