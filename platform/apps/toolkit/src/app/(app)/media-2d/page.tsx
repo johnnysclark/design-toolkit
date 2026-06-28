@@ -7,7 +7,7 @@ import ToolHub, { HubCard } from "@/components/ToolHub";
 export const metadata = {
   title: "2D Tooling · Design Toolkit",
   description:
-    "A bench of 2D-media tools — drawing & scan cleanup, Halftone & Riso (spot-colour separation), Vantage (camera, lens & perspective), and Pattern Studio (parametric screens → SVG/DXF), with more proposed."
+    "A bench of 2D-media tools — drawing & scan cleanup, Halftone & Riso (spot-colour separation), Dither Camera (live-camera dither / halftone), Vectorize (raster → vector), Vantage (camera, lens & perspective), and Pattern Studio (parametric screens → SVG/DXF), with more proposed."
 };
 
 const CARDS: HubCard[] = [
@@ -44,6 +44,14 @@ const CARDS: HubCard[] = [
       "Screen any image into a halftone, two-colour duotone, or full Risograph-style spot-colour separation — for plates, zines, posters and graphic poché. Adjustable dot shape, ruling and screen angle, real Riso inks, mis-registration and grain, over any paper colour. Export a finished PNG, per-ink plate masters for an actual Risograph, or vector SVG dots for print / plotter / laser. Client-side."
   },
   {
+    title: "Dither Camera",
+    source: "Live camera → dither / halftone (GRIT)",
+    status: "live",
+    href: "/media-2d/dither-camera",
+    blurb:
+      "Point your phone or webcam at anything and watch it become a live dithered / halftone image — 10 algorithms (Floyd-Steinberg, Atkinson, Bayer, angled halftone, variable dots, lines…), CMYK colour screening, a Sobel edge overlay, posterise, gamma / invert and an optional AI depth map. Built for PIAF tactile printing and zines: freeze a frame and save a high-contrast PNG. Front / back camera, all in the browser."
+  },
+  {
     title: "Vectorize",
     source: "New — raster → vector tracer",
     status: "live",
@@ -78,7 +86,7 @@ export default function Media2DPage() {
     <ToolHub
       title="2D Tooling"
       subtitle="Drawing & Fabrication"
-      intro="Single-purpose widgets for 2D studio production — the jobs that usually mean opening Photoshop and remembering a workflow. Each runs entirely in your browser; nothing is uploaded. Pattern Studio, Drawing Cleaner, Halftone & Riso, Vectorize, Vantage, and Scale Bar are ready now; the rest are proposals."
+      intro="Single-purpose widgets for 2D studio production — the jobs that usually mean opening Photoshop and remembering a workflow. Each runs entirely in your browser; nothing is uploaded. Pattern Studio, Drawing Cleaner, Halftone & Riso, Dither Camera, Vectorize, Vantage, and Scale Bar are ready now; the rest are proposals."
       cards={CARDS}
     />
   );

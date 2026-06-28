@@ -11,7 +11,8 @@ export default function EmbeddedTool({
   src,
   backHref,
   backLabel,
-  note
+  note,
+  allow
 }: {
   title: string;
   subtitle: string;
@@ -20,6 +21,8 @@ export default function EmbeddedTool({
   backHref: string;
   backLabel: string;
   note?: string;
+  /** Permissions-Policy delegated to the iframe (e.g. "camera; fullscreen"). */
+  allow?: string;
 }) {
   return (
     <div>
@@ -55,7 +58,7 @@ export default function EmbeddedTool({
         </a>
       </div>
 
-      <FullscreenFrame src={src} title={title} heightClass="h-[82vh]" label={title} />
+      <FullscreenFrame src={src} title={title} heightClass="h-[82vh]" label={title} allow={allow} />
 
       {note && <p className="mt-3 max-w-2xl text-sm text-neutral-900">{note}</p>}
     </div>

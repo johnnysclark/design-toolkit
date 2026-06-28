@@ -1,0 +1,2018 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>GRIT</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  background: #111;
+  color: #eee;
+  font-family: -apple-system, system-ui, sans-serif;
+  touch-action: manipulation;
+  min-height: 100vh;
+}
+#start-screen {
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  min-height: 100vh;
+  gap: 16px; padding: 20px;
+  background: #111;
+}
+#start-screen h1 {
+  font-size: 30px; font-weight: 800; color: #fff;
+  margin-bottom: -6px; letter-spacing: -0.5px;
+}
+#start-screen .subtitle {
+  font-size: 13px; color: #666; line-height: 1.4;
+  max-width: 300px; text-align: center;
+  margin-bottom: 10px;
+}
+.start-btn {
+  display: block; width: 280px;
+  padding: 18px; border: none; border-radius: 16px;
+  font-size: 18px; font-weight: 600;
+  cursor: pointer; color: #fff; text-align: center;
+  transition: transform 0.15s, box-shadow 0.15s;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.15);
+  letter-spacing: 0.3px;
+}
+.start-btn:active { transform: scale(0.95); box-shadow: 0 2px 8px rgba(0,0,0,0.3); }
+.btn-photo { background: linear-gradient(145deg, #3cb371, #2a8c57); }
+.btn-library { background: linear-gradient(145deg, #5b7fda, #4060b8); }
+.btn-live { background: linear-gradient(145deg, #d4803a, #b86520); }
+.camera-select {
+  font-size: 14px; padding: 8px 12px; border-radius: 8px;
+  background: #222; color: #ccc; border: 1px solid #444;
+}
+input[type="file"] { display: none; }
+video { display: none; }
+.hidden { display: none !important; }
+#canvas-container {
+  width: 100vw;
+  display: flex; align-items: center; justify-content: center;
+  padding: 8px; overflow: hidden;
+}
+#output {
+  max-width: 100%;
+  max-height: calc(100vh - 120px);
+  border-radius: 4px;
+}
+/* ── Bottom bar ── */
+.bottom-bar {
+  position: fixed; bottom: 0; left: 0; right: 0;
+  background: rgba(18, 18, 18, 0.92);
+  backdrop-filter: blur(24px) saturate(1.4);
+  -webkit-backdrop-filter: blur(24px) saturate(1.4);
+  padding: 0 8px env(safe-area-inset-bottom, 8px);
+  z-index: 10;
+  border-top: 1px solid rgba(255,255,255,0.06);
+}
+.slider-row {
+  display: flex; align-items: center; gap: 10px; padding: 8px 4px 4px;
+}
+.slider-row label {
+  font-size: 11px; font-weight: 700; min-width: 54px; color: #4af;
+  text-transform: uppercase; letter-spacing: 1px;
+}
+.slider-row input[type="range"] {
+  flex: 1; height: 48px; accent-color: #4af;
+  -webkit-appearance: none; appearance: none;
+  background: transparent; cursor: pointer;
+}
+input[type="range"]::-webkit-slider-runnable-track {
+  height: 4px;
+  background: #333;
+  border-radius: 2px;
+}
+input[type="range"]::-moz-range-track {
+  height: 4px;
+  background: #333;
+  border-radius: 2px; border: none;
+}
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none; appearance: none;
+  width: 26px; height: 26px; border-radius: 50%;
+  background: radial-gradient(circle at 38% 32%, #adf, #4af 60%, #38e);
+  border: 2px solid #1a1a1a;
+  margin-top: -11px;
+  box-shadow: 0 2px 10px rgba(68,170,255,0.45), 0 0 0 3px rgba(68,170,255,0.1);
+  transition: box-shadow 0.15s, transform 0.15s;
+}
+input[type="range"]:active::-webkit-slider-thumb {
+  transform: scale(1.15);
+  box-shadow: 0 2px 14px rgba(68,170,255,0.6), 0 0 0 5px rgba(68,170,255,0.12);
+}
+input[type="range"]::-moz-range-thumb {
+  width: 26px; height: 26px; border-radius: 50%;
+  background: radial-gradient(circle at 38% 32%, #adf, #4af 60%, #38e);
+  border: 2px solid #1a1a1a;
+  box-shadow: 0 2px 10px rgba(68,170,255,0.45), 0 0 0 3px rgba(68,170,255,0.1);
+}
+input[type="range"]::-moz-range-progress {
+  height: 4px; background: #4af; border-radius: 2px;
+}
+.slider-row .val {
+  font-size: 15px; min-width: 36px; text-align: right;
+  font-variant-numeric: tabular-nums; color: #fff; font-weight: 600;
+}
+.menu-bar {
+  display: flex; gap: 6px; padding: 4px 8px 8px;
+}
+.menu-btn {
+  flex: 1; aspect-ratio: 1; border: 1.5px solid #3a3a3a; border-radius: 12px;
+  font-size: 10px; font-weight: 600; cursor: pointer;
+  color: #bbb; background: linear-gradient(180deg, #252525, #1a1a1a);
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+  -webkit-tap-highlight-color: transparent; user-select: none;
+  position: relative;
+  transition: all 0.15s;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.06);
+  padding: 0;
+}
+.menu-btn .btn-icon { font-size: 20px; line-height: 1; }
+.menu-btn .btn-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; line-height: 1; }
+.menu-btn:active { background: #2a2a2a; transform: scale(0.96); box-shadow: 0 1px 3px rgba(0,0,0,0.3); }
+.menu-btn.has-active { border-color: #4af; color: #fff; box-shadow: 0 2px 10px rgba(68,170,255,0.2), inset 0 1px 0 rgba(255,255,255,0.06); }
+.menu-btn.toggled { border-color: #4af; color: #4af; background: linear-gradient(180deg, #1a2a3a, #0f1f2f); }
+/* ── Popup menu ── */
+.popup-menu {
+  display: none; position: fixed;
+  min-width: 170px; max-height: 60vh; overflow-y: auto;
+  background: linear-gradient(180deg, #2a2a2a, #1e1e1e);
+  border: 1.5px solid rgba(255,255,255,0.1); border-radius: 14px;
+  padding: 5px;
+  z-index: 20; box-shadow: 0 -8px 32px rgba(0,0,0,0.6), 0 0 0 1px rgba(0,0,0,0.3);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+.popup-menu.visible { display: block; }
+.popup-item {
+  display: block; width: 100%; padding: 11px 14px;
+  border: none; border-radius: 9px; background: transparent;
+  color: #bbb; font-size: 15px; font-weight: 500;
+  cursor: pointer; text-align: left;
+  -webkit-tap-highlight-color: transparent;
+  transition: background 0.12s, color 0.12s;
+}
+.popup-item:active { background: rgba(255,255,255,0.08); }
+.popup-item.selected {
+  background: rgba(68,170,255,0.18); color: #fff; font-weight: 600;
+  box-shadow: inset 0 0 0 1px rgba(68,170,255,0.15);
+}
+.popup-item.toggled {
+  color: #4af; font-weight: 600;
+}
+.popup-item + .popup-item {
+  border-top: 1px solid rgba(255,255,255,0.04);
+}
+.popup-overlay {
+  display: none; position: fixed; inset: 0; z-index: 9;
+}
+.popup-overlay.visible { display: block; }
+#status {
+  position: fixed; top: 8px; left: 8px; right: 8px;
+  text-align: center; font-size: 13px; color: #8f8;
+  pointer-events: none; z-index: 5;
+  text-shadow: 0 1px 4px rgba(0,0,0,0.6);
+}
+#help-screen {
+  position: fixed; inset: 0; z-index: 20;
+  background: #111; color: #ddd;
+  overflow-y: auto; -webkit-overflow-scrolling: touch;
+  padding: 20px 16px 60px; display: none;
+}
+#help-screen.visible { display: block; }
+#help-screen h1 { font-size: 22px; margin-bottom: 12px; }
+#help-screen h2 { font-size: 17px; color: #4af; margin: 18px 0 6px; }
+#help-screen p { font-size: 14px; line-height: 1.5; margin-bottom: 8px; color: #ccc; }
+#help-screen .algo-name { color: #fff; font-weight: 600; }
+#help-screen .close-help {
+  position: sticky; top: 0; z-index: 21;
+  display: block; width: 100%; padding: 14px;
+  background: linear-gradient(180deg, #252525, #1e1e1e);
+  border: 1.5px solid rgba(255,255,255,0.08); border-radius: 12px;
+  color: #4af; font-size: 16px; font-weight: 600;
+  cursor: pointer; margin-bottom: 12px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+  transition: transform 0.12s;
+}
+#help-screen .close-help:active { transform: scale(0.97); }
+</style>
+</head>
+<body>
+
+<div id="help-screen">
+  <button class="close-help" id="closeHelpBtn">Close Help</button>
+  <h1>GRIT Manual</h1>
+
+  <h2>What is Dithering?</h2>
+  <p>Dithering converts a photograph with continuous shades of gray into a pattern of pure black and white marks. This is essential for PIAF tactile printing, which can only raise or not raise the paper — there are no in-between tones. Different dithering algorithms create different visual textures while preserving the impression of the original image's light and dark areas.</p>
+
+  <h2>Algorithms</h2>
+
+  <p><span class="algo-name">Dots</span> — Variable-size shapes on a regular grid. Darker areas get bigger shapes, lighter areas get smaller ones. Choose from circle, cross, dash, or diamond shapes. Good general-purpose choice for tactile printing because the dot spacing is predictable and easy to feel.</p>
+
+  <p><span class="algo-name">Floyd</span> — Floyd-Steinberg error diffusion. Each pixel is rounded to black or white, and the rounding error is spread to neighboring pixels. Produces detailed, organic-looking results that closely follow the original image. Can feel noisy on tactile prints at fine scales.</p>
+
+  <p><span class="algo-name">Atkinson</span> — Bill Atkinson's error diffusion, made famous on the original Macintosh. Like Floyd-Steinberg but intentionally discards some error, creating a lighter, more open result with more white space. Better for tactile printing when you want less clutter.</p>
+
+  <p><span class="algo-name">Bayer</span> — Ordered dithering using a 4x4 threshold matrix. Creates a regular, grid-like pattern. Has a distinctive retro/digital look. The structured pattern can be easier to read by touch because it's highly regular.</p>
+
+  <p><span class="algo-name">Halftone</span> — Diamond-shaped dots on a 45-degree rotated grid. Dots grow with darkness and merge into a connected diamond mesh at mid-tones. This is the classic amplitude-modulated screen used in newspaper and magazine printing. Very distinct tactile texture.</p>
+
+  <p><span class="algo-name">Lines</span> — Horizontal bars whose thickness varies with darkness. Light areas have thin lines, dark areas have thick bars that merge together. Simple and effective for architectural drawings and graphics with clear horizontal features.</p>
+
+  <p><span class="algo-name">Hatch</span> — Cross-hatching that layers lines at different angles based on darkness. Light areas get a single horizontal line, mid-tones add vertical, darker areas add diagonals. Mimics traditional pen-and-ink illustration technique. Rich tactile texture.</p>
+
+  <p><span class="algo-name">Engrave</span> — Continuous diagonal lines with variable thickness. Produces the look of engraved banknotes or etched illustrations. The lines follow a consistent 45-degree angle but swell and thin with the image's tones.</p>
+
+  <p><span class="algo-name">Stipple</span> — Randomly placed dots with density proportional to darkness. Unlike the regular grid of Dots, stipple places dots at random positions, creating a hand-drawn pointillist effect. Uses a deterministic random seed so the same image always produces the same output.</p>
+
+  <p><span class="algo-name">OX</span> — Uses two distinct mark shapes: O (circle outlines) for lighter areas and X (diagonal crosses) for darker areas. Mid-tones overlay both. Creates a tactile texture where you can feel the difference between light and dark by mark shape, not just density.</p>
+
+  <h2>Controls</h2>
+  <p><span class="algo-name">Spacing / Scale</span> — Controls how large the dithering pattern is. Higher values produce bigger, chunkier marks with more space between them. Lower values produce finer detail. For tactile printing, larger spacing (10-16) is usually better.</p>
+  <p><span class="algo-name">Gamma</span> — Adjusts the midtone balance. Values below 1.0 darken the image, values above 1.0 lighten it. Useful for bringing out detail in shadows or highlights.</p>
+  <p><span class="algo-name">Contrast</span> — Increases or decreases the difference between light and dark areas. Positive values make lights lighter and darks darker. Negative values flatten the tonal range.</p>
+  <p><span class="algo-name">Brightness</span> — Shifts all tones lighter (positive) or darker (negative).</p>
+  <p><span class="algo-name">Invert</span> — Swaps black and white. Useful when printing on dark paper or when you want raised marks to represent light areas instead of dark.</p>
+  <p><span class="algo-name">Color</span> — Enables CMYK color halftone mode. Separates the image into Cyan, Magenta, and Yellow channels, each rendered as diamond halftone dots at classic print screen angles (C=15°, M=75°, Y=0°). Overlapping dots mix subtractively to reproduce the full color spectrum, just like newspaper and magazine color printing.</p>
+  <p><span class="algo-name">Edges</span> — Overlays detected edges on top of the dithered image. Uses a Sobel filter to find areas of high contrast (object boundaries, architectural lines) and draws them as thin lines. Works with any algorithm and with color mode. Especially useful for architectural images where you want structural lines to remain crisp.</p>
+  <p><span class="algo-name">Blur/Sharp</span> — Pre-processing filter applied before dithering. Negative values blur (soften), positive values sharpen (enhance edges). Useful for reducing noise before dithering or emphasizing detail.</p>
+  <p><span class="algo-name">Posterize</span> — Reduces the number of tonal levels before dithering. Low values (2-4) create dramatic banding effects. Set to 32 for off.</p>
+  <p><span class="algo-name">Depth</span> — Uses an AI model (Depth Anything V2) to estimate distance from camera. Bright areas are close, dark areas are far. First use downloads ~40MB model (cached afterward). Tap to toggle between depth map and original photo. All algorithms work on the depth data.</p>
+  <p><span class="algo-name">Bracket</span> — Saves three versions at once: tight (60% spacing), medium (current), and loose (160% spacing). Handy for testing which spacing works best on your PIAF machine.</p>
+
+  <h2>Keyboard Shortcuts</h2>
+  <p>Space: Save image. B: Bracket capture. I: Toggle invert. +/-: Adjust spacing. [/]: Adjust gamma.</p>
+</div>
+
+<div id="start-screen">
+  <h1>GRIT</h1>
+  <span class="subtitle">Grayscale Rendering & Ink Toolkit. 10 dithering algorithms, AI depth map, CMYK color, live camera.</span>
+  <button class="start-btn btn-photo" id="takePhotoBtn">Take Photo</button>
+  <button class="start-btn btn-library" id="choosePhotoBtn">Choose from Library</button>
+  <button class="start-btn btn-live" id="liveBtn">Live Camera</button>
+  <button class="start-btn" id="helpBtn" style="background:linear-gradient(145deg,#444,#333); box-shadow: 0 4px 12px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.1);">Help</button>
+  <select id="cameraSelect" class="camera-select">
+    <option value="environment">Back Camera</option>
+    <option value="user">Front Camera</option>
+  </select>
+  <input type="file" id="cameraInput" accept="image/*" capture="environment">
+  <input type="file" id="libraryInput" accept="image/*">
+</div>
+
+<div id="editor" class="hidden">
+  <div id="canvas-container">
+    <canvas id="output"></canvas>
+  </div>
+  <video id="video" playsinline autoplay muted></video>
+  <div id="status"></div>
+
+  <!-- Hidden sliders for values not shown -->
+  <input type="hidden" id="contrast" value="0">
+  <input type="hidden" id="brightness" value="0">
+
+  <div class="bottom-bar" id="bottomBar" style="display:none">
+    <div class="slider-row">
+      <label id="sliderLabel">Spacing</label>
+      <input type="range" id="mainSlider" min="2" max="30" value="8" step="1">
+      <span class="val" id="sliderVal">8</span>
+    </div>
+    <!-- Hidden sliders that feed values -->
+    <input type="range" id="spacing" min="2" max="30" value="8" step="1" style="display:none">
+    <input type="range" id="scale" min="1" max="8" value="3" step="1" style="display:none">
+    <input type="range" id="gamma" min="0.2" max="4.0" value="1.0" step="0.1" style="display:none">
+    <input type="range" id="weight" min="0.2" max="3.0" value="1.0" step="0.1" style="display:none">
+    <input type="range" id="rotation" min="0" max="360" value="0" step="5" style="display:none">
+    <input type="range" id="outline" min="0" max="10" value="0" step="1" style="display:none">
+    <input type="range" id="blur" min="-5" max="5" value="0" step="1" style="display:none">
+    <input type="range" id="posterize" min="2" max="32" value="32" step="1" style="display:none">
+
+    <div class="menu-bar">
+      <div class="menu-btn has-active" id="algoMenuBtn" data-menu="algoMenu">
+        <span class="btn-icon">&#9670;</span><span class="btn-label">Dots</span>
+      </div>
+      <div class="menu-btn" id="adjustMenuBtn" data-menu="adjustMenu">
+        <span class="btn-icon">&#9703;</span><span class="btn-label">Tune</span>
+      </div>
+      <div class="menu-btn" id="optionsMenuBtn" data-menu="optionsMenu">
+        <span class="btn-icon">&#10022;</span><span class="btn-label">FX</span>
+      </div>
+      <div class="menu-btn" id="depthBtn">
+        <span class="btn-icon">&#9680;</span><span class="btn-label">Depth</span>
+      </div>
+      <div class="menu-btn" id="actionMenuBtn" data-menu="actionMenu">
+        <span class="btn-icon">&#9660;</span><span class="btn-label">Save</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Popup menus live outside bottom-bar to avoid backdrop-filter stacking context -->
+<div id="popup-overlay" class="popup-overlay"></div>
+<div class="popup-menu" id="algoMenu" data-btn="algoMenuBtn">
+  <button class="popup-item selected" data-algo="dithertone">Dots</button>
+  <button class="popup-item" data-algo="floyd">Floyd</button>
+  <button class="popup-item" data-algo="atkinson">Atkinson</button>
+  <button class="popup-item" data-algo="bayer">Bayer</button>
+  <button class="popup-item" data-algo="angledhalftone">Halftone</button>
+  <button class="popup-item" data-algo="halftone">Lines</button>
+  <button class="popup-item" data-algo="crosshatch">Hatch</button>
+  <button class="popup-item" data-algo="engrave">Engrave</button>
+  <button class="popup-item" data-algo="stipple">Stipple</button>
+  <button class="popup-item" data-algo="ox">OX</button>
+</div>
+<div class="popup-menu" id="adjustMenu" data-btn="adjustMenuBtn">
+  <button class="popup-item selected" data-slider="spacing">Spacing</button>
+  <button class="popup-item" data-slider="weight">Weight</button>
+  <button class="popup-item" data-slider="rotation">Rotation</button>
+  <button class="popup-item" data-slider="outline">Outline</button>
+  <button class="popup-item" data-slider="gamma">Gamma</button>
+  <button class="popup-item" data-slider="contrast">Contrast</button>
+  <button class="popup-item" data-slider="brightness">Brightness</button>
+  <button class="popup-item" data-slider="blur">Blur/Sharp</button>
+  <button class="popup-item" data-slider="posterize">Posterize</button>
+  <button class="popup-item" data-slider="shape">Shape: Circle</button>
+</div>
+<div class="popup-menu" id="optionsMenu" data-btn="optionsMenuBtn">
+  <button class="popup-item" data-option="color">Color</button>
+  <button class="popup-item" data-option="edges">Edges</button>
+  <button class="popup-item" data-option="invert">Invert</button>
+</div>
+<div class="popup-menu" id="actionMenu" data-btn="actionMenuBtn">
+  <button class="popup-item" data-action="save">Save PNG</button>
+  <button class="popup-item" data-action="bracket">Bracket (3x)</button>
+  <button class="popup-item" data-action="new">New Image</button>
+  <button class="popup-item" data-action="capture" style="display:none">Capture Frame</button>
+  <button class="popup-item" data-action="flip" style="display:none">Flip Camera</button>
+  <button class="popup-item" data-action="stop" style="display:none">Stop Camera</button>
+</div>
+
+<script>
+var output = document.getElementById('output');
+var ctx = output.getContext('2d');
+var statusEl = document.getElementById('status');
+var video = document.getElementById('video');
+
+// Source image data
+var sourceGray = null;
+var sourceRGBA = null;
+var sourceW = 0;
+var sourceH = 0;
+var inverted = false;
+var currentShape = 'circle';
+var currentAlgo = 'dithertone';
+var liveMode = false;
+var liveRunning = false;
+var facingMode = 'environment';
+var colorMode = false;
+var edgeMode = false;
+var lastFrameRGBA = null;
+
+// Depth map state
+var depthActive = false;
+var depthGray = null;
+var depthPipeline = null;
+var depthLoading = false;
+var originalGray = null; // saved copy of sourceGray before depth replaces it
+
+// Hidden canvas for grabbing video frames
+var srcCanvas = document.createElement('canvas');
+var srcCtx = srcCanvas.getContext('2d', { willReadFrequently: true });
+
+// Sliders (hidden backing sliders + the visible mainSlider)
+var spacingSlider = document.getElementById('spacing');
+var scaleSlider = document.getElementById('scale');
+var gammaSlider = document.getElementById('gamma');
+var contrastSlider = document.getElementById('contrast');
+var brightnessSlider = document.getElementById('brightness');
+var weightSlider = document.getElementById('weight');
+var rotationSlider = document.getElementById('rotation');
+var outlineSlider = document.getElementById('outline');
+var blurSlider = document.getElementById('blur');
+var posterizeSlider = document.getElementById('posterize');
+var mainSlider = document.getElementById('mainSlider');
+var sliderLabel = document.getElementById('sliderLabel');
+var sliderVal = document.getElementById('sliderVal');
+
+// Which parameter the main slider currently controls
+var currentSliderParam = 'spacing';
+
+// Shapes cycle
+var SHAPES = ['circle', 'cross', 'dash', 'diamond'];
+var shapeIndex = 0;
+
+// Pixel-level algorithms that use the scale slider instead of spacing
+var PIXEL_ALGOS = { floyd: 1, atkinson: 1, stucki: 1, bayer: 1 };
+
+function getParams() {
+  return {
+    spacing: parseInt(spacingSlider.value),
+    scale: parseInt(scaleSlider.value),
+    gamma: parseFloat(gammaSlider.value),
+    contrast: parseFloat(contrastSlider.value),
+    brightness: parseFloat(brightnessSlider.value),
+    weight: parseFloat(weightSlider.value),
+    rotation: parseFloat(rotationSlider.value),
+    outline: parseInt(outlineSlider.value),
+    blur: parseInt(blurSlider.value),
+    posterize: parseInt(posterizeSlider.value),
+    invert: inverted,
+    shape: currentShape,
+    algorithm: currentAlgo,
+    maxRadiusFactor: 0.45,
+    minRadius: 0.5,
+  };
+}
+
+// Slider config per parameter
+var SLIDER_CONFIG = {
+  spacing:    { label: 'Spacing',    min: 2,    max: 30,  step: 1,   format: function(v) { return Math.round(v); } },
+  scale:      { label: 'Scale',      min: 1,    max: 8,   step: 1,   format: function(v) { return Math.round(v); } },
+  gamma:      { label: 'Gamma',      min: 0.2,  max: 4.0, step: 0.1, format: function(v) { return parseFloat(v).toFixed(1); } },
+  contrast:   { label: 'Contrast',   min: -100, max: 100, step: 5,   format: function(v) { return Math.round(v); } },
+  brightness: { label: 'Brightness', min: -100, max: 100, step: 5,   format: function(v) { return Math.round(v); } },
+  weight:     { label: 'Weight',     min: 0.2,  max: 3.0, step: 0.1, format: function(v) { return parseFloat(v).toFixed(1); } },
+  rotation:   { label: 'Rotation',   min: 0,    max: 360, step: 5,   format: function(v) { return Math.round(v) + '\u00B0'; } },
+  outline:    { label: 'Outline',   min: 0,    max: 10,  step: 1,   format: function(v) { return v == 0 ? 'Off' : Math.round(v) + 'px'; } },
+  blur:       { label: 'Blur/Sharp', min: -5,  max: 5,   step: 1,   format: function(v) { var n = Math.round(v); return n < 0 ? 'Blur ' + Math.abs(n) : n > 0 ? 'Sharp ' + n : 'Off'; } },
+  posterize:  { label: 'Posterize', min: 2,    max: 32,  step: 1,   format: function(v) { return v >= 32 ? 'Off' : Math.round(v) + ' lvl'; } },
+};
+
+function syncMainSlider() {
+  // Determine which param to show: pixel algos use scale instead of spacing
+  var param = currentSliderParam;
+  if (param === 'spacing' && currentAlgo in PIXEL_ALGOS) param = 'scale';
+
+  var cfg = SLIDER_CONFIG[param];
+  var backing = document.getElementById(param);
+
+  sliderLabel.textContent = cfg.label;
+  mainSlider.min = cfg.min;
+  mainSlider.max = cfg.max;
+  mainSlider.step = cfg.step;
+  mainSlider.value = backing.value;
+  sliderVal.textContent = cfg.format(backing.value);
+}
+
+function onParamChange() {
+  syncMainSlider();
+  if (sourceGray && !liveMode) render(sourceGray, sourceW, sourceH, getParams());
+}
+
+mainSlider.addEventListener('input', function() {
+  var param = currentSliderParam;
+  if (param === 'spacing' && currentAlgo in PIXEL_ALGOS) param = 'scale';
+  var backing = document.getElementById(param);
+  backing.value = mainSlider.value;
+  var cfg = SLIDER_CONFIG[param];
+  sliderVal.textContent = cfg.format(mainSlider.value);
+  if (sourceGray && !liveMode) render(sourceGray, sourceW, sourceH, getParams());
+});
+
+// Gamma LUT
+var gammaLUT = new Uint8Array(256);
+var lastGamma = -1;
+function buildGammaLUT(gamma) {
+  if (gamma === lastGamma) return;
+  var invGamma = 1.0 / gamma;
+  for (var i = 0; i < 256; i++) {
+    gammaLUT[i] = Math.round(Math.pow(i / 255, invGamma) * 255);
+  }
+  lastGamma = gamma;
+}
+
+function applyConvolution3x3(gray, w, h, kernel, divisor) {
+  var result = new Uint8Array(gray.length);
+  for (var y = 0; y < h; y++) {
+    for (var x = 0; x < w; x++) {
+      if (y === 0 || y === h - 1 || x === 0 || x === w - 1) {
+        result[y * w + x] = gray[y * w + x];
+        continue;
+      }
+      var sum = 0;
+      for (var ky = -1; ky <= 1; ky++) {
+        for (var kx = -1; kx <= 1; kx++) {
+          sum += gray[(y + ky) * w + (x + kx)] * kernel[(ky + 1) * 3 + (kx + 1)];
+        }
+      }
+      result[y * w + x] = Math.max(0, Math.min(255, Math.round(sum / divisor)));
+    }
+  }
+  return result;
+}
+
+function applyBlurSharpen(gray, w, h, amount) {
+  if (amount === 0) return gray;
+  var blurKernel = [1,2,1, 2,4,2, 1,2,1];
+  var sharpKernel = [0,-1,0, -1,5,-1, 0,-1,0];
+  var iterations = Math.abs(amount);
+  var result = gray;
+  for (var i = 0; i < iterations; i++) {
+    if (amount < 0) {
+      result = applyConvolution3x3(result, w, h, blurKernel, 16);
+    } else {
+      result = applyConvolution3x3(result, w, h, sharpKernel, 1);
+    }
+  }
+  return result;
+}
+
+function adjustPixels(gray, w, h, params) {
+  var result = new Uint8Array(gray.length);
+  var factor = (100 + params.contrast) / 100;
+  buildGammaLUT(params.gamma);
+  for (var i = 0; i < gray.length; i++) {
+    var v = gray[i] + params.brightness;
+    v = 128 + factor * (v - 128);
+    v = Math.max(0, Math.min(255, v));
+    if (params.gamma !== 1.0) v = gammaLUT[Math.round(v)];
+    result[i] = v;
+  }
+  // Blur/sharpen
+  if (params.blur && params.blur !== 0 && w && h) {
+    result = applyBlurSharpen(result, w, h, params.blur);
+  }
+  // Posterize
+  if (params.posterize && params.posterize < 32 && params.posterize >= 2) {
+    var levels = params.posterize;
+    var step = 255 / (levels - 1);
+    for (var i = 0; i < result.length; i++) {
+      result[i] = Math.round(Math.round(result[i] / step) * step);
+    }
+  }
+  return result;
+}
+
+function adjustRGBA(rgba, w, h, params) {
+  var result = new Uint8Array(rgba.length);
+  var factor = (100 + params.contrast) / 100;
+  buildGammaLUT(params.gamma);
+  for (var i = 0; i < rgba.length; i += 4) {
+    for (var c = 0; c < 3; c++) {
+      var v = rgba[i + c] + params.brightness;
+      v = 128 + factor * (v - 128);
+      v = Math.max(0, Math.min(255, v));
+      if (params.gamma !== 1.0) v = gammaLUT[Math.round(v)];
+      result[i + c] = v;
+    }
+    result[i + 3] = 255;
+  }
+  // Apply blur/sharpen per channel
+  if (params.blur && params.blur !== 0 && w && h) {
+    var numPixels = w * h;
+    for (var ch = 0; ch < 3; ch++) {
+      var chan = new Uint8Array(numPixels);
+      for (var p = 0; p < numPixels; p++) chan[p] = result[p * 4 + ch];
+      chan = applyBlurSharpen(chan, w, h, params.blur);
+      for (var p = 0; p < numPixels; p++) result[p * 4 + ch] = chan[p];
+    }
+  }
+  // Posterize per channel
+  if (params.posterize && params.posterize < 32 && params.posterize >= 2) {
+    var levels = params.posterize;
+    var step = 255 / (levels - 1);
+    for (var i = 0; i < rgba.length; i += 4) {
+      for (var c = 0; c < 3; c++) {
+        result[i + c] = Math.round(Math.round(result[i + c] / step) * step);
+      }
+    }
+  }
+  return result;
+}
+
+// ── Grid rotation helpers ──
+// For canvas-drawing algorithms: sets up a rotated canvas context and
+// returns expanded iteration bounds so the rotated grid covers the full canvas.
+// Brightness is sampled by reverse-rotating grid coords back to image space.
+function setupGridRotation(w, h, params) {
+  var deg = params.rotation || 0;
+  if (deg === 0) return null;
+  var rad = deg * Math.PI / 180;
+  var cos = Math.cos(rad), sin = Math.sin(rad);
+  // Extra margin so rotated grid covers corners
+  var diag = Math.sqrt(w * w + h * h);
+  var extend = Math.ceil((diag - Math.min(w, h)) / 2) + 20;
+  ctx.save();
+  ctx.translate(w / 2, h / 2);
+  ctx.rotate(rad);
+  ctx.translate(-w / 2, -h / 2);
+  return { cos: cos, sin: sin, extend: extend, cx: w / 2, cy: h / 2 };
+}
+
+function endGridRotation(rot) {
+  if (rot) ctx.restore();
+}
+
+// Sample brightness from the unrotated source image given a grid position
+// in the rotated coordinate system. The canvas ctx.rotate() maps grid pos
+// (gx,gy) to screen pos via forward rotation, so we forward-rotate to find
+// where in the original image to sample brightness.
+function sampleRotated(adjusted, w, h, gx, gy, rot) {
+  if (!rot) {
+    if (gx < 0 || gx >= w || gy < 0 || gy >= h) return 255;
+    return adjusted[gy * w + gx];
+  }
+  // Forward-rotate (gx, gy) around image center to get screen position
+  var dx = gx - rot.cx, dy = gy - rot.cy;
+  var sx = Math.round(rot.cos * dx - rot.sin * dy + rot.cx);
+  var sy = Math.round(rot.sin * dx + rot.cos * dy + rot.cy);
+  if (sx < 0 || sx >= w || sy < 0 || sy >= h) return 255;
+  return adjusted[sy * w + sx];
+}
+
+// ── Main render dispatcher ──
+function render(gray, w, h, params) {
+  var rgba = liveMode ? lastFrameRGBA : sourceRGBA;
+  if (colorMode && rgba) {
+    renderColor(rgba, w, h, params);
+  } else {
+    switch (params.algorithm) {
+      case 'dithertone':  renderDithertone(gray, w, h, params); break;
+      case 'floyd':       renderFloydSteinberg(gray, w, h, params); break;
+      case 'atkinson':    renderAtkinson(gray, w, h, params); break;
+      case 'bayer':       renderBayer(gray, w, h, params); break;
+      case 'angledhalftone': renderAngledHalftone(gray, w, h, params); break;
+      case 'halftone':    renderHalftone(gray, w, h, params); break;
+      case 'crosshatch':  renderCrosshatch(gray, w, h, params); break;
+      case 'engrave':     renderEngrave(gray, w, h, params); break;
+      case 'stipple':     renderStipple(gray, w, h, params); break;
+      case 'ox':          renderOX(gray, w, h, params); break;
+    }
+  }
+  if (edgeMode || params.outline > 0) {
+    overlayEdges(gray, w, h, params);
+  }
+}
+
+// ── Dithertone (variable-size shapes on grid) ──
+function renderDithertone(gray, w, h, params) {
+  var adjusted = adjustPixels(gray, w, h, params);
+  var spacing = params.spacing;
+  var wt = params.weight || 1.0;
+  var maxRadius = spacing * params.maxRadiusFactor * wt;
+  var minRadius = params.minRadius;
+  var half = Math.floor(spacing / 2);
+  var shape = params.shape || 'circle';
+
+  output.width = w;
+  output.height = h;
+
+  if (params.invert) {
+    ctx.fillStyle = '#000';
+    ctx.fillRect(0, 0, w, h);
+  } else {
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(0, 0, w, h);
+  }
+
+  var rot = setupGridRotation(w, h, params);
+  ctx.fillStyle = params.invert ? '#fff' : '#000';
+  var ext = rot ? rot.extend : 0;
+
+  for (var y = half - ext; y < h + ext; y += spacing) {
+    for (var x = half - ext; x < w + ext; x += spacing) {
+      var b = sampleRotated(adjusted, w, h, x, y, rot);
+      var radius;
+      if (params.invert) {
+        radius = maxRadius * (b / 255);
+      } else {
+        radius = maxRadius * (1 - b / 255);
+      }
+      if (radius > minRadius) {
+        drawShape(ctx, x, y, radius, shape);
+      }
+    }
+  }
+  endGridRotation(rot);
+}
+
+function drawShape(c, x, y, r, shape) {
+  switch (shape) {
+    case 'circle':
+      c.beginPath();
+      c.arc(x, y, r, 0, Math.PI * 2);
+      c.fill();
+      break;
+    case 'cross':
+      var t = r * 0.35;
+      c.fillRect(x - r, y - t, r * 2, t * 2);
+      c.fillRect(x - t, y - r, t * 2, r * 2);
+      break;
+    case 'dash':
+      c.fillRect(x - r, y - r * 0.3, r * 2, r * 0.6);
+      break;
+    case 'diamond':
+      c.beginPath();
+      c.moveTo(x, y - r);
+      c.lineTo(x + r, y);
+      c.lineTo(x, y + r);
+      c.lineTo(x - r, y);
+      c.closePath();
+      c.fill();
+      break;
+  }
+}
+
+// ── Downscale helper for pixel-level algorithms ──
+// Uses spacing as a scale factor: higher spacing = more downscale = chunkier pixels.
+// Dithers at reduced resolution, then nearest-neighbor upscales back.
+function downsampleGray(gray, w, h, spacing) {
+  if (spacing <= 1) return { gray: gray, w: w, h: h };
+  var sw = Math.max(1, Math.round(w / spacing));
+  var sh = Math.max(1, Math.round(h / spacing));
+  var small = new Uint8Array(sw * sh);
+  for (var y = 0; y < sh; y++) {
+    for (var x = 0; x < sw; x++) {
+      var srcX = Math.min(Math.round(x * w / sw), w - 1);
+      var srcY = Math.min(Math.round(y * h / sh), h - 1);
+      small[y * sw + x] = gray[srcY * w + srcX];
+    }
+  }
+  return { gray: small, w: sw, h: sh };
+}
+
+function upsampleToCanvas(imgData, sw, sh, w, h) {
+  var src = imgData.data;
+  output.width = w;
+  output.height = h;
+  var dst = ctx.createImageData(w, h);
+  var pix = dst.data;
+  for (var y = 0; y < h; y++) {
+    var sy = Math.min(Math.floor(y * sh / h), sh - 1);
+    for (var x = 0; x < w; x++) {
+      var sx = Math.min(Math.floor(x * sw / w), sw - 1);
+      var si = (sy * sw + sx) * 4;
+      var di = (y * w + x) * 4;
+      pix[di] = src[si];
+      pix[di + 1] = src[si + 1];
+      pix[di + 2] = src[si + 2];
+      pix[di + 3] = 255;
+    }
+  }
+  ctx.putImageData(dst, 0, 0);
+}
+
+// ── Floyd-Steinberg error diffusion ──
+function renderFloydSteinberg(gray, w, h, params) {
+  var ds = downsampleGray(adjustPixels(gray, w, h, params), w, h, params.scale);
+  var sw = ds.w, sh = ds.h;
+  var err = new Float32Array(ds.gray.length);
+  for (var i = 0; i < ds.gray.length; i++) err[i] = ds.gray[i];
+
+  var imgData = ctx.createImageData(sw, sh);
+  var pix = imgData.data;
+
+  for (var y = 0; y < sh; y++) {
+    for (var x = 0; x < sw; x++) {
+      var idx = y * sw + x;
+      var old = err[idx];
+      var nv = old < 128 ? 0 : 255;
+      if (params.invert) nv = 255 - nv;
+      var e = old - (old < 128 ? 0 : 255);
+
+      var pi = idx * 4;
+      pix[pi] = pix[pi + 1] = pix[pi + 2] = nv;
+      pix[pi + 3] = 255;
+
+      if (x + 1 < sw) err[idx + 1] += e * 7 / 16;
+      if (y + 1 < sh) {
+        if (x > 0) err[idx + sw - 1] += e * 3 / 16;
+        err[idx + sw] += e * 5 / 16;
+        if (x + 1 < sw) err[idx + sw + 1] += e * 1 / 16;
+      }
+    }
+  }
+  upsampleToCanvas(imgData, sw, sh, w, h);
+}
+
+// ── Bayer ordered dither (4x4) ──
+var BAYER4 = [
+   0, 8, 2, 10,
+  12, 4, 14,  6,
+   3, 11, 1,  9,
+  15, 7, 13,  5
+];
+// Scale to 0-255
+var bayerThreshold = new Uint8Array(16);
+for (var i = 0; i < 16; i++) {
+  bayerThreshold[i] = Math.round((BAYER4[i] / 16) * 255);
+}
+
+function renderBayer(gray, w, h, params) {
+  var ds = downsampleGray(adjustPixels(gray, w, h, params), w, h, params.scale);
+  var sw = ds.w, sh = ds.h;
+
+  var imgData = ctx.createImageData(sw, sh);
+  var pix = imgData.data;
+
+  for (var y = 0; y < sh; y++) {
+    for (var x = 0; x < sw; x++) {
+      var idx = y * sw + x;
+      var v = ds.gray[idx];
+      // Rotate the threshold sampling coordinates for pattern rotation
+      var tx = x, ty = y;
+      if (params.rotation) {
+        var rad = params.rotation * Math.PI / 180;
+        var rc = Math.cos(rad), rs = Math.sin(rad);
+        tx = Math.round(rc * x + rs * y);
+        ty = Math.round(-rs * x + rc * y);
+      }
+      var thresh = bayerThreshold[((ty % 4 + 4) % 4) * 4 + ((tx % 4 + 4) % 4)];
+      var nv = v > thresh ? 255 : 0;
+      if (params.invert) nv = 255 - nv;
+
+      var pi = idx * 4;
+      pix[pi] = pix[pi + 1] = pix[pi + 2] = nv;
+      pix[pi + 3] = 255;
+    }
+  }
+  upsampleToCanvas(imgData, sw, sh, w, h);
+}
+
+// ── Halftone lines ──
+function renderHalftone(gray, w, h, params) {
+  var adjusted = adjustPixels(gray, w, h, params);
+  var spacing = params.spacing;
+  var half = Math.floor(spacing / 2);
+  var wt = params.weight || 1.0;
+  var maxThick = spacing * 0.9 * wt;
+
+  output.width = w;
+  output.height = h;
+
+  if (params.invert) {
+    ctx.fillStyle = '#000';
+    ctx.fillRect(0, 0, w, h);
+  } else {
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(0, 0, w, h);
+  }
+
+  var rot = setupGridRotation(w, h, params);
+  ctx.fillStyle = params.invert ? '#fff' : '#000';
+  var ext = rot ? rot.extend : 0;
+
+  for (var y = half - ext; y < h + ext; y += spacing) {
+    for (var x = half - ext; x < w + ext; x += spacing) {
+      var b = sampleRotated(adjusted, w, h, x, y, rot);
+      var thick;
+      if (params.invert) {
+        thick = maxThick * (b / 255);
+      } else {
+        thick = maxThick * (1 - b / 255);
+      }
+      if (thick > 0.5) {
+        var ht = thick / 2;
+        ctx.fillRect(x - half, y - ht, spacing, thick);
+      }
+    }
+  }
+  endGridRotation(rot);
+}
+
+// ── Atkinson error diffusion ──
+// Distributes only 6/8 of quantization error, giving a lighter, more open look.
+// Classic original Macintosh algorithm.
+function renderAtkinson(gray, w, h, params) {
+  var ds = downsampleGray(adjustPixels(gray, w, h, params), w, h, params.scale);
+  var sw = ds.w, sh = ds.h;
+  var err = new Float32Array(ds.gray.length);
+  for (var i = 0; i < ds.gray.length; i++) err[i] = ds.gray[i];
+
+  var imgData = ctx.createImageData(sw, sh);
+  var pix = imgData.data;
+
+  for (var y = 0; y < sh; y++) {
+    for (var x = 0; x < sw; x++) {
+      var idx = y * sw + x;
+      var old = err[idx];
+      var nv = old < 128 ? 0 : 255;
+      if (params.invert) nv = 255 - nv;
+      var e = (old - (old < 128 ? 0 : 255)) / 8;
+
+      var pi = idx * 4;
+      pix[pi] = pix[pi + 1] = pix[pi + 2] = nv;
+      pix[pi + 3] = 255;
+
+      // Spread 1/8 to each of 6 neighbors (total 6/8, discards 2/8)
+      if (x + 1 < sw) err[idx + 1] += e;
+      if (x + 2 < sw) err[idx + 2] += e;
+      if (y + 1 < sh) {
+        if (x > 0) err[idx + sw - 1] += e;
+        err[idx + sw] += e;
+        if (x + 1 < sw) err[idx + sw + 1] += e;
+      }
+      if (y + 2 < sh) err[idx + sw * 2] += e;
+    }
+  }
+  upsampleToCanvas(imgData, sw, sh, w, h);
+}
+
+// ── Crosshatch ──
+// Layers lines at different angles based on darkness level.
+// Light areas get fewer line directions, dark areas stack up to 4 directions.
+function renderCrosshatch(gray, w, h, params) {
+  var adjusted = adjustPixels(gray, w, h, params);
+  var spacing = params.spacing;
+
+  output.width = w;
+  output.height = h;
+
+  if (params.invert) {
+    ctx.fillStyle = '#000';
+    ctx.fillRect(0, 0, w, h);
+  } else {
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(0, 0, w, h);
+  }
+
+  var rot = setupGridRotation(w, h, params);
+  ctx.strokeStyle = params.invert ? '#fff' : '#000';
+  var wt = params.weight || 1.0;
+  ctx.lineWidth = Math.max(1, spacing * 0.15 * wt);
+  var ext = rot ? rot.extend : 0;
+
+  var half = Math.floor(spacing / 2);
+  for (var cy = half - ext; cy < h + ext; cy += spacing) {
+    for (var cx = half - ext; cx < w + ext; cx += spacing) {
+      var b = sampleRotated(adjusted, w, h, cx, cy, rot);
+      var darkness = params.invert ? (b / 255) : (1 - b / 255);
+
+      var level = 0;
+      if (darkness > 0.15) level = 1;
+      if (darkness > 0.35) level = 2;
+      if (darkness > 0.55) level = 3;
+      if (darkness > 0.75) level = 4;
+
+      if (level === 0) continue;
+
+      var x0 = cx - half;
+      var y0 = cy - half;
+      var x1 = cx + half;
+      var y1 = cy + half;
+
+      ctx.beginPath();
+      if (level >= 1) { ctx.moveTo(x0, cy); ctx.lineTo(x1, cy); }
+      if (level >= 2) { ctx.moveTo(cx, y0); ctx.lineTo(cx, y1); }
+      if (level >= 3) { ctx.moveTo(x0, y1); ctx.lineTo(x1, y0); }
+      if (level >= 4) { ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); }
+      ctx.stroke();
+    }
+  }
+  endGridRotation(rot);
+}
+
+// ── OX (O strokes + X strokes) ──
+// Hatch-style algorithm using two distinct stroke shapes: O (circle outlines)
+// for lighter areas and X (diagonal crosses) for darker areas. Mid-tones
+// overlay both. Line weight increases with darkness.
+function renderOX(gray, w, h, params) {
+  var adjusted = adjustPixels(gray, w, h, params);
+  var spacing = params.spacing;
+  var half = Math.floor(spacing / 2);
+  var maxR = spacing * 0.45;
+
+  output.width = w;
+  output.height = h;
+
+  var fg, bg;
+  if (params.invert) {
+    bg = '#000'; fg = '#fff';
+  } else {
+    bg = '#fff'; fg = '#000';
+  }
+  ctx.fillStyle = bg;
+  ctx.fillRect(0, 0, w, h);
+
+  var rot = setupGridRotation(w, h, params);
+  ctx.strokeStyle = fg;
+  ctx.lineCap = 'round';
+  var ext = rot ? rot.extend : 0;
+
+  for (var cy = half - ext; cy < h + ext; cy += spacing) {
+    for (var cx = half - ext; cx < w + ext; cx += spacing) {
+      var b = sampleRotated(adjusted, w, h, cx, cy, rot);
+      var darkness = params.invert ? (b / 255) : (1 - b / 255);
+      if (darkness < 0.05) continue;
+
+      var wt = params.weight || 1.0;
+      var r = maxR * Math.min(darkness * 1.2, 1);
+      var lw = Math.max(1, (spacing * 0.1 + spacing * 0.12 * darkness) * wt);
+      ctx.lineWidth = lw;
+
+      if (darkness <= 0.5) {
+        ctx.beginPath();
+        ctx.arc(cx, cy, Math.max(1, r), 0, Math.PI * 2);
+        ctx.stroke();
+      } else if (darkness <= 0.75) {
+        ctx.beginPath();
+        ctx.arc(cx, cy, r, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(cx - r, cy - r); ctx.lineTo(cx + r, cy + r);
+        ctx.moveTo(cx + r, cy - r); ctx.lineTo(cx - r, cy + r);
+        ctx.stroke();
+      } else {
+        ctx.lineWidth = lw * 1.4;
+        ctx.beginPath();
+        ctx.arc(cx, cy, r, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(cx - r, cy - r); ctx.lineTo(cx + r, cy + r);
+        ctx.moveTo(cx + r, cy - r); ctx.lineTo(cx - r, cy + r);
+        ctx.stroke();
+      }
+    }
+  }
+  endGridRotation(rot);
+}
+
+// ── Angled Halftone ──
+// Diamond-shaped dots on a 45-degree rotated grid. Dots grow with darkness
+// and merge into a connected diamond mesh at mid-tones, then invert to
+// shrink white holes in dark areas. Classic AM (amplitude-modulated) screen.
+function renderAngledHalftone(gray, w, h, params) {
+  var adjusted = adjustPixels(gray, w, h, params);
+  var spacing = params.spacing;
+
+  output.width = w;
+  output.height = h;
+
+  var fg, bg;
+  if (params.invert) {
+    bg = '#000'; fg = '#fff';
+  } else {
+    bg = '#fff'; fg = '#000';
+  }
+  ctx.fillStyle = bg;
+  ctx.fillRect(0, 0, w, h);
+
+  var angle = Math.PI / 4 + (params.rotation || 0) * Math.PI / 180;
+  var cosA = Math.cos(angle);
+  var sinA = Math.sin(angle);
+  var step = spacing;
+  var halfStep = step * 0.5;
+
+  // Cover the canvas in rotated grid coordinates
+  var diag = Math.sqrt(w * w + h * h);
+  var count = Math.ceil(diag / step) + 2;
+
+  // Per-pixel approach: for each pixel, determine which rotated grid cell
+  // it belongs to and whether it's inside the diamond for that cell's darkness.
+  var imgData = ctx.getImageData(0, 0, w, h);
+  var pix = imgData.data;
+
+  // Parse fg color
+  var fR, fG, fB, bR, bG, bB;
+  if (params.invert) {
+    fR = fG = fB = 255; bR = bG = bB = 0;
+  } else {
+    fR = fG = fB = 0; bR = bG = bB = 255;
+  }
+
+  for (var py = 0; py < h; py++) {
+    for (var px = 0; px < w; px++) {
+      // Rotate pixel into grid space
+      var gx = px * cosA + py * sinA;
+      var gy = -px * sinA + py * cosA;
+
+      // Find nearest grid center
+      var ci = Math.round(gx / step);
+      var cj = Math.round(gy / step);
+
+      // Grid center back in pixel space for sampling
+      var centerPx = ci * step * cosA - cj * step * sinA;
+      var centerPy = ci * step * sinA + cj * step * cosA;
+
+      var sx = Math.round(Math.max(0, Math.min(w - 1, centerPx)));
+      var sy = Math.round(Math.max(0, Math.min(h - 1, centerPy)));
+      var b = adjusted[sy * w + sx];
+      var darkness = params.invert ? (b / 255) : (1 - b / 255);
+
+      // Distance from grid center in grid space (diamond / L1 metric)
+      var dx = Math.abs(gx - ci * step);
+      var dy = Math.abs(gy - cj * step);
+      var dist = (dx + dy) / step;  // normalized 0..1, diamond shape
+
+      // Diamond radius: 0 at darkness=0, fills entire cell at darkness=1
+      var threshold = darkness;
+
+      if (dist < threshold) {
+        var idx = (py * w + px) * 4;
+        pix[idx] = fR;
+        pix[idx + 1] = fG;
+        pix[idx + 2] = fB;
+      }
+    }
+  }
+  ctx.putImageData(imgData, 0, 0);
+}
+
+// ── Engrave ──
+// Continuous diagonal lines with variable thickness based on brightness.
+// Produces an engraving / banknote etching look.
+function renderEngrave(gray, w, h, params) {
+  var adjusted = adjustPixels(gray, w, h, params);
+  var spacing = params.spacing;
+
+  output.width = w;
+  output.height = h;
+
+  if (params.invert) {
+    ctx.fillStyle = '#000';
+    ctx.fillRect(0, 0, w, h);
+  } else {
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(0, 0, w, h);
+  }
+
+  var rot = setupGridRotation(w, h, params);
+  ctx.strokeStyle = params.invert ? '#fff' : '#000';
+  ctx.lineCap = 'butt';
+
+  var wt = params.weight || 1.0;
+  var maxThick = spacing * 0.85 * wt;
+  var step = Math.max(2, Math.floor(spacing * 0.5));
+  var ext = rot ? rot.extend : 0;
+
+  // Lines go from top-right to bottom-left (perpendicular offset along y = -x direction)
+  for (var d = -(h + ext); d < w + h + ext * 2; d += spacing) {
+    ctx.beginPath();
+    var started = false;
+    for (var x = Math.max(-ext, d); x < Math.min(w + ext, d + h + ext * 2); x += step) {
+      var y = x - d;
+      if (y < -ext || y >= h + ext) continue;
+      var b = sampleRotated(adjusted, w, h, x, y, rot);
+      var darkness = params.invert ? (b / 255) : (1 - b / 255);
+      var thick = maxThick * darkness;
+      if (thick < 0.3) {
+        if (started) { ctx.stroke(); ctx.beginPath(); started = false; }
+        continue;
+      }
+      ctx.lineWidth = thick;
+      if (!started) {
+        ctx.moveTo(x, y);
+        started = true;
+      } else {
+        ctx.lineTo(x, y);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(x, y);
+      }
+    }
+    if (started) ctx.stroke();
+  }
+  ctx.lineCap = 'butt';
+  endGridRotation(rot);
+}
+
+// ── Stipple ──
+// Random dot placement with density proportional to darkness.
+// Uses a seeded PRNG so output is deterministic for the same image.
+function renderStipple(gray, w, h, params) {
+  var adjusted = adjustPixels(gray, w, h, params);
+  var spacing = params.spacing;
+
+  output.width = w;
+  output.height = h;
+
+  if (params.invert) {
+    ctx.fillStyle = '#000';
+    ctx.fillRect(0, 0, w, h);
+    ctx.fillStyle = '#fff';
+  } else {
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(0, 0, w, h);
+    ctx.fillStyle = '#000';
+  }
+
+  // Dot radius scales with spacing and weight
+  var wt = params.weight || 1.0;
+  var dotRadius = Math.max(1, spacing * 0.3 * wt);
+  // Number of candidate dots — more candidates = denser coverage
+  var area = w * h;
+  var maxDots = Math.round(area / (spacing * spacing) * 3);
+
+  // Simple seeded PRNG (mulberry32) for deterministic output
+  var seed = 12345;
+  function rand() {
+    seed |= 0; seed = seed + 0x6D2B79F5 | 0;
+    var t = Math.imul(seed ^ seed >>> 15, 1 | seed);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  }
+
+  for (var i = 0; i < maxDots; i++) {
+    var x = Math.floor(rand() * w);
+    var y = Math.floor(rand() * h);
+    var b = adjusted[y * w + x];
+    var darkness = params.invert ? (b / 255) : (1 - b / 255);
+    // Accept dot with probability proportional to darkness
+    if (rand() < darkness) {
+      ctx.beginPath();
+      ctx.arc(x, y, dotRadius, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+}
+
+// ── Color mode (per-algorithm CMY channel separation) ──
+// Renders the current algorithm 3 times — once for each CMY channel — then
+// composites with subtractive color mixing. Works with every algorithm.
+var offCanvas = document.createElement('canvas');
+var offCtx = offCanvas.getContext('2d');
+
+function extractChannel(rgba, w, h, channelIdx) {
+  // Extract a single color channel as a grayscale array.
+  // channelIdx: 0=R (→Cyan darkness), 1=G (→Magenta darkness), 2=B (→Yellow darkness)
+  // Returns inverted: dark areas in the channel = where that ink is heavy.
+  var gray = new Uint8Array(w * h);
+  for (var i = 0; i < w * h; i++) {
+    gray[i] = rgba[i * 4 + channelIdx]; // keep as-is; the algorithm will darken low values
+  }
+  return gray;
+}
+
+function renderColor(rgba, w, h, params) {
+  var adjusted = adjustRGBA(rgba, w, h, params);
+
+  // Render the selected algorithm for each CMY channel onto offscreen canvases
+  // We temporarily swap the output canvas/context to capture each pass
+  var origCanvas = output;
+  var origCtx = ctx;
+
+  var channels = []; // [{imageData}] for C, M, Y
+
+  for (var ch = 0; ch < 3; ch++) {
+    var chanGray = extractChannel(adjusted, w, h, ch);
+
+    // Create a temporary canvas for this channel
+    var tmpCanvas = document.createElement('canvas');
+    tmpCanvas.width = w;
+    tmpCanvas.height = h;
+    var tmpCtx = tmpCanvas.getContext('2d');
+
+    // Temporarily redirect rendering to this canvas
+    output = tmpCanvas;
+    ctx = tmpCtx;
+
+    // Force non-invert for channel rendering (we handle invert in composite)
+    var chanParams = {};
+    for (var k in params) chanParams[k] = params[k];
+    chanParams.invert = false;
+    // Skip brightness/contrast/gamma — already applied via adjustRGBA
+    chanParams.brightness = 0;
+    chanParams.contrast = 0;
+    chanParams.gamma = 1.0;
+
+    // Render the selected algorithm in black-on-white
+    switch (params.algorithm) {
+      case 'dithertone':     renderDithertone(chanGray, w, h, chanParams); break;
+      case 'floyd':          renderFloydSteinberg(chanGray, w, h, chanParams); break;
+      case 'atkinson':       renderAtkinson(chanGray, w, h, chanParams); break;
+      case 'bayer':          renderBayer(chanGray, w, h, chanParams); break;
+      case 'angledhalftone': renderAngledHalftone(chanGray, w, h, chanParams); break;
+      case 'halftone':       renderHalftone(chanGray, w, h, chanParams); break;
+      case 'crosshatch':     renderCrosshatch(chanGray, w, h, chanParams); break;
+      case 'engrave':        renderEngrave(chanGray, w, h, chanParams); break;
+      case 'stipple':        renderStipple(chanGray, w, h, chanParams); break;
+      case 'ox':             renderOX(chanGray, w, h, chanParams); break;
+    }
+
+    channels.push(tmpCtx.getImageData(0, 0, w, h));
+  }
+
+  // Restore original canvas/context
+  output = origCanvas;
+  ctx = origCtx;
+  output.width = w;
+  output.height = h;
+
+  // Composite: subtractive color mixing
+  // Each channel rendered black marks on white. Black pixel = ink present.
+  // C channel: where black → subtract red (cyan ink)
+  // M channel: where black → subtract green (magenta ink)
+  // Y channel: where black → subtract blue (yellow ink)
+  var cPix = channels[0].data; // R channel → Cyan
+  var mPix = channels[1].data; // G channel → Magenta
+  var yPix = channels[2].data; // B channel → Yellow
+
+  var result = ctx.createImageData(w, h);
+  var out = result.data;
+
+  for (var i = 0; i < w * h; i++) {
+    var pi = i * 4;
+    // Each channel: 0 = ink present (dark mark), 255 = no ink (white)
+    // Darkness = how much ink: cDark = 1 means full cyan
+    var cInk = 1 - cPix[pi] / 255; // darkness of cyan channel rendering
+    var mInk = 1 - mPix[pi] / 255; // darkness of magenta channel rendering
+    var yInk = 1 - yPix[pi] / 255; // darkness of yellow channel rendering
+
+    // Subtractive: start from white, subtract CMY
+    var r = 255 * (1 - cInk);
+    var g = 255 * (1 - mInk);
+    var b = 255 * (1 - yInk);
+
+    if (params.invert) {
+      r = 255 - r;
+      g = 255 - g;
+      b = 255 - b;
+    }
+
+    out[pi] = r;
+    out[pi + 1] = g;
+    out[pi + 2] = b;
+    out[pi + 3] = 255;
+  }
+
+  ctx.putImageData(result, 0, 0);
+}
+
+// ── Edge detection overlay (Sobel) ──
+// Computes gradient magnitude at each pixel and overlays detected edges
+// on top of the current dithered output.
+function overlayEdges(gray, w, h, params) {
+  var adjusted = adjustPixels(gray, w, h, params);
+  var edgeColor = params.invert ? 255 : 0;
+  var threshold = 80;
+  var thickness = params.outline || 1;
+
+  // Build edge magnitude map
+  var edges = new Uint8Array(w * h);
+  for (var y = 1; y < h - 1; y++) {
+    for (var x = 1; x < w - 1; x++) {
+      var gx = -adjusted[(y-1)*w+(x-1)] - 2*adjusted[y*w+(x-1)] - adjusted[(y+1)*w+(x-1)]
+              + adjusted[(y-1)*w+(x+1)] + 2*adjusted[y*w+(x+1)] + adjusted[(y+1)*w+(x+1)];
+      var gy = -adjusted[(y-1)*w+(x-1)] - 2*adjusted[(y-1)*w+x] - adjusted[(y-1)*w+(x+1)]
+              + adjusted[(y+1)*w+(x-1)] + 2*adjusted[(y+1)*w+x] + adjusted[(y+1)*w+(x+1)];
+      var mag = Math.sqrt(gx * gx + gy * gy);
+      if (mag > threshold) edges[y * w + x] = 1;
+    }
+  }
+
+  // Dilate edges by thickness and paint onto canvas
+  var imgData = ctx.getImageData(0, 0, w, h);
+  var pix = imgData.data;
+  var rad = Math.floor(thickness / 2);
+  for (var y = 0; y < h; y++) {
+    for (var x = 0; x < w; x++) {
+      // Check if any edge pixel is within radius
+      var found = false;
+      for (var dy = -rad; dy <= rad && !found; dy++) {
+        for (var dx = -rad; dx <= rad && !found; dx++) {
+          var ny = y + dy, nx = x + dx;
+          if (ny >= 0 && ny < h && nx >= 0 && nx < w && edges[ny * w + nx]) {
+            found = true;
+          }
+        }
+      }
+      if (found) {
+        var pi = (y * w + x) * 4;
+        pix[pi] = pix[pi + 1] = pix[pi + 2] = edgeColor;
+      }
+    }
+  }
+  ctx.putImageData(imgData, 0, 0);
+}
+
+// ── Popup menu system ──
+var popupOverlay = document.getElementById('popup-overlay');
+var openMenu = null;
+
+function closeAllMenus() {
+  document.querySelectorAll('.popup-menu').forEach(function(m) { m.classList.remove('visible'); });
+  popupOverlay.classList.remove('visible');
+  openMenu = null;
+}
+
+function toggleMenu(menuId) {
+  var menu = document.getElementById(menuId);
+  if (openMenu === menuId) {
+    closeAllMenus();
+  } else {
+    closeAllMenus();
+    menu.classList.add('visible');
+    popupOverlay.classList.add('visible');
+    openMenu = menuId;
+
+    // Position menu above its parent button, clamped to viewport
+    var btn = document.getElementById(menu.dataset.btn);
+    var btnRect = btn.getBoundingClientRect();
+    var menuRect = menu.getBoundingClientRect();
+    var left = btnRect.left + btnRect.width / 2 - menuRect.width / 2;
+    // Clamp horizontal
+    left = Math.max(8, Math.min(left, window.innerWidth - menuRect.width - 8));
+    var bottom = window.innerHeight - btnRect.top + 8;
+    menu.style.left = left + 'px';
+    menu.style.bottom = bottom + 'px';
+    menu.style.right = 'auto';
+    menu.style.top = 'auto';
+  }
+}
+
+popupOverlay.addEventListener('click', closeAllMenus);
+
+// Menu button clicks open their associated popup
+document.querySelectorAll('.menu-btn').forEach(function(btn) {
+  btn.addEventListener('click', function(e) {
+    var menuId = btn.dataset.menu;
+    if (menuId) toggleMenu(menuId);
+  });
+});
+
+// ── Algorithm menu ──
+document.querySelectorAll('#algoMenu .popup-item').forEach(function(btn) {
+  btn.addEventListener('click', function(e) {
+    e.stopPropagation();
+    document.querySelectorAll('#algoMenu .popup-item').forEach(function(b) { b.classList.remove('selected'); });
+    btn.classList.add('selected');
+    currentAlgo = btn.dataset.algo;
+    document.getElementById('algoMenuBtn').querySelector('.btn-label').textContent = btn.textContent;
+
+    // Auto-switch slider: pixel algos show scale, others show spacing
+    if (currentSliderParam === 'spacing' || currentSliderParam === 'scale') {
+      currentSliderParam = (currentAlgo in PIXEL_ALGOS) ? 'scale' : 'spacing';
+      // Update adjust menu selection
+      document.querySelectorAll('#adjustMenu .popup-item').forEach(function(b) {
+        b.classList.remove('selected');
+        if (b.dataset.slider === currentSliderParam) b.classList.add('selected');
+      });
+    }
+
+    // Show/hide shape option in adjust menu
+    var shapeItem = document.querySelector('#adjustMenu [data-slider="shape"]');
+    if (shapeItem) shapeItem.style.display = currentAlgo === 'dithertone' ? 'block' : 'none';
+
+    closeAllMenus();
+    onParamChange();
+  });
+});
+
+// ── Adjust menu (slider selector + shape) ──
+document.querySelectorAll('#adjustMenu .popup-item').forEach(function(btn) {
+  btn.addEventListener('click', function(e) {
+    e.stopPropagation();
+
+    if (btn.dataset.slider === 'shape') {
+      // Cycle through shapes
+      shapeIndex = (shapeIndex + 1) % SHAPES.length;
+      currentShape = SHAPES[shapeIndex];
+      btn.textContent = 'Shape: ' + currentShape.charAt(0).toUpperCase() + currentShape.slice(1);
+      onParamChange();
+      return;
+    }
+
+    document.querySelectorAll('#adjustMenu .popup-item').forEach(function(b) {
+      if (b.dataset.slider !== 'shape') b.classList.remove('selected');
+    });
+    btn.classList.add('selected');
+    currentSliderParam = btn.dataset.slider;
+    closeAllMenus();
+    syncMainSlider();
+  });
+});
+
+// ── Options menu (toggles) ──
+document.querySelectorAll('#optionsMenu .popup-item').forEach(function(btn) {
+  btn.addEventListener('click', function(e) {
+    e.stopPropagation();
+    var opt = btn.dataset.option;
+    if (opt === 'color') {
+      colorMode = !colorMode;
+      btn.classList.toggle('toggled', colorMode);
+    } else if (opt === 'edges') {
+      edgeMode = !edgeMode;
+      btn.classList.toggle('toggled', edgeMode);
+    } else if (opt === 'invert') {
+      toggleInvert();
+      btn.classList.toggle('toggled', inverted);
+    }
+    // Update FX button label to show active count
+    var activeCount = (colorMode ? 1 : 0) + (edgeMode ? 1 : 0) + (inverted ? 1 : 0);
+    var fxBtn = document.getElementById('optionsMenuBtn');
+    fxBtn.querySelector('.btn-label').textContent = activeCount > 0 ? 'FX (' + activeCount + ')' : 'FX';
+    fxBtn.classList.toggle('has-active', activeCount > 0);
+    closeAllMenus();
+    onParamChange();
+  });
+});
+
+// ── Action menu ──
+document.querySelectorAll('#actionMenu .popup-item').forEach(function(btn) {
+  btn.addEventListener('click', function(e) {
+    e.stopPropagation();
+    closeAllMenus();
+    var action = btn.dataset.action;
+    if (action === 'save') savePNG();
+    else if (action === 'bracket') {
+      if (liveMode) liveBracket();
+      else bracketCapture(sourceGray, sourceW, sourceH);
+    }
+    else if (action === 'new') returnToStart();
+    else if (action === 'capture') captureLiveFrame();
+    else if (action === 'flip') flipCamera();
+    else if (action === 'stop') returnToStart();
+  });
+});
+
+// ── Load image from file input ──
+function loadImage(file) {
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    var img = new Image();
+    img.onload = function() {
+      var maxDim = 800;
+      var scale = Math.min(1, maxDim / Math.max(img.width, img.height));
+      sourceW = Math.round(img.width * scale);
+      sourceH = Math.round(img.height * scale);
+
+      var tmp = document.createElement('canvas');
+      tmp.width = sourceW;
+      tmp.height = sourceH;
+      var tmpCtx = tmp.getContext('2d', { willReadFrequently: true });
+      tmpCtx.drawImage(img, 0, 0, sourceW, sourceH);
+      var imageData = tmpCtx.getImageData(0, 0, sourceW, sourceH);
+      var data = imageData.data;
+
+      // Clear depth cache on new image
+      depthActive = false;
+      depthGray = null;
+      originalGray = null;
+      var depthBtnEl = document.getElementById('depthBtn');
+      if (depthBtnEl) depthBtnEl.classList.remove('toggled');
+
+      sourceRGBA = new Uint8Array(data);
+      sourceGray = new Uint8Array(sourceW * sourceH);
+      for (var i = 0; i < sourceGray.length; i++) {
+        var idx = i * 4;
+        sourceGray[i] = Math.round(
+          0.299 * data[idx] + 0.587 * data[idx+1] + 0.114 * data[idx+2]
+        );
+      }
+
+      enterPhotoMode();
+      render(sourceGray, sourceW, sourceH, getParams());
+      showStatus('Photo loaded. Adjust sliders and save.');
+    };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+function enterPhotoMode() {
+  liveMode = false;
+  document.getElementById('start-screen').classList.add('hidden');
+  document.getElementById('editor').classList.remove('hidden');
+  document.getElementById('bottomBar').style.display = '';
+  // Show photo actions, hide live actions
+  document.querySelector('[data-action="save"]').style.display = '';
+  document.querySelector('[data-action="bracket"]').style.display = '';
+  document.querySelector('[data-action="new"]').style.display = '';
+  document.querySelector('[data-action="capture"]').style.display = 'none';
+  document.querySelector('[data-action="flip"]').style.display = 'none';
+  document.querySelector('[data-action="stop"]').style.display = 'none';
+  syncMainSlider();
+}
+
+function enterLiveMode() {
+  liveMode = true;
+  document.getElementById('start-screen').classList.add('hidden');
+  document.getElementById('editor').classList.remove('hidden');
+  document.getElementById('bottomBar').style.display = '';
+  // Show live actions, hide photo-only
+  document.querySelector('[data-action="save"]').style.display = 'none';
+  document.querySelector('[data-action="new"]').style.display = 'none';
+  document.querySelector('[data-action="capture"]').style.display = '';
+  document.querySelector('[data-action="bracket"]').style.display = '';
+  document.querySelector('[data-action="flip"]').style.display = '';
+  document.querySelector('[data-action="stop"]').style.display = '';
+  syncMainSlider();
+}
+
+function returnToStart() {
+  stopLive();
+  sourceGray = null;
+  sourceRGBA = null;
+  lastFrameRGBA = null;
+  inverted = false;
+  currentShape = 'circle';
+  currentAlgo = 'dithertone';
+  colorMode = false;
+  edgeMode = false;
+  liveMode = false;
+  shapeIndex = 0;
+  currentSliderParam = 'spacing';
+
+  // Reset UI
+  closeAllMenus();
+  // Reset algo menu
+  document.querySelectorAll('#algoMenu .popup-item').forEach(function(b) { b.classList.remove('selected'); });
+  document.querySelector('#algoMenu [data-algo="dithertone"]').classList.add('selected');
+  document.getElementById('algoMenuBtn').querySelector('.btn-label').textContent = 'Dots';
+  // Reset adjust menu
+  document.querySelectorAll('#adjustMenu .popup-item').forEach(function(b) { b.classList.remove('selected'); });
+  document.querySelector('#adjustMenu [data-slider="spacing"]').classList.add('selected');
+  var shapeItem = document.querySelector('#adjustMenu [data-slider="shape"]');
+  if (shapeItem) { shapeItem.textContent = 'Shape: Circle'; shapeItem.style.display = 'block'; }
+  // Reset options
+  document.querySelectorAll('#optionsMenu .popup-item').forEach(function(b) { b.classList.remove('toggled'); });
+  var fxBtn = document.getElementById('optionsMenuBtn');
+  fxBtn.querySelector('.btn-label').textContent = 'FX';
+  fxBtn.classList.remove('has-active');
+  // Reset sliders
+  spacingSlider.value = 8;
+  scaleSlider.value = 3;
+  gammaSlider.value = 1.0;
+  contrastSlider.value = 0;
+  brightnessSlider.value = 0;
+  weightSlider.value = 1.0;
+  rotationSlider.value = 0;
+  outlineSlider.value = 0;
+  blurSlider.value = 0;
+  posterizeSlider.value = 32;
+  // Reset depth state
+  depthActive = false;
+  depthGray = null;
+  originalGray = null;
+  var depthBtnEl = document.getElementById('depthBtn');
+  if (depthBtnEl) depthBtnEl.classList.remove('toggled');
+
+  document.getElementById('bottomBar').style.display = 'none';
+  document.getElementById('editor').classList.add('hidden');
+  document.getElementById('start-screen').classList.remove('hidden');
+  document.getElementById('cameraInput').value = '';
+  document.getElementById('libraryInput').value = '';
+}
+
+// ── Live webcam ──
+function getGrayscaleFromVideo(w, h) {
+  srcCanvas.width = w;
+  srcCanvas.height = h;
+  srcCtx.drawImage(video, 0, 0, w, h);
+  var imageData = srcCtx.getImageData(0, 0, w, h);
+  var data = imageData.data;
+  lastFrameRGBA = new Uint8Array(data);
+  var gray = new Uint8Array(w * h);
+  for (var i = 0; i < gray.length; i++) {
+    var idx = i * 4;
+    gray[i] = Math.round(0.299 * data[idx] + 0.587 * data[idx+1] + 0.114 * data[idx+2]);
+  }
+  return gray;
+}
+
+function liveRenderLoop() {
+  if (!liveRunning) return;
+  var vw = video.videoWidth;
+  var vh = video.videoHeight;
+  if (vw > 0 && vh > 0) {
+    var scale = Math.min(1, 480 / Math.max(vw, vh));
+    var w = Math.round(vw * scale);
+    var h = Math.round(vh * scale);
+    var gray = getGrayscaleFromVideo(w, h);
+    render(gray, w, h, getParams());
+  }
+  requestAnimationFrame(liveRenderLoop);
+}
+
+function startLive() {
+  facingMode = document.getElementById('cameraSelect').value;
+  navigator.mediaDevices.getUserMedia({
+    video: { facingMode: facingMode, width: { ideal: 1280 }, height: { ideal: 720 } },
+    audio: false,
+  }).then(function(stream) {
+    video.srcObject = stream;
+    video.play();
+    liveRunning = true;
+    enterLiveMode();
+    showStatus('Camera started');
+    liveRenderLoop();
+  }).catch(function(err) {
+    showStatus('Camera error: ' + err.message);
+  });
+}
+
+function stopLive() {
+  liveRunning = false;
+  if (video.srcObject) {
+    video.srcObject.getTracks().forEach(function(t) { t.stop(); });
+    video.srcObject = null;
+  }
+}
+
+function flipCamera() {
+  stopLive();
+  facingMode = facingMode === 'environment' ? 'user' : 'environment';
+  document.getElementById('cameraSelect').value = facingMode;
+  navigator.mediaDevices.getUserMedia({
+    video: { facingMode: facingMode, width: { ideal: 1280 }, height: { ideal: 720 } },
+    audio: false,
+  }).then(function(stream) {
+    video.srcObject = stream;
+    video.play();
+    liveRunning = true;
+    showStatus('Camera flipped');
+    liveRenderLoop();
+  }).catch(function(err) {
+    showStatus('Camera error: ' + err.message);
+  });
+}
+
+function captureLiveFrame() {
+  if (!video.srcObject) return;
+  var vw = video.videoWidth;
+  var vh = video.videoHeight;
+  if (vw === 0) return;
+  var maxDim = 800;
+  var scale = Math.min(1, maxDim / Math.max(vw, vh));
+  sourceW = Math.round(vw * scale);
+  sourceH = Math.round(vh * scale);
+  sourceGray = getGrayscaleFromVideo(sourceW, sourceH);
+  sourceRGBA = lastFrameRGBA;
+
+  stopLive();
+  enterPhotoMode();
+  render(sourceGray, sourceW, sourceH, getParams());
+  showStatus('Frame captured. Adjust and save.');
+}
+
+// ── Save / Bracket ──
+function savePNG(suffix) {
+  var ts = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+  var name = suffix ? 'dither_' + suffix + '_' + ts + '.png' : 'dither_' + ts + '.png';
+  var dataURL = output.toDataURL('image/png');
+
+  var link = document.createElement('a');
+  link.download = name;
+  link.href = dataURL;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  showStatus('Saved: ' + name);
+}
+
+function bracketCapture(gray, w, h) {
+  if (!gray) return;
+  var baseParams = getParams();
+  var baseSpacing = baseParams.spacing;
+  var variants = [
+    { label: 'tight', spacing: Math.max(2, Math.round(baseSpacing * 0.6)) },
+    { label: 'medium', spacing: baseSpacing },
+    { label: 'loose', spacing: Math.min(30, Math.round(baseSpacing * 1.6)) },
+  ];
+  variants.forEach(function(v) {
+    var p = {};
+    for (var k in baseParams) p[k] = baseParams[k];
+    p.spacing = v.spacing;
+    render(gray, w, h, p);
+    savePNG(v.label);
+  });
+  render(gray, w, h, baseParams);
+  showStatus('Bracket: 3 variants saved');
+}
+
+function liveBracket() {
+  if (!video.srcObject) return;
+  var vw = video.videoWidth;
+  var vh = video.videoHeight;
+  if (vw === 0) return;
+  var scale = Math.min(1, 640 / Math.max(vw, vh));
+  var w = Math.round(vw * scale);
+  var h = Math.round(vh * scale);
+  var gray = getGrayscaleFromVideo(w, h);
+  bracketCapture(gray, w, h);
+}
+
+function showStatus(msg, persistent) {
+  statusEl.textContent = msg;
+  if (!persistent) setTimeout(function() { statusEl.textContent = ''; }, 4000);
+}
+
+function toggleInvert() {
+  inverted = !inverted;
+  if (sourceGray && !liveMode) render(sourceGray, sourceW, sourceH, getParams());
+}
+
+// ── Depth estimation (Transformers.js) ──
+var depthTransformers = null; // cached module reference
+
+function loadDepthPipeline() {
+  if (depthPipeline) return Promise.resolve(depthPipeline);
+  if (depthLoading) return Promise.resolve(null);
+  depthLoading = true;
+  showStatus('Loading depth model...', true);
+  return import('https://cdn.jsdelivr.net/npm/@huggingface/transformers').then(function(mod) {
+    depthTransformers = mod;
+    showStatus('Initializing depth model...', true);
+    return mod.pipeline('depth-estimation', 'onnx-community/depth-anything-v2-small', {
+      device: 'wasm',
+      dtype: 'fp32',
+    });
+  }).then(function(pipe) {
+    depthPipeline = pipe;
+    depthLoading = false;
+    showStatus('Depth model ready.');
+    return depthPipeline;
+  }).catch(function(err) {
+    depthLoading = false;
+    showStatus('Depth load error: ' + (err.message || err));
+    return null;
+  });
+}
+
+function processDepthResult(result) {
+  try {
+    var depthBtnEl = document.getElementById('depthBtn');
+    if (!result || !result.depth) {
+      showStatus('Depth: no result returned');
+      return;
+    }
+    var depthImg = result.depth;
+    var dw = depthImg.width;
+    var dh = depthImg.height;
+    var channels = depthImg.channels || 1;
+    var depthData = depthImg.data;
+
+    if (!depthData || !dw || !dh) {
+      showStatus('Depth: invalid result format');
+      return;
+    }
+
+    // Extract first channel as grayscale (data is Uint8Array, already 0-255)
+    var rawGray = new Uint8Array(dw * dh);
+    for (var i = 0; i < dw * dh; i++) {
+      rawGray[i] = depthData[i * channels];
+    }
+
+    // Resize to source dimensions via canvas
+    var tmpCanvas = document.createElement('canvas');
+    tmpCanvas.width = dw;
+    tmpCanvas.height = dh;
+    var tmpCtx = tmpCanvas.getContext('2d');
+    var imgData = tmpCtx.createImageData(dw, dh);
+    for (var i = 0; i < dw * dh; i++) {
+      imgData.data[i * 4] = rawGray[i];
+      imgData.data[i * 4 + 1] = rawGray[i];
+      imgData.data[i * 4 + 2] = rawGray[i];
+      imgData.data[i * 4 + 3] = 255;
+    }
+    tmpCtx.putImageData(imgData, 0, 0);
+
+    var resCanvas = document.createElement('canvas');
+    resCanvas.width = sourceW;
+    resCanvas.height = sourceH;
+    var resCtx = resCanvas.getContext('2d');
+    resCtx.drawImage(tmpCanvas, 0, 0, sourceW, sourceH);
+    var resData = resCtx.getImageData(0, 0, sourceW, sourceH).data;
+    depthGray = new Uint8Array(sourceW * sourceH);
+    for (var i = 0; i < depthGray.length; i++) {
+      depthGray[i] = resData[i * 4];
+    }
+
+    // Clean up temp canvases
+    tmpCanvas.width = 0;
+    resCanvas.width = 0;
+
+    originalGray = sourceGray;
+    sourceGray = depthGray;
+    depthActive = true;
+    depthBtnEl.classList.add('toggled');
+    showStatus('Depth map active.');
+    render(sourceGray, sourceW, sourceH, getParams());
+  } catch (err) {
+    showStatus('Depth process error: ' + (err.message || err));
+  }
+}
+
+function runDepthEstimation() {
+  if (liveMode) {
+    showStatus('Depth not available in live mode. Capture first.');
+    return;
+  }
+  if (!sourceGray || !sourceRGBA) {
+    showStatus('Load an image first.');
+    return;
+  }
+
+  var depthBtnEl = document.getElementById('depthBtn');
+
+  // Toggle off
+  if (depthActive && originalGray) {
+    depthActive = false;
+    sourceGray = originalGray;
+    depthBtnEl.classList.remove('toggled');
+    showStatus('Depth off — original restored.');
+    render(sourceGray, sourceW, sourceH, getParams());
+    return;
+  }
+
+  // Use cached depth if available
+  if (depthGray) {
+    depthActive = true;
+    if (!originalGray) originalGray = sourceGray;
+    sourceGray = depthGray;
+    depthBtnEl.classList.add('toggled');
+    showStatus('Depth map active.');
+    render(sourceGray, sourceW, sourceH, getParams());
+    return;
+  }
+
+  // Run depth estimation
+  showStatus('Starting depth estimation...', true);
+  loadDepthPipeline().then(function(pipe) {
+    if (!pipe) return;
+    showStatus('Estimating depth...', true);
+
+    // Scale down for depth estimation to save memory (max 384px)
+    var maxDepthDim = 384;
+    var depthScale = Math.min(1, maxDepthDim / Math.max(sourceW, sourceH));
+    var dw = Math.round(sourceW * depthScale);
+    var dh = Math.round(sourceH * depthScale);
+
+    var tmpCanvas = document.createElement('canvas');
+    tmpCanvas.width = dw;
+    tmpCanvas.height = dh;
+    var tmpCtx = tmpCanvas.getContext('2d');
+    var fullImg = tmpCtx.createImageData(dw, dh);
+
+    // Downsample sourceRGBA to smaller size
+    if (dw === sourceW && dh === sourceH) {
+      fullImg.data.set(sourceRGBA);
+    } else {
+      // Use a full-size canvas to draw then scale
+      var srcCvs = document.createElement('canvas');
+      srcCvs.width = sourceW;
+      srcCvs.height = sourceH;
+      var srcC = srcCvs.getContext('2d');
+      var srcImg = srcC.createImageData(sourceW, sourceH);
+      srcImg.data.set(sourceRGBA);
+      srcC.putImageData(srcImg, 0, 0);
+      tmpCtx.drawImage(srcCvs, 0, 0, dw, dh);
+      srcCvs.width = 0; // free memory
+    }
+
+    // Use RawImage if available, otherwise fall back to data URL
+    var input;
+    if (depthTransformers && depthTransformers.RawImage) {
+      input = depthTransformers.RawImage.fromCanvas(tmpCanvas);
+    } else {
+      input = tmpCanvas.toDataURL('image/jpeg', 0.85);
+    }
+    tmpCanvas.width = 0; // free memory
+
+    return pipe(input);
+  }).then(function(result) {
+    if (result) processDepthResult(result);
+  }).catch(function(err) {
+    showStatus('Depth error: ' + (err.message || err));
+  });
+}
+
+// Depth button handler
+document.getElementById('depthBtn').addEventListener('click', function(e) {
+  e.stopPropagation();
+  runDepthEstimation();
+});
+
+
+// ── Help screen ──
+document.getElementById('helpBtn').addEventListener('click', function() {
+  document.getElementById('help-screen').classList.add('visible');
+});
+document.getElementById('closeHelpBtn').addEventListener('click', function() {
+  document.getElementById('help-screen').classList.remove('visible');
+});
+
+// ── Button handlers ──
+document.getElementById('takePhotoBtn').addEventListener('click', function() {
+  document.getElementById('cameraInput').click();
+});
+document.getElementById('choosePhotoBtn').addEventListener('click', function() {
+  document.getElementById('libraryInput').click();
+});
+document.getElementById('cameraInput').addEventListener('change', function(e) {
+  if (e.target.files.length > 0) loadImage(e.target.files[0]);
+});
+document.getElementById('libraryInput').addEventListener('change', function(e) {
+  if (e.target.files.length > 0) loadImage(e.target.files[0]);
+});
+
+// Live mode start button (on start screen)
+document.getElementById('liveBtn').addEventListener('click', startLive);
+
+// Keyboard shortcuts
+document.addEventListener('keydown', function(e) {
+  if (e.key === ' ') { e.preventDefault(); if (liveMode) captureLiveFrame(); else savePNG(); }
+  else if (e.key === 'b') { if (liveMode) liveBracket(); else bracketCapture(sourceGray, sourceW, sourceH); }
+  else if (e.key === 'i') toggleInvert();
+  else if (e.key === '=' || e.key === '+') { spacingSlider.value = Math.min(30, parseInt(spacingSlider.value) + 1); onParamChange(); }
+  else if (e.key === '-') { spacingSlider.value = Math.max(2, parseInt(spacingSlider.value) - 1); onParamChange(); }
+  else if (e.key === ']') { gammaSlider.value = Math.min(4, parseFloat(gammaSlider.value) + 0.1).toFixed(1); onParamChange(); }
+  else if (e.key === '[') { gammaSlider.value = Math.max(0.2, parseFloat(gammaSlider.value) - 0.1).toFixed(1); onParamChange(); }
+});
+</script>
+</body>
+</html>
