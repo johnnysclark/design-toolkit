@@ -186,7 +186,7 @@ export function Read({ label, children }: { label: string; children: ReactNode }
       <div className="text-[10px] font-semibold uppercase tracking-wide text-neutral-900">
         {label}
       </div>
-      <p className="mt-0.5 whitespace-pre-line text-sm leading-relaxed text-neutral-900">{children}</p>
+      <p className="mt-0.5 max-w-prose whitespace-pre-line text-sm leading-relaxed text-neutral-900">{children}</p>
     </div>
   );
 }

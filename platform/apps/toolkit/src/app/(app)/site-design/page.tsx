@@ -6,6 +6,8 @@
 // pages (consistent header + edges, reflows with the sidebar). "Open full screen"
 // gives the studio its full three-panel width.
 
+import FullscreenFrame from "@/components/FullscreenFrame";
+
 // Loads the version shell (a top toggle that switches between V2 — the site-forces
 // method — and V1 — the original). Add versions in web/shell.html.
 const STUDIO_URL = "/tools/gable-studio/web/shell.html";
@@ -37,18 +39,17 @@ export default function Page() {
           rel="noopener noreferrer"
           className="shrink-0 rounded-md border border-neutral-300 px-3 py-1.5 text-sm font-medium text-neutral-900 transition hover:border-neutral-400 hover:bg-neutral-50"
         >
-          Open full screen ↗
+          Open in new tab ↗
         </a>
       </div>
 
-      <div className="mt-6 overflow-hidden rounded-xl border border-neutral-200 bg-white">
-        <iframe
-          src={STUDIO_URL}
-          title="Eco-Architect"
-          className="block h-[80vh] w-full border-0"
-          allow="fullscreen"
-        />
-      </div>
+      <FullscreenFrame
+        src={STUDIO_URL}
+        title="Eco-Architect"
+        heightClass="h-[80vh]"
+        label="studio"
+        allow="fullscreen"
+      />
     </div>
   );
 }

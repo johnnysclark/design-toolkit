@@ -98,7 +98,7 @@ export default function UploadForm() {
   return (
     <form
       onSubmit={onSubmit}
-      className="mt-6 grid grid-cols-1 gap-3 rounded-xl border border-neutral-200 bg-white p-5 sm:grid-cols-2"
+      className="mt-6 grid max-w-3xl grid-cols-1 gap-3 rounded-xl border border-neutral-200 bg-white p-5 sm:grid-cols-2"
     >
       <input name="title" placeholder="Title *" className={field} />
       <input name="project" placeholder="Project" className={field} />

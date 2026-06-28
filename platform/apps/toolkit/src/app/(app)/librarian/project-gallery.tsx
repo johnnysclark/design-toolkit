@@ -164,7 +164,7 @@ export default function ProjectGallery({
       </div>
 
       {/* grid */}
-      <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
         {filtered.map((it) => {
           const mine = me && it.owner === me;
           const meta = [it.building, it.architect, it.year].filter(Boolean).join(" · ");

@@ -41,7 +41,7 @@ export default async function RapStudioPage() {
 
       <RapStudio signedIn={!!user} />
 
-      <footer className="rounded-lg border border-neutral-300 p-4 text-sm leading-relaxed text-neutral-900">
+      <footer className="max-w-prose rounded-lg border border-neutral-300 p-4 text-sm leading-relaxed text-neutral-900">
         <b>Driving real Rhino — what&rsquo;s next.</b> The <code className="font-mono">state.json</code> you download here is the interchange.
         Drop it into a RAP working folder and the existing Watcher (TCP&nbsp;1998) rebuilds the model in desktop Rhino — a free, working drive
         with no new infrastructure. A small local companion bridge would make it live (type here, Rhino moves). See the options write-up for the
