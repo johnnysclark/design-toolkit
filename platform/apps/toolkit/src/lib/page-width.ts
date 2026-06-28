@@ -36,9 +36,13 @@ const ROUTE_TIERS: Array<[string, WidthTier]> = [
   ["/pinup", "full"], // Archivist — studio pinup / crit wall
   ["/media-2d/drawing-cleaner", "full"], // fixed rail + fluid fit-to-container preview
   ["/media-2d/vantage", "full"], // three.js camera demo (100vh iframe)
+  ["/media-2d/pattern-studio", "full"], // embedded pattern canvas
+  ["/media-2d/scale-bar", "full"], // embedded scale-bar tool
   ["/tools-3d/obliquify", "full"], // r3f oblique/paraline viewer
   ["/tools-3d/model-viewer", "full"], // embedded WebGL model viewer
   ["/tools-3d/rhino-python", "full"], // embedded Rhino/GhPython gallery
+  ["/tools-3d/solar-envelope", "full"], // embedded three.js solar envelope
+  ["/tools-3d/sun-study", "full"], // embedded three.js sun study
   ["/rap/studio", "full"] // RAP — orthographic CAD viewport + panels
 ];
 
