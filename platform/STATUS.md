@@ -1,4 +1,24 @@
 <!-- ───────────────────────────── CURRENT STATE (top) ───────────────────────────── -->
+> **Eco-Architect V3 — NSGA-II optimizer + extensible site forces (2026-06-27, branch
+> `feat/eco-architect-v3`, worktree `design-toolkit-eco-v3`, NOT merged).** A third version of the
+> Site Design tool (Gable Studio), added as a **V3 pill** in `web/shell.html` (default stays V2).
+> Realizes the OVERHAUL-PLAN's deferred "Phase 3": a hand-built, dependency-free, in-browser
+> **multi-objective optimizer** (Wallacei/Galapagos-style). The Charter becomes the optimization
+> problem — soft rules → objectives (op→direction), hard rules → constraints (`g = −evaluateRule`
+> margin); NSGA-II evolves a Pareto front of the kit-of-parts that the student INSPECTS and
+> **SPAWNS into the Series** (decision-support — "populate, never auto-select", per the plan's own
+> Phase-3 stance). Plus ~5 new data-only forces (compactness · glazing budget · form · solar-skin ·
+> buoyant-vent — existing metrics, **zero parity cost**), a live **Define-a-force** authoring UI,
+> and user-declared tensions. **Reuses core.js / viewport.js / v2 forces+series+units UNCHANGED** →
+> no parity touch. New files: `web/v3/{nsga2,genome,objectives,charts,spawn,authoring,forces_extra,
+> app3}.js` + `index.html` + `v3.css` + 7 headless tests (**240 assertions**, wired into
+> `npm run test:v3`). Only existing-file edits: one `shell.html` registry line + the `package.json`
+> test script. Verified: full `npm test` green (parity worst Δ≈6e-14 unchanged); **headless-Chrome
+> smoke (WebGL) PASS** — optimizer runs to a feasible front, scatter + parallel-coordinates render,
+> knee auto-suggested, spawn→series + custom-force authoring work, **0 console exceptions**. Plan:
+> `~/.claude/plans/virtual-napping-dragonfly.md`. NEXT: human review → merge to `main`
+> (Vercel auto-deploys; surfaces at `/site-design`, V3 pill).
+>
 > **Vantage — interactive camera / lens / perspective demo (2026-06-26, branch `tool/vantage`,
 > worktree `design-toolkit-vantage`, NOT merged).** A new client-only tool under the **2D Tooling**
 > hub at `/media-2d/vantage` (image-making) — built fresh as a real **three.js (r160)** scene, no

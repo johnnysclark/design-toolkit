@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Eco-Architect V3 · evolve the trade-offs</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Archivo+Black&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="./v3.css" />
+  <!-- Zero-build. three.js is the SAME vendored copy v1/v2 use (../vendor); core.js,
+       viewport.js, and the v2 forces/series/units modules are reused unchanged.
+       v3 adds the NSGA-II optimizer + extensible forces on top. -->
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "../vendor/three.module.js",
+      "three/addons/": "../vendor/addons/"
+    }
+  }
+  </script>
+</head>
+<body>
+  <header class="v3head">
+    <div class="v3head-l">
+      <h1>Evolve the trade-offs</h1>
+      <p class="v3sub">Name the forces → commit a charter → choose what's free to change → <b>evolve a Pareto front</b> of answers → read the trade-off, pick one, and fork it with your reasoning.</p>
+    </div>
+    <div class="v3head-r">
+      <button id="v3-propose" class="btn">✶ Propose a charter</button>
+      <button id="v3-reset" class="btn">Reset design</button>
+      <button id="v3-save" class="btn">Save project</button>
+      <button id="v3-load" class="btn">Load project</button>
+    </div>
+  </header>
+
+  <main class="v3main">
+    <!-- LEFT — READ / NAME / COMMIT: forces (built-in + extra + your own) -->
+    <section class="dock left" id="dock-left">
+      <div class="dock-h"><span class="dock-step">1·2</span> Read the site &amp; name the forces</div>
+      <div id="forcedeck" class="scroll"></div>
+      <button id="v3-define" class="btn wide">＋ Define a force</button>
+    </section>
+
+    <!-- CENTER — EXPLORE: the phenotype preview + the Pareto charts -->
+    <section class="center">
+      <div class="viewbox" id="stage"><canvas id="view"></canvas></div>
+      <div id="v3-phenotype" class="phenotype">Hover a point on the front to preview a design here.</div>
+      <div class="charts">
+        <div class="dock-h sub"><span class="dock-step">★</span> The Pareto front <span class="dock-hint" id="v3-chart-mode">— run the optimizer</span></div>
+        <div id="v3-charts" class="chartstage"></div>
+      </div>
+    </section>
+
+    <!-- RIGHT — COMMIT / SET UP / RUN -->
+    <section class="dock right" id="dock-right">
+      <div class="dock-h"><span class="dock-step">3</span> The charter — your brief to the site</div>
+      <div id="charter-standing" class="standing"></div>
+      <div id="charter-tensions" class="tensions"></div>
+      <div id="charter-clauses" class="scroll short"></div>
+      <button id="v3-mark-tension" class="btn wide small">＋ Mark a tension</button>
+
+      <div class="dock-h"><span class="dock-step">4</span> What's free to change <span class="dock-hint">genes</span></div>
+      <div id="v3-genes" class="scroll short"></div>
+
+      <div class="dock-h"><span class="dock-step">5</span> What to optimize <span class="dock-hint">objectives</span></div>
+      <div id="v3-objectives" class="optobj"></div>
+
+      <div class="dock-h"><span class="dock-step">6</span> Evolve</div>
+      <div class="runrow">
+        <label>Pop <input id="v3-pop" type="number" min="20" max="200" step="10" value="80" /></label>
+        <label>Gens <input id="v3-gens" type="number" min="10" max="200" step="10" value="60" /></label>
+        <label>Seed <input id="v3-seed" type="number" min="0" step="1" value="1" /></label>
+      </div>
+      <div class="runrow">
+        <button id="v3-run" class="btn primary">▶ Run</button>
+        <button id="v3-pause" class="btn" disabled>⏸ Pause</button>
+        <button id="v3-step" class="btn">⏭ Step</button>
+        <button id="v3-stop" class="btn" disabled>⏹ Stop</button>
+      </div>
+      <div id="v3-progress" class="progress"></div>
+      <svg id="v3-convergence" class="convergence" viewBox="0 0 240 54" preserveAspectRatio="none"></svg>
+      <button id="v3-spawn" class="btn primary wide" disabled>⑂ Spawn this phenotype into the series</button>
+      <div class="honesty">Optimizing transparent first-order proxies — a front to <b>reason with</b>, not to trust. Not validated simulation.</div>
+    </section>
+
+    <!-- BOTTOM — the series of variations -->
+    <section class="series" id="series-dock">
+      <div class="series-h">
+        <span class="dock-step">7</span> The series — a genealogy of forks
+        <button id="v3-fork" class="btn">⑂ Fork the current design</button>
+        <span id="v3-status" class="v3status"></span>
+      </div>
+      <div id="series" class="series-board"></div>
+    </section>
+  </main>
+
+  <!-- Spawn / fork dialog: capture the decision (the "why") -->
+  <div id="forkModal" class="modal" style="display:none">
+    <div class="modal-box">
+      <div class="modal-head"><b>Record this variation</b><button class="modal-x" data-close="forkModal">✕</button></div>
+      <div class="modal-body" id="fork-form"></div>
+    </div>
+  </div>
+
+  <!-- Define-a-force dialog -->
+  <div id="defineModal" class="modal" style="display:none">
+    <div class="modal-box">
+      <div class="modal-head"><b>Define a site force</b><button class="modal-x" data-close="defineModal">✕</button></div>
+      <div class="modal-body" id="define-form"></div>
+    </div>
+  </div>
+
+  <!-- Mark-a-tension dialog -->
+  <div id="tensionModal" class="modal" style="display:none">
+    <div class="modal-box">
+      <div class="modal-head"><b>Mark a tension</b><button class="modal-x" data-close="tensionModal">✕</button></div>
+      <div class="modal-body" id="tension-form"></div>
+    </div>
+  </div>
+
+  <script type="module" src="./app3.js"></script>
+</body>
+</html>
