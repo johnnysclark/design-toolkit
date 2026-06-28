@@ -28,12 +28,17 @@ const TIER_CLASS: Record<WidthTier, string> = {
 };
 
 // Routes that should grow past the 1024px default. Anything not listed = "default".
-// (Hubs are intentionally absent so they stay narrow while their leaf tools fill.)
+// The two tooling HUBS (/media-2d, /tools-3d) are full too so their card grids can
+// tile to 3 columns when the screen is wide (see ToolHub).
 const ROUTE_TIERS: Array<[string, WidthTier]> = [
   ["/site-analysis", "full"], // Surveyor — MapLibre map + data dashboard
   ["/site-design", "full"], // Eco-Architect — embedded 3-panel 3D studio
+  ["/skills-coach", "full"], // Coach — chat, full-bleed
+  ["/skills-pathways", "full"], // Cartographer — skill board, full-bleed
   ["/librarian", "full"], // Librarian — visual reference gallery
   ["/pinup", "full"], // Archivist — studio pinup / crit wall
+  ["/media-2d", "full"], // 2D Tooling hub — card grid tiles to 3 cols
+  ["/tools-3d", "full"], // 3D Tooling hub — card grid tiles to 3 cols
   ["/media-2d/drawing-cleaner", "full"], // fixed rail + fluid fit-to-container preview
   ["/media-2d/vantage", "full"], // three.js camera demo (100vh iframe)
   ["/media-2d/pattern-studio", "full"], // embedded pattern canvas

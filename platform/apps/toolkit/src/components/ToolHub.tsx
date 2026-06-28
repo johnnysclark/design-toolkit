@@ -103,7 +103,7 @@ export default function ToolHub({
       </h1>
       <p className="mt-2 max-w-2xl text-neutral-900">{intro}</p>
 
-      <div className="mt-8 grid gap-4 sm:grid-cols-2">
+      <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {built.map((c) => (
           <Card key={c.title} card={c} />
         ))}
@@ -118,7 +118,7 @@ export default function ToolHub({
             Ideas for this bench — suggestions from Claude, not yet built. Say the
             word and any of these can become a real card.
           </p>
-          <div className="mt-4 grid gap-4 sm:grid-cols-2">
+          <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {proposed.map((c) => (
               <Card key={c.title} card={c} />
             ))}
