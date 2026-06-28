@@ -57,7 +57,7 @@ const CARDS: HubCard[] = [
     status: "live",
     href: "/media-2d/vectorize",
     blurb:
-      "Trace a raster into crisp, editable vectors. Centreline traces the middle of every stroke — a scanned sketch or a Rhino Make2D dump becomes single paths, not hollow outlines; Outline traces filled shapes; Colour posterises a photo into flat layers. Threshold (auto / manual), despeckle, simplify and smooth, then export SVG for Illustrator or DXF (real millimetres) for CAD and laser. Client-side."
+      "Trace a raster into crisp, editable vectors — two modes. Outline gives stroked line work (centreline down the middle of each stroke, for a Make2D dump or sketch, or a stroked contour); Fill gives solid shapes (one colour, or a posterised colour separation). Tune with pre-blur, global / adaptive threshold, morphological cleanup, simplify & smooth, then export SVG for Illustrator or DXF (real millimetres) for CAD and laser. Client-side."
   },
   {
     title: "Live Video Tracer",

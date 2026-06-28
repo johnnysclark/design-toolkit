@@ -3,10 +3,12 @@
 // build notes). It checks each algorithm on synthetic shapes with hand-derived
 // expectations, then throws if anything regresses.
 
-import { binarize, despeckle, otsu, toGray } from "./binarize";
+import { adaptiveBinarize, binarize, despeckle, otsu, toGray } from "./binarize";
+import { blurChannel } from "./blur";
 import { quantize } from "./color";
 import { skeletonPaths, thinZhangSuen } from "./centreline";
 import { fitPath } from "./fit";
+import { dilate, erode, morph } from "./morph";
 import { traceLoops } from "./outline";
 import { polygonArea, rdp, rdpClosed } from "./simplify";
 import { toDXF } from "./dxf";
@@ -222,15 +224,71 @@ function countCmd(cmds: Cmd[], c: Cmd["c"]): number {
   eq("quantize: 3 labels used", labelsUsed.size, 3);
 }
 
+// ── pre-blur (box blur via integral image) ───────────────────────────────────
+{
+  // A single hot pixel in a flat field spreads to its (2r+1)² neighbourhood and
+  // its peak drops; total signal is conserved (edge clamping aside).
+  const w = 9;
+  const h = 9;
+  const spike = new Uint8Array(w * h);
+  spike[4 * w + 4] = 255;
+  const b = blurChannel(spike, w, h, 1);
+  ok("blur: peak reduced", b[4 * w + 4] < 255 && b[4 * w + 4] > 0);
+  ok("blur: spread to neighbour", b[4 * w + 3] > 0);
+  ok("blur: radius 0 is identity", blurChannel(spike, w, h, 0)[4 * w + 4] === 255);
+}
+
+// ── morphology (dilate / erode / open / close) ───────────────────────────────
+{
+  const w = 11;
+  const h = 11;
+  // A 3×3 block dilates outward and erodes inward.
+  const block = mask(w, h, (x, y) => x >= 4 && x <= 6 && y >= 4 && y <= 6);
+  ok("dilate grows area", sum(dilate(block, w, h, 1)) > sum(block));
+  ok("erode shrinks area", sum(erode(block, w, h, 1)) < sum(block));
+  // OPEN removes a lone speck; CLOSE bridges a 1px gap in a bar.
+  const speck = mask(w, h, (x, y) => x === 1 && y === 1);
+  eq("open removes a speck", sum(morph(speck, w, h, -1)), 0);
+  const broken = mask(w, h, (x, y) => y === 5 && x >= 2 && x <= 8 && x !== 5); // gap at x=5
+  ok("close bridges a gap", morph(broken, w, h, 1)[5 * w + 5] === 1);
+}
+
+// ── adaptive (local-mean) threshold ──────────────────────────────────────────
+{
+  // A dark mark on a strong brightness gradient: a global threshold can't catch
+  // it everywhere, but a local-mean threshold pulls it out against its backdrop.
+  const w = 40;
+  const h = 12;
+  const gray = new Uint8Array(w * h);
+  for (let y = 0; y < h; y++)
+    for (let x = 0; x < w; x++) {
+      const bg = 40 + Math.round((x / (w - 1)) * 200); // 40→240 left→right
+      const mark = y >= 4 && y <= 7 && x % 8 === 0; // periodic dark ticks
+      gray[y * w + x] = mark ? Math.max(0, bg - 60) : bg;
+    }
+  const bin = adaptiveBinarize(gray, w, h, 4, 8, false);
+  let ticksFound = 0;
+  for (let x = 0; x < w; x += 8) if (bin[5 * w + x] === 1) ticksFound++;
+  ok(`adaptive: catches ticks across the gradient (${ticksFound}/5)`, ticksFound >= 4);
+}
+
 // ── end-to-end trace + serialisers ───────────────────────────────────────────
 function baseOpts(over: Partial<TraceOptions>): TraceOptions {
   return {
     mode: "outline",
+    outlineMethod: "centreline",
+    fillStyle: "mono",
     scale: 1,
-    threshold: 128,
+    blur: 0,
     autoThreshold: true,
+    threshold: 128,
+    adaptive: false,
+    adaptiveRadius: 12,
+    adaptiveBias: 7,
     invert: false,
+    morph: 0,
     despeckle: 2,
+    holeArea: 1,
     detail: 1,
     smooth: 1,
     corner: 60,
@@ -242,31 +300,55 @@ function baseOpts(over: Partial<TraceOptions>): TraceOptions {
     ...over
   };
 }
+const disk = img(40, 40, (x, y) => (x - 20) ** 2 + (y - 20) ** 2 <= 14 * 14);
 {
-  // Filled disk → outline mode → at least one closed subpath.
-  const w = 40;
-  const h = 40;
-  const disk = img(w, h, (x, y) => (x - 20) ** 2 + (y - 20) ** 2 <= 14 * 14);
-  const r = trace(disk, baseOpts({ mode: "outline" }));
-  ok("trace outline: produced subpaths", r.layers[0].subpaths.length >= 1);
-  ok("trace outline: nodes counted", r.stats.nodes > 0);
+  // Fill · mono → a filled layer with at least one closed subpath.
+  const r = trace(disk, baseOpts({ mode: "fill", fillStyle: "mono" }));
+  ok("trace fill/mono: fill layer", r.layers[0].kind === "fill");
+  ok("trace fill/mono: produced subpaths", r.layers[0].subpaths.length >= 1);
+  ok("trace fill/mono: subpaths closed", r.layers[0].subpaths.every((sp) => sp.closed));
   const svg = toSVG(r, "#ffffff");
   ok("toSVG: looks like svg", svg.startsWith("<svg") && svg.includes("<path") && svg.includes("fill-rule"));
   const dxf = toDXF(r, 0.5);
   ok("toDXF: has polylines + EOF", dxf.includes("LWPOLYLINE") && dxf.trimEnd().endsWith("EOF"));
-
-  // Scale bakes into the output dimensions + coordinates.
-  const r2 = trace(disk, baseOpts({ mode: "outline", scale: 2 }));
-  eq("trace: scale bakes width", r2.width, 80);
+  // Scale bakes into the output dimensions.
+  eq("trace: scale bakes width", trace(disk, baseOpts({ mode: "fill", scale: 2 })).width, 80);
 }
 {
-  // A cross of strokes → centreline mode → stroked layer with multiple paths.
+  // Outline · contour → the SAME disk, but STROKED (kind=stroke), one ring.
+  const r = trace(disk, baseOpts({ mode: "outline", outlineMethod: "contour" }));
+  ok("trace outline/contour: stroke layer", r.layers[0].kind === "stroke");
+  ok("trace outline/contour: produced a loop", r.layers[0].subpaths.length >= 1);
+  ok("trace outline/contour: subpaths closed", r.layers[0].subpaths.every((sp) => sp.closed));
+}
+{
+  // Outline · centreline → a cross of strokes → open stroked paths.
   const w = 40;
   const h = 40;
   const cross = img(w, h, (x, y) => (Math.abs(x - 20) <= 1 && y >= 5 && y <= 35) || (Math.abs(y - 20) <= 1 && x >= 5 && x <= 35));
-  const r = trace(cross, baseOpts({ mode: "centreline", minLength: 3 }));
-  ok("trace centreline: stroke layer", r.layers[0].kind === "stroke");
-  ok("trace centreline: produced strokes", r.layers[0].subpaths.length >= 1);
+  const r = trace(cross, baseOpts({ mode: "outline", outlineMethod: "centreline", minLength: 3 }));
+  ok("trace outline/centreline: stroke layer", r.layers[0].kind === "stroke");
+  ok("trace outline/centreline: produced strokes", r.layers[0].subpaths.length >= 1);
+  ok("trace outline/centreline: subpaths open", r.layers[0].subpaths.every((sp) => !sp.closed));
+}
+{
+  // Fill · colour → three bands → multiple filled layers.
+  const w = 30;
+  const h = 10;
+  const data = new Uint8ClampedArray(w * h * 4);
+  for (let y = 0; y < h; y++)
+    for (let x = 0; x < w; x++) {
+      const o = (y * w + x) * 4;
+      const band = (x / 10) | 0;
+      const col = band === 0 ? [230, 30, 30] : band === 1 ? [30, 200, 30] : [30, 30, 220];
+      data[o] = col[0];
+      data[o + 1] = col[1];
+      data[o + 2] = col[2];
+      data[o + 3] = 255;
+    }
+  const r = trace({ data, width: w, height: h }, baseOpts({ mode: "fill", fillStyle: "colour", colors: 3, despeckle: 1, holeArea: 1 }));
+  ok(`trace fill/colour: multiple layers (${r.layers.length})`, r.layers.length >= 2);
+  ok("trace fill/colour: all fill", r.layers.every((l) => l.kind === "fill"));
 }
 
 // ── summary ──────────────────────────────────────────────────────────────────

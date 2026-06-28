@@ -38,26 +38,49 @@ export interface Layer {
   subpaths: SubPath[];
 }
 
-export type TraceMode = "outline" | "centreline" | "color";
+// Two top-level modes for the vectorising process:
+//   outline → STROKED paths (line work). Method = centreline (one line down the
+//             middle of each stroke) or contour (stroke the boundary of the ink).
+//   fill    → SOLID filled shapes. Style = mono (one colour) or colour (posterised
+//             multi-layer).
+export type TraceMode = "outline" | "fill";
+export type OutlineMethod = "centreline" | "contour";
+export type FillStyle = "mono" | "colour";
 
 export interface TraceOptions {
   mode: TraceMode;
+  outlineMethod: OutlineMethod;
+  fillStyle: FillStyle;
   // Working→original-pixel multiplier. The engine traces at a (possibly
   // downscaled) working resolution for speed, then bakes this factor into every
   // coordinate so the result is in original-image pixels.
   scale: number;
-  threshold: number; // 0..255 — ink is darker than this (after optional invert)
-  autoThreshold: boolean; // ignore `threshold`, use Otsu
-  invert: boolean; // treat light as ink (e.g. white-on-black scans)
+
+  // ── binarisation ──
+  blur: number; // pre-blur radius (working px) — knock back grain/noise; 0 = off
+  autoThreshold: boolean; // Otsu global threshold (ignores `threshold`)
+  threshold: number; // 0..255 manual global threshold
+  adaptive: boolean; // local-mean threshold (overrides global) — for uneven scans
+  adaptiveRadius: number; // local window radius (working px)
+  adaptiveBias: number; // local-mean bias (higher = stricter)
+  invert: boolean; // treat light as ink (white-on-black scans)
+
+  // ── cleanup ──
+  morph: number; // signed: >0 close (bridge gaps), <0 open (drop specks/fuzz)
   despeckle: number; // drop connected components smaller than this (working px²)
+  holeArea: number; // drop loops/holes with area below this (working px²)
+
+  // ── shape ──
   detail: number; // RDP tolerance in working px (0 = keep every pixel step)
   smooth: number; // 0..1 curve smoothing (0 = straight polylines)
   corner: number; // corner angle threshold in degrees — sharper turns stay hard
-  minLength: number; // drop paths/loops shorter than this (working px)
-  colors: number; // colour mode: palette size (2..12)
-  fill: string; // fill colour, outline mode
-  stroke: string; // stroke colour, centreline mode
-  strokeWidth: number; // stroke width in working px, centreline mode
+  minLength: number; // centreline: drop paths shorter than this (working px)
+
+  // ── colours / styling ──
+  colors: number; // colour fill: palette size (2..12)
+  fill: string; // fill colour, mono fill
+  stroke: string; // stroke colour, outline mode
+  strokeWidth: number; // stroke width in working px, outline mode
 }
 
 export interface TraceStats {

@@ -20,6 +20,18 @@
 > `loadImage()` — the headless fake camera doesn't deliver frames, but that's John's proven on-device
 > code). Pushed to `main` → Vercel deploying.
 >
+
+> **VECTORIZE — rebuilt around two modes + more tuning (2026-06-28, branch `tool/vectorize-modes`,
+> worktree `design-toolkit-vectorize`, deploying).** Reworked per user feedback. The mode picker is now
+> **Outline** (stroked line work — method *Centreline* medial-axis OR *Contour* stroked boundary) vs
+> **Fill** (solid shapes — style *Mono* one colour OR *Colour* posterised layers); the old "Outline"
+> mode that silently *filled* is fixed, and "Centreline"/"Colour" fold in as sub-options. New tuning:
+> **pre-blur** (denoise), **adaptive (local-mean) threshold** (+ radius/bias, for shadowed phone
+> photos), a signed **morphology "clean up"** knob (− open / + close — bridges broken strokes), and a
+> separate min-feature/hole filter. New engine files `integral.ts` / `blur.ts` / `morph.ts` (all pure,
+> integral-image based); **51/51 self-tests**, `next build` green, headless-Chrome smoke PASS across all
+> four mode combos (0 console errors).
+
 > **Halftone & Riso — image → halftone / duotone / CMYK spot-colour separation (2026-06-27,
 > branch `tool/halftone-riso`, worktree `design-toolkit-halftone`, MERGED + LIVE).** A new
 > client-only tool under the **2D Tooling** hub at `/media-2d/halftone-riso` — built as a *native*
