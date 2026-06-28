@@ -44,10 +44,12 @@ const CARDS: HubCard[] = [
       "Screen any image into a halftone, two-colour duotone, or full Risograph-style spot-colour separation — for plates, zines, posters and graphic poché. Adjustable dot shape, ruling and screen angle, real Riso inks, mis-registration and grain, over any paper colour. Export a finished PNG, per-ink plate masters for an actual Risograph, or vector SVG dots for print / plotter / laser. Client-side."
   },
   {
-    title: "Vectorize / Make2D cleanup",
-    status: "proposed",
+    title: "Vectorize",
+    source: "New — raster → vector tracer",
+    status: "live",
+    href: "/media-2d/vectorize",
     blurb:
-      "Trace a cleaned raster into crisp SVG line work — threshold, centreline trace, simplify — so a scanned sketch or a Rhino Make2D dump becomes editable vectors for Illustrator or laser."
+      "Trace a raster into crisp, editable vectors. Centreline traces the middle of every stroke — a scanned sketch or a Rhino Make2D dump becomes single paths, not hollow outlines; Outline traces filled shapes; Colour posterises a photo into flat layers. Threshold (auto / manual), despeckle, simplify and smooth, then export SVG for Illustrator or DXF (real millimetres) for CAD and laser. Client-side."
   },
   {
     title: "Live Video Tracer",
@@ -76,7 +78,7 @@ export default function Media2DPage() {
     <ToolHub
       title="2D Tooling"
       subtitle="Drawing & Fabrication"
-      intro="Single-purpose widgets for 2D studio production — the jobs that usually mean opening Photoshop and remembering a workflow. Each runs entirely in your browser; nothing is uploaded. Drawing Cleaner, Halftone & Riso, Vantage, and Pattern Studio are ready now; the rest are proposals."
+      intro="Single-purpose widgets for 2D studio production — the jobs that usually mean opening Photoshop and remembering a workflow. Each runs entirely in your browser; nothing is uploaded. Pattern Studio, Drawing Cleaner, Halftone & Riso, Vectorize, Vantage, and Scale Bar are ready now; the rest are proposals."
       cards={CARDS}
     />
   );
