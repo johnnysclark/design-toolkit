@@ -1,0 +1,480 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Figure-Ground / Nolli</title>
+<!--
+  Figure-Ground / Nolli — trace a site plan into a clean figure-ground diagram.
+  Drop a reference plan image onto the stage; it sits FAINTLY under a paint layer
+  (opacity slider / hide toggle) and is NEVER part of the export. Paint the built
+  mass in black with Brush, Rectangle, Polygon, Eraser and Fill. Switch between
+  Figure-ground (solid mass on white) and Nolli (poché-hatched mass), and Invert
+  to read the void as solid.
+
+  The building layer is kept separate from the reference (the reference is just an
+  ImageBitmap drawn to the canvas; the mass lives on its own offscreen canvas plus
+  a vector shape list) so PNG/SVG export shows the diagram alone. Rectangles and
+  polygons stay TRUE VECTOR in the SVG; freehand strokes are vector paths too. A
+  flood-fill, being inherently raster, makes the SVG fall back to an embedded PNG.
+
+  Client-side only. Vanilla JS, no dependencies, runs offline. Nothing is uploaded.
+  Part of the All Means Works design toolkit (2D Tooling).
+-->
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root { --bg:#f5f5f3; --surface:#fff; --line:#e4e4e0; --ink:#111; --accent:#ff3b21; }
+html, body { height: 100%; }
+body { font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  background: var(--bg); color: var(--ink); display: flex; flex-direction: column; overflow: hidden; }
+header { padding: 10px 18px; background: var(--surface); border-bottom: 2px solid var(--ink);
+  display: flex; align-items: baseline; gap: 14px; flex-shrink: 0; }
+header h1 { font-size: 18px; font-weight: 800; letter-spacing: -0.01em; text-transform: uppercase; }
+header .subtitle { font-size: 12px; }
+.app { display: flex; flex: 1; overflow: hidden; min-height: 0; }
+.sidebar { width: 304px; flex-shrink: 0; background: var(--surface); border-right: 1px solid var(--line);
+  overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 16px; }
+.group { display: flex; flex-direction: column; gap: 9px; }
+.group > .label { font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.06em;
+  border-bottom: 1px solid var(--line); padding-bottom: 5px; }
+.row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.row label { font-size: 13px; }
+.row .val { font-size: 12px; font-variant-numeric: tabular-nums; min-width: 64px; text-align: right; }
+input[type="range"] { width: 100%; accent-color: var(--accent); }
+.two { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.btn { font: inherit; font-size: 13px; font-weight: 700; padding: 9px 12px; border-radius: 6px;
+  border: 1px solid var(--ink); background: #fff; color: var(--ink); cursor: pointer; text-align: center; }
+.btn:hover { background: #f0f0ee; }
+.btn.accent { background: var(--accent); color: #fff; border-color: var(--accent); }
+/* a tool/mode button that is the current selection */
+.btn.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+.btn.active:hover { background: var(--accent); }
+.check { display: flex; align-items: center; gap: 8px; font-size: 13px; cursor: pointer; }
+.check input { accent-color: var(--accent); width: 15px; height: 15px; }
+.hint { font-size: 11px; line-height: 1.45; }
+.stage { position: relative; flex: 1; min-width: 0; display: flex; align-items: center;
+  justify-content: center; background: #eceae6; padding: 24px; }
+/* the visible "paper": backing-store resolution set in JS, display size set by fitView() */
+#canvas { display: block; background: #fff; box-shadow: 0 2px 20px rgba(0,0,0,0.14);
+  touch-action: none; cursor: crosshair; max-width: 100%; max-height: 100%; }
+.readout { position: absolute; top: 12px; left: 12px; background: rgba(255,255,255,0.92); border: 1px solid var(--line);
+  border-radius: 8px; padding: 9px 12px; backdrop-filter: blur(4px); font-size: 12px; line-height: 1.55; max-width: 260px; }
+.readout .big { font-size: 14px; font-weight: 800; }
+.drop { position: absolute; inset: 0; display: none; align-items: center; justify-content: center;
+  background: rgba(245,245,243,0.85); border: 3px dashed var(--accent); font-weight: 800; font-size: 16px; z-index: 5; }
+.drop.on { display: flex; }
+@media (max-width: 720px) { .app { flex-direction: column; } .sidebar { width: 100%; max-height: 46vh; } }
+</style>
+</head>
+<body>
+<header>
+  <h1>Figure&#8209;Ground&nbsp;/&nbsp;Nolli</h1>
+  <span class="subtitle">Trace a site plan into a clean figure-ground diagram</span>
+</header>
+
+<div class="app">
+  <aside class="sidebar">
+    <div class="group">
+      <div class="label">Reference plan</div>
+      <button class="btn" id="importBtn">Import site plan &#8593;</button>
+      <input type="file" id="file" accept="image/*" hidden>
+      <p class="hint" id="refState">No reference loaded</p>
+      <button class="btn" id="removeRef" style="display:none">Remove reference</button>
+      <label class="check"><input type="checkbox" id="showRef" checked> Show reference</label>
+      <div class="row"><label for="op">Opacity</label><span class="val" id="opV">50%</span></div>
+      <input type="range" id="op" min="0" max="100" value="50">
+      <p class="hint">Drop a plan image on the canvas, or import one. It sits faintly under your tracing as a guide and is never included in exports.</p>
+    </div>
+
+    <div class="group">
+      <div class="label">Trace tools</div>
+      <div class="two"><button class="btn" id="tBrush">Brush</button><button class="btn" id="tRect">Rectangle</button></div>
+      <div class="two"><button class="btn" id="tPoly">Polygon</button><button class="btn" id="tErase">Eraser</button></div>
+      <button class="btn" id="tFill">Fill region</button>
+      <div class="row"><label for="bsize">Brush size</label><span class="val" id="bsizeV">26 px</span></div>
+      <input type="range" id="bsize" min="3" max="120" value="26">
+      <p class="hint" id="hintPoly" style="display:none">Polygon: click to drop points; click the first point, press Enter, or double-click to close &amp; fill. Esc cancels.</p>
+    </div>
+
+    <div class="group">
+      <div class="label">Diagram mode</div>
+      <div class="two"><button class="btn active" id="mFig">Figure-ground</button><button class="btn" id="mNolli">Nolli poch&eacute;</button></div>
+      <label class="check"><input type="checkbox" id="inv"> Invert (void as solid)</label>
+      <p class="hint">Figure-ground paints built mass solid black. Nolli renders the mass as poch&eacute; hatch. Invert swaps figure &amp; ground.</p>
+    </div>
+
+    <div class="group">
+      <div class="label">Edit</div>
+      <div class="two"><button class="btn" id="undoBtn">Undo</button><button class="btn" id="clearBtn">Clear</button></div>
+    </div>
+
+    <div class="group">
+      <div class="label">Export</div>
+      <div class="two"><button class="btn accent" id="pngBtn">Download PNG</button><button class="btn" id="svgBtn">Download SVG</button></div>
+      <p class="hint">Exports the clean diagram only &mdash; built mass on ground, without the reference image. Rectangles &amp; polygons stay true vector in the SVG.</p>
+    </div>
+  </aside>
+
+  <div class="stage" id="stage">
+    <canvas id="canvas"></canvas>
+    <div class="readout" id="readout"></div>
+    <div class="drop" id="drop">Drop site plan to trace</div>
+  </div>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+const f = n => Math.round(n * 10) / 10;   // 1-decimal rounding for compact SVG numbers
+
+// ── canvases ────────────────────────────────────────────────────────────────
+const view = $("canvas"), vctx = view.getContext("2d");   // the visible paper
+const stage = $("stage");
+const mask = document.createElement("canvas");            // built mass: opaque #111 on transparent
+const mctx = mask.getContext("2d", { willReadFrequently: true });
+const fig  = document.createElement("canvas");            // scratch: recolour/hatch the mass for display
+const fctx = fig.getContext("2d");
+
+// ── state ─────────────────────────────────────────────────────────────────--
+let LW = 1200, LH = 900;          // logical paper size (also export resolution)
+let tool = "brush";               // brush | rect | poly | eraser | fill
+let mode = "figure";              // figure | nolli
+let invert = false, showRef = true, refOpacity = 0.5, brushSize = 26;
+let refBmp = null;                // ImageBitmap of the reference (never an <img> element)
+
+let shapes = [];                  // committed ops, in order — the source of truth for export & undo
+let preview = null;               // in-progress rect / brush stroke (live feedback only)
+let polyPts = [];                 // polygon vertices being placed
+let cursor = null;                // last logical pointer position (poly rubber-band)
+let drag = null;                  // active pointer drag, or null
+
+// foreground/background colours for the current mode
+function pal() { return invert ? { ground: "#111111", figure: "#ffffff" } : { ground: "#ffffff", figure: "#111111" }; }
+
+// ── diagonal hatch pattern (Nolli poché), cached per colour ──────────────────
+let hatchCache = { color: null, pat: null };
+function hatch(color) {
+  if (hatchCache.color === color && hatchCache.pat) return hatchCache.pat;
+  const t = document.createElement("canvas"); t.width = t.height = 10;
+  const x = t.getContext("2d");
+  x.strokeStyle = color; x.lineWidth = 2; x.lineCap = "square";
+  // two parallel 45° segments that tile into continuous hatch
+  x.beginPath(); x.moveTo(-2, 8); x.lineTo(8, -2); x.moveTo(2, 12); x.lineTo(12, 2); x.stroke();
+  const p = fctx.createPattern(t, "repeat");
+  hatchCache = { color, pat: p };
+  return p;
+}
+
+// ── drawing a shape onto the mass canvas ─────────────────────────────────────
+function normRect(s) {                         // rects may be drawn with negative w/h
+  let x = s.x, y = s.y, w = s.w, h = s.h;
+  if (w < 0) { x += w; w = -w; }
+  if (h < 0) { y += h; h = -h; }
+  return { x, y, w, h };
+}
+function strokePath(ctx, s) {                   // freehand brush / eraser stroke
+  ctx.lineWidth = s.size; ctx.lineCap = "round"; ctx.lineJoin = "round";
+  if (s.pts.length === 1) { ctx.beginPath(); ctx.arc(s.pts[0][0], s.pts[0][1], s.size / 2, 0, 7); ctx.fill(); return; }
+  ctx.beginPath(); ctx.moveTo(s.pts[0][0], s.pts[0][1]);
+  for (let i = 1; i < s.pts.length; i++) ctx.lineTo(s.pts[i][0], s.pts[i][1]);
+  ctx.stroke();
+}
+function drawShapeToMask(s) {
+  mctx.save();
+  mctx.globalCompositeOperation = s.erase ? "destination-out" : "source-over";
+  mctx.fillStyle = "#111111"; mctx.strokeStyle = "#111111";
+  if (s.type === "rect") { const r = normRect(s); mctx.fillRect(r.x, r.y, r.w, r.h); }
+  else if (s.type === "poly") {
+    if (s.pts.length >= 3) {
+      mctx.beginPath(); mctx.moveTo(s.pts[0][0], s.pts[0][1]);
+      for (let i = 1; i < s.pts.length; i++) mctx.lineTo(s.pts[i][0], s.pts[i][1]);
+      mctx.closePath(); mctx.fill();
+    }
+  } else if (s.type === "brush") { strokePath(mctx, s); }
+  else if (s.type === "fill") { floodFill(s.x | 0, s.y | 0); }   // raster bucket-fill (always additive)
+  mctx.restore();
+}
+
+// scanline flood fill of the connected EMPTY region at (sx,sy), bounded by existing mass
+function floodFill(sx, sy) {
+  if (sx < 0 || sy < 0 || sx >= LW || sy >= LH) return;
+  const img = mctx.getImageData(0, 0, LW, LH), d = img.data;
+  const empty = i => d[i * 4 + 3] <= 30;        // treat near-transparent as paintable
+  if (!empty(sy * LW + sx)) return;             // clicked on existing mass → nothing to do
+  const stack = [sy * LW + sx];
+  while (stack.length) {
+    const p = stack.pop();
+    if (!empty(p)) continue;
+    const x = p % LW, y = (p - x) / LW;
+    let l = x; while (l > 0 && empty(y * LW + l - 1)) l--;
+    let r = x; while (r < LW - 1 && empty(y * LW + r + 1)) r++;
+    for (let ix = l; ix <= r; ix++) {
+      const o = (y * LW + ix) * 4;
+      d[o] = 17; d[o + 1] = 17; d[o + 2] = 17; d[o + 3] = 255;   // #111 opaque
+      if (y > 0 && empty((y - 1) * LW + ix)) stack.push((y - 1) * LW + ix);
+      if (y < LH - 1 && empty((y + 1) * LW + ix)) stack.push((y + 1) * LW + ix);
+    }
+  }
+  mctx.putImageData(img, 0, 0);
+}
+
+function rebuildMask() { mctx.clearRect(0, 0, LW, LH); for (const s of shapes) drawShapeToMask(s); updateCoverage(); }
+
+// ── compositing: ground + (optional) reference + figure + (optional) live overlay
+function compose(ctx, withRef, live) {
+  const c = pal();
+  ctx.save();
+  ctx.fillStyle = c.ground; ctx.fillRect(0, 0, LW, LH);                       // 1. ground
+  if (withRef && showRef && refBmp) {                                        // 2. faint reference (display only)
+    ctx.globalAlpha = refOpacity; ctx.drawImage(refBmp, 0, 0, LW, LH); ctx.globalAlpha = 1;
+  }
+  // 3. figure: paint the figure look, then keep it only where the mass mask is opaque
+  fctx.clearRect(0, 0, LW, LH);
+  if (mode === "nolli") {
+    fctx.fillStyle = c.figure; fctx.globalAlpha = 0.16; fctx.fillRect(0, 0, LW, LH); fctx.globalAlpha = 1; // faint tint
+    fctx.fillStyle = hatch(c.figure); fctx.fillRect(0, 0, LW, LH);                                         // poché hatch
+  } else {
+    fctx.fillStyle = c.figure; fctx.fillRect(0, 0, LW, LH);
+  }
+  fctx.save(); fctx.globalCompositeOperation = "destination-in"; fctx.drawImage(mask, 0, 0); fctx.restore();
+  ctx.drawImage(fig, 0, 0);
+  if (live) { if (preview) drawPreview(ctx, c); drawPolyProgress(ctx, c); }   // 4. in-progress feedback
+  ctx.restore();
+}
+function paint() { compose(vctx, true, true); }
+
+function drawPreview(ctx, c) {
+  const s = preview;
+  const addCol = c.figure, erCol = "rgba(255,59,33,0.55)";   // erase shown in translucent accent so it reads on any ground
+  ctx.save();
+  if (s.type === "rect") {
+    const r = normRect(s);
+    ctx.fillStyle = s.erase ? erCol : addCol; ctx.globalAlpha = s.erase ? 1 : 0.85; ctx.fillRect(r.x, r.y, r.w, r.h);
+    ctx.globalAlpha = 1; ctx.strokeStyle = "#ff3b21"; ctx.setLineDash([9, 6]); ctx.lineWidth = 2; ctx.strokeRect(r.x, r.y, r.w, r.h);
+  } else if (s.type === "brush") {
+    ctx.strokeStyle = s.erase ? erCol : addCol; ctx.fillStyle = ctx.strokeStyle; ctx.globalAlpha = s.erase ? 1 : 0.9;
+    strokePath(ctx, s);
+  }
+  ctx.restore();
+}
+function drawPolyProgress(ctx, c) {
+  if (tool !== "poly" || !polyPts.length) return;
+  ctx.save();
+  if (polyPts.length >= 2) {
+    ctx.beginPath(); ctx.moveTo(polyPts[0][0], polyPts[0][1]);
+    for (let i = 1; i < polyPts.length; i++) ctx.lineTo(polyPts[i][0], polyPts[i][1]);
+    if (cursor) ctx.lineTo(cursor.x, cursor.y);
+    ctx.closePath();
+    ctx.globalAlpha = 0.12; ctx.fillStyle = c.figure; ctx.fill(); ctx.globalAlpha = 1;
+    ctx.strokeStyle = "#ff3b21"; ctx.setLineDash([7, 5]); ctx.lineWidth = 2; ctx.stroke(); ctx.setLineDash([]);
+  }
+  for (const p of polyPts) {   // vertex handles
+    ctx.beginPath(); ctx.arc(p[0], p[1], 5, 0, 7); ctx.fillStyle = "#ff3b21"; ctx.fill();
+    ctx.strokeStyle = "#fff"; ctx.lineWidth = 1.5; ctx.stroke();
+  }
+  ctx.restore();
+}
+
+// ── commit / undo / clear ────────────────────────────────────────────────────
+function commit(s) { shapes.push(s); drawShapeToMask(s); updateCoverage(); paint(); }
+function undo() {
+  if (preview || drag) { preview = null; drag = null; paint(); return; }
+  if (polyPts.length) { polyPts.pop(); paint(); return; }     // step back through poly points first
+  if (shapes.length) { shapes.pop(); rebuildMask(); paint(); }
+}
+function clearAll() { shapes = []; polyPts = []; preview = null; rebuildMask(); paint(); }
+
+// ── coverage readout (sample the mask at low-res) ────────────────────────────
+const cov = document.createElement("canvas"); cov.width = 120; cov.height = 90;
+const covctx = cov.getContext("2d", { willReadFrequently: true });
+let coverage = 0;
+function updateCoverage() {
+  covctx.clearRect(0, 0, 120, 90); covctx.drawImage(mask, 0, 0, 120, 90);
+  const d = covctx.getImageData(0, 0, 120, 90).data; let n = 0;
+  for (let i = 3; i < d.length; i += 4) if (d[i] > 30) n++;
+  coverage = n / (120 * 90); updateReadout();
+}
+function updateReadout() {
+  const modeName = mode === "nolli" ? "Nolli (poché)" : "Figure-ground";
+  $("readout").innerHTML =
+    `<div class="big">${modeName}${invert ? " · inverted" : ""}</div>` +
+    `Tool: ${tool} · ${shapes.length} shape${shapes.length !== 1 ? "s" : ""}<br>` +
+    `built mass ${Math.round(coverage * 100)}% of plan` +
+    (refBmp ? `<br><span style="color:var(--accent)">reference loaded</span>` : "");
+}
+
+// ── pointer interaction ──────────────────────────────────────────────────────
+function L(e) {   // screen → logical paper coords (canvas backing maps uniformly to its displayed box)
+  const r = view.getBoundingClientRect();
+  return { x: clamp((e.clientX - r.left) / r.width * LW, 0, LW), y: clamp((e.clientY - r.top) / r.height * LH, 0, LH) };
+}
+view.addEventListener("pointerdown", e => {
+  const p = L(e); cursor = p;
+  if (tool === "poly") {
+    if (polyPts.length >= 3 && Math.hypot(p.x - polyPts[0][0], p.y - polyPts[0][1]) < 14) { closePoly(); return; }
+    polyPts.push([p.x, p.y]); paint(); return;
+  }
+  if (tool === "fill") { commit({ type: "fill", x: p.x, y: p.y }); return; }
+  view.setPointerCapture(e.pointerId);
+  if (tool === "rect") { drag = { kind: "rect" }; preview = { type: "rect", x: p.x, y: p.y, w: 0, h: 0, erase: false }; }
+  else { drag = { kind: "brush" }; preview = { type: "brush", pts: [[p.x, p.y]], size: brushSize, erase: tool === "eraser" }; }
+  paint();
+});
+view.addEventListener("pointermove", e => {
+  const p = L(e); cursor = p;
+  if (drag) {
+    if (drag.kind === "rect") { preview.w = p.x - preview.x; preview.h = p.y - preview.y; }
+    else { const last = preview.pts[preview.pts.length - 1]; if (Math.hypot(p.x - last[0], p.y - last[1]) > 1.2) preview.pts.push([p.x, p.y]); }
+    paint();
+  } else if (tool === "poly" && polyPts.length) { paint(); }   // rubber-band to cursor
+});
+function endDrag() {
+  if (!drag) return;
+  const s = preview; preview = null; drag = null;
+  if (s.type === "rect") { const r = normRect(s); if (r.w > 2 && r.h > 2) commit({ type: "rect", ...r, erase: false }); else paint(); }
+  else commit(s);
+}
+view.addEventListener("pointerup", endDrag);
+view.addEventListener("pointercancel", endDrag);
+view.addEventListener("dblclick", () => { if (tool === "poly") closePoly(); });
+function closePoly() {
+  // drop trailing coincident points (e.g. the two clicks of a double-click), then commit
+  while (polyPts.length >= 2) {
+    const a = polyPts[polyPts.length - 1], b = polyPts[polyPts.length - 2];
+    if (Math.hypot(a[0] - b[0], a[1] - b[1]) < 6) polyPts.pop(); else break;
+  }
+  if (polyPts.length >= 3) commit({ type: "poly", pts: polyPts.slice(), erase: false });
+  polyPts = []; paint();
+}
+addEventListener("keydown", e => {
+  if (e.key === "Enter" && tool === "poly") closePoly();
+  else if (e.key === "Escape") { polyPts = []; preview = null; drag = null; paint(); }
+  else if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "z") { e.preventDefault(); undo(); }
+});
+
+// ── reference import (file picker + drag-drop) → adapt paper to image aspect ──
+async function loadRef(file) {
+  try {
+    const bmp = await createImageBitmap(file);
+    const target = 1400, k = target / Math.max(bmp.width, bmp.height);   // longest side → 1400px
+    const nw = Math.max(200, Math.round(bmp.width * k)), nh = Math.max(200, Math.round(bmp.height * k));
+    remapShapes(nw / LW, nh / LH);     // keep any existing tracing aligned to the new paper
+    refBmp = bmp; showRef = true; $("showRef").checked = true;
+    setPaper(nw, nh);
+    $("refState").textContent = file.name;
+    $("removeRef").style.display = "block";
+    updateReadout();
+  } catch (err) { console.warn(err); $("refState").textContent = "Couldn't read that image file."; }
+}
+function remapShapes(sx, sy) {
+  for (const s of shapes) {
+    if (s.type === "rect") { s.x *= sx; s.y *= sy; s.w *= sx; s.h *= sy; }
+    else if (s.type === "poly" || s.type === "brush") { s.pts = s.pts.map(p => [p[0] * sx, p[1] * sy]); }
+    if (s.type === "brush") s.size *= (sx + sy) / 2;
+    if (s.type === "fill") { s.x *= sx; s.y *= sy; }
+  }
+}
+
+// ── paper sizing & fit ───────────────────────────────────────────────────────
+function setPaper(w, h) {
+  LW = w; LH = h;
+  for (const cv of [mask, fig, view]) { cv.width = w; cv.height = h; }   // resize backing stores
+  rebuildMask(); fitView(); paint();
+}
+function fitView() {   // letterbox the paper inside the stage, preserving aspect
+  const r = stage.getBoundingClientRect(), pad = 48;
+  const k = Math.min((r.width - pad) / LW, (r.height - pad) / LH);
+  view.style.width = (LW * k) + "px"; view.style.height = (LH * k) + "px";
+}
+addEventListener("resize", fitView);
+
+// ── export ───────────────────────────────────────────────────────────────────
+function download(name, blob) {
+  const a = document.createElement("a"); a.href = URL.createObjectURL(blob);
+  a.download = name; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+}
+function exportPNG() {
+  const c = document.createElement("canvas"); c.width = LW; c.height = LH;
+  compose(c.getContext("2d"), false, false);   // clean: no reference, no overlay
+  c.toBlob(b => download("figure-ground.png", b), "image/png");
+}
+function exportSVG() {
+  const c = pal();
+  const hasFill = shapes.some(s => s.type === "fill");
+  let svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${LW}" height="${LH}" viewBox="0 0 ${LW} ${LH}">`;
+  if (hasFill) {
+    // a flood-fill is raster — fall back to embedding the clean diagram as a PNG
+    const cc = document.createElement("canvas"); cc.width = LW; cc.height = LH;
+    compose(cc.getContext("2d"), false, false);
+    svg += `<image width="${LW}" height="${LH}" href="${cc.toDataURL("image/png")}"/>`;
+  } else {
+    if (mode === "nolli") {   // poché as a real SVG pattern (tint + diagonal lines)
+      svg += `<defs><pattern id="poche" width="9" height="9" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">` +
+             `<rect width="9" height="9" fill="${c.figure}" fill-opacity="0.16"/>` +
+             `<line x1="0" y1="0" x2="0" y2="9" stroke="${c.figure}" stroke-width="1.6"/></pattern></defs>`;
+    }
+    const figFill = mode === "nolli" ? "url(#poche)" : c.figure;
+    svg += `<rect width="${LW}" height="${LH}" fill="${c.ground}"/>`;
+    // Emit shapes in order. Eraser ops paint the GROUND colour over earlier mass — because the
+    // export is opaque and draw order is preserved, that reproduces erasing exactly, as vector.
+    for (const s of shapes) {
+      const col = s.erase ? c.ground : figFill;
+      if (s.type === "rect") { const r = normRect(s); svg += `<rect x="${f(r.x)}" y="${f(r.y)}" width="${f(r.w)}" height="${f(r.h)}" fill="${col}"/>`; }
+      else if (s.type === "poly") { if (s.pts.length >= 3) svg += `<polygon points="${s.pts.map(p => f(p[0]) + "," + f(p[1])).join(" ")}" fill="${col}"/>`; }
+      else if (s.type === "brush") {
+        const stroke = s.erase ? c.ground : c.figure;   // strokes stay solid (hatching a thin path reads poorly)
+        if (s.pts.length === 1) svg += `<circle cx="${f(s.pts[0][0])}" cy="${f(s.pts[0][1])}" r="${f(s.size / 2)}" fill="${stroke}"/>`;
+        else svg += `<path d="M${s.pts.map(p => f(p[0]) + " " + f(p[1])).join(" L")}" fill="none" stroke="${stroke}" stroke-width="${f(s.size)}" stroke-linecap="round" stroke-linejoin="round"/>`;
+      }
+    }
+  }
+  svg += `</svg>`;
+  download("figure-ground.svg", new Blob([svg], { type: "image/svg+xml" }));
+}
+
+// ── UI wiring ────────────────────────────────────────────────────────────────
+const toolBtns = { brush: "tBrush", rect: "tRect", poly: "tPoly", eraser: "tErase", fill: "tFill" };
+function setTool(t) {
+  if (tool === "poly" && t !== "poly") polyPts = [];      // leaving polygon mode abandons the in-progress shape
+  tool = t;
+  for (const k in toolBtns) $(toolBtns[k]).classList.toggle("active", k === t);
+  $("hintPoly").style.display = t === "poly" ? "block" : "none";
+  updateReadout(); paint();
+}
+for (const k in toolBtns) $(toolBtns[k]).onclick = () => setTool(k);
+
+$("mFig").onclick   = () => { mode = "figure"; $("mFig").classList.add("active"); $("mNolli").classList.remove("active"); paint(); updateReadout(); };
+$("mNolli").onclick = () => { mode = "nolli";  $("mNolli").classList.add("active"); $("mFig").classList.remove("active"); paint(); updateReadout(); };
+$("inv").onchange     = e => { invert = e.target.checked; paint(); updateReadout(); };
+$("showRef").onchange = e => { showRef = e.target.checked; paint(); };
+$("op").oninput       = e => { refOpacity = +e.target.value / 100; $("opV").textContent = e.target.value + "%"; paint(); };
+$("bsize").oninput    = e => { brushSize = +e.target.value; $("bsizeV").textContent = e.target.value + " px"; };
+$("importBtn").onclick = () => $("file").click();
+$("file").onchange = e => { if (e.target.files[0]) loadRef(e.target.files[0]); e.target.value = ""; };
+$("removeRef").onclick = () => { refBmp = null; $("refState").textContent = "No reference loaded"; $("removeRef").style.display = "none"; paint(); updateReadout(); };
+$("undoBtn").onclick = undo;
+$("clearBtn").onclick = clearAll;
+$("pngBtn").onclick = exportPNG;
+$("svgBtn").onclick = exportSVG;
+
+// drag & drop a reference onto the stage
+const drop = $("drop");
+["dragenter", "dragover"].forEach(ev => stage.addEventListener(ev, e => { e.preventDefault(); drop.classList.add("on"); }));
+["dragleave", "drop"].forEach(ev => stage.addEventListener(ev, e => { e.preventDefault(); if (ev === "drop" || e.target === drop) drop.classList.remove("on"); }));
+stage.addEventListener("drop", e => { const file = e.dataTransfer.files[0]; if (file) loadRef(file); });
+
+// ── default state: a small urban block so the canvas renders something useful ─
+shapes = [
+  { type: "rect", x: 120, y: 120, w: 260, h: 150, erase: false },
+  { type: "rect", x: 430, y: 120, w: 180, h: 150, erase: false },
+  { type: "rect", x: 120, y: 330, w: 150, h: 230, erase: false },
+  { type: "poly", pts: [[700, 140], [1040, 140], [1040, 300], [880, 300], [880, 420], [700, 420]], erase: false }, // L-block
+  { type: "rect", x: 720, y: 470, w: 300, h: 120, erase: false },
+  { type: "rect", x: 430, y: 620, w: 200, h: 160, erase: false },
+  { type: "rect", x: 150, y: 640, w: 170, h: 150, erase: false },
+];
+setTool("brush");
+setPaper(1200, 900);   // builds the mask from the demo shapes, fits, and paints
+</script>
+</body>
+</html>

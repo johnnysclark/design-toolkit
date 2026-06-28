@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hatch &amp; Poché</title>
+<!--
+  Hatch & Poché — a library of standard architectural hatch / poché fills, each
+  built as a real SVG <pattern> of BLACK linework on white. Pick a material
+  (concrete, brick, CMU, insulation, wood, steel, soil…), set the real-world
+  repeat size and the drawing scale, and the swatch shows the TRUE density you'll
+  get on the sheet. Export a true-millimetre SVG that drops into Illustrator /
+  CAD at 100%, a PNG, or copy the bare <pattern> markup to reuse anywhere.
+
+  Single self-contained file · vanilla JS · no network · runs fully offline.
+  Part of the All Means Works design toolkit (2D tooling).
+-->
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root { --bg:#f5f5f3; --surface:#fff; --line:#e4e4e0; --ink:#111; --accent:#ff3b21; }
+html, body { height: 100%; }
+body { font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  background: var(--bg); color: var(--ink); display: flex; flex-direction: column; overflow: hidden; }
+header { padding: 10px 18px; background: var(--surface); border-bottom: 2px solid var(--ink);
+  display: flex; align-items: baseline; gap: 14px; flex-shrink: 0; }
+header h1 { font-size: 18px; font-weight: 800; letter-spacing: -0.01em; text-transform: uppercase; }
+header .subtitle { font-size: 12px; }
+.app { display: flex; flex: 1; overflow: hidden; min-height: 0; }
+.sidebar { width: 304px; flex-shrink: 0; background: var(--surface); border-right: 1px solid var(--line);
+  overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 16px; }
+.group { display: flex; flex-direction: column; gap: 9px; }
+.group > .label { font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.06em;
+  border-bottom: 1px solid var(--line); padding-bottom: 5px; }
+.row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.row label { font-size: 13px; }
+.row .val { font-size: 12px; font-variant-numeric: tabular-nums; min-width: 64px; text-align: right; }
+input[type="range"] { width: 100%; accent-color: var(--accent); }
+input[type="number"], select { width: 100%; font: inherit; font-size: 13px; padding: 7px 8px;
+  border: 1px solid var(--line); border-radius: 6px; color: var(--ink); background: #fff; }
+.two { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.btn { font: inherit; font-size: 13px; font-weight: 700; padding: 9px 12px; border-radius: 6px;
+  border: 1px solid var(--ink); background: #fff; color: var(--ink); cursor: pointer; text-align: center; }
+.btn:hover { background: #f0f0ee; }
+.btn.accent, .btn.on { background: var(--accent); color: #fff; border-color: var(--accent); }
+.pat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.pat-grid .btn { padding: 8px 6px; font-size: 12px; font-weight: 700; }
+.check { display: flex; align-items: center; gap: 8px; font-size: 13px; cursor: pointer; }
+.hint { font-size: 11px; line-height: 1.45; }
+.stage { position: relative; flex: 1; min-width: 0; background: var(--bg); }
+#view { position: absolute; inset: 0; }
+#view svg { display: block; width: 100%; height: 100%; }
+.readout { position: absolute; top: 12px; left: 12px; background: rgba(255,255,255,0.92); border: 1px solid var(--line);
+  border-radius: 8px; padding: 9px 12px; backdrop-filter: blur(4px); font-size: 12px; line-height: 1.55; max-width: 280px; }
+.readout .big { font-size: 14px; font-weight: 800; }
+@media (max-width: 720px) { .app { flex-direction: column; } .sidebar { width: 100%; max-height: 46vh; } }
+</style>
+</head>
+<body>
+<header>
+  <h1>Hatch&nbsp;&amp;&nbsp;Poché</h1>
+  <span class="subtitle">Standard architectural hatch fills — true-to-scale SVG</span>
+</header>
+
+<div class="app">
+  <aside class="sidebar">
+    <div class="group">
+      <div class="label">Material / pattern</div>
+      <div class="pat-grid" id="patGrid"><!-- buttons injected --></div>
+    </div>
+
+    <div class="group">
+      <div class="label">Scale &amp; weight</div>
+      <div class="row"><label for="scale">Real repeat</label><span class="val" id="scaleV">1500 mm</span></div>
+      <input type="range" id="scale" min="30" max="2400" step="10" value="1500">
+      <div class="row"><label for="draw">Drawing scale</label></div>
+      <select id="draw">
+        <option value="20">1 : 20</option>
+        <option value="50" selected>1 : 50</option>
+        <option value="100">1 : 100</option>
+        <option value="200">1 : 200</option>
+      </select>
+      <div class="row"><label for="lw">Line weight</label><span class="val" id="lwV">0.35 mm</span></div>
+      <input type="range" id="lw" min="0.05" max="1" step="0.05" value="0.35">
+      <p class="hint">Repeat is set in real millimetres, then divided by the drawing scale so the swatch shows the density you'll actually get on the sheet. Line weight is the true pen weight on paper.</p>
+    </div>
+
+    <div class="group">
+      <div class="label">Texture</div>
+      <div class="row"><label for="rot">Rotation</label><span class="val" id="rotV">0°</span></div>
+      <input type="range" id="rot" min="0" max="90" step="1" value="0">
+      <div class="row"><label for="dens">Density / spacing</label><span class="val" id="densV">1.05×</span></div>
+      <input type="range" id="dens" min="0" max="100" step="1" value="50">
+      <p class="hint">Density tightens hatch spacing and packs more aggregate / stipple. Masonry &amp; solid poché ignore it (size is set by the repeat).</p>
+    </div>
+
+    <div class="group">
+      <div class="label">Preview surface</div>
+      <div class="two">
+        <button class="btn on" id="mSwatch">Swatch</button>
+        <button class="btn" id="mWall">Wall corner</button>
+      </div>
+    </div>
+
+    <div class="group">
+      <div class="label">Export</div>
+      <div class="two">
+        <button class="btn accent" id="svgBtn">Download SVG</button>
+        <button class="btn" id="pngBtn">Download PNG</button>
+      </div>
+      <button class="btn" id="copyBtn">Copy Concrete SVG</button>
+      <p class="hint">SVG is sized in real millimetres (150 mm square) — import at 100% into Illustrator / CAD for a true-scale fill. "Copy" puts the bare &lt;pattern&gt; markup on your clipboard.</p>
+    </div>
+  </aside>
+
+  <div class="stage" id="stage">
+    <div id="view"></div>
+    <div class="readout" id="readout"></div>
+  </div>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+const f = n => (+n).toFixed(2);                       // compact number formatter
+const DISP = 4;                                       // screen-px per paper-mm in the preview
+
+// ── tiny deterministic RNG so a pattern's scatter is stable across re-renders ──
+function mulberry32(a){ return function(){ a|=0; a=a+0x6D2B79F5|0; let t=Math.imul(a^a>>>15,1|a);
+  t=t+Math.imul(t^t>>>7,61|t)^t; return ((t^t>>>14)>>>0)/4294967296; }; }
+
+// SVG primitive helpers (all black linework on a white tile ground)
+const ln = (x1,y1,x2,y2,lw) => `<line x1="${f(x1)}" y1="${f(y1)}" x2="${f(x2)}" y2="${f(y2)}" stroke="#111" stroke-width="${f(lw)}"/>`;
+const rc = (x,y,w,h,lw)     => `<rect x="${f(x)}" y="${f(y)}" width="${f(w)}" height="${f(h)}" fill="none" stroke="#111" stroke-width="${f(lw)}"/>`;
+const dot = (x,y,r)         => `<circle cx="${f(x)}" cy="${f(y)}" r="${f(r)}" fill="#111"/>`;
+const ring = (x,y,r,lw)     => `<circle cx="${f(x)}" cy="${f(y)}" r="${f(r)}" fill="none" stroke="#111" stroke-width="${f(lw)}"/>`;
+
+// Return a mark's positions wrapped across tile edges so the field tiles seamlessly.
+function wrap(x,y,r,w,h){
+  const xs=[x]; if(x<r)xs.push(x+w); if(x>w-r)xs.push(x-w);
+  const ys=[y]; if(y<r)ys.push(y+h); if(y>h-r)ys.push(y-h);
+  const o=[]; for(const X of xs) for(const Y of ys) o.push([X,Y]); return o;
+}
+
+// ── pattern library ──────────────────────────────────────────────────────────
+// cat: field=scatter, line=hatch (density tightens spacing), masonry, solid.
+// tile(u,dm) -> [w,h] in paper-mm.  draw(w,h,{lw,dm,rng}) -> inner SVG markup.
+const diag = (w,h,p) => ln(0,h,w,0,p.lw);            // one 45° anti-diagonal per tile
+
+const PATTERNS = {
+  concrete: { name:"Concrete", real:1500, seed:11, tile:u=>[u,u], draw(w,h,p){
+    const {rng,dm,lw}=p; let s=""; const nt=Math.round(11*dm), nd=Math.round(18*dm);
+    for(let i=0;i<nt;i++){                            // angular aggregate (small triangles)
+      const cx=rng()*w, cy=rng()*h, a=rng()*6.283, sz=w*0.05*(0.7+rng()*0.7);
+      for(const [X,Y] of wrap(cx,cy,sz,w,h)){
+        const pts=[0,2.094,4.189].map(k=>`${f(X+Math.cos(a+k)*sz)},${f(Y+Math.sin(a+k)*sz)}`).join(" ");
+        s+=`<polygon points="${pts}" fill="#111"/>`; } }
+    for(let i=0;i<nd;i++){                            // sand / cement dots
+      const cx=rng()*w, cy=rng()*h, r=w*0.016*(0.6+rng()*0.9);
+      for(const [X,Y] of wrap(cx,cy,r,w,h)) s+=dot(X,Y,r); }
+    return s; } },
+
+  brick: { name:"Brick", real:230, seed:22, tile:u=>[u, 2*u/3], draw(w,h,p){
+    const ch=h/2, lw=p.lw;                            // running bond: 2 courses per tile
+    return ln(0,0,w,0,lw)+ln(0,ch,w,ch,lw)           // bed (course) joints
+         + ln(0,0,0,ch,lw)+ln(w/2,ch,w/2,h,lw); } },  // head joints, offset half a brick
+
+  cmu: { name:"CMU block", real:400, seed:33, tile:u=>[u, u*0.5], draw(w,h,p){
+    const lw=p.lw, ins=Math.min(w,h)*0.16;           // stack-bond stretcher units
+    return ln(0,0,w,0,lw)+ln(0,0,0,h,lw)             // course + head joint (completed by tiling)
+         + rc(ins,ins,w-2*ins,h-2*ins,lw)            // face shell
+         + ln(w/2,ins,w/2,h-ins,lw); } },            // central web -> two cells
+
+  stone: { name:"Stone / rubble", real:1600, seed:44, tile:u=>[u,u], draw(w,h,p){
+    const lw=p.lw, cols=5, rows=5, cw=w/cols, ch=h/rows; let s="";
+    const H=(i,j)=>{ let n=(i*73856093)^(j*19349663); n=(n^n>>13)*1274126177; return ((n>>>0)%10000)/10000; };
+    const pt=(i,j)=>{ const ii=((i%cols)+cols)%cols, jj=((j%rows)+rows)%rows;   // modular -> seamless tiling
+      return [ i*cw+(H(ii,jj)-0.5)*cw*0.38, j*ch+(H(jj+7,ii+3)-0.5)*ch*0.38 ]; };
+    for(let j=0;j<rows;j++) for(let i=0;i<cols;i++){ // each lattice cell = one irregular stone
+      const a=pt(i,j), b=pt(i+1,j), c=pt(i+1,j+1), d=pt(i,j+1);
+      const cx=(a[0]+b[0]+c[0]+d[0])/4, cy=(a[1]+b[1]+c[1]+d[1])/4, t=0.1;   // inset toward centroid -> mortar gap
+      const I=P=>`${f(P[0]+(cx-P[0])*t)},${f(P[1]+(cy-P[1])*t)}`;
+      s+=`<polygon points="${I(a)} ${I(b)} ${I(c)} ${I(d)}" fill="none" stroke="#111" stroke-width="${f(lw)}"/>`; }
+    return s; } },
+
+  earth: { name:"Earth / Soil", real:600, seed:55, tile:(u,dm)=>[u/dm,u/dm], draw(w,h,p){
+    const lw=p.lw, da=`stroke-dasharray="${f(w*0.13)} ${f(w*0.13)}"`;        // 45° solids + dashed infill
+    return ln(0,h,w,0,lw)
+      + `<line x1="0" y1="${f(h/2)}" x2="${f(w/2)}" y2="0" stroke="#111" stroke-width="${f(lw)}" ${da}/>`
+      + `<line x1="${f(w/2)}" y1="${f(h)}" x2="${f(w)}" y2="${f(h/2)}" stroke="#111" stroke-width="${f(lw)}" ${da}/>`; } },
+
+  gravel: { name:"Gravel", real:1100, seed:66, tile:u=>[u,u], draw(w,h,p){
+    const {rng,dm,lw}=p; let s=""; const n=Math.round(16*dm);                 // outlined pebbles, varied size
+    for(let i=0;i<n;i++){ const cx=rng()*w, cy=rng()*h, r=w*0.05*(0.6+rng()*1.0);
+      for(const [X,Y] of wrap(cx,cy,r,w,h)) s+=ring(X,Y,r,lw); }
+    return s; } },
+
+  sand: { name:"Sand", real:1000, seed:77, tile:u=>[u,u], draw(w,h,p){
+    const {rng,dm}=p; let s=""; const n=Math.round(72*dm);                    // fine stipple
+    for(let i=0;i<n;i++){ const cx=rng()*w, cy=rng()*h, r=w*0.008*(0.7+rng()*0.8);
+      for(const [X,Y] of wrap(cx,cy,r,w,h)) s+=dot(X,Y,r); }
+    return s; } },
+
+  woodgrain: { name:"Wood grain", real:520, seed:88, tile:u=>[u,u], draw(w,h,p){
+    const {rng,lw}=p; let s=""; const lines=5, sp=h/lines;                    // gently wavy parallel grain
+    for(let k=0;k<lines;k++){ const y=k*sp, amp=sp*0.28*(0.5+rng()*0.8), ph=rng()*6.283, seg=14;
+      let d=`M0 ${f(y+Math.sin(ph)*amp)}`;
+      for(let q=1;q<=seg;q++){ const x=w*q/seg, yy=y+Math.sin(ph+(q/seg)*6.283)*amp; d+=` L${f(x)} ${f(yy)}`; }
+      s+=`<path d="${d}" fill="none" stroke="#111" stroke-width="${f(lw)}"/>`; }
+    return s; } },
+
+  woodend: { name:"Wood end-grain", real:320, seed:99, tile:u=>[u,u], draw(w,h,p){
+    const lw=p.lw, cx=w/2, cy=h/2; let s="";                                  // concentric growth rings (log ends)
+    for(let k=1;k<=4;k++) s+=ring(cx,cy,(w/2)*(k/4)*0.92,lw);
+    return s + dot(cx,cy,w*0.03) + ln(cx,cy,cx,cy-(w/2)*0.92,lw); } },        // pith + a radial check
+
+  batt: { name:"Batt insulation", real:300, seed:101, tile:u=>[u,u*0.55], draw(w,h,p){
+    const lw=p.lw; let s="";                                                  // soft looping rows
+    for(let b=0;b<2;b++){ const yc=h*(b+0.5)/2, a=(h/2)*0.7;
+      s+=`<path d="M0 ${f(yc)} C ${f(w*0.25)} ${f(yc-a)} ${f(w*0.25)} ${f(yc-a)} ${f(w*0.5)} ${f(yc)} `
+        +`C ${f(w*0.75)} ${f(yc+a)} ${f(w*0.75)} ${f(yc+a)} ${f(w)} ${f(yc)}" fill="none" stroke="#111" stroke-width="${f(lw)}"/>`; }
+    return s; } },
+
+  rigid: { name:"Rigid insul.", real:240, seed:112, tile:(u,dm)=>[u/dm,u/dm], draw(w,h,p){
+    return ln(0,h,w,0,p.lw)+ln(0,0,w,h,p.lw); } },                           // cross diagonals (X grid)
+
+  steel: { name:"Steel / metal", real:90, seed:123, tile:(u,dm)=>[u/dm,u/dm], draw:diag },  // tight 45°
+
+  hatch45: { name:"Hatch 45°", real:360, seed:134, tile:(u,dm)=>[u/dm,u/dm], draw:diag },
+
+  crosshatch: { name:"Crosshatch", real:360, seed:145, tile:(u,dm)=>[u/dm,u/dm], draw(w,h,p){
+    return ln(0,0,0,h,p.lw)+ln(0,0,w,0,p.lw); } },                           // orthogonal grid
+
+  poche: { name:"Poché solid", real:120, seed:156, tile:u=>[u,u], draw(){ return ""; } } // ground rect is black
+};
+const ORDER = Object.keys(PATTERNS);
+
+// ── state ─────────────────────────────────────────────────────────────────────
+const S = { pat:"concrete", scale:1500, draw:50, lw:0.35, rot:0, dens:50, mode:"swatch" };
+
+// Compute the live geometry: paper repeat, density multiplier, tile size, markup.
+function geom(){
+  const P = PATTERNS[S.pat];
+  const u  = S.scale / S.draw;             // paper-mm repeat (true to the drawing scale)
+  const dm = 0.4 + S.dens/100 * 1.3;       // density multiplier 0.4…1.7
+  const [w,h] = P.tile(u, dm);
+  const markup = P.draw(w, h, { lw:S.lw, dm, rng: mulberry32(P.seed) });
+  return { P, u, dm, w, h, markup, ground: S.pat==="poche" ? "#111" : "#fff" };
+}
+
+// The <pattern> element — shared by preview, exports and clipboard copy.
+function patternEl(id){
+  const g = geom();
+  return `<pattern id="${id}" patternUnits="userSpaceOnUse" width="${f(g.w)}" height="${f(g.h)}" patternTransform="rotate(${S.rot})">`
+       + `<rect width="${f(g.w)}" height="${f(g.h)}" fill="${g.ground}"/>` + g.markup + `</pattern>`;
+}
+
+// ── preview render ──────────────────────────────────────────────────────────────
+const stage = $("stage"), view = $("view");
+function render(){
+  const sw = stage.clientWidth || 800, sh = stage.clientHeight || 600;
+  const VBW = sw/DISP, VBH = sh/DISP;                 // viewBox measured in paper-mm
+  const def = patternEl("hp");
+  const bw  = Math.max(0.4, VBW*0.004);               // outline weight (paper-mm)
+  let body;
+  if(S.mode === "wall"){                              // simple plan poché: an L-shaped wall corner
+    const m=Math.min(VBW,VBH)*0.1, W=VBW-2*m, Hh=VBH-2*m, tw=Math.min(W,Hh)*0.18, ox=m, oy=m;
+    const d=`M${f(ox)} ${f(oy)} L${f(ox+tw)} ${f(oy)} L${f(ox+tw)} ${f(oy+Hh-tw)} `
+          + `L${f(ox+W)} ${f(oy+Hh-tw)} L${f(ox+W)} ${f(oy+Hh)} L${f(ox)} ${f(oy+Hh)} Z`;
+    body=`<path d="${d}" fill="url(#hp)" stroke="#111" stroke-width="${f(bw)}"/>`;
+  } else {                                            // large sample swatch
+    const m=Math.min(VBW,VBH)*0.07, x=m, y=m, wd=VBW-2*m, ht=VBH-2*m;
+    body=`<rect x="${f(x)}" y="${f(y)}" width="${f(wd)}" height="${f(ht)}" fill="url(#hp)"/>`
+       + `<rect x="${f(x)}" y="${f(y)}" width="${f(wd)}" height="${f(ht)}" fill="none" stroke="#111" stroke-width="${f(bw)}"/>`;
+  }
+  view.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="100%" height="100%" `
+    + `viewBox="0 0 ${f(VBW)} ${f(VBH)}" preserveAspectRatio="xMidYMid meet"><defs>${def}</defs>${body}</svg>`;
+  updateReadout();
+}
+function updateReadout(){
+  const P=PATTERNS[S.pat], u=S.scale/S.draw, dm=0.4+S.dens/100*1.3;
+  $("readout").innerHTML =
+    `<div class="big">${P.name}</div>` +
+    `Real repeat ${S.scale} mm · paper ${u.toFixed(2)} mm<br>` +
+    `Drawing 1:${S.draw} · pen ${S.lw.toFixed(2)} mm<br>` +
+    `<span>density ${dm.toFixed(2)}× · rotation ${S.rot}°</span>`;
+}
+
+// ── exports ─────────────────────────────────────────────────────────────────────
+function exportSVG(side){                             // a true-millimetre filled square
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${side}mm" height="${side}mm" viewBox="0 0 ${side} ${side}">`
+    + `<!-- ${PATTERNS[S.pat].name} · repeat ${S.scale}mm @ 1:${S.draw} · pen ${S.lw}mm · All Means Works -->`
+    + `<defs>${patternEl("hp")}</defs>`
+    + `<rect width="${side}" height="${side}" fill="url(#hp)"/>`
+    + `<rect width="${side}" height="${side}" fill="none" stroke="#111" stroke-width="0.1"/></svg>`;
+}
+function dl(name, data, mime){
+  const blob = data instanceof Blob ? data : new Blob([data], { type:mime });
+  const a = document.createElement("a"); a.href = URL.createObjectURL(blob);
+  a.download = name; a.click(); setTimeout(()=>URL.revokeObjectURL(a.href), 1500);
+}
+function exportPNG(){
+  const svg = exportSVG(150), px = 1400, img = new Image();
+  img.onload = () => {
+    const c = document.createElement("canvas"); c.width = c.height = px;
+    const x = c.getContext("2d"); x.fillStyle = "#fff"; x.fillRect(0,0,px,px);
+    x.drawImage(img, 0, 0, px, px);
+    c.toBlob(b => dl("hatch-"+S.pat+".png", b), "image/png");
+  };
+  img.src = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svg);   // data URL -> canvas stays untainted
+}
+let copyTimer;
+async function copyDef(){
+  const txt = patternEl("hatch");
+  try { await navigator.clipboard.writeText(txt); }
+  catch(e){ const ta=document.createElement("textarea"); ta.value=txt; document.body.appendChild(ta);
+    ta.select(); try{ document.execCommand("copy"); }catch(_){} ta.remove(); }
+  const b=$("copyBtn"); b.textContent="Copied ✓"; b.classList.add("accent"); clearTimeout(copyTimer);
+  copyTimer=setTimeout(()=>{ b.textContent="Copy "+PATTERNS[S.pat].name+" SVG"; b.classList.remove("accent"); }, 1200);
+}
+
+// ── UI wiring ─────────────────────────────────────────────────────────────────
+function selectPat(k){
+  S.pat = k; S.scale = PATTERNS[k].real;
+  $("scale").value = S.scale; $("scaleV").textContent = S.scale + " mm";
+  document.querySelectorAll("#patGrid .btn").forEach(b => b.classList.toggle("on", b.dataset.k===k));
+  $("copyBtn").textContent = "Copy " + PATTERNS[k].name + " SVG";
+  render();
+}
+function setMode(m){
+  S.mode = m;
+  $("mSwatch").classList.toggle("on", m==="swatch");
+  $("mWall").classList.toggle("on", m==="wall");
+  render();
+}
+// build the pattern button grid
+const grid = $("patGrid");
+ORDER.forEach(k => {
+  const b = document.createElement("button");
+  b.className = "btn" + (k===S.pat ? " on" : ""); b.textContent = PATTERNS[k].name; b.dataset.k = k;
+  b.onclick = () => selectPat(k); grid.appendChild(b);
+});
+
+$("scale").oninput = e => { S.scale=+e.target.value; $("scaleV").textContent=S.scale+" mm"; render(); };
+$("draw").onchange = e => { S.draw=+e.target.value; render(); };
+$("lw").oninput    = e => { S.lw=+e.target.value; $("lwV").textContent=S.lw.toFixed(2)+" mm"; render(); };
+$("rot").oninput   = e => { S.rot=+e.target.value; $("rotV").textContent=S.rot+"°"; render(); };
+$("dens").oninput  = e => { S.dens=+e.target.value; $("densV").textContent=(0.4+S.dens/100*1.3).toFixed(2)+"×"; render(); };
+$("mSwatch").onclick = () => setMode("swatch");
+$("mWall").onclick   = () => setMode("wall");
+$("svgBtn").onclick  = () => dl("hatch-"+S.pat+".svg", exportSVG(150), "image/svg+xml");
+$("pngBtn").onclick  = exportPNG;
+$("copyBtn").onclick = copyDef;
+addEventListener("resize", render);
+
+// ── boot: Concrete swatch, true-to-1:50, filling the sample ──────────────────────
+render();
+</script>
+</body>
+</html>

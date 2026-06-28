@@ -1,0 +1,484 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Entourage Library</title>
+<!--
+  Entourage Library — a palette of scalable BLACK silhouette entourage (people,
+  trees in elevation + plan, vehicles, plan furniture symbols) plus a small
+  compositor. Click a palette item to drop it; drag to move, grab the corner
+  handle (or the size slider) to resize, flip it, delete it. Everything is to a
+  shared metric scale, with a 1.7 m reference figure + ground line so people and
+  trees read at the right size against your drawing.
+
+  Out come transparent SVG / PNG layers (drop straight over a plan, section or
+  collage) and a single-silhouette SVG of any selected item.
+
+  Single self-contained file — vanilla JS, no network, runs fully offline.
+  Part of the All Means Works design toolkit (2D / Media).
+-->
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root { --bg:#f5f5f3; --surface:#fff; --line:#e4e4e0; --ink:#111; --accent:#ff3b21; }
+html, body { height: 100%; }
+body { font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  background: var(--bg); color: var(--ink); display: flex; flex-direction: column; overflow: hidden; }
+header { padding: 10px 18px; background: var(--surface); border-bottom: 2px solid var(--ink);
+  display: flex; align-items: baseline; gap: 14px; flex-shrink: 0; }
+header h1 { font-size: 18px; font-weight: 800; letter-spacing: -0.01em; text-transform: uppercase; }
+header .subtitle { font-size: 12px; }
+.app { display: flex; flex: 1; overflow: hidden; min-height: 0; }
+.sidebar { width: 304px; flex-shrink: 0; background: var(--surface); border-right: 1px solid var(--line);
+  overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 16px; }
+.group { display: flex; flex-direction: column; gap: 9px; }
+.group > .label { font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.06em;
+  border-bottom: 1px solid var(--line); padding-bottom: 5px; }
+.row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.row label { font-size: 13px; }
+.row .val { font-size: 12px; font-variant-numeric: tabular-nums; min-width: 64px; text-align: right; }
+input[type="range"] { width: 100%; accent-color: var(--accent); }
+select { width: 100%; font: inherit; font-size: 13px; padding: 7px 8px;
+  border: 1px solid var(--line); border-radius: 6px; color: var(--ink); background: #fff; }
+.two { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.btn { font: inherit; font-size: 13px; font-weight: 700; padding: 9px 12px; border-radius: 6px;
+  border: 1px solid var(--ink); background: #fff; color: var(--ink); cursor: pointer; text-align: center; }
+.btn:hover { background: #f0f0ee; }
+.btn.accent { background: var(--accent); color: #fff; border-color: var(--accent); }
+.btn:disabled { opacity: .4; cursor: not-allowed; }
+.check { display: flex; align-items: center; gap: 8px; font-size: 13px; cursor: pointer; }
+.check input { accent-color: var(--accent); width: 15px; height: 15px; }
+.hint { font-size: 11px; line-height: 1.45; }
+/* palette of clickable silhouette thumbnails */
+.palette { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 7px; }
+.thumb { display: flex; flex-direction: column; align-items: center; gap: 3px; cursor: pointer;
+  background: #fff; border: 1px solid var(--line); border-radius: 7px; padding: 6px 4px 4px; }
+.thumb:hover { border-color: var(--ink); background: #faf9f7; }
+.thumb svg { width: 100%; height: 44px; display: block; }
+.thumb span { font-size: 9.5px; line-height: 1.1; text-align: center; }
+.stage { position: relative; flex: 1; min-width: 0; background: #dcdcd8; }
+#stage { display: block; width: 100%; height: 100%; background: #fff; touch-action: none; }
+g.item { cursor: move; }
+#handle { cursor: nwse-resize; }
+.selbox { fill: none; stroke: var(--accent); stroke-width: 1.2; stroke-dasharray: 5 4; pointer-events: none; }
+.readout { position: absolute; top: 12px; left: 12px; background: rgba(255,255,255,0.92); border: 1px solid var(--line);
+  border-radius: 8px; padding: 9px 12px; backdrop-filter: blur(4px); font-size: 12px; line-height: 1.55; max-width: 260px; }
+.readout .big { font-size: 14px; font-weight: 800; }
+@media (max-width: 720px) { .app { flex-direction: column; } .sidebar { width: 100%; max-height: 46vh; }
+  .palette { grid-template-columns: repeat(4, 1fr); } }
+</style>
+</head>
+<body>
+<header>
+  <h1>Entourage&nbsp;Library</h1>
+  <span class="subtitle">Scalable black silhouettes for drawings &amp; collage</span>
+</header>
+
+<div class="app">
+  <aside class="sidebar">
+    <div class="group">
+      <div class="label">Library</div>
+      <select id="catSel"></select>
+      <div class="palette" id="palette"></div>
+      <p class="hint">Click a silhouette to drop it on the canvas. Everything is sized to the shared metre scale below.</p>
+    </div>
+
+    <div class="group">
+      <div class="label">Selected item</div>
+      <p class="hint" id="selInfo">Click an item on the canvas to select it.</p>
+      <div class="row"><label for="size">Size</label><span class="val" id="sizeV">100%</span></div>
+      <input type="range" id="size" min="10" max="320" value="100" disabled>
+      <div class="two">
+        <button class="btn" id="flipBtn" disabled>Flip ⇋</button>
+        <button class="btn" id="delBtn" disabled>Delete ✕</button>
+      </div>
+    </div>
+
+    <div class="group">
+      <div class="label">Composition</div>
+      <div class="row"><label for="scale">Scale (1 m =)</label><span class="val" id="scaleV">64 px</span></div>
+      <input type="range" id="scale" min="20" max="160" step="2" value="64">
+      <label class="check"><input type="checkbox" id="groundChk" checked> Ground line</label>
+      <label class="check"><input type="checkbox" id="noteChk" checked> Scale reference (1.7 m)</label>
+      <button class="btn" id="clearBtn">Clear canvas</button>
+    </div>
+
+    <div class="group">
+      <div class="label">Export (transparent)</div>
+      <div class="two">
+        <button class="btn accent" id="svgBtn">Download SVG</button>
+        <button class="btn" id="pngBtn">Download PNG</button>
+      </div>
+      <button class="btn" id="dlSelBtn" disabled>Download selected item ↓</button>
+      <p class="hint" id="status">SVG &amp; PNG export with a transparent background — layer them straight over a plan or section.</p>
+    </div>
+  </aside>
+
+  <div class="stage" id="stageEl">
+    <svg id="stage" xmlns="http://www.w3.org/2000/svg">
+      <g id="guides"></g>
+      <g id="items"></g>
+      <g id="overlay"></g>
+    </svg>
+    <div class="readout" id="readout"></div>
+  </div>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+const SVGNS = "http://www.w3.org/2000/svg";
+const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+
+// ── Silhouette library ──────────────────────────────────────────────────────
+// Each item is authored in its own coordinate box [w,h] (≈ centimetres) whose
+// HEIGHT maps to a real-world size `m` metres — so the box aspect already equals
+// the real proportions and every item is mutually to-scale at the same px/m.
+// `svg` is plain inner SVG (shapes inherit black fill from the parent group;
+// transparent gaps + a few evenodd holes do the detailing, so exports layer).
+const LIB = [
+  // ── People (≈1.7 m adults) ────────────────────────────────────────────────
+  { id:"stand", cat:"people", name:"Standing", m:1.7, w:60, h:170, svg:`
+    <circle cx="30" cy="14" r="11"/>
+    <path d="M18 33 Q30 26 42 33 L40 95 L20 95 Z"/>
+    <path d="M19 34 L12 40 L15 94 L21 92 Z"/><path d="M41 34 L48 40 L45 94 L39 92 Z"/>
+    <path d="M20 92 L21 168 L29 168 L30 96 Z"/><path d="M40 92 L39 168 L31 168 L30 96 Z"/>` },
+  { id:"walk", cat:"people", name:"Walking", m:1.7, w:72, h:170, svg:`
+    <circle cx="34" cy="14" r="11"/>
+    <path d="M22 32 Q34 26 46 33 L43 92 L27 92 Z"/>
+    <path d="M45 34 L60 50 L56 56 L42 40 Z"/><path d="M23 34 L12 52 L17 57 L29 40 Z"/>
+    <path d="M35 90 L55 158 L63 156 L43 90 Z"/><path d="M31 90 L14 156 L8 152 L27 90 Z"/>` },
+  { id:"sit", cat:"people", name:"Sitting", m:1.3, w:64, h:132, svg:`
+    <circle cx="22" cy="14" r="11"/>
+    <path d="M14 28 L30 28 L34 72 L18 76 Z"/>
+    <path d="M18 70 L60 68 L60 82 L18 86 Z"/><path d="M48 80 L60 80 L60 130 L48 130 Z"/>
+    <path d="M28 32 L42 60 L48 56 L34 30 Z"/>` },
+  { id:"bag", cat:"people", name:"With bag", m:1.7, w:66, h:170, svg:`
+    <circle cx="28" cy="14" r="11"/>
+    <path d="M16 33 Q28 26 40 33 L38 95 L18 95 Z"/>
+    <path d="M17 34 L11 40 L14 92 L20 90 Z"/><path d="M39 34 L46 40 L44 96 L38 94 Z"/>
+    <path d="M18 92 L19 168 L27 168 L28 96 Z"/><path d="M38 92 L37 168 L29 168 L28 96 Z"/>
+    <rect x="44" y="96" width="18" height="22" rx="2"/>
+    <path d="M46 96 q5 -8 12 0" fill="none" stroke="#111" stroke-width="2"/>` },
+  { id:"child", cat:"people", name:"Child", m:1.1, w:44, h:110, svg:`
+    <circle cx="22" cy="15" r="13"/>
+    <path d="M13 32 Q22 27 31 32 L29 66 L15 66 Z"/>
+    <path d="M14 33 L9 38 L12 64 L17 62 Z"/><path d="M30 33 L35 38 L32 64 L27 62 Z"/>
+    <path d="M15 64 L16 108 L21 108 L22 67 Z"/><path d="M29 64 L28 108 L23 108 L22 67 Z"/>` },
+  { id:"group", cat:"people", name:"Small group", m:1.76, w:120, h:176, svg:`
+    <circle cx="24" cy="30" r="11"/><path d="M13 48 Q24 41 35 48 L33 108 L15 108 Z"/>
+    <path d="M15 106 L16 174 L23 174 L24 110 Z"/><path d="M33 106 L32 174 L25 174 L24 110 Z"/>
+    <circle cx="96" cy="26" r="11"/><path d="M85 44 Q96 37 107 44 L105 106 L87 106 Z"/>
+    <path d="M87 104 L88 174 L95 174 L96 108 Z"/><path d="M105 104 L104 174 L97 174 L96 108 Z"/>
+    <circle cx="58" cy="16" r="12"/><path d="M45 36 Q58 28 71 36 L68 100 L48 100 Z"/>
+    <path d="M48 98 L49 174 L57 174 L58 102 Z"/><path d="M68 98 L67 174 L59 174 L58 102 Z"/>` },
+  // ── Trees, elevation ──────────────────────────────────────────────────────
+  { id:"decid", cat:"tree-elev", name:"Deciduous", m:6, w:220, h:600, svg:`
+    <path d="M100 600 L104 300 L116 300 L120 600 Z"/>
+    <circle cx="110" cy="200" r="105"/><circle cx="60" cy="240" r="62"/>
+    <circle cx="165" cy="235" r="60"/><circle cx="110" cy="120" r="60"/>` },
+  { id:"conifer", cat:"tree-elev", name:"Conifer", m:8, w:240, h:800, svg:`
+    <rect x="110" y="700" width="20" height="100"/>
+    <polygon points="120,40 30,360 210,360"/><polygon points="120,200 14,540 226,540"/>
+    <polygon points="120,360 4,720 236,720"/>` },
+  { id:"palm", cat:"tree-elev", name:"Palm", m:7, w:240, h:700, svg:`
+    <path d="M98 700 Q110 430 122 235 L140 237 Q124 440 118 700 Z"/>
+    <circle cx="130" cy="232" r="14"/>
+    <polygon points="130,232 8,150 70,202"/><polygon points="130,232 40,76 96,150"/>
+    <polygon points="130,232 130,28 166,150"/><polygon points="130,232 224,86 176,160"/>
+    <polygon points="130,232 234,180 176,210"/><polygon points="130,232 58,300 110,250"/>
+    <polygon points="130,232 204,300 152,250"/>` },
+  { id:"columnar", cat:"tree-elev", name:"Columnar", m:9, w:90, h:900, svg:`
+    <path d="M45 24 C18 130 14 520 28 760 Q45 800 62 760 C76 520 72 130 45 24 Z"/>
+    <rect x="40" y="755" width="10" height="145"/>` },
+  { id:"shrub", cat:"tree-elev", name:"Shrub", m:1.2, w:200, h:120, svg:`
+    <circle cx="50" cy="78" r="40"/><circle cx="100" cy="60" r="50"/>
+    <circle cx="150" cy="80" r="38"/><rect x="0" y="100" width="200" height="20"/>` },
+  // ── Trees, plan ───────────────────────────────────────────────────────────
+  { id:"canopy", cat:"tree-plan", name:"Canopy", m:6, w:600, h:600, svg:`
+    <circle cx="300" cy="300" r="172"/>
+    <circle cx="510" cy="300" r="70"/><circle cx="448" cy="448" r="70"/>
+    <circle cx="300" cy="510" r="70"/><circle cx="152" cy="448" r="70"/>
+    <circle cx="90" cy="300" r="70"/><circle cx="152" cy="152" r="70"/>
+    <circle cx="300" cy="90" r="70"/><circle cx="448" cy="152" r="70"/>` },
+  { id:"conplan", cat:"tree-plan", name:"Conifer", m:4, w:400, h:400, svg:`
+    <polygon points="200,18 232,168 382,200 232,232 200,382 168,232 18,200 168,168"/>
+    <polygon points="92,92 200,160 308,92 240,200 308,308 200,240 92,308 160,200"/>
+    <circle cx="200" cy="200" r="46"/>` },
+  // ── Vehicles ──────────────────────────────────────────────────────────────
+  { id:"carside", cat:"vehicle", name:"Car (side)", m:1.6, w:460, h:160, svg:`
+    <path d="M14 120 L14 98 Q14 90 26 88 L120 80 Q150 52 205 50 L295 52 Q335 72 360 82
+      L432 94 Q446 98 446 114 L446 120 L392 120 A40 40 0 0 0 312 120 L168 120 A40 40 0 0 0 88 120 Z"/>
+    <path fill-rule="evenodd" d="M88 120 a40 40 0 1 0 80 0 a40 40 0 1 0 -80 0
+      M106 120 a22 22 0 1 0 44 0 a22 22 0 1 0 -44 0
+      M312 120 a40 40 0 1 0 80 0 a40 40 0 1 0 -80 0
+      M330 120 a22 22 0 1 0 44 0 a22 22 0 1 0 -44 0 Z"/>` },
+  { id:"carplan", cat:"vehicle", name:"Car (plan)", m:4.6, w:180, h:460, svg:`
+    <path fill-rule="evenodd" d="M30 8 L150 8 Q172 8 172 40 L172 420 Q172 452 150 452 L30 452
+      Q8 452 8 420 L8 40 Q8 8 30 8 Z
+      M44 120 L136 120 L150 200 L150 300 L30 300 L30 200 Z"/>
+    <rect x="0" y="150" width="10" height="26" rx="3"/><rect x="170" y="150" width="10" height="26" rx="3"/>` },
+  { id:"bike", cat:"vehicle", name:"Bicycle", m:1.2, w:200, h:120, svg:`
+    <path fill-rule="evenodd" d="M8 78 a38 38 0 1 0 76 0 a38 38 0 1 0 -76 0
+      M22 78 a24 24 0 1 0 48 0 a24 24 0 1 0 -48 0
+      M116 78 a38 38 0 1 0 76 0 a38 38 0 1 0 -76 0
+      M130 78 a24 24 0 1 0 48 0 a24 24 0 1 0 -48 0 Z"/>
+    <g fill="none" stroke="#111" stroke-width="6" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M154 78 L104 80 L120 38 L70 44 L104 80 M70 44 L46 78 M70 44 L60 30 L80 32"/></g>
+    <rect x="110" y="32" width="22" height="6" rx="3"/>` },
+  // ── Furniture / plan symbols ──────────────────────────────────────────────
+  { id:"sofa", cat:"furn-plan", name:"Sofa", m:0.9, w:200, h:90, svg:`
+    <rect x="4" y="4" width="192" height="22" rx="6"/>
+    <rect x="4" y="20" width="22" height="66" rx="6"/><rect x="174" y="20" width="22" height="66" rx="6"/>
+    <rect x="30" y="30" width="64" height="54" rx="6"/><rect x="106" y="30" width="64" height="54" rx="6"/>` },
+  { id:"bed", cat:"furn-plan", name:"Bed", m:2.0, w:160, h:210, svg:`
+    <rect x="6" y="6" width="148" height="14" rx="5"/>
+    <rect x="16" y="26" width="58" height="30" rx="8"/><rect x="86" y="26" width="58" height="30" rx="8"/>
+    <rect x="6" y="64" width="148" height="140" rx="8"/>` },
+  { id:"dining", cat:"furn-plan", name:"Table+chairs", m:1.7, w:170, h:170, svg:`
+    <circle cx="85" cy="85" r="46"/>
+    <rect x="64" y="2" width="42" height="22" rx="6"/><rect x="64" y="146" width="42" height="22" rx="6"/>
+    <rect x="2" y="64" width="22" height="42" rx="6"/><rect x="146" y="64" width="22" height="42" rx="6"/>` },
+  { id:"toilet", cat:"furn-plan", name:"Toilet", m:0.8, w:50, h:80, svg:`
+    <rect x="6" y="2" width="38" height="20" rx="3"/>
+    <path fill-rule="evenodd" d="M25 20 C6 20 4 44 4 52 C4 70 18 78 25 78 C32 78 46 70 46 52 C46 44 44 20 25 20 Z
+      M25 30 C14 30 12 46 12 52 C12 64 19 70 25 70 C31 70 38 64 38 52 C38 46 36 30 25 30 Z"/>` },
+  { id:"sink", cat:"furn-plan", name:"Sink", m:0.52, w:64, h:52, svg:`
+    <path fill-rule="evenodd" d="M2 6 Q2 2 6 2 L58 2 Q62 2 62 6 L62 46 Q62 50 58 50 L6 50 Q2 50 2 46 Z
+      M32 12 C18 12 12 22 12 28 C12 38 22 42 32 42 C42 42 52 38 52 28 C52 22 46 12 32 12 Z"/>
+    <circle cx="32" cy="9" r="3"/>` },
+  { id:"stall", cat:"furn-plan", name:"Car in stall", m:5.2, w:260, h:520, svg:`
+    <g fill="none" stroke="#111" stroke-width="6"><path d="M6 6 L6 514 M254 6 L254 514 M6 514 L254 514"/></g>
+    <path fill-rule="evenodd" d="M70 60 L190 60 Q210 60 210 92 L210 452 Q210 484 190 484 L70 484
+      Q50 484 50 452 L50 92 Q50 60 70 60 Z
+      M84 168 L176 168 L188 240 L188 330 L72 330 L72 240 Z"/>` },
+];
+const LBY = Object.fromEntries(LIB.map(l => [l.id, l]));
+const CATS = [["all","All"],["people","People"],["tree-elev","Trees — elevation"],
+  ["tree-plan","Trees — plan"],["vehicle","Vehicles"],["furn-plan","Furniture — plan"]];
+
+// ── State ───────────────────────────────────────────────────────────────────
+const S = { cat:"all", pxPerM:64, ground:true, note:true };
+let items = [];      // { id, lib, x, y, scale, flip }   (x,y = top-left in stage px)
+let sel = null;      // selected item id
+let uid = 1;
+let SW = 800, SH = 600, groundY = 480, groundInit = false;
+
+const svg = $("stage"), itemsG = $("items"), overlayG = $("overlay"), guidesG = $("guides");
+const stageEl = $("stageEl");
+
+// real px dimensions of a placed item, and the local→px scale factor f
+function dims(it) {
+  const f = (it.lib.m * S.pxPerM * it.scale) / it.lib.h;
+  return { f, wpx: it.lib.w * f, hpx: it.lib.h * f };
+}
+// transform for an item, offset by (ox,oy) — flip mirrors within its own box
+function xform(it, ox = 0, oy = 0) {
+  const { f, wpx } = dims(it), x = it.x + ox, y = it.y + oy;
+  return it.flip < 0 ? `translate(${(x + wpx).toFixed(2)} ${y.toFixed(2)}) scale(${-f} ${f})`
+                     : `translate(${x.toFixed(2)} ${y.toFixed(2)}) scale(${f} ${f})`;
+}
+const get = id => items.find(i => i.id === id);
+
+// ── Palette + category filter ───────────────────────────────────────────────
+function buildCats() {
+  $("catSel").innerHTML = CATS.map(c => `<option value="${c[0]}">${c[1]}</option>`).join("");
+}
+function renderPalette() {
+  const list = LIB.filter(l => S.cat === "all" || l.cat === S.cat);
+  $("palette").innerHTML = list.map(l =>
+    `<button class="thumb" data-lib="${l.id}" title="${l.name} · ${l.m} m">
+       <svg viewBox="0 0 ${l.w} ${l.h}" preserveAspectRatio="xMidYMid meet"><g fill="#111">${l.svg}</g></svg>
+       <span>${l.name}</span></button>`).join("");
+}
+
+// ── Render the composition ──────────────────────────────────────────────────
+function render() {
+  // guides: ground line + 1.7 m reference dimension + scale note
+  let g = "";
+  if (S.ground) g += `<line x1="0" y1="${groundY}" x2="${SW}" y2="${groundY}" stroke="#111" stroke-width="2"/>`;
+  if (S.note) {
+    const refH = 1.7 * S.pxPerM, x = 26, top = groundY - refH;
+    g += `<g stroke="#ff3b21" stroke-width="1.5">
+        <line x1="${x}" y1="${groundY}" x2="${x}" y2="${top}"/>
+        <line x1="${x-5}" y1="${groundY}" x2="${x+5}" y2="${groundY}"/>
+        <line x1="${x-5}" y1="${top}" x2="${x+5}" y2="${top}"/></g>
+      <text x="${x+9}" y="${top + refH/2}" fill="#111" font-size="12" dominant-baseline="middle">1.7 m</text>
+      <text x="10" y="${SH-12}" fill="#111" font-size="12">Scale: 1 m = ${S.pxPerM} px</text>`;
+  }
+  guidesG.innerHTML = g;
+
+  // items (each a group carrying the silhouette, tagged with its id)
+  itemsG.innerHTML = items.map(it =>
+    `<g class="item" data-id="${it.id}" transform="${xform(it)}" fill="#111">${it.lib.svg}</g>`).join("");
+
+  drawOverlay();
+  $("readout").innerHTML =
+    `<div class="big">${items.length} item${items.length===1?"":"s"} placed</div>` +
+    `1 m = ${S.pxPerM} px · drag to move, corner to resize`;
+}
+
+// selection box + resize handle live in the overlay so they never export
+function drawOverlay() {
+  const it = get(sel);
+  if (!it) { overlayG.innerHTML = ""; }
+  else {
+    const { wpx, hpx } = dims(it), hs = 7;
+    overlayG.innerHTML =
+      `<rect class="selbox" x="${it.x}" y="${it.y}" width="${wpx}" height="${hpx}"/>` +
+      `<rect id="handle" x="${it.x+wpx-hs}" y="${it.y+hpx-hs}" width="${hs*2}" height="${hs*2}" fill="#ff3b21"/>`;
+  }
+  // selected-item sidebar panel
+  $("size").disabled = $("flipBtn").disabled = $("delBtn").disabled = $("dlSelBtn").disabled = !it;
+  if (it) {
+    $("size").value = Math.round(it.scale * 100); $("sizeV").textContent = Math.round(it.scale*100) + "%";
+    $("selInfo").textContent = `${it.lib.name} · ${it.lib.m} m tall (${Math.round(dims(it).hpx)} px)`;
+  } else { $("selInfo").textContent = "Click an item on the canvas to select it."; }
+}
+
+function select(id) { sel = id; drawOverlay(); }
+
+// drop a fresh library item, resting its base on the ground line
+function addItem(libId) {
+  const lib = LBY[libId]; if (!lib) return;
+  const hpx = lib.m * S.pxPerM, n = items.length;
+  const x = clamp(110 + (n % 5) * 64, 10, SW - lib.w * (hpx/lib.h) - 10);
+  const y = clamp((S.ground ? groundY : SH * 0.75) - hpx, 6, SH - 20);
+  const it = { id: uid++, lib, x, y, scale: 1, flip: 1 };
+  items.push(it); render(); select(it.id);
+}
+
+// ── Pointer drag / resize (event-delegated on the svg) ──────────────────────
+function pt(e) { const r = svg.getBoundingClientRect(); return { x: e.clientX - r.left, y: e.clientY - r.top }; }
+let drag = null;   // { mode:'move', dx, dy }  or  { mode:'resize' }
+
+svg.addEventListener("pointerdown", e => {
+  const p = pt(e);
+  if (e.target.id === "handle") { drag = { mode: "resize" }; svg.setPointerCapture(e.pointerId); return; }
+  const grp = e.target.closest("g.item");
+  if (grp) {
+    const id = +grp.dataset.id, it = get(id);
+    select(id);
+    drag = { mode: "move", dx: p.x - it.x, dy: p.y - it.y };
+    svg.setPointerCapture(e.pointerId);
+  } else { select(null); }   // click empty canvas → deselect
+});
+svg.addEventListener("pointermove", e => {
+  if (!drag) return;
+  const p = pt(e), it = get(sel); if (!it) return;
+  if (drag.mode === "resize") {
+    // vertical drag from the item's top sets its pixel height → solve for scale
+    const newH = clamp(p.y - it.y, 10, 6000);
+    it.scale = clamp(newH / (it.lib.m * S.pxPerM), 0.05, 6);
+  } else {
+    it.x = clamp(p.x - drag.dx, -dims(it).wpx + 24, SW - 24);
+    it.y = clamp(p.y - drag.dy, -dims(it).hpx + 24, SH - 24);
+  }
+  // update just this group's transform (smooth) + overlay + panel
+  const el = itemsG.querySelector(`[data-id="${it.id}"]`);
+  if (el) el.setAttribute("transform", xform(it));
+  drawOverlay();
+});
+const endDrag = () => { drag = null; };
+svg.addEventListener("pointerup", endDrag);
+svg.addEventListener("pointercancel", endDrag);
+
+// delete selected with the keyboard (unless typing in a control)
+addEventListener("keydown", e => {
+  if ((e.key === "Delete" || e.key === "Backspace") && sel != null &&
+      !/^(INPUT|SELECT|TEXTAREA)$/.test(document.activeElement.tagName)) {
+    e.preventDefault(); items = items.filter(i => i.id !== sel); sel = null; render();
+  }
+});
+
+// ── Export (transparent background) ─────────────────────────────────────────
+function setStatus(t) { $("status").textContent = t; }
+function dl(blob, name) {
+  const a = document.createElement("a"); a.href = URL.createObjectURL(blob);
+  a.download = name; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+}
+// build a standalone SVG of the whole composition, cropped to content, no bg
+function buildExportSVG() {
+  if (!items.length) return null;
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  for (const it of items) {
+    const { wpx, hpx } = dims(it);
+    minX = Math.min(minX, it.x); minY = Math.min(minY, it.y);
+    maxX = Math.max(maxX, it.x + wpx); maxY = Math.max(maxY, it.y + hpx);
+  }
+  if (S.ground) { minY = Math.min(minY, groundY); maxY = Math.max(maxY, groundY); }
+  const pad = 16, ox = -minX + pad, oy = -minY + pad;
+  const W = (maxX - minX + pad * 2).toFixed(1), H = (maxY - minY + pad * 2).toFixed(1);
+  let body = "";
+  if (S.ground) body += `<line x1="${pad}" y1="${(groundY+oy).toFixed(1)}" x2="${(+W-pad).toFixed(1)}" y2="${(groundY+oy).toFixed(1)}" stroke="#111" stroke-width="2"/>`;
+  for (const it of items) body += `<g transform="${xform(it, ox, oy)}">${it.lib.svg}</g>`;
+  return `<svg xmlns="${SVGNS}" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}"><g fill="#111">${body}</g></svg>`;
+}
+$("svgBtn").onclick = () => {
+  const s = buildExportSVG();
+  if (!s) return setStatus("Add some items first, then export.");
+  dl(new Blob([s], { type: "image/svg+xml" }), "entourage.svg");
+  setStatus("Saved entourage.svg (transparent).");
+};
+$("pngBtn").onclick = () => {
+  const s = buildExportSVG();
+  if (!s) return setStatus("Add some items first, then export.");
+  const m = s.match(/viewBox="0 0 ([\d.]+) ([\d.]+)"/), vw = +m[1], vh = +m[2];
+  const img = new Image(), url = URL.createObjectURL(new Blob([s], { type: "image/svg+xml" }));
+  img.onload = () => {
+    const k = Math.max(2, 1400 / vw), c = document.createElement("canvas");
+    c.width = Math.round(vw * k); c.height = Math.round(vh * k);
+    c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);   // no fill → transparent
+    c.toBlob(b => { dl(b, "entourage.png"); setStatus("Saved entourage.png (transparent)."); }, "image/png");
+    URL.revokeObjectURL(url);
+  };
+  img.onerror = () => setStatus("PNG export failed — try the SVG.");
+  img.src = url;
+};
+$("dlSelBtn").onclick = () => {
+  const it = get(sel); if (!it) return setStatus("Select an item to download it on its own.");
+  const L = it.lib;
+  const s = `<svg xmlns="${SVGNS}" width="${L.w}" height="${L.h}" viewBox="0 0 ${L.w} ${L.h}"><g fill="#111">${L.svg}</g></svg>`;
+  dl(new Blob([s], { type: "image/svg+xml" }), `entourage-${L.id}.svg`);
+  setStatus(`Saved ${L.name} as a single silhouette.`);
+};
+
+// ── Wiring ──────────────────────────────────────────────────────────────────
+$("catSel").onchange = e => { S.cat = e.target.value; renderPalette(); };
+$("palette").addEventListener("click", e => { const b = e.target.closest("[data-lib]"); if (b) addItem(b.dataset.lib); });
+$("size").oninput = e => {
+  const it = get(sel); if (!it) return;
+  it.scale = +e.target.value / 100; $("sizeV").textContent = e.target.value + "%";
+  const el = itemsG.querySelector(`[data-id="${it.id}"]`); if (el) el.setAttribute("transform", xform(it));
+  drawOverlay();
+};
+$("flipBtn").onclick = () => { const it = get(sel); if (!it) return; it.flip *= -1;
+  const el = itemsG.querySelector(`[data-id="${it.id}"]`); if (el) el.setAttribute("transform", xform(it)); };
+$("delBtn").onclick = () => { if (sel == null) return; items = items.filter(i => i.id !== sel); sel = null; render(); };
+$("scale").oninput = e => { S.pxPerM = +e.target.value; $("scaleV").textContent = S.pxPerM + " px"; render(); };
+$("groundChk").onchange = e => { S.ground = e.target.checked; render(); };
+$("noteChk").onchange = e => { S.note = e.target.checked; render(); };
+$("clearBtn").onclick = () => { items = []; sel = null; render(); setStatus("Canvas cleared."); };
+
+// ── Boot ────────────────────────────────────────────────────────────────────
+function resize() {
+  SW = stageEl.clientWidth; SH = stageEl.clientHeight;
+  svg.setAttribute("viewBox", `0 0 ${SW} ${SH}`);
+  if (!groundInit || groundY > SH - 10) { groundY = Math.round(SH * 0.82); groundInit = true; }
+  render();
+}
+addEventListener("resize", resize);
+
+function seed() {   // sensible default scene so a screenshot shows it working
+  const place = (libId, frac) => {
+    const lib = LBY[libId], hpx = lib.m * S.pxPerM;
+    items.push({ id: uid++, lib, x: SW * frac, y: groundY - hpx, scale: 1, flip: 1 });
+  };
+  place("decid", 0.74); place("stand", 0.30); place("walk", 0.45); place("child", 0.60);
+}
+
+buildCats(); renderPalette();
+resize();           // establishes SW/SH/groundY
+seed(); render();
+</script>
+</body>
+</html>

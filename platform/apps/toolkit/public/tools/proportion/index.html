@@ -1,0 +1,526 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Proportioning Overlays</title>
+<!--
+  Proportioning Overlays — drop in a facade or plan (or just use the demo frame)
+  and lay the classical proportioning systems straight over it to TEST whether a
+  composition is regulated: golden section + spiral, the root rectangles (√2/√3/√5),
+  rule of thirds, a Fibonacci grid, Le Corbusier's Modulor red/blue bands, a
+  tatami/ken module grid, regulating lines (diagonals of the whole vs the parts,
+  to read parallels), and the symmetry axis. The analysis frame is draggable and
+  resizable; every overlay is built relative to it. Out comes a flattened PNG
+  (image + overlays) or a vector SVG of just the lines, to drop over the drawing
+  in any editor.
+
+  Single self-contained file, vanilla JS, no network — runs offline.
+  Part of the All Means Works design toolkit (2D Tooling).
+-->
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root { --bg:#f5f5f3; --surface:#fff; --line:#e4e4e0; --ink:#111; --accent:#ff3b21; }
+html, body { height: 100%; }
+body { font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  background: var(--bg); color: var(--ink); display: flex; flex-direction: column; overflow: hidden; }
+header { padding: 10px 18px; background: var(--surface); border-bottom: 2px solid var(--ink);
+  display: flex; align-items: baseline; gap: 14px; flex-shrink: 0; }
+header h1 { font-size: 18px; font-weight: 800; letter-spacing: -0.01em; text-transform: uppercase; }
+header .subtitle { font-size: 12px; }
+.app { display: flex; flex: 1; overflow: hidden; min-height: 0; }
+.sidebar { width: 304px; flex-shrink: 0; background: var(--surface); border-right: 1px solid var(--line);
+  overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 16px; }
+.group { display: flex; flex-direction: column; gap: 9px; }
+.group > .label { font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.06em;
+  border-bottom: 1px solid var(--line); padding-bottom: 5px; }
+.row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.row label { font-size: 13px; }
+.row .val { font-size: 12px; font-variant-numeric: tabular-nums; min-width: 64px; text-align: right; }
+input[type="range"] { width: 100%; accent-color: var(--accent); }
+input[type="number"], select { width: 100%; font: inherit; font-size: 13px; padding: 7px 8px;
+  border: 1px solid var(--line); border-radius: 6px; color: var(--ink); background: #fff; }
+input[type="color"] { width: 100%; height: 34px; padding: 2px; border: 1px solid var(--line); border-radius: 6px; background: #fff; cursor: pointer; }
+.two { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.btn { font: inherit; font-size: 13px; font-weight: 700; padding: 9px 12px; border-radius: 6px;
+  border: 1px solid var(--ink); background: #fff; color: var(--ink); cursor: pointer; text-align: center; }
+.btn:hover { background: #f0f0ee; }
+.btn.accent { background: var(--accent); color: #fff; border-color: var(--accent); }
+.check { display: flex; align-items: center; gap: 8px; font-size: 13px; cursor: pointer; }
+.check input { accent-color: var(--accent); width: 15px; height: 15px; flex-shrink: 0; }
+.check .sw { width: 11px; height: 11px; border-radius: 2px; flex-shrink: 0; }
+.hint { font-size: 11px; line-height: 1.45; }
+.stage { position: relative; flex: 1; min-width: 0; background: var(--bg); }
+#canvas { display: block; width: 100%; height: 100%; touch-action: none; }
+.readout { position: absolute; top: 12px; left: 12px; background: rgba(255,255,255,0.92); border: 1px solid var(--line);
+  border-radius: 8px; padding: 9px 12px; backdrop-filter: blur(4px); font-size: 12px; line-height: 1.55; max-width: 260px; }
+.readout .big { font-size: 14px; font-weight: 800; }
+.drop { position: absolute; inset: 0; display: none; align-items: center; justify-content: center;
+  background: rgba(245,245,243,0.85); border: 3px dashed var(--accent); font-weight: 800; font-size: 16px; z-index: 5; }
+.drop.on { display: flex; }
+@media (max-width: 720px) { .app { flex-direction: column; } .sidebar { width: 100%; max-height: 46vh; } }
+</style>
+</head>
+<body>
+<header>
+  <h1>Proportioning&nbsp;Overlays</h1>
+  <span class="subtitle">Read a facade or plan against the classical proportioning systems</span>
+</header>
+
+<div class="app">
+  <aside class="sidebar">
+    <div class="group">
+      <div class="label">Analysis frame</div>
+      <select id="aspect" title="Lock the frame's aspect ratio">
+        <option value="free">Aspect: free</option>
+        <option value="3:2" selected>Aspect: 3 : 2</option>
+        <option value="golden">Aspect: golden φ (1.618)</option>
+        <option value="root2">Aspect: √2 (1.414)</option>
+        <option value="1:1">Aspect: 1 : 1 (square)</option>
+      </select>
+      <div class="row"><label for="fw">Width</label><span class="val" id="fwV">—</span></div>
+      <input type="range" id="fw" min="8" max="100" value="62">
+      <div class="row"><label for="fh">Height</label><span class="val" id="fhV">—</span></div>
+      <input type="range" id="fh" min="8" max="100" value="50">
+      <p class="hint">Drag inside the frame to move it; drag the red handles to resize. With a locked aspect, resizing keeps the ratio.</p>
+    </div>
+
+    <div class="group">
+      <div class="label">Overlays</div>
+      <label class="check"><input type="checkbox" id="ov_golden" checked><span>Golden section + spiral</span></label>
+      <label class="check"><input type="checkbox" id="ov_roots"><span>Root rectangles (√2 · √3 · √5)</span></label>
+      <label class="check"><input type="checkbox" id="ov_thirds"><span>Rule of thirds</span></label>
+      <label class="check"><input type="checkbox" id="ov_fib"><span>Fibonacci grid</span></label>
+      <label class="check"><input type="checkbox" id="ov_modulor"><span>Modulor bands
+        <span class="sw" style="background:#d4231a"></span><span class="sw" style="background:#2f6df0"></span></span></label>
+      <label class="check"><input type="checkbox" id="ov_ken"><span>Tatami / Ken grid</span></label>
+      <div class="row" id="kenRow"><label for="ken">Modules</label><span class="val" id="kenV">6</span></div>
+      <input type="range" id="ken" min="2" max="16" value="6">
+      <label class="check"><input type="checkbox" id="ov_reg"><span>Regulating lines</span></label>
+      <label class="check"><input type="checkbox" id="ov_sym"><span>Symmetry axes</span></label>
+    </div>
+
+    <div class="group">
+      <div class="label">Line style</div>
+      <div class="row"><label for="op">Opacity</label><span class="val" id="opV">85%</span></div>
+      <input type="range" id="op" min="15" max="100" value="85">
+      <div class="row"><label for="wt">Weight</label><span class="val" id="wtV">1.3 px</span></div>
+      <input type="range" id="wt" min="5" max="35" value="13">
+      <div><div class="hint">Line colour (regulating lines)</div><input type="color" id="col" value="#ff3b21"></div>
+    </div>
+
+    <div class="group">
+      <div class="label">Image</div>
+      <button class="btn" id="importBtn">Import image ↑</button>
+      <input type="file" id="file" accept="image/*" hidden>
+      <div class="two">
+        <button class="btn" id="fitBtn">Fit frame</button>
+        <button class="btn" id="clearImg">Clear image</button>
+      </div>
+      <p class="hint" id="imgHint">Drop a facade or plan anywhere on the canvas. It's shown letterboxed; the frame snaps to it so you can test the whole image, then resize to read a part.</p>
+    </div>
+
+    <div class="group">
+      <div class="label">Export</div>
+      <div class="two">
+        <button class="btn accent" id="pngBtn">Download PNG</button>
+        <button class="btn" id="svgBtn">Download SVG</button>
+      </div>
+      <p class="hint">PNG flattens the image with the overlays. SVG is the overlays as crisp vector lines on a transparent ground — drop it over the drawing in any editor.</p>
+    </div>
+  </aside>
+
+  <div class="stage" id="stage">
+    <canvas id="canvas"></canvas>
+    <div class="readout" id="readout"></div>
+    <div class="drop" id="drop">Drop image to analyse</div>
+  </div>
+</div>
+
+<script>
+"use strict";
+const $ = id => document.getElementById(id);
+const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+const PHI = (1 + Math.sqrt(5)) / 2;
+const RED = "#d4231a", BLUE = "#2f6df0";          // Modulor's two series (semantic colours)
+
+// ── state ────────────────────────────────────────────────────────────────
+const cfg = {
+  golden: true, roots: false, thirds: false, fib: false,
+  modulor: false, ken: false, reg: false, sym: false,
+  kenCount: 6, opacity: 0.85, weight: 1.3, color: "#ff3b21"
+};
+let frame = null;                  // analysis frame {x,y,w,h} in CSS px
+let ratio = 1.5;                   // locked w:h (null = free); default 3:2
+let img = null;                    // loaded Image, or null
+let cssW = 0, cssH = 0;            // stage size in CSS px
+const dpr = Math.min(window.devicePixelRatio || 1, 2);
+
+const canvas = $("canvas"), stage = $("stage"), mctx = canvas.getContext("2d");
+
+// ── overlay primitives ───────────────────────────────────────────────────
+// Every overlay pushes into O as {t:'line'|'arc'|'text', ...}. Both the canvas
+// and the SVG export iterate O, so the two outputs can never drift apart.
+let O = [];
+const L = (x1, y1, x2, y2, c, dash) => O.push({ t: "line", x1, y1, x2, y2, c, dash });
+const A = (cx, cy, r, a0, a1, c) => O.push({ t: "arc", cx, cy, r, a0, a1, c });
+const T = (x, y, s) => O.push({ t: "text", x, y, s });
+// Sample an arc as a polyline through a coordinate map (used where the local
+// frame may be transposed for portrait frames — a reflection a real arc can't take).
+function arcPoly(cx, cy, r, a0, a1, map, c) {
+  const n = 26;
+  for (let k = 0; k < n; k++) {
+    const t0 = a0 + (a1 - a0) * k / n, t1 = a0 + (a1 - a0) * (k + 1) / n;
+    const p0 = map(cx + r * Math.cos(t0), cy + r * Math.sin(t0));
+    const p1 = map(cx + r * Math.cos(t1), cy + r * Math.sin(t1));
+    L(p0[0], p0[1], p1[0], p1[1], c);
+  }
+}
+
+// ── individual overlays (all built relative to frame F) ─────────────────────
+// Golden / Euclidean square subdivision: repeatedly cut off the largest square,
+// winding clockwise so the inscribed quarter-arcs chain into a spiral. When the
+// frame IS golden the spiral is exact; otherwise the squares reveal how far off
+// the proportion sits — which is the point of the overlay.
+function ovGolden(F) {
+  let cx = F.x, cy = F.y, cw = F.w, ch = F.h, prev = null;
+  const pick = land => {                 // choose which side to peel the square from
+    let s;
+    if (land) s = (prev === "L") ? "R" : (prev === "R") ? "L" : (prev === "B") ? "L" : "R";
+    else      s = (prev === "T") ? "B" : (prev === "B") ? "T" : (prev === "L") ? "T" : "B";
+    if (prev === null) s = land ? "L" : "T";
+    prev = s; return s;
+  };
+  for (let i = 0; i < 12; i++) {
+    const s = Math.min(cw, ch);
+    if (s < 3) break;
+    const side = pick(cw >= ch);
+    if (side === "L")      { const x = cx + s;        L(x, cy, x, cy + ch); A(x, cy + ch, s, Math.PI, 1.5 * Math.PI); cx = x; cw -= s; }
+    else if (side === "R") { const x = cx + cw - s;   L(x, cy, x, cy + ch); A(x, cy, s, 0, 0.5 * Math.PI);             cw -= s; }
+    else if (side === "T") { const y = cy + s;        L(cx, y, cx + cw, y); A(cx, y, s, 1.5 * Math.PI, 2 * Math.PI);   cy = y; ch -= s; }
+    else                   { const y = cy + ch - s;   L(cx, y, cx + cw, y); A(cx + cw, y, s, 0.5 * Math.PI, Math.PI);  ch -= s; }
+  }
+}
+
+// Root rectangles: from a unit square (= short side) swing each successive
+// diagonal down to the baseline, marking the √2, √3, √4(=2) and √5 widths.
+function ovRoots(F) {
+  const land = F.w >= F.h, unit = land ? F.h : F.w, along = land ? F.w : F.h;
+  // local space grows along +X with the unit across +Y; map back (transpose for portrait)
+  const map = land ? (x, y) => [F.x + x, F.y + y] : (x, y) => [F.x + y, F.y + x];
+  let p = map(unit, 0), q = map(unit, unit); L(p[0], p[1], q[0], q[1]);   // far edge of the unit square
+  const roots = [[Math.SQRT2, "√2"], [Math.sqrt(3), "√3"], [2, "2"], [Math.sqrt(5), "√5"]];
+  let prevX = unit;
+  for (const [r, nm] of roots) {
+    const x = unit * r;
+    if (x > along + 0.5) break;
+    const a = map(0, unit), b = map(prevX, 0); L(a[0], a[1], b[0], b[1]);  // diagonal of the current rectangle
+    arcPoly(0, unit, unit * r, Math.atan2(-unit, prevX), 0, map);          // swing it to the baseline
+    const c = map(x, 0), d = map(x, unit); L(c[0], c[1], d[0], d[1]);      // new rectangle edge
+    const tp = map(x - 3, unit - 4); T(tp[0], tp[1], nm);
+    prevX = x;
+  }
+}
+
+function ovThirds(F) {
+  for (let i = 1; i <= 2; i++) {
+    const x = F.x + F.w * i / 3, y = F.y + F.h * i / 3;
+    L(x, F.y, x, F.y + F.h); L(F.x, y, F.x + F.w, y);
+  }
+}
+
+// Fibonacci grid: partition each side at the cumulative Fibonacci ratios so the
+// cells step 1:1:2:3:5:8 — a non-uniform grid distinct from the thirds.
+function ovFib(F) {
+  const seq = [1, 1, 2, 3, 5, 8], sum = seq.reduce((a, b) => a + b, 0);
+  let acc = 0;
+  for (let i = 0; i < seq.length - 1; i++) { acc += seq[i]; const x = F.x + F.w * acc / sum; L(x, F.y, x, F.y + F.h); }
+  acc = 0;
+  for (let i = 0; i < seq.length - 1; i++) { acc += seq[i]; const y = F.y + F.h * acc / sum; L(F.x, y, F.x + F.w, y); }
+}
+
+// Modulor: a red series (1-D golden subdivision from the top) with a blue series
+// interleaved in each interval — Le Corbusier's two locking scales.
+function ovModulor(F) {
+  let y = F.y, h = F.h;
+  for (let i = 0; i < 9 && h > 4; i++) {
+    const cut = h / PHI;
+    L(F.x, y + h - cut, F.x + F.w, y + h - cut, BLUE);  // blue: golden point from the far end
+    L(F.x, y + cut, F.x + F.w, y + cut, RED);           // red: golden point from this end
+    y += cut; h -= cut;
+  }
+}
+
+// Tatami / ken grid: a square module grid, count modules across the short side.
+function ovKen(F) {
+  const cell = Math.min(F.w, F.h) / cfg.kenCount;
+  for (let x = F.x + cell; x < F.x + F.w - 0.5; x += cell) L(x, F.y, x, F.y + F.h);
+  for (let y = F.y + cell; y < F.y + F.h - 0.5; y += cell) L(F.x, y, F.x + F.w, y);
+}
+
+// Regulating lines: the two whole diagonals, the four corner-to-opposite-mid
+// "harmonic" lines, and a perpendicular from a corner to the main diagonal so
+// shared angles (parallels) jump out.
+function ovReg(F) {
+  const x = F.x, y = F.y, w = F.w, h = F.h, mx = x + w / 2, my = y + h / 2;
+  L(x, y, x + w, y + h); L(x + w, y, x, y + h);                 // whole diagonals
+  L(x, y, x + w, my); L(x, y + h, x + w, my);                   // left corners → right mid
+  L(x + w, y, x, my); L(x + w, y + h, x, my);                   // right corners → left mid
+  const ax = x, ay = y, bx = x + w, by = y + h, px = x + w, py = y;   // foot of perpendicular from top-right onto TL→BR
+  const t = ((px - ax) * (bx - ax) + (py - ay) * (by - ay)) / ((bx - ax) ** 2 + (by - ay) ** 2);
+  L(px, py, ax + t * (bx - ax), ay + t * (by - ay));
+}
+
+function ovSym(F) {
+  L(F.x + F.w / 2, F.y, F.x + F.w / 2, F.y + F.h, null, true);
+  L(F.x, F.y + F.h / 2, F.x + F.w, F.y + F.h / 2, null, true);
+}
+
+function computeOverlays() {
+  O = [];
+  if (!frame) return;
+  if (cfg.golden) ovGolden(frame);
+  if (cfg.roots) ovRoots(frame);
+  if (cfg.thirds) ovThirds(frame);
+  if (cfg.fib) ovFib(frame);
+  if (cfg.modulor) ovModulor(frame);
+  if (cfg.ken) ovKen(frame);
+  if (cfg.reg) ovReg(frame);
+  if (cfg.sym) ovSym(frame);
+}
+
+// ── drawing ────────────────────────────────────────────────────────────────
+function imgRect() {                       // object-fit: contain, within the stage
+  const ir = img.width / img.height, cr = cssW / cssH; let w, h;
+  if (ir > cr) { w = cssW; h = cssW / ir; } else { h = cssH; w = cssH * ir; }
+  return { x: (cssW - w) / 2, y: (cssH - h) / 2, w, h };
+}
+function handlePts() {
+  const f = frame;
+  return [
+    { n: "nw", x: f.x, y: f.y }, { n: "n", x: f.x + f.w / 2, y: f.y }, { n: "ne", x: f.x + f.w, y: f.y },
+    { n: "e", x: f.x + f.w, y: f.y + f.h / 2 }, { n: "se", x: f.x + f.w, y: f.y + f.h },
+    { n: "s", x: f.x + f.w / 2, y: f.y + f.h }, { n: "sw", x: f.x, y: f.y + f.h }, { n: "w", x: f.x, y: f.y + f.h / 2 }
+  ];
+}
+function drawDots(ctx) {                    // faint reference grid on the blank ground
+  ctx.fillStyle = "#dedede";
+  for (let y = 24; y < cssH; y += 32) for (let x = 24; x < cssW; x += 32) ctx.fillRect(x, y, 1.4, 1.4);
+}
+function drawScene(ctx, screen) {
+  ctx.fillStyle = "#f5f5f3"; ctx.fillRect(0, 0, cssW, cssH);
+  if (img) { const r = imgRect(); ctx.drawImage(img, r.x, r.y, r.w, r.h); }
+  else if (screen) drawDots(ctx);
+  // overlays
+  ctx.lineJoin = "round"; ctx.lineCap = "round"; ctx.lineWidth = cfg.weight;
+  for (const p of O) {
+    if (p.t === "text") continue;
+    ctx.globalAlpha = cfg.opacity; ctx.strokeStyle = p.c || cfg.color;
+    ctx.setLineDash(p.dash ? [7, 5] : []);
+    ctx.beginPath();
+    if (p.t === "line") { ctx.moveTo(p.x1, p.y1); ctx.lineTo(p.x2, p.y2); }
+    else ctx.arc(p.cx, p.cy, p.r, p.a0, p.a1);
+    ctx.stroke();
+  }
+  ctx.setLineDash([]); ctx.globalAlpha = 1;
+  // labels (always black, per house rule)
+  ctx.fillStyle = "#111"; ctx.font = "700 11px ui-sans-serif, system-ui, sans-serif";
+  for (const p of O) if (p.t === "text") ctx.fillText(p.s, p.x, p.y);
+  // analysis frame border
+  ctx.strokeStyle = cfg.color; ctx.globalAlpha = 1; ctx.lineWidth = Math.max(1.5, cfg.weight + 0.4);
+  ctx.strokeRect(frame.x, frame.y, frame.w, frame.h);
+  // corner / edge handles (screen only — never exported)
+  if (screen) {
+    ctx.fillStyle = "#ff3b21"; ctx.strokeStyle = "#fff"; ctx.lineWidth = 1.5;
+    for (const h of handlePts()) { ctx.beginPath(); ctx.rect(h.x - 4.5, h.y - 4.5, 9, 9); ctx.fill(); ctx.stroke(); }
+  }
+}
+function paint() {
+  computeOverlays();
+  mctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  mctx.clearRect(0, 0, cssW, cssH);
+  drawScene(mctx, true);
+  updateReadout();
+}
+
+// ── readout: live aspect-ratio analysis ─────────────────────────────────────
+const KNOWN = [["1:1", 1], ["4:3", 4 / 3], ["√2", Math.SQRT2], ["3:2", 1.5], ["φ", PHI], ["√3", Math.sqrt(3)], ["2:1", 2], ["√5", Math.sqrt(5)]];
+function nearest(r) { let best = null, bd = 1e9; for (const [n, v] of KNOWN) { const d = Math.abs(r - v) / v; if (d < bd) { bd = d; best = n; } } return bd < 0.02 ? best : null; }
+function updateReadout() {
+  const a = frame.w / frame.h, land = a >= 1, r = land ? a : 1 / a, nm = nearest(r);
+  const on = ["golden", "roots", "thirds", "fib", "modulor", "ken", "reg", "sym"].filter(k => cfg[k]).length;
+  $("readout").innerHTML =
+    `<div class="big">${Math.round(frame.w)} × ${Math.round(frame.h)} px</div>` +
+    `ratio ${r.toFixed(3)} : 1 <span style="opacity:.7">${land ? "landscape" : "portrait"}</span><br>` +
+    (nm ? `matches <b>${nm}</b>` : `non-standard ratio`) +
+    `<br><span style="opacity:.7">${on} overlay${on === 1 ? "" : "s"} active${img ? " · image loaded" : ""}</span>`;
+}
+
+// ── frame geometry helpers ───────────────────────────────────────────────────
+function clampFrame() {
+  frame.w = clamp(frame.w, 20, cssW); frame.h = clamp(frame.h, 20, cssH);
+  frame.x = clamp(frame.x, 0, cssW - frame.w); frame.y = clamp(frame.y, 0, cssH - frame.h);
+}
+function defaultFrame() {
+  const w = cssW * 0.6, h = ratio ? w / ratio : cssW * 0.4;
+  frame = { x: (cssW - w) / 2, y: (cssH - h) / 2, w, h };
+  clampFrame();
+}
+function syncControls() {
+  $("fw").value = Math.round(frame.w / cssW * 100);
+  $("fh").value = Math.round(frame.h / cssH * 100);
+  $("fwV").textContent = Math.round(frame.w) + " px";
+  $("fhV").textContent = Math.round(frame.h) + " px";
+}
+
+// ── pointer interaction: move + resize the frame ─────────────────────────────
+let drag = null, F0 = null, off = null;
+function evPos(e) { const r = canvas.getBoundingClientRect(); return [e.clientX - r.left, e.clientY - r.top]; }
+function hitHandle(x, y) { for (const h of handlePts()) if (Math.abs(x - h.x) < 8 && Math.abs(y - h.y) < 8) return h.n; return null; }
+const CURSOR = { nw: "nwse-resize", se: "nwse-resize", ne: "nesw-resize", sw: "nesw-resize", n: "ns-resize", s: "ns-resize", e: "ew-resize", w: "ew-resize" };
+
+function resizeFrame(name, mx, my) {
+  let x = F0.x, y = F0.y, w = F0.w, h = F0.h;
+  const R = F0.x + F0.w, B = F0.y + F0.h;
+  const horiz = name.includes("e") || name.includes("w"), vert = name.includes("n") || name.includes("s");
+  if (name.includes("e")) w = mx - F0.x;
+  if (name.includes("w")) { w = R - mx; x = mx; }
+  if (name.includes("s")) h = my - F0.y;
+  if (name.includes("n")) { h = B - my; y = my; }
+  w = Math.max(20, w); h = Math.max(20, h);
+  if (ratio) {                              // re-impose the locked ratio
+    if (horiz && !vert) { h = w / ratio; y = (F0.y + F0.h / 2) - h / 2; }        // pure side handle → grow about centre
+    else if (vert && !horiz) { w = h * ratio; x = (F0.x + F0.w / 2) - w / 2; }
+    else {                                  // corner → width drives height, anchor the fixed corner
+      h = w / ratio;
+      x = name.includes("w") ? R - w : F0.x;
+      y = name.includes("n") ? B - h : F0.y;
+    }
+  }
+  frame = { x, y, w, h }; clampFrame();
+}
+canvas.addEventListener("pointerdown", e => {
+  const [mx, my] = evPos(e); const h = hitHandle(mx, my);
+  if (h) { drag = h; }
+  else if (mx >= frame.x && mx <= frame.x + frame.w && my >= frame.y && my <= frame.y + frame.h) { drag = "move"; off = [mx - frame.x, my - frame.y]; }
+  else return;
+  F0 = { ...frame }; canvas.setPointerCapture(e.pointerId); e.preventDefault();
+});
+canvas.addEventListener("pointermove", e => {
+  const [mx, my] = evPos(e);
+  if (!drag) { const h = hitHandle(mx, my); canvas.style.cursor = h ? CURSOR[h] : (mx >= frame.x && mx <= frame.x + frame.w && my >= frame.y && my <= frame.y + frame.h ? "move" : "default"); return; }
+  if (drag === "move") { frame.x = clamp(mx - off[0], 0, cssW - frame.w); frame.y = clamp(my - off[1], 0, cssH - frame.h); }
+  else resizeFrame(drag, mx, my);
+  paint(); syncControls();
+});
+const endDrag = e => { if (drag) { drag = null; try { canvas.releasePointerCapture(e.pointerId); } catch (_) {} } };
+canvas.addEventListener("pointerup", endDrag);
+canvas.addEventListener("pointercancel", endDrag);
+
+// ── control wiring ───────────────────────────────────────────────────────────
+[["golden", "ov_golden"], ["roots", "ov_roots"], ["thirds", "ov_thirds"], ["fib", "ov_fib"],
+ ["modulor", "ov_modulor"], ["ken", "ov_ken"], ["reg", "ov_reg"], ["sym", "ov_sym"]
+].forEach(([k, id]) => { $(id).onchange = e => { cfg[k] = e.target.checked; paint(); }; });
+
+$("aspect").onchange = e => {
+  const m = { free: null, "3:2": 1.5, golden: PHI, root2: Math.SQRT2, "1:1": 1 };
+  ratio = m[e.target.value];
+  $("fh").disabled = !!ratio;
+  if (ratio) {                              // snap current frame to the new ratio about its centre
+    const cx = frame.x + frame.w / 2, cy = frame.y + frame.h / 2;
+    frame.h = frame.w / ratio; frame.x = cx - frame.w / 2; frame.y = cy - frame.h / 2; clampFrame();
+  }
+  paint(); syncControls();
+};
+$("fw").oninput = e => {
+  const cx = frame.x + frame.w / 2, cy = frame.y + frame.h / 2;
+  frame.w = clamp(+e.target.value / 100 * cssW, 20, cssW);
+  if (ratio) frame.h = frame.w / ratio;
+  frame.x = cx - frame.w / 2; frame.y = cy - frame.h / 2; clampFrame(); paint(); syncControls();
+};
+$("fh").oninput = e => {
+  if (ratio) return;
+  const cy = frame.y + frame.h / 2;
+  frame.h = clamp(+e.target.value / 100 * cssH, 20, cssH);
+  frame.y = cy - frame.h / 2; clampFrame(); paint(); syncControls();
+};
+$("ken").oninput = e => { cfg.kenCount = +e.target.value; $("kenV").textContent = cfg.kenCount; if (cfg.ken) paint(); };
+$("op").oninput = e => { cfg.opacity = +e.target.value / 100; $("opV").textContent = e.target.value + "%"; paint(); };
+$("wt").oninput = e => { cfg.weight = +e.target.value / 10; $("wtV").textContent = cfg.weight.toFixed(1) + " px"; paint(); };
+$("col").oninput = e => { cfg.color = e.target.value; paint(); };
+
+// ── image load / clear ───────────────────────────────────────────────────────
+function loadImage(file) {
+  if (!file || !file.type.startsWith("image/")) { $("imgHint").textContent = "That's not an image file."; return; }
+  const url = URL.createObjectURL(file), im = new Image();
+  im.onload = () => {
+    img = im; URL.revokeObjectURL(url);
+    $("aspect").value = "free"; ratio = null; $("fh").disabled = false;
+    frame = { ...imgRect() }; clampFrame();             // snap the frame to the image
+    $("imgHint").textContent = file.name + " loaded — frame fitted to the image.";
+    paint(); syncControls();
+  };
+  im.onerror = () => { URL.revokeObjectURL(url); $("imgHint").textContent = "Couldn't read that image."; };
+  im.src = url;
+}
+$("importBtn").onclick = () => $("file").click();
+$("file").onchange = e => { if (e.target.files[0]) loadImage(e.target.files[0]); };
+$("fitBtn").onclick = () => { if (img) { $("aspect").value = "free"; ratio = null; $("fh").disabled = false; frame = { ...imgRect() }; } else defaultFrame(); clampFrame(); paint(); syncControls(); };
+$("clearImg").onclick = () => { img = null; $("imgHint").textContent = "Image cleared — analysing the frame on the blank ground."; paint(); };
+
+// ── exports ──────────────────────────────────────────────────────────────────
+function download(name, blob) {
+  const a = document.createElement("a"); a.href = URL.createObjectURL(blob);
+  a.download = name; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+}
+$("pngBtn").onclick = () => {
+  const scale = 2, tc = document.createElement("canvas");
+  tc.width = cssW * scale; tc.height = cssH * scale;
+  const tx = tc.getContext("2d"); tx.setTransform(scale, 0, 0, scale, 0, 0);
+  computeOverlays(); drawScene(tx, false);              // no handles, no dot grid
+  tc.toBlob(b => download("proportioning-overlays.png", b), "image/png");
+};
+function svgArc(p) {                                     // canvas arc → SVG path (each is a +90° clockwise quarter)
+  const x0 = p.cx + p.r * Math.cos(p.a0), y0 = p.cy + p.r * Math.sin(p.a0);
+  const x1 = p.cx + p.r * Math.cos(p.a1), y1 = p.cy + p.r * Math.sin(p.a1);
+  return `<path d="M${x0.toFixed(2)} ${y0.toFixed(2)} A${p.r.toFixed(2)} ${p.r.toFixed(2)} 0 0 1 ${x1.toFixed(2)} ${y1.toFixed(2)}" fill="none" stroke="${cfg.color}" stroke-opacity="${cfg.opacity}" stroke-width="${cfg.weight}"/>`;
+}
+$("svgBtn").onclick = () => {
+  computeOverlays();
+  const f = n => n.toFixed(2);
+  let s = `<svg xmlns="http://www.w3.org/2000/svg" width="${cssW}" height="${cssH}" viewBox="0 0 ${cssW} ${cssH}">`;
+  for (const p of O) {
+    if (p.t === "line") {
+      const col = p.c || cfg.color, dash = p.dash ? ` stroke-dasharray="7 5"` : "";
+      s += `<line x1="${f(p.x1)}" y1="${f(p.y1)}" x2="${f(p.x2)}" y2="${f(p.y2)}" stroke="${col}" stroke-opacity="${cfg.opacity}" stroke-width="${cfg.weight}" stroke-linecap="round"${dash}/>`;
+    } else if (p.t === "arc") s += svgArc(p);
+  }
+  s += `<rect x="${f(frame.x)}" y="${f(frame.y)}" width="${f(frame.w)}" height="${f(frame.h)}" fill="none" stroke="${cfg.color}" stroke-width="${Math.max(1.5, cfg.weight + 0.4)}"/>`;
+  s += `<g fill="#111" font-family="sans-serif" font-size="11" font-weight="700">`;
+  for (const p of O) if (p.t === "text") s += `<text x="${f(p.x)}" y="${f(p.y)}">${p.s}</text>`;
+  s += `</g></svg>`;
+  download("proportioning-overlays.svg", new Blob([s], { type: "image/svg+xml" }));
+};
+
+// ── drag & drop ──────────────────────────────────────────────────────────────
+const drop = $("drop");
+["dragenter", "dragover"].forEach(ev => stage.addEventListener(ev, e => { e.preventDefault(); drop.classList.add("on"); }));
+["dragleave", "drop"].forEach(ev => stage.addEventListener(ev, e => { e.preventDefault(); if (ev === "drop" || e.target === drop) drop.classList.remove("on"); }));
+stage.addEventListener("drop", e => { const fl = e.dataTransfer.files[0]; if (fl) loadImage(fl); });
+
+// ── boot ─────────────────────────────────────────────────────────────────────
+function resize() {
+  const w = stage.clientWidth, h = stage.clientHeight; if (!w || !h) return;
+  if (frame && cssW && cssH) {                            // keep the frame proportional through resizes
+    frame.x *= w / cssW; frame.w *= w / cssW; frame.y *= h / cssH; frame.h *= h / cssH;
+  }
+  cssW = w; cssH = h; canvas.width = w * dpr; canvas.height = h * dpr;
+  if (!frame) defaultFrame();
+  clampFrame(); paint(); syncControls();
+}
+window.addEventListener("resize", resize);
+$("fh").disabled = !!ratio;           // default aspect is locked to 3:2 → height is derived
+resize();
+</script>
+</body>
+</html>
